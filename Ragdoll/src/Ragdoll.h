@@ -31,3 +31,5 @@ ________________________________________________________________________________
 
 #include "Ragdoll/EntryPoint.h"
 #include "Ragdoll/Application.h"
+
+#include "Ragdoll/Graphics/Window/Window.h"

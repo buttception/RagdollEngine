@@ -1,27 +1,29 @@
 @echo off
 
 set "dependencies_path=%~dp0\..\Ragdoll\dependencies"
-powershell write-host -back White -fore Black Pulling all dependencies
+echo [97mPulling all dependencies[0m
 
 call :pull_dependency "spdlog" "https://github.com/buttception/spdlog.git"
+call :pull_dependency "glfw" "https://github.com/buttception/glfw.git"
+call :pull_dependency "glad" "https://github.com/buttception/Glad.git"
 call :exit
 pause >nul
 exit
 
 :pull_dependency
-powershell write-host -back White -fore Black Cloning %~1...
+echo [97mCloning %~1[0m
 if exist "%dependencies_path%\%~1" (
-    powershell write-host -back Yellow -fore Black %~1 exists. Delete the folder if updating is required.
+    echo [93m%~1 exists. Delete the folder if updating is required.[0m
 ) else (
     git clone %~2 "%dependencies_path%\%~1" 
     if errorlevel 1 (
-       powershell write-host -back Red -fore Black Error pulling %~1 from %~2
+       echo [91mError pulling %~1 from %~2[0m
     ) else (
-       powershell write-host -back Green -fore Black %~1 cloned succesfully.
+       echo [92m%~1 cloned succesfully.[0m
     )
 )
 goto:eof
 
 :exit
-powershell write-host -back White -fore Black Script done
+echo [97mScript done[0m
 goto:eof

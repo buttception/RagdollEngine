@@ -1,5 +1,5 @@
 ﻿/*!
-\file		Application.cpp
+\file		Window.h
 \date		05/08/2024
 
 \author		Devin Tan
@@ -27,42 +27,36 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
+#pragma once
 
-#include "ragdollpch.h"
-
-#include "Application.h"
-
-#include "Core/Logger.h"
-#include "Core/Core.h"
-#include "Graphics/Window/Window.h"
-#include "Graphics/GLFWContext.h"
+struct GLFWwindow;
 
 namespace Ragdoll
 {
-	void Application::Init(const ApplicationConfig& config)
+	class Window
 	{
-		Logger::Init();
-		RD_CORE_INFO("spdlog initialized for use.");
-
-		GLFWContext::Init();
-
-		m_PrimaryWindow = std::make_shared<Window>();
-		m_PrimaryWindow->Init();
-	}
-
-	void Application::Run()
-	{
-		while(m_Running)
+	public:
+		struct WindowProperties
 		{
-			m_PrimaryWindow->StartRender();
+			std::string m_Title{ "Ragdoll Engine" };
+			int m_Width{ 800 };
+			int m_Height{ 600 };
+		};
 
-			m_PrimaryWindow->EndRender();
-		}
-	}
+		Window();
+		Window(const WindowProperties& properties);
 
-	void Application::Shutdown()
-	{
-		m_PrimaryWindow->Shutdown();
-		GLFWContext::Shutdown();
-	}
+		bool Init();
+		void StartRender();
+		void EndRender();
+		void Close();
+		void Shutdown();
+
+	private:
+		WindowProperties m_Properties;
+
+		GLFWwindow* m_GlfwWindow;
+
+		bool m_Initialized;
+	};
 }

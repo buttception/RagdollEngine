@@ -28,6 +28,7 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 
+#include "ragdollpch.h"
 #include "Ragdoll.h"
 
 class Editor : public Ragdoll::Application

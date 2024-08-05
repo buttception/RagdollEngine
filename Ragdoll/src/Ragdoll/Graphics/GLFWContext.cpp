@@ -1,5 +1,5 @@
 ﻿/*!
-\file		Application.cpp
+\file		GLFWContext.cpp
 \date		05/08/2024
 
 \author		Devin Tan
@@ -30,39 +30,55 @@ ________________________________________________________________________________
 
 #include "ragdollpch.h"
 
-#include "Application.h"
+#include "GLFWContext.h"
 
-#include "Core/Logger.h"
-#include "Core/Core.h"
-#include "Graphics/Window/Window.h"
-#include "Graphics/GLFWContext.h"
+#include "Ragdoll/Core/Logger.h"
+#include "GLFW/glfw3.h"
+#include "Ragdoll/Core/Core.h"
 
 namespace Ragdoll
 {
-	void Application::Init(const ApplicationConfig& config)
+	bool GLFWContext::Init()
 	{
-		Logger::Init();
-		RD_CORE_INFO("spdlog initialized for use.");
+		if (s_GLFWInitialized)
+		{
+			RD_CORE_WARN("GLFW already initialized, tried to initialize again");
+			return true;
+		}
 
-		GLFWContext::Init();
+		int success = glfwInit();
+		RD_ASSERT(!success, "Initializing GLFW failed.");
+		if(!success)
+		{
+			exit(EXIT_FAILURE);
+		}
+		glfwSetErrorCallback(GLFWErrorCallback);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-		m_PrimaryWindow = std::make_shared<Window>();
-		m_PrimaryWindow->Init();
+		s_GLFWInitialized = true;
+		RD_CORE_INFO("GLFW initialized successfully.");
+
+		return s_GLFWInitialized;
 	}
 
-	void Application::Run()
+	void GLFWContext::Shutdown()
 	{
-		while(m_Running)
+		if(s_GLFWInitialized)
 		{
-			m_PrimaryWindow->StartRender();
-
-			m_PrimaryWindow->EndRender();
+			glfwTerminate();
+			s_GLFWInitialized = false;
+			RD_CORE_INFO("GLFW terminated successfully.");
+		}
+		else
+		{
+			RD_CORE_WARN("GLFW already terminated, tried to terminate again.");
 		}
 	}
 
-	void Application::Shutdown()
+	void GLFWContext::GLFWErrorCallback(int _error, const char* description)
 	{
-		m_PrimaryWindow->Shutdown();
-		GLFWContext::Shutdown();
+		RD_CORE_ERROR("GLFW Error ({0}): {1}", _error, description);
 	}
 }

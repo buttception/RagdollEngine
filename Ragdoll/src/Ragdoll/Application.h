@@ -31,6 +31,8 @@ ________________________________________________________________________________
 
 namespace Ragdoll
 {
+	class Window;
+
 	class Application
 	{
 	public:
@@ -50,6 +52,8 @@ namespace Ragdoll
 
 	private:
 		bool m_Running{ true };
+
+		std::shared_ptr<Window> m_PrimaryWindow;
 	};
 
 	/**
