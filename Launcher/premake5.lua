@@ -20,7 +20,7 @@ project "Launcher"
 
 	links
 	{
-		"Meow"
+		"Ragdoll"
 	}
 
     includedirs

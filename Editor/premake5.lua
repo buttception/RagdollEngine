@@ -25,8 +25,7 @@ project "Editor"
 
 	links
 	{
-		"Meow",
-		"imgui"
+		"Ragdoll"
 	}
 
     includedirs
