@@ -12,7 +12,7 @@ project "Ragdoll"
 	objdir ("%{wks.location}/build-int/" .. outputdir .. "/%{prj.name}")
 
 	pchheader "ragdollpch.h"
-	pchsource "src/ragdoll.cpp"
+	pchsource "src/ragdollpch.cpp"
 
 	flags
 	{
