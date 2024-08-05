@@ -1,0 +1,21 @@
+#Directories
+.vs/
+build/
+build-int/
+dependencies/
+Editor/intermediates/
+Editor/compilers/
+Launcher/intermediates/
+Launcher/compilers/
+Launcher/assets/
+
+#Files
+*.sln
+*.user
+*.vcxproj
+*.vcxproj.user
+*.vcxproj.filters
+*.csproj
+*.csproj.user
+
+#Specific files
