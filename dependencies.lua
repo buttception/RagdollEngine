@@ -1,0 +1,3 @@
+IncludesDir = {}
+
+LibDirs = {}
