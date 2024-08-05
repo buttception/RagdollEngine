@@ -1,4 +1,6 @@
 # Application and Entry Point
+## Editor and Launcher
+The difference between this 2 application is to seperate the editor and game functionality of the engine. Thus features needed by only the editor ie. ImGui or launcher will not be present in either applications. The main engine components such as the renderer and ECS will be present in the main static library compiled, which will be linked to both application for use instead.
 ## Application
 The ragdoll library will provide a the base class for the application, with 3 primary functions, ```init```, ```run```, and ```shutdown```. It will also provide a declaration for a function to call to create the application
 ```cpp

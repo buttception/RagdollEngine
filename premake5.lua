@@ -1,4 +1,4 @@
-include "dependencies.lua"
+include "Tools/dependencies.lua"
 
 workspace "Ragdoll"
 	architecture "x64"

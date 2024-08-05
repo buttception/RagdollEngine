@@ -1,5 +1,5 @@
 ﻿/*!
-\file		Application.cpp
+\file		Logger.cpp
 \date		05/08/2024
 
 \author		Devin Tan
@@ -30,28 +30,24 @@ ________________________________________________________________________________
 
 #include "ragdollpch.h"
 
-#include "Application.h"
+#include "Logger.h"
 
-#include "Core/Logger.h"
-#include "Core/Core.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
+
 namespace Ragdoll
 {
-	void Application::Init(const ApplicationConfig& config)
+	void Logger::Init()
 	{
-		Logger::Init();
-		RD_CORE_INFO("spdlog initialized for use.");
-		RD_ASSERT(true, "Assert failed");
+		spdlog::set_pattern("[%T] %n: %v%$");
+		s_CoreLogger = spdlog::stdout_color_mt("Ragdoll");
+		s_CoreLogger->set_level(spdlog::level::trace);
+
+		s_ClientLogger = spdlog::stdout_color_mt("Ragdoll Runtime");
+		s_ClientLogger->set_level(spdlog::level::trace);
 	}
 
-	void Application::Run()
+	void Logger::Shutdown()
 	{
-		while(m_Running)
-		{
-			
-		}
-	}
-
-	void Application::Shutdown()
-	{
+		spdlog::shutdown();
 	}
 }

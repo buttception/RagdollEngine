@@ -42,7 +42,8 @@ project "Ragdoll"
 
     includedirs
     {
-        "src"
+        "src",
+		"%{IncludesDir.spdlog}"
     }
 
 	filter "system:windows"
