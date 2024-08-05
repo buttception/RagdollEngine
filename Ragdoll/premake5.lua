@@ -37,13 +37,16 @@ project "Ragdoll"
 
 	links
 	{
-		
+		"GLFW",
+		"Glad"
 	}
 
     includedirs
     {
         "src",
-		"%{IncludesDir.spdlog}"
+		"%{IncludesDir.spdlog}",
+		"%{IncludesDir.glfw}",
+		"%{IncludesDir.glad}"
     }
 
 	filter "system:windows"
@@ -56,7 +59,7 @@ project "Ragdoll"
 		symbols "on"
 
 	filter "configurations:Release"
-		defines "RAGDOLL_DEBUG`"
+		defines "RAGDOLL_RELEASE"
 		runtime "Release"
 		optimize "on"
 		symbols "off"

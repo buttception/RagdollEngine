@@ -15,6 +15,10 @@ outputdir = "%{cfg.buildcfg}"
 group ""
 	include "Ragdoll"
 
+group "Dependencies"
+	include "Ragdoll/dependencies/glfw"
+	include "Ragdoll/dependencies/glad"
+
 group "Application"
 	include "Editor"
 	include "Launcher"

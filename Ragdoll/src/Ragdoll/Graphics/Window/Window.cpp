@@ -1,5 +1,5 @@
 ﻿/*!
-\file		Application.cpp
+\file		Window.cpp
 \date		05/08/2024
 
 \author		Devin Tan
@@ -30,39 +30,55 @@ ________________________________________________________________________________
 
 #include "ragdollpch.h"
 
-#include "Application.h"
+#include "Window.h"
 
-#include "Core/Logger.h"
-#include "Core/Core.h"
-#include "Graphics/Window/Window.h"
-#include "Graphics/GLFWContext.h"
+#include "GLFW/glfw3.h"
+
+#include "Ragdoll/Core/Core.h"
+#include "Ragdoll/Core/Logger.h"
 
 namespace Ragdoll
 {
-	void Application::Init(const ApplicationConfig& config)
+	Window::Window()
 	{
-		Logger::Init();
-		RD_CORE_INFO("spdlog initialized for use.");
-
-		GLFWContext::Init();
-
-		m_PrimaryWindow = std::make_shared<Window>();
-		m_PrimaryWindow->Init();
 	}
 
-	void Application::Run()
+	Window::Window(const WindowProperties& properties)
 	{
-		while(m_Running)
+	}
+
+	bool Window::Init()
+	{
+		m_GlfwWindow = glfwCreateWindow(m_Properties.m_Width, m_Properties.m_Height, m_Properties.m_Title.c_str(), nullptr, nullptr);
+		RD_ASSERT(m_GlfwWindow == nullptr, "Window failed to initialize");
+
+		return true;
+	}
+
+	void Window::StartRender()
+	{
+		glfwPollEvents();
+	}
+
+	void Window::EndRender()
+	{
+		glfwSwapBuffers(m_GlfwWindow);
+	}
+
+	void Window::Close()
+	{
+		glfwSetWindowShouldClose(m_GlfwWindow, GLFW_TRUE);
+		glfwPollEvents();
+	}
+
+	void Window::Shutdown()
+	{
+		if(m_Initialized)
 		{
-			m_PrimaryWindow->StartRender();
-
-			m_PrimaryWindow->EndRender();
+			glfwDestroyWindow(m_GlfwWindow);
+			glfwTerminate();
 		}
-	}
-
-	void Application::Shutdown()
-	{
-		m_PrimaryWindow->Shutdown();
-		GLFWContext::Shutdown();
+		m_Initialized = false;
+		m_GlfwWindow = nullptr;
 	}
 }

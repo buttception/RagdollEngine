@@ -28,6 +28,7 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
+
 #include "spdlog/spdlog.h"
 
 namespace Ragdoll

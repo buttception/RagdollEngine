@@ -28,6 +28,7 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 
+#include "ragdollpch.h"
 #include "Ragdoll.h"
 
 class Launcher : public Ragdoll::Application

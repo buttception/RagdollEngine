@@ -1,5 +1,5 @@
 ﻿/*!
-\file		Application.cpp
+\file		GLFWContext.h
 \date		05/08/2024
 
 \author		Devin Tan
@@ -27,42 +27,18 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-
-#include "ragdollpch.h"
-
-#include "Application.h"
-
-#include "Core/Logger.h"
-#include "Core/Core.h"
-#include "Graphics/Window/Window.h"
-#include "Graphics/GLFWContext.h"
+#pragma once
 
 namespace Ragdoll
 {
-	void Application::Init(const ApplicationConfig& config)
+	class GLFWContext
 	{
-		Logger::Init();
-		RD_CORE_INFO("spdlog initialized for use.");
+	public:
+		static bool Init();
+		static void Shutdown();
 
-		GLFWContext::Init();
+		static void GLFWErrorCallback(int _error, const char* description);
 
-		m_PrimaryWindow = std::make_shared<Window>();
-		m_PrimaryWindow->Init();
-	}
-
-	void Application::Run()
-	{
-		while(m_Running)
-		{
-			m_PrimaryWindow->StartRender();
-
-			m_PrimaryWindow->EndRender();
-		}
-	}
-
-	void Application::Shutdown()
-	{
-		m_PrimaryWindow->Shutdown();
-		GLFWContext::Shutdown();
-	}
+		inline static bool s_GLFWInitialized{ false };
+	};
 }
