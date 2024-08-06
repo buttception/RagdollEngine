@@ -86,3 +86,6 @@ namespace Ragdoll
 	class Event;
 }
 using EventCallbackFn = std::function<void(Ragdoll::Event&)>;
+
+#define RD_LOG_EVENT 0
+#define RD_LOG_INPUT 1

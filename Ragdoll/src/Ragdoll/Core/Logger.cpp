@@ -32,6 +32,10 @@ ________________________________________________________________________________
 
 #include "Logger.h"
 
+#include "Ragdoll/Event/Event.h"
+#include "Ragdoll/Event/KeyEvents.h"
+#include "Ragdoll/Math/IVector2.h"
+#include "Ragdoll/Math/Vector3.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 
 namespace Ragdoll
@@ -51,3 +55,7 @@ namespace Ragdoll
 		spdlog::shutdown();
 	}
 }
+
+RD_LOG_USER_TYPE(Ragdoll::IVector2);
+RD_LOG_USER_TYPE(Ragdoll::Vector2);
+RD_LOG_USER_TYPE(Ragdoll::Vector3);

@@ -37,6 +37,9 @@ ________________________________________________________________________________
 #include "Graphics/Window/Window.h"
 #include "Graphics/GLFWContext.h"
 #include "Event/WindowEvents.h"
+#include "Event/KeyEvents.h"
+#include "Event/MouseEvent.h"
+#include "Input/InputHandler.h"
 
 namespace Ragdoll
 {
@@ -47,16 +50,20 @@ namespace Ragdoll
 
 		GLFWContext::Init();
 
-		m_PrimaryWindow = std::make_shared<Window>();
+		m_PrimaryWindow = std::make_unique<Window>();
 		m_PrimaryWindow->Init();
 		//bind the application callback to the window
 		m_PrimaryWindow->SetEventCallback(RD_BIND_EVENT_FN(Application::OnEvent));
+		//setup input handler
+		m_InputHandler = std::make_unique<InputHandler>();
 	}
 
 	void Application::Run()
 	{
 		while(m_Running)
 		{
+			//input update must be called before window polls for inputs
+			m_InputHandler->Update(m_PrimaryWindow->getDeltaTime());
 			m_PrimaryWindow->StartRender();
 
 			m_PrimaryWindow->EndRender();
@@ -73,19 +80,23 @@ namespace Ragdoll
 	void Application::OnEvent(Event& event)
 	{
 		EventDispatcher dispatcher(event);
-		static auto closedCallback = RD_BIND_EVENT_FN(Application::OnWindowClose);
-		dispatcher.Dispatch<WindowCloseEvent>(closedCallback);
-		static auto resizeCallback = RD_BIND_EVENT_FN(Application::OnWindowResize);
-		dispatcher.Dispatch<WindowResizeEvent>(resizeCallback);
-		static auto moveCallback = RD_BIND_EVENT_FN(Application::OnWindowMove);
-		dispatcher.Dispatch<WindowMoveEvent>(moveCallback);
+		RD_DISPATCH_EVENT(dispatcher, WindowCloseEvent, event, Application::OnWindowClose);
+		RD_DISPATCH_EVENT(dispatcher, WindowResizeEvent, event, Application::OnWindowResize);
+		RD_DISPATCH_EVENT(dispatcher, WindowMoveEvent, event, Application::OnWindowMove);
+		RD_DISPATCH_EVENT(dispatcher, KeyPressedEvent, event, Application::OnKeyPressed);
+		RD_DISPATCH_EVENT(dispatcher, KeyReleasedEvent, event, Application::OnKeyReleased);
+		RD_DISPATCH_EVENT(dispatcher, KeyTypedEvent, event, Application::OnKeyTyped);
+		RD_DISPATCH_EVENT(dispatcher, MouseMovedEvent, event, Application::OnMouseMove);
+		RD_DISPATCH_EVENT(dispatcher, MouseButtonPressedEvent, event, Application::OnMouseButtonPressed);
+		RD_DISPATCH_EVENT(dispatcher, MouseButtonReleasedEvent, event, Application::OnMouseButtonReleased);
+		RD_DISPATCH_EVENT(dispatcher, MouseScrolledEvent, event, Application::OnMouseScrolled);
 	}
 
 	bool Application::OnWindowClose(WindowCloseEvent& event)
 	{
 		UNREFERENCED_PARAMETER(event);
-#ifdef RAGDOLL_DEBUG
-		RD_CORE_TRACE(event.ToString());
+#if RD_LOG_EVENT
+		RD_CORE_TRACE("Event: {}", event.ToString());
 #endif
 		m_Running = false;
 		return true;
@@ -93,17 +104,80 @@ namespace Ragdoll
 
 	bool Application::OnWindowResize(WindowResizeEvent& event)
 	{
-#ifdef RAGDOLL_DEBUG
-		RD_CORE_TRACE(event.ToString());
+#if RD_LOG_EVENT
+		RD_CORE_TRACE("Event: {}", event.ToString());
 #endif
 		return false;
 	}
 
 	bool Application::OnWindowMove(WindowMoveEvent& event)
 	{
-#ifdef RAGDOLL_DEBUG
-		RD_CORE_TRACE(event.ToString());
+#if RD_LOG_EVENT
+		RD_CORE_TRACE("Event: {}", event.ToString());
 #endif
+		return false;
+	}
+
+	bool Application::OnKeyPressed(KeyPressedEvent& event)
+	{
+#if RD_LOG_EVENT
+		RD_CORE_TRACE("Event: {}", event.ToString());
+#endif
+		m_InputHandler->OnKeyPressed(event);
+		return false;
+	}
+
+	bool Application::OnKeyReleased(KeyReleasedEvent& event)
+	{
+#if RD_LOG_EVENT
+		RD_CORE_TRACE("Event: {}", event.ToString());
+#endif
+		m_InputHandler->OnKeyReleased(event);
+		return false;
+	}
+
+	bool Application::OnKeyTyped(KeyTypedEvent& event)
+	{
+#if RD_LOG_EVENT
+		RD_CORE_TRACE("Event: {}", event.ToString());
+#endif
+		m_InputHandler->OnKeyTyped(event);
+		return false;
+	}
+
+	bool Application::OnMouseMove(MouseMovedEvent& event)
+	{
+#if RD_LOG_EVENT
+		RD_CORE_TRACE("Event: {}", event.ToString());
+#endif
+		m_InputHandler->OnMouseMove(event);
+		return false;
+	}
+
+	bool Application::OnMouseButtonPressed(MouseButtonPressedEvent& event)
+	{
+#if RD_LOG_EVENT
+		RD_CORE_TRACE("Event: {}", event.ToString());
+#endif
+		m_InputHandler->OnMouseButtonPressed(event);
+		return false;
+	}
+
+	bool Application::OnMouseButtonReleased(MouseButtonReleasedEvent& event)
+	{
+#if RD_LOG_EVENT
+		RD_CORE_TRACE("Event: {}", event.ToString());
+#endif
+		m_InputHandler->OnMouseButtonReleased(event);
+		return false;
+	}
+
+	bool Application::OnMouseScrolled(MouseScrolledEvent& event)
+	{
+#if RD_LOG_EVENT
+		RD_CORE_TRACE("Event: {}", event.ToString());
+#endif
+		m_InputHandler->OnMouseScrolled(event);
 		return false;
 	}
 }

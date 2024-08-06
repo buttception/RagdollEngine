@@ -38,6 +38,8 @@ ________________________________________________________________________________
 #include "Ragdoll/Core/Core.h"
 #include "Ragdoll/Core/Logger.h"
 #include "Ragdoll/Core/Timestep.h"
+#include "Ragdoll/Event/KeyEvents.h"
+#include "Ragdoll/Event/MouseEvent.h"
 
 #include "Ragdoll/Event/WindowEvents.h"
 
@@ -100,6 +102,93 @@ namespace Ragdoll
 
 			WindowMoveEvent event{_x, _y};
 			data.m_Callback(event);
+		});
+
+		glfwSetKeyCallback(m_GlfwWindow, [](GLFWwindow* window, int _key, int _scancode, int _action, int _mods)
+		{
+			UNREFERENCED_PARAMETER(_scancode);
+			UNREFERENCED_PARAMETER(_mods);
+
+			Window& data = *static_cast<Window*>(glfwGetWindowUserPointer(window));
+
+			switch (_action)
+			{
+			case GLFW_PRESS:
+			{
+				KeyPressedEvent event(_key, 0);
+				if (data.m_Callback != nullptr)
+					data.m_Callback(event);
+				break;
+			}
+			case GLFW_RELEASE:
+			{
+				KeyReleasedEvent event(_key);
+				if (data.m_Callback != nullptr)
+					data.m_Callback(event);
+				break;
+			}
+			case GLFW_REPEAT:
+			{
+				KeyPressedEvent event(_key, 1);
+				if (data.m_Callback != nullptr)
+					data.m_Callback(event);
+				break;
+			}
+			}
+		});
+
+		glfwSetCharCallback(m_GlfwWindow, [](GLFWwindow* window, unsigned int keycode)
+		{
+			Window& data = *static_cast<Window*>(glfwGetWindowUserPointer(window));
+			KeyTypedEvent event(keycode);
+			if (data.m_Callback != nullptr)
+				data.m_Callback(event);
+		});
+
+		glfwSetMouseButtonCallback(m_GlfwWindow, [](GLFWwindow* window, int _button, int _action, int _mods)
+		{
+			UNREFERENCED_PARAMETER(_mods);
+
+			Window& data = *static_cast<Window*>(glfwGetWindowUserPointer(window));
+
+			switch (_action)
+			{
+			case GLFW_PRESS:
+			{
+				MouseButtonPressedEvent event(_button);
+				if (data.m_Callback != nullptr)
+					data.m_Callback(event);
+				break;
+			}
+			case GLFW_RELEASE:
+			{
+				MouseButtonReleasedEvent event(_button);
+				if (data.m_Callback != nullptr)
+					data.m_Callback(event);
+				break;
+			}
+			}
+		});
+
+		glfwSetScrollCallback(m_GlfwWindow, [](GLFWwindow* window, double _xOffset, double _yOffset)
+		{
+			Window& data = *static_cast<Window*>(glfwGetWindowUserPointer(window));
+
+			MouseScrolledEvent event(static_cast<float>(_xOffset), static_cast<float>(_yOffset));
+
+			if (data.m_Callback != nullptr)
+				data.m_Callback(event);
+
+		});
+
+		glfwSetCursorPosCallback(m_GlfwWindow, [](GLFWwindow* window, double _xPos, double _yPos)
+		{
+			Window& data = *static_cast<Window*>(glfwGetWindowUserPointer(window));
+
+			MouseMovedEvent event(static_cast<float>(_xPos), static_cast<float>(_yPos));
+
+			if (data.m_Callback != nullptr)
+				data.m_Callback(event);
 		});
 
 		m_Initialized = true;
