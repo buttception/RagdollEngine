@@ -43,6 +43,7 @@ if exist "%dependencies_path%\%~1" (
 )
 goto:eof
 ```
+![Console Image](resources/3_console.png)
 Of course this is only possible with header only dependencies, but I will go into how I can pull dependencies that needs to be compiled in the future.
 ## spdlog
 We need a fast logging tool for the engine, hence I chose spdlog. It is highly performant as it is has asynchronous logging, a simple API for easy use, and provides multiple types of sinks for me to do logging to file or logging into the editor GUI next time.

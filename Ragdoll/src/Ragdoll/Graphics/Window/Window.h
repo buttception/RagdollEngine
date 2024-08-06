@@ -28,8 +28,10 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
+
 #include "Ragdoll/Math/Vector2.h"
 #include "Ragdoll/Math/Vector3.h"
+#include "Ragdoll/Math/IVector2.h"
 #include "Ragdoll/Event/Event.h"
 
 struct GLFWwindow;
@@ -46,7 +48,7 @@ namespace Ragdoll
 			std::string m_Title{ "Ragdoll Engine" };
 			int m_Width{ 800 };
 			int m_Height{ 600 };
-			Vector2 m_Position{};
+			IVector2 m_Position{};
 			int m_NumSamplesMSAA{ 0 };
 			Vector3 m_BackgroundColor{};
 			float m_Opacity{ 1.f };
