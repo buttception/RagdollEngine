@@ -1,7 +1,7 @@
 # Dependencies and spdlog
 ## Dependencies
 ### Configurations
-So, how do we use easily make sure whoever uses the project easily get all the required dependencies, as well as the correct configuration to run the project? Easy, using premake and batch files too. Extending on the first blog on how to use premake, we can easily add on include directories to our projects use the lua files. With ```includedirs```, we can specifiy the paths to be used as include directories. To add on, I would create a dictionary of include directories as well as library directories, to better organize and understand that are all of the current header only/ compiled libraries I need. This also stops my scripts from looking like a amalgamation of file paths, and prevents human errors of copy pasting the paths to all the other premake scripts.
+So, how do we easily make sure whoever uses the project easily get all the required dependencies, as well as the correct configuration to run the project? Easy, using premake and batch files too. Extending on the first blog on how to use premake, we can easily add on include directories to our projects use the lua files. With ```includedirs```, we can specifiy the paths to be used as include directories. To add on, I would create a dictionary of include directories as well as library directories, to better organize and understand that are all of the current header only/ compiled libraries I need. This also stops my scripts from looking like a amalgamation of file paths, and prevents human errors of copy pasting the paths to all the other premake scripts.
 ```lua
 -- in Tools/dependencies.lua
 IncludesDir = {}
@@ -17,10 +17,10 @@ includedirs
 }
 ```
 ### How to pull the dependencies in
-I used a batch file as well as git to pull in all the dependencies required for the project into a dependency folder. Using a "function" similar to how most programming languages work, I can write a very simple way for me to use git to download the dependencies.
+I used a batch file as well as git to pull in all the dependencies required for the project into a dependency folder. Using a "function" similar to how most programming languages work, I can write a very simple way for me to use git to download the dependencies. Do take note all the special characters is for me to format the text with color when outputted onto console.
 ```bat
 set "dependencies_path=%~dp0\..\Ragdoll\dependencies"
-powershell write-host -back White -fore Black Pulling all dependencies
+echo [97mPulling all dependencies[0m
 
 call :pull_dependency "spdlog" "https://github.com/buttception/spdlog.git"
 call :exit
@@ -30,15 +30,15 @@ exit
 Personally I would like to not redownload every dependencies I have when there is a new one added, so I would check if the path to the dependency exist first, before I proceed to use git to clone the repository into the directory. This allows me to pull only those that I do not have, and also enables to update specfic dependency by just deleting the whole directory that it resides in. The script also provides some error logging so I will know when the process explode.
 ```bat
 :pull_dependency
-powershell write-host -back White -fore Black Cloning %~1...
+echo [97mCloning %~1[0m
 if exist "%dependencies_path%\%~1" (
-    powershell write-host -back Yellow -fore Black %~1 exists. Delete the folder if updating is required.
+    echo [93m%~1 exists. Delete the folder if updating is required.[0m
 ) else (
     git clone %~2 "%dependencies_path%\%~1" 
     if errorlevel 1 (
-       powershell write-host -back Red -fore Black Error pulling %~1 from %~2
+       echo [91mError pulling %~1 from %~2[0m
     ) else (
-       powershell write-host -back Green -fore Black %~1 cloned succesfully.
+       echo [92m%~1 cloned succesfully.[0m
     )
 )
 goto:eof
@@ -79,4 +79,4 @@ The following lines of code will give me these logs
 RD_CORE_INFO("spdlog initialized for use.");
 RD_ASSERT(true, "Assert failed");
 ```
-![Log](3_log_image.png)
+![Log](resources/3_log_image.png)

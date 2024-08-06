@@ -74,7 +74,15 @@ ________________________________________________________________________________
 #endif
 
 // Bit macro helper
-#define MEOW_BIT(x) (1 << x)
+#define BIT(x) (1 << x)
 
 // Stringify macro
 #define STRINGIFY(x) #x
+
+// Function pointer binding with std::functions
+#define RD_BIND_EVENT_FN(fn) std::bind(&fn, this, std::placeholders::_1)
+namespace Ragdoll
+{
+	class Event;
+}
+using EventCallbackFn = std::function<void(Ragdoll::Event&)>;

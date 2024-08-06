@@ -15,3 +15,6 @@ TBD
 
 ## Features
 TBD
+
+## Credits
+I followed Cherno's Game Engine Series when I was starting out as a student making a few game engines, and hence there may be parts of this project that will look similar to Hazel.

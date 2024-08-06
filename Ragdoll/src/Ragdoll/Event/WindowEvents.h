@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Application.h
-\date		05/08/2024
+\file		WindowEvents.h
+\date		06/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -29,44 +29,62 @@
 __________________________________________________________________________________*/
 #pragma once
 
+#include "Event.h"
+
 namespace Ragdoll
 {
-	class WindowMoveEvent;
-	class WindowResizeEvent;
-	class WindowCloseEvent;
-	class Event;
-	class Window;
-
-	class Application
+	class WindowResizeEvent : public Event
 	{
 	public:
-		struct ApplicationConfig
+		WindowResizeEvent(int _width, int _height)
+			: m_Width(_width), m_Height(_height) {}
+
+		inline unsigned int GetWidth() const { return m_Width; }
+		inline unsigned int GetHeight() const { return m_Height; }
+
+		std::string ToString() const override
 		{
-			
-		};
+			std::stringstream ss;
+			ss << "WindowResizeEvent: " << m_Width << ", " << m_Height;
+			return ss.str();
+		}
 
-		Application() = default;
-		virtual ~Application() = default;
-
-		virtual void Init(const ApplicationConfig& config);
-		void Run();
-		virtual void Shutdown();
-
-		void OnEvent(Event& event);
-
-		bool OnWindowClose(WindowCloseEvent& event);
-		bool OnWindowResize(WindowResizeEvent& event);
-		bool OnWindowMove(WindowMoveEvent& event);
-
+		// Sets the types and category for the event
+		EVENT_CLASS_TYPE(WindowResize)
+		EVENT_CLASS_CATEGORY(EventCategoryApplication)
 	private:
-		bool m_Running{ true };
-
-		std::shared_ptr<Window> m_PrimaryWindow;
+		int m_Width, m_Height;
 	};
 
-	/**
-	 * \brief Function to be defined by the client in the editor or launcher project. This way the engine will run a modified version of the application with the modifications needed by the client.
-	 * \return The application created
-	 */
-	Application* CreateApplication();
+	class WindowCloseEvent : public Event
+	{
+	public:
+		WindowCloseEvent() {}
+
+		EVENT_CLASS_TYPE(WindowClose)
+		EVENT_CLASS_CATEGORY(EventCategoryApplication)
+	};
+
+	class WindowMoveEvent : public Event
+	{
+	public:
+		WindowMoveEvent(int _x, int _y)
+			: m_PosX(_x), m_PosY(_y) {}
+
+		inline unsigned int GetX() const { return m_PosX; }
+		inline unsigned int GetY() const { return m_PosY; }
+
+		std::string ToString() const override
+		{
+			std::stringstream ss;
+			ss << "WindowMoveEvent: " << m_PosX << ", " << m_PosY;
+			return ss.str();
+		}
+
+		EVENT_CLASS_TYPE(WindowMoved)
+		EVENT_CLASS_CATEGORY(EventCategoryApplication)
+
+	private:
+		int m_PosX, m_PosY;
+	};
 }

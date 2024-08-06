@@ -1,5 +1,5 @@
 ﻿/*!
-\file		Ragdoll.h
+\file		Timestep.h
 \date		05/08/2024
 
 \author		Devin Tan
@@ -29,9 +29,23 @@
 __________________________________________________________________________________*/
 #pragma once
 
-#include "Ragdoll/Core/Core.h"
+namespace Ragdoll
+{
+	struct Timestep
+	{
 
-#include "Ragdoll/EntryPoint.h"
-#include "Ragdoll/Application.h"
+	public:
+		Timestep(double _time = 0.f)
+			:m_DeltaTime(_time)
+		{
 
-#include "Ragdoll/Graphics/Window/Window.h"
+		}
+
+		operator double() const { return m_DeltaTime; }
+		double GetSeconds() const { return m_DeltaTime; }
+		double GetMilliseconds() const { return m_DeltaTime * 1000.f; }
+
+	private:
+		double m_DeltaTime;
+	};
+}

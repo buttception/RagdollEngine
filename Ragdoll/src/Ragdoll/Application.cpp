@@ -36,6 +36,7 @@ ________________________________________________________________________________
 #include "Core/Core.h"
 #include "Graphics/Window/Window.h"
 #include "Graphics/GLFWContext.h"
+#include "Event/WindowEvents.h"
 
 namespace Ragdoll
 {
@@ -48,6 +49,8 @@ namespace Ragdoll
 
 		m_PrimaryWindow = std::make_shared<Window>();
 		m_PrimaryWindow->Init();
+		//bind the application callback to the window
+		m_PrimaryWindow->SetEventCallback(RD_BIND_EVENT_FN(Application::OnEvent));
 	}
 
 	void Application::Run()
@@ -64,5 +67,43 @@ namespace Ragdoll
 	{
 		m_PrimaryWindow->Shutdown();
 		GLFWContext::Shutdown();
+		RD_CORE_INFO("Ragdoll Engine application shut down successfull");
+	}
+
+	void Application::OnEvent(Event& event)
+	{
+		EventDispatcher dispatcher(event);
+		static auto closedCallback = RD_BIND_EVENT_FN(Application::OnWindowClose);
+		dispatcher.Dispatch<WindowCloseEvent>(closedCallback);
+		static auto resizeCallback = RD_BIND_EVENT_FN(Application::OnWindowResize);
+		dispatcher.Dispatch<WindowResizeEvent>(resizeCallback);
+		static auto moveCallback = RD_BIND_EVENT_FN(Application::OnWindowMove);
+		dispatcher.Dispatch<WindowMoveEvent>(moveCallback);
+	}
+
+	bool Application::OnWindowClose(WindowCloseEvent& event)
+	{
+		UNREFERENCED_PARAMETER(event);
+#ifdef RAGDOLL_DEBUG
+		RD_CORE_TRACE(event.ToString());
+#endif
+		m_Running = false;
+		return true;
+	}
+
+	bool Application::OnWindowResize(WindowResizeEvent& event)
+	{
+#ifdef RAGDOLL_DEBUG
+		RD_CORE_TRACE(event.ToString());
+#endif
+		return false;
+	}
+
+	bool Application::OnWindowMove(WindowMoveEvent& event)
+	{
+#ifdef RAGDOLL_DEBUG
+		RD_CORE_TRACE(event.ToString());
+#endif
+		return false;
 	}
 }

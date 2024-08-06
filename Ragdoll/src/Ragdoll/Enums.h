@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Ragdoll.h
-\date		05/08/2024
+\file		Enums.h
+\date		06/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -28,10 +28,25 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
-
 #include "Ragdoll/Core/Core.h"
 
-#include "Ragdoll/EntryPoint.h"
-#include "Ragdoll/Application.h"
+namespace Ragdoll
+{
+	enum class EventType
+	{
+		None = 0,
+		WindowClose, WindowResize, WindowFocus, WindowLostFocus, WindowMoved,
+		KeyPressed, KeyReleased, KeyTyped,
+		MouseButtonPressed, MouseButtonReleased, MouseMoved, MouseScrolled
+	};
 
-#include "Ragdoll/Graphics/Window/Window.h"
+	enum EventCategory
+	{
+		None = 0,
+		EventCategoryApplication = BIT(0),
+		EventCategoryInput = BIT(1),
+		EventCategoryKeyboard = BIT(2),
+		EventCategoryMouse = BIT(3),
+		EventCategoryMouseButton = BIT(4)
+	};
+}
