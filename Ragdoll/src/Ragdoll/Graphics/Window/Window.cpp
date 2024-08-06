@@ -32,10 +32,14 @@ ________________________________________________________________________________
 
 #include "Window.h"
 
+#include "glad/glad.h"
 #include "GLFW/glfw3.h"
 
 #include "Ragdoll/Core/Core.h"
 #include "Ragdoll/Core/Logger.h"
+#include "Ragdoll/Core/Timestep.h"
+
+#include "Ragdoll/Event/WindowEvents.h"
 
 namespace Ragdoll
 {
@@ -43,20 +47,95 @@ namespace Ragdoll
 	{
 	}
 
-	Window::Window(const WindowProperties& properties)
+	Window::Window(const WindowProperties& properties) : m_Properties{ properties }
 	{
 	}
 
 	bool Window::Init()
 	{
+		glfwWindowHint(GLFW_RESIZABLE, m_Properties.m_Resizable);
+		glfwWindowHint(GLFW_VISIBLE, m_Properties.m_Visible);
+		glfwWindowHint(GLFW_FOCUSED, m_Properties.m_Focused);
+		glfwWindowHint(GLFW_DECORATED, m_Properties.m_Decorated);
+		glfwWindowHint(GLFW_FLOATING, m_Properties.m_Topmost);
+		glfwWindowHint(GLFW_FOCUS_ON_SHOW, m_Properties.m_FocusOnShow);
+		glfwWindowHint(GLFW_SAMPLES, m_Properties.m_NumSamplesMSAA);
+
+		if (m_PrimaryMonitor == nullptr) m_PrimaryMonitor = glfwGetPrimaryMonitor();
+		if (m_PrimaryMonitorInfo == nullptr) m_PrimaryMonitorInfo = const_cast<GLFWvidmode*>(glfwGetVideoMode(m_PrimaryMonitor));
+
 		m_GlfwWindow = glfwCreateWindow(m_Properties.m_Width, m_Properties.m_Height, m_Properties.m_Title.c_str(), nullptr, nullptr);
 		RD_ASSERT(m_GlfwWindow == nullptr, "Window failed to initialize");
+		if(!m_GlfwWindow)
+		{
+			return false;
+		}
+		glfwMakeContextCurrent(m_GlfwWindow);
+		glfwGetFramebufferSize(m_GlfwWindow, &m_BufferWidth, &m_BufferHeight);
+		glfwSetWindowUserPointer(m_GlfwWindow, this);
+
+		//glfw callbacks using lambda functions
+		glfwSetWindowSizeCallback(m_GlfwWindow, [](GLFWwindow* window, int _width, int _height)
+		{
+			Window& data = *static_cast<Window*>(glfwGetWindowUserPointer(window));
+			data.m_BufferWidth = _width;
+			data.m_BufferHeight = _height;
+
+			WindowResizeEvent event{_width, _height};
+			data.m_Callback(event);
+		});
+
+		glfwSetWindowCloseCallback(m_GlfwWindow, [](GLFWwindow* window)
+		{
+			Window& data = *static_cast<Window*>(glfwGetWindowUserPointer(window));
+
+			WindowCloseEvent event{};
+			data.m_Callback(event);
+		});
+
+		glfwSetWindowPosCallback(m_GlfwWindow, [](GLFWwindow* window, int _x, int _y)
+		{
+			Window& data = *static_cast<Window*>(glfwGetWindowUserPointer(window));
+			data.m_Properties.m_Position = IVector2(_x, _y);
+
+			WindowMoveEvent event{_x, _y};
+			data.m_Callback(event);
+		});
+
+		m_Initialized = true;
 
 		return true;
 	}
 
 	void Window::StartRender()
 	{
+		auto now = std::chrono::steady_clock::now();
+		Timestep timestep{ std::chrono::duration_cast<std::chrono::nanoseconds>(now - m_LastFrameTime).count() / 1000000000.0 };
+		m_LastFrameTime = now;
+		m_DeltaTime = timestep.GetSeconds();
+
+		m_Timer += m_DeltaTime;
+		if(m_Timer >= 1.f)
+		{
+			m_Timer -= 1.f;
+			m_Fps = m_FpsCounter;
+			m_FpsCounter = 0;
+		}
+
+		if(m_Properties.m_DisplayDetailsInTitle)
+		{
+			std::string title = m_Properties.m_Title + " | ";
+			if(m_Properties.m_DisplayFpsInTitle)
+				title += "FPS: " + std::to_string(m_Fps) + " | ";
+			if(m_Properties.m_DisplayFrameCountInTitle)
+				title += "Frame: " + std::to_string(m_Frame) + " | ";
+			if(m_Properties.m_DisplayFrameTimeInTitle)
+				title += "Frame Time: " + fmt::format("{:.2f}", timestep.GetMilliseconds()) + "ms | ";
+			glfwSetWindowTitle(m_GlfwWindow, title.c_str());
+		}
+
+		m_Frame++;
+		m_FpsCounter++;
 		glfwPollEvents();
 	}
 
@@ -80,5 +159,10 @@ namespace Ragdoll
 		}
 		m_Initialized = false;
 		m_GlfwWindow = nullptr;
+	}
+
+	void Window::SetEventCallback(const EventCallbackFn& fn)
+	{
+		m_Callback = fn;
 	}
 }

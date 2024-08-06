@@ -66,3 +66,4 @@ void Window::EndRender()
 }
 ```
 You will notice a problem, the window is not reacting to any inputs now. The callbacks for these events will be added next, and it will become a functioning window in the next part.
+![Finished window](resources/4_window_image.png)

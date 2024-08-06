@@ -1,5 +1,5 @@
 ﻿/*!
-\file		Ragdoll.h
+\file		Vector3.h
 \date		05/08/2024
 
 \author		Devin Tan
@@ -28,10 +28,29 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
+#include "Vector2.h"
 
-#include "Ragdoll/Core/Core.h"
+namespace Ragdoll
+{
+	union Vector3
+	{
+		float m_Data[3]{};
+		struct { float x, y, z; };
 
-#include "Ragdoll/EntryPoint.h"
-#include "Ragdoll/Application.h"
+		Vector3() = default;
+		Vector3(const Vector3& other) : x(other.x), y(other.y), z(other.z) {}
+		Vector3(Vector3&&) = default;
 
-#include "Ragdoll/Graphics/Window/Window.h"
+		Vector3(const float _x, const float _y, const float _z) : x(_x), y(_y), z(_z) {}
+		Vector3(const Vector2& vector, const float _z) : x(vector.x), y(vector.y), z(_z) {}
+		Vector3(const float f) : x(f), y(f), z(f) {}
+		~Vector3() = default;
+
+		operator float* () { return m_Data; }
+		operator const float* () const { return m_Data; }
+
+		Vector3& operator=(const Vector3& rhs) = default;
+		Vector3& operator=(Vector3&& rhs) = default;
+	};
+	inline std::ostream& operator<<(std::ostream& os, const Vector3& vector) { os << "(" << vector.x << ", " << vector.y << ", " << vector.z << ")"; return os; }
+}

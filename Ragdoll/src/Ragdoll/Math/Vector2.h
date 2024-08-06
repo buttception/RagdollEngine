@@ -1,5 +1,5 @@
 ﻿/*!
-\file		Ragdoll.h
+\file		Vector2.h
 \date		05/08/2024
 
 \author		Devin Tan
@@ -28,10 +28,30 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
+#include "ragdollpch.h"
+#pragma warning (disable: 4201) // nonstandard extension used: nameless struct/union
 
-#include "Ragdoll/Core/Core.h"
+namespace Ragdoll
+{
+	union Vector2
+	{
+		float m_Data[2]{};
+		struct { float x, y; };
 
-#include "Ragdoll/EntryPoint.h"
-#include "Ragdoll/Application.h"
+		Vector2() = default;
+		Vector2(const Vector2& other) : x(other.x), y(other.y) {}
+		Vector2(Vector2&&) = default;
 
-#include "Ragdoll/Graphics/Window/Window.h"
+		Vector2(const float _x, const float _y) : x(_x), y(_y) {}
+		Vector2(const float f) : x(f), y(f) {}
+		~Vector2() = default;
+
+		operator float* () { return m_Data; }
+		operator const float* () const { return m_Data; }
+
+		Vector2& operator=(const Vector2& rhs) = default;
+		Vector2& operator=(Vector2&& rhs) = default;
+
+	};
+	inline std::ostream& operator<<(std::ostream& os, const Vector2& vector) { os << "(" << vector.x << ", " << vector.y << ")"; return os; }
+}

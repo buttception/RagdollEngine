@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Ragdoll.h
-\date		05/08/2024
+\file		IVector2.h
+\date		06/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -29,9 +29,27 @@
 __________________________________________________________________________________*/
 #pragma once
 
-#include "Ragdoll/Core/Core.h"
+namespace Ragdoll
+{
+	union IVector2
+	{
+		int m_Data[2]{};
+		struct { int x, y; };
 
-#include "Ragdoll/EntryPoint.h"
-#include "Ragdoll/Application.h"
+		IVector2() = default;
+		IVector2(const IVector2& other) : x(other.x), y(other.y) {}
+		IVector2(IVector2&&) = default;
 
-#include "Ragdoll/Graphics/Window/Window.h"
+		IVector2(const int _x, const int _y) : x(_x), y(_y) {}
+		IVector2(const int f) : x(f), y(f) {}
+		~IVector2() = default;
+
+		operator int* () { return m_Data; }
+		operator const int* () const { return m_Data; }
+
+		IVector2& operator=(const IVector2& rhs) = default;
+		IVector2& operator=(IVector2&& rhs) = default;
+
+	};
+	inline std::ostream& operator<<(std::ostream& os, const IVector2& vector) { os << "(" << vector.x << ", " << vector.y << ")"; return os; }
+}
