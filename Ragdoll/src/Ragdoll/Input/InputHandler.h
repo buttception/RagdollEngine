@@ -32,11 +32,11 @@ ________________________________________________________________________________
 #include "Ragdoll/Enums.h"
 #include "Ragdoll/Event/KeyEvents.h"
 #include "Ragdoll/Event/MouseEvent.h"
-#include "Ragdoll/Math/Vector2.h"
+#include "Ragdoll/Math/RagdollMath.h"
 
 namespace Ragdoll
 {
-	struct KeyState
+	struct InputState
 	{
 		unsigned int m_Press : 1 { 0 };
 		unsigned int m_Release : 1 { 0 };
@@ -50,11 +50,11 @@ namespace Ragdoll
 		unsigned int : 23;
 	};
 
-	struct KeyData
+	struct InputData
 	{
 		union
 		{
-			KeyState m_KeyState;
+			InputState m_InputState;
 			struct
 			{
 				unsigned int : 9;
@@ -65,12 +65,13 @@ namespace Ragdoll
 		float m_MultiTapTimer{ 0.f };
 		unsigned int m_RepeatCount{ 0 };
 
-		KeyData() : m_KeyState{ 0 } {}
-		~KeyData() {}
+		InputData() : m_InputState{ 0 } {}
+		~InputData() {}
 	};
 
 	class InputHandler
 	{
+		friend class Application;
 	public:
 		void Init();
 		void Update(double _dt);
@@ -83,14 +84,25 @@ namespace Ragdoll
 		const static MouseButton GetButtonFromString(const char* _button) { return s_StrToButtonMap.at(_button); }
 		const static char* GetStringFromButton(MouseButton _button) { return s_ButtonToStrMap.at(_button); }
 
-		void OnKeyPressed(KeyPressedEvent& event);
-		void OnKeyReleased(KeyReleasedEvent& event);
-		void OnKeyTyped(KeyTypedEvent& event);
+		//functions for getting key states
+		bool IsKeyPressed(Key _key) const { return m_Keys[static_cast<int>(_key)].m_InputState.m_Press; }
+		bool IsKeyDown(Key _key) const { return m_Keys[static_cast<int>(_key)].m_InputState.m_Hold; }
+		bool IsKeyReleased(Key _key) const { return m_Keys[static_cast<int>(_key)].m_InputState.m_Release; }
+		bool IsKeyRepeated(Key _key) const { return m_Keys[static_cast<int>(_key)].m_InputState.m_Repeat; }
+		unsigned int GetKeyRepeatCount(Key _key) const { return m_Keys[static_cast<int>(_key)].m_RepeatCount; }
+		bool IsKeyLongPressed(Key _key) const { return m_Keys[static_cast<int>(_key)].m_InputState.m_LongPress; }
+		bool IsKeyTapped(Key _key) const { return m_Keys[static_cast<int>(_key)].m_InputState.m_Tap; }
+		bool IsKeyMultiTap(Key _key) const { return m_Keys[static_cast<int>(_key)].m_InputState.m_MultiTap; }
+		unsigned int GetKeyTapCount(Key _key) const { return m_Keys[static_cast<int>(_key)].m_TapCount; }
 
-		void OnMouseMove(MouseMovedEvent& event);
-		void OnMouseButtonPressed(MouseButtonPressedEvent& event);
-		void OnMouseButtonReleased(MouseButtonReleasedEvent& event);
-		void OnMouseScrolled(MouseScrolledEvent& event);
+		//functions for getting mouse states
+		bool IsMouseButtonPressed(MouseButton _button) const { return m_MouseButtons[static_cast<int>(_button)].m_InputState.m_Press; }
+		bool IsMouseButtonDown(MouseButton _button) const { return m_MouseButtons[static_cast<int>(_button)].m_InputState.m_Hold; }
+		bool IsMouseButtonReleased(MouseButton _button) const { return m_MouseButtons[static_cast<int>(_button)].m_InputState.m_Release; }
+		bool IsMouseButtonLongPressed(MouseButton _button) const { return m_MouseButtons[static_cast<int>(_button)].m_InputState.m_LongPress; }
+		bool IsMouseButtonTapped(MouseButton _button) const { return m_MouseButtons[static_cast<int>(_button)].m_InputState.m_Tap; }
+		bool IsMouseButtonMultiTap(MouseButton _button) const { return m_MouseButtons[static_cast<int>(_button)].m_InputState.m_MultiTap; }
+		unsigned int GetMouseButtonTapCount(MouseButton _button) const { return m_MouseButtons[static_cast<int>(_button)].m_TapCount; }
 
 	private:
 		const static std::unordered_map<char, Key> s_CharToKeyMap;
@@ -106,16 +118,33 @@ namespace Ragdoll
 		inline const static float s_MultiTapTime = 0.2f;
 		inline const static float s_TapTime = 0.3f;
 
-		KeyData m_Keys[static_cast<int>(Key::MaxKey)];
+		InputData m_Keys[static_cast<int>(Key::MaxKey)];
+		InputData m_MouseButtons[static_cast<int>(MouseButton::MaxButton)];
 
-		Vector2 m_MousePos{};
-		Vector2 m_LastMousePos{};
-		Vector2 m_MouseDeltas{};
-		Vector2 m_ScrollDeltas{};
+		iVec2 m_MousePos{};
+		iVec2 m_LastMousePos{};
+		iVec2 m_MouseDeltas{};
+		iVec2 m_ScrollDeltas{};
 		bool m_ScrollThisFrame{};
 
+		//functions to update states based on the event
+		void OnKeyPressed(KeyPressedEvent& event);
+		void OnKeyReleased(KeyReleasedEvent& event);
+		void OnKeyTyped(KeyTypedEvent& event);
+
+		void OnMouseMove(MouseMovedEvent& event);
+		void OnMouseButtonPressed(MouseButtonPressedEvent& event);
+		void OnMouseButtonReleased(MouseButtonReleasedEvent& event);
+		void OnMouseScrolled(MouseScrolledEvent& event);
+
+		//helpers for updating key states
+		void UpdateDataStatesAndTimers(Key _key, double _dt);
+		void UpdateDataStatesAndTimers(MouseButton _mousebtn, double _dt);
+		void UpdateDataStatesAndTimers(InputData& _data, double _dt);
+
 #if RD_LOG_INPUT
-		void LogKeyEvents(const Key& keyCode, const KeyData& data);
+		void LogKeyEvents(const Key& keyCode, const InputData& data);
+		void LogMouseEvents(const MouseButton& mouseButton, const InputData& data);
 #endif
 	};
 }

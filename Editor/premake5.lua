@@ -30,7 +30,9 @@ project "Editor"
 
     includedirs
     {
-        "%{wks.location}/Ragdoll/src"
+        "%{wks.location}/Ragdoll/src",
+		"%{IncludesDir.glm}",
+		"%{IncludesDir.spdlog}",
     }
 
 	postbuildcommands

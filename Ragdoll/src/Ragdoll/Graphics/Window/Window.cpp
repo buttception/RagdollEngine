@@ -98,7 +98,7 @@ namespace Ragdoll
 		glfwSetWindowPosCallback(m_GlfwWindow, [](GLFWwindow* window, int _x, int _y)
 		{
 			Window& data = *static_cast<Window*>(glfwGetWindowUserPointer(window));
-			data.m_Properties.m_Position = IVector2(_x, _y);
+			data.m_Properties.m_Position = iVec2(_x, _y);
 
 			WindowMoveEvent event{_x, _y};
 			data.m_Callback(event);

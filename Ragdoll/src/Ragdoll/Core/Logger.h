@@ -79,11 +79,20 @@ namespace Ragdoll
 #define RD_CLIENT_ERROR(...) ::Ragdoll::Logger::GetClientLogger()->error(__VA_ARGS__)
 #define RD_CLIENT_FATAL(...) ::Ragdoll::Logger::GetClientLogger()->critical(__VA_ARGS__)
 
-#define RD_LOG_USER_TYPE(type)\
-template<> struct fmt::formatter<type> : fmt::formatter<std::string>\
-{\
-	auto format(type data, fmt::format_context& ctx) const -> decltype(ctx.out())\
-	{\
-		return fmt::format_to(ctx.out(), "{}", data);\
-	}\
-};
+#include "spdlog/fmt/bundled/ostream.h"
+#include "Ragdoll/Math/RagdollMath.h"
+#define RD_LOG_OVERLOAD_USERTYPE(type, var, format)\
+inline std::ostream& operator<<(std::ostream& os, const type& var){\
+	return os << format;\
+}\
+template <> struct fmt::formatter<type> : ostream_formatter {}
+
+RD_LOG_OVERLOAD_USERTYPE(Ragdoll::iVec2, vec, "(" << vec.x << "," << vec.y << ")");
+RD_LOG_OVERLOAD_USERTYPE(Ragdoll::iVec3, vec, "(" << vec.x << "," << vec.y << ", " << vec.z <<  ")");
+RD_LOG_OVERLOAD_USERTYPE(Ragdoll::iVec4, vec, "(" << vec.x << "," << vec.y << ", " << vec.z << ", " << vec.w << ")");
+RD_LOG_OVERLOAD_USERTYPE(Ragdoll::Vec2, vec, "(" << vec.x << "," << vec.y << ")");
+RD_LOG_OVERLOAD_USERTYPE(Ragdoll::Vec3, vec, "(" << vec.x << "," << vec.y << ", " << vec.z << ")");
+RD_LOG_OVERLOAD_USERTYPE(Ragdoll::Vec4, vec, "(" << vec.x << "," << vec.y << ", " << vec.z << ", " << vec.w << ")");
+RD_LOG_OVERLOAD_USERTYPE(Ragdoll::dVec2, vec, "(" << vec.x << "," << vec.y << ")");
+RD_LOG_OVERLOAD_USERTYPE(Ragdoll::dVec3, vec, "(" << vec.x << "," << vec.y << ", " << vec.z << ")");
+RD_LOG_OVERLOAD_USERTYPE(Ragdoll::dVec4, vec, "(" << vec.x << "," << vec.y << ", " << vec.z << ", " << vec.w << ")");

@@ -46,7 +46,8 @@ project "Ragdoll"
         "src",
 		"%{IncludesDir.spdlog}",
 		"%{IncludesDir.glfw}",
-		"%{IncludesDir.glad}"
+		"%{IncludesDir.glad}",
+		"%{IncludesDir.glm}",
     }
 
 	filter "system:windows"
