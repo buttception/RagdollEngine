@@ -78,3 +78,12 @@ namespace Ragdoll
 #define RD_CLIENT_WARN(...) ::Ragdoll::Logger::GetClientLogger()->warn(__VA_ARGS__)
 #define RD_CLIENT_ERROR(...) ::Ragdoll::Logger::GetClientLogger()->error(__VA_ARGS__)
 #define RD_CLIENT_FATAL(...) ::Ragdoll::Logger::GetClientLogger()->critical(__VA_ARGS__)
+
+#define RD_LOG_USER_TYPE(type)\
+template<> struct fmt::formatter<type> : fmt::formatter<std::string>\
+{\
+	auto format(type data, fmt::format_context& ctx) const -> decltype(ctx.out())\
+	{\
+		return fmt::format_to(ctx.out(), "{}", data);\
+	}\
+};

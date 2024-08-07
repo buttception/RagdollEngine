@@ -34,8 +34,17 @@ namespace Ragdoll
 	class WindowMoveEvent;
 	class WindowResizeEvent;
 	class WindowCloseEvent;
+	class KeyPressedEvent;
+	class KeyReleasedEvent;
+	class KeyTypedEvent;
+	class MouseMovedEvent;
+	class MouseButtonPressedEvent;
+	class MouseButtonReleasedEvent;
+	class MouseScrolledEvent;
 	class Event;
 	class Window;
+
+	class InputHandler;
 
 	class Application
 	{
@@ -58,10 +67,20 @@ namespace Ragdoll
 		bool OnWindowResize(WindowResizeEvent& event);
 		bool OnWindowMove(WindowMoveEvent& event);
 
+		bool OnKeyPressed(KeyPressedEvent& event);
+		bool OnKeyReleased(KeyReleasedEvent& event);
+		bool OnKeyTyped(KeyTypedEvent& event);
+
+		bool OnMouseMove(MouseMovedEvent& event);
+		bool OnMouseButtonPressed(MouseButtonPressedEvent& event);
+		bool OnMouseButtonReleased(MouseButtonReleasedEvent& event);
+		bool OnMouseScrolled(MouseScrolledEvent& event);
+
 	private:
 		bool m_Running{ true };
 
-		std::shared_ptr<Window> m_PrimaryWindow;
+		std::unique_ptr<Window> m_PrimaryWindow;
+		std::unique_ptr<InputHandler> m_InputHandler;
 	};
 
 	/**

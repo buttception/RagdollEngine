@@ -67,6 +67,45 @@ namespace Ragdoll
 			bool m_DisplayFrameTimeInTitle{ true };
 		};
 
+		// Getters
+		const std::string& getTitle() const { return m_Properties.m_Title; }
+		int getWidth() const { return m_Properties.m_Width; }
+		int getHeight() const { return m_Properties.m_Height; }
+		const IVector2& getPosition() const { return m_Properties.m_Position; }
+		int getNumSamplesMSAA() const { return m_Properties.m_NumSamplesMSAA; }
+		const Vector3& getBackgroundColor() const { return m_Properties.m_BackgroundColor; }
+		float getOpacity() const { return m_Properties.m_Opacity; }
+		bool isResizable() const { return m_Properties.m_Resizable; }
+		bool isVisible() const { return m_Properties.m_Visible; }
+		bool isFocused() const { return m_Properties.m_Focused; }
+		bool isFullscreen() const { return m_Properties.m_Fullscreen; }
+		bool isDecorated() const { return m_Properties.m_Decorated; }
+		bool isTopmost() const { return m_Properties.m_Topmost; }
+		bool isFocusOnShow() const { return m_Properties.m_FocusOnShow; }
+
+		// Personal preference getters
+		bool isDisplayDetailsInTitle() const { return m_Properties.m_DisplayDetailsInTitle; }
+		bool isDisplayFpsInTitle() const { return m_Properties.m_DisplayFpsInTitle; }
+		bool isDisplayFrameCountInTitle() const { return m_Properties.m_DisplayFrameCountInTitle; }
+		bool isDisplayFrameTimeInTitle() const { return m_Properties.m_DisplayFrameTimeInTitle; }
+
+		// Getters for static members
+		static GLFWmonitor* getPrimaryMonitor() { return m_PrimaryMonitor; }
+		static GLFWvidmode* getPrimaryMonitorInfo() { return m_PrimaryMonitorInfo; }
+
+		// Getters for non-static members
+		int getBufferWidth() const { return m_BufferWidth; }
+		int getBufferHeight() const { return m_BufferHeight; }
+
+		bool isInitialized() const { return m_Initialized; }
+
+		unsigned long getFrame() const { return m_Frame; }
+		int getFps() const { return m_Fps; }
+		int getFpsCounter() const { return m_FpsCounter; }
+		std::chrono::time_point<std::chrono::steady_clock> getLastFrameTime() const { return m_LastFrameTime; }
+		double getTimer() const { return m_Timer; }
+		double getDeltaTime() const { return m_DeltaTime; }
+
 		Window();
 		Window(const WindowProperties& properties);
 

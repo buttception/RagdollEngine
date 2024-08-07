@@ -94,3 +94,9 @@ namespace Ragdoll
 		return os << e.ToString();
 	}
 }
+
+#define RD_CONCAT(a, b) RD_CONCAT_INNER(a, b)
+#define RD_CONCAT_INNER(a, b) a ## b
+
+#define RD_DISPATCH_EVENT(dispatcher, eventType, event, callback)\
+static auto RD_CONCAT(var, __LINE__) = RD_BIND_EVENT_FN(callback); dispatcher.Dispatch<eventType>(RD_CONCAT(var, __LINE__))
