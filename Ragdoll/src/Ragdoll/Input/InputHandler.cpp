@@ -542,6 +542,7 @@ namespace Ragdoll
 
 	void InputHandler::OnMouseMove(MouseMovedEvent& event)
 	{
+
 	}
 
 	void InputHandler::OnMouseButtonPressed(MouseButtonPressedEvent& event)

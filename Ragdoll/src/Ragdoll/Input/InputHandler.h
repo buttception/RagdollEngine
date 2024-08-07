@@ -115,7 +115,7 @@ namespace Ragdoll
 		bool m_ScrollThisFrame{};
 
 #if RD_LOG_INPUT
-		void LogInput(const Key& keyCode, const KeyData& data);
+		void LogKeyEvents(const Key& keyCode, const KeyData& data);
 #endif
 	};
 }
