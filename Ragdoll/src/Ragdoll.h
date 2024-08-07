@@ -31,6 +31,7 @@ ________________________________________________________________________________
 
 #include "Ragdoll/Core/Core.h"
 
+#include "Ragdoll/Math/RagdollMath.h"
 #include "Ragdoll/EntryPoint.h"
 #include "Ragdoll/Application.h"
 #include "Ragdoll/Input/InputHandler.h"

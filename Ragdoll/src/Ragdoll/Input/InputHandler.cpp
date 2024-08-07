@@ -438,60 +438,26 @@ namespace Ragdoll
 
 	void InputHandler::Update(double _dt)
 	{
-#if RD_LOG_INPUT
-		int index = 0;
-#endif
-		for(auto& key : m_Keys)
+		for(unsigned int i{}; i < static_cast<int>(Key::MaxKey); ++i)
 		{
+			auto& key = m_Keys[i];
 #if RD_LOG_INPUT
 			//this log is one frame late
-			if (key.m_KeyState.m_Hold || key.m_KeyState.m_Tap || key.m_KeyState.m_LongPress || key.m_KeyState.m_MultiTap)
-				LogKeyEvents(static_cast<Key>(index), key);
+			if (key.m_InputState.m_Hold || key.m_InputState.m_Tap || key.m_InputState.m_LongPress || key.m_InputState.m_MultiTap)
+				LogKeyEvents(static_cast<Key>(i), key);
 #endif
-			//reset the states
-			key.m_KeyState.m_Repeat = key.m_KeyState.m_LongPress = key.m_KeyState.m_MultiTap = key.m_KeyState.m_Tap = 0;
+			UpdateDataStatesAndTimers(static_cast<Key>(i), _dt);
+		}
 
-			//double press logic
-			if (key.m_KeyState.m_IncrementMultiTapTimer)
-			{
-				key.m_MultiTapTimer += static_cast<float>(_dt);
-				if (key.m_MultiTapTimer > s_MultiTapTime)
-				{
-					key.m_MultiTapTimer = 0.f;
-					key.m_KeyState.m_IncrementMultiTapTimer = 0;
-					key.m_TapCount = 0;
-				}
-			}
-			if (key.m_KeyState.m_Press)
-			{
-				if (key.m_KeyState.m_IncrementMultiTapTimer)
-				{
-					if (key.m_MultiTapTimer < s_MultiTapTime)
-					{
-						key.m_KeyState.m_MultiTap = 1;
-						key.m_TapCount++;
-						key.m_MultiTapTimer = 0.f;
-					}
-					key.m_KeyState.m_IncrementMultiTapTimer = 0;
-				}
-			}
-			
-			//long pressing logic
-			if(key.m_KeyState.m_Hold)
-			{
-				key.m_KeyState.m_Press = 0;
-				key.m_HeldTimer += static_cast<float>(_dt);
-				//if the key is held for more than 0.75s, it is considered a long press
-				if(key.m_HeldTimer > s_LongPressTime && !key.m_KeyState.m_LongPressTriggered)
-				{
-					key.m_KeyState.m_LongPressTriggered =  1;
-					key.m_KeyState.m_LongPress = 1;
-					key.m_HeldTimer = 0.f;
-				}
-			}
+		for(unsigned int i{}; i < static_cast<int>(MouseButton::MaxButton); ++i)
+		{
+			auto& mbtn = m_MouseButtons[i];
 #if RD_LOG_INPUT
-			index++;
+			//this log is one frame late
+			if (mbtn.m_InputState.m_Hold || mbtn.m_InputState.m_Tap || mbtn.m_InputState.m_LongPress || mbtn.m_InputState.m_MultiTap)
+				LogMouseEvents(static_cast<MouseButton>(i), mbtn);
 #endif
+			UpdateDataStatesAndTimers(static_cast<MouseButton>(i), _dt);
 		}
 	}
 
@@ -502,13 +468,13 @@ namespace Ragdoll
 	void InputHandler::OnKeyPressed(KeyPressedEvent& event)
 	{
 		auto& key = m_Keys[event.GetKeyCode()];
-		if(!key.m_KeyState.m_Hold)
-			key.m_KeyState.m_Press = 1;
-		key.m_KeyState.m_Release = 0;
-		key.m_KeyState.m_Hold = 1;
-		key.m_KeyState.m_Repeat = event.GetRepeatCount();
+		if(!key.m_InputState.m_Hold)
+			key.m_InputState.m_Press = 1;
+		key.m_InputState.m_Release = 0;
+		key.m_InputState.m_Hold = 1;
+		key.m_InputState.m_Repeat = event.GetRepeatCount();
 
-		key.m_RepeatCount += key.m_KeyState.m_Repeat;
+		key.m_RepeatCount += key.m_InputState.m_Repeat;
 
 		//reset tap and double press timers
 		key.m_MultiTapTimer = 0.f;
@@ -517,19 +483,19 @@ namespace Ragdoll
 	void InputHandler::OnKeyReleased(KeyReleasedEvent& event)
 	{
 		auto& key = m_Keys[event.GetKeyCode()];
-		key.m_KeyState.m_Press = 0;
-		key.m_KeyState.m_Release = 1;
-		key.m_KeyState.m_Hold = 0;
-		key.m_KeyState.m_Repeat = 0;
-		key.m_KeyState.m_IncrementMultiTapTimer = 1;
-		key.m_KeyState.m_LongPressTriggered = 0;
+		key.m_InputState.m_Press = 0;
+		key.m_InputState.m_Release = 1;
+		key.m_InputState.m_Hold = 0;
+		key.m_InputState.m_Repeat = 0;
+		key.m_InputState.m_IncrementMultiTapTimer = 1;
+		key.m_InputState.m_LongPressTriggered = 0;
 
 		key.m_RepeatCount = 0;
 
 		//if the tap timer is smaller the tap time, means user tapped key
 		if (key.m_HeldTimer < s_TapTime)
 		{
-			key.m_KeyState.m_Tap = 1;
+			key.m_InputState.m_Tap = 1;
 		}
 		//reset the long press timer
 		key.m_HeldTimer = 0.f;
@@ -537,28 +503,117 @@ namespace Ragdoll
 
 	void InputHandler::OnKeyTyped(KeyTypedEvent& event)
 	{
+		UNREFERENCED_PARAMETER(event);
 		//handle in the future in case character pressed is a unicode character, get the unicode value for text input
 	}
 
 	void InputHandler::OnMouseMove(MouseMovedEvent& event)
 	{
-
+		m_MousePos = { event.GetX(), event.GetY() };
+		m_MouseDeltas = m_MousePos - m_LastMousePos;
+		m_LastMousePos = m_MousePos;
+#if RD_LOG_INPUT
+		RD_CORE_TRACE("Mouse Pos: {}, Mouse Delta: {}", m_MousePos, m_MouseDeltas);
+#endif
 	}
 
 	void InputHandler::OnMouseButtonPressed(MouseButtonPressedEvent& event)
 	{
+		auto& mbtn = m_MouseButtons[event.GetMouseButton()];
+		if (!mbtn.m_InputState.m_Hold)
+			mbtn.m_InputState.m_Press = 1;
+		mbtn.m_InputState.m_Release = 0;
+		mbtn.m_InputState.m_Hold = 1;
+
+		//reset tap and double press timers
+		mbtn.m_MultiTapTimer = 0.f;
 	}
 
 	void InputHandler::OnMouseButtonReleased(MouseButtonReleasedEvent& event)
 	{
+		auto& mbtn = m_MouseButtons[event.GetMouseButton()];
+		mbtn.m_InputState.m_Press = 0;
+		mbtn.m_InputState.m_Release = 1;
+		mbtn.m_InputState.m_Hold = 0;
+		mbtn.m_InputState.m_Repeat = 0;
+		mbtn.m_InputState.m_IncrementMultiTapTimer = 1;
+		mbtn.m_InputState.m_LongPressTriggered = 0;
+
+		//if the tap timer is smaller the tap time, means user tapped key
+		if (mbtn.m_HeldTimer < s_TapTime)
+		{
+			mbtn.m_InputState.m_Tap = 1;
+		}
+		//reset the long press timer
+		mbtn.m_HeldTimer = 0.f;
 	}
 
 	void InputHandler::OnMouseScrolled(MouseScrolledEvent& event)
 	{
+		m_ScrollThisFrame = true;
+		m_ScrollDeltas = { event.GetXOffset(), event.GetYOffset() };
+#if RD_LOG_INPUT
+		RD_CORE_TRACE("Scroll Delta: {}", m_ScrollDeltas);
+#endif
+	}
+
+	void InputHandler::UpdateDataStatesAndTimers(Key _key, double _dt)
+	{
+		UpdateDataStatesAndTimers(m_Keys[static_cast<int>(_key)], _dt);
+	}
+
+	void InputHandler::UpdateDataStatesAndTimers(MouseButton _mousebtn, double _dt)
+	{
+		UpdateDataStatesAndTimers(m_MouseButtons[static_cast<int>(_mousebtn)], _dt);
+	}
+
+	void InputHandler::UpdateDataStatesAndTimers(InputData& _data, double _dt)
+	{
+		//reset the states
+		_data.m_InputState.m_Repeat = _data.m_InputState.m_LongPress = _data.m_InputState.m_MultiTap = _data.m_InputState.m_Tap = 0;
+
+		//double press logic
+		if (_data.m_InputState.m_IncrementMultiTapTimer)
+		{
+			_data.m_MultiTapTimer += static_cast<float>(_dt);
+			if (_data.m_MultiTapTimer > s_MultiTapTime)
+			{
+				_data.m_MultiTapTimer = 0.f;
+				_data.m_InputState.m_IncrementMultiTapTimer = 0;
+				_data.m_TapCount = 0;
+			}
+		}
+		if (_data.m_InputState.m_Press)
+		{
+			if (_data.m_InputState.m_IncrementMultiTapTimer)
+			{
+				if (_data.m_MultiTapTimer < s_MultiTapTime)
+				{
+					_data.m_InputState.m_MultiTap = 1;
+					_data.m_TapCount++;
+					_data.m_MultiTapTimer = 0.f;
+				}
+				_data.m_InputState.m_IncrementMultiTapTimer = 0;
+			}
+		}
+
+		//long pressing logic
+		if (_data.m_InputState.m_Hold)
+		{
+			_data.m_InputState.m_Press = 0;
+			_data.m_HeldTimer += static_cast<float>(_dt);
+			//if the _data is held for more than 0.75s, it is considered a long press
+			if (_data.m_HeldTimer > s_LongPressTime && !_data.m_InputState.m_LongPressTriggered)
+			{
+				_data.m_InputState.m_LongPressTriggered = 1;
+				_data.m_InputState.m_LongPress = 1;
+				_data.m_HeldTimer = 0.f;
+			}
+		}
 	}
 
 #if RD_LOG_INPUT
-	void InputHandler::LogKeyEvents(const Key& keyCode, const KeyData& data)
+	void InputHandler::LogKeyEvents(const Key& keyCode, const InputData& data)
 	{
 		const char* red = "\x1b[31m";
 		const char* green = "\x1b[32m";
@@ -566,14 +621,31 @@ namespace Ragdoll
 		const char* reset = "\x1b[0m";
 		RD_CORE_TRACE("{}: Press[{}{}{}],Release[{}{}{}],Hold[{}{}{}],Repeat[{}{}{}],Tap[{}{}{}],MulTap[{}{}{}],LongPress[{}{}{}],RepeatCnt[{}{}{}],TapCnt[{}{}{}]",
 			s_KeyToStrMap.at(keyCode),
-			data.m_KeyState.m_Press ? green : red, data.m_KeyState.m_Press, reset,
-			data.m_KeyState.m_Release ? green : red, data.m_KeyState.m_Release, reset,
-			data.m_KeyState.m_Hold ? green : red, data.m_KeyState.m_Hold, reset,
-			data.m_KeyState.m_Repeat ? green : red, data.m_KeyState.m_Repeat, reset,
-			data.m_KeyState.m_Tap ? green : red, data.m_KeyState.m_Tap, reset,
-			data.m_KeyState.m_MultiTap ? green : red, data.m_KeyState.m_MultiTap, reset,
-			data.m_KeyState.m_LongPress ? green : red, data.m_KeyState.m_LongPress, reset,
+			data.m_InputState.m_Press ? green : red, data.m_InputState.m_Press, reset,
+			data.m_InputState.m_Release ? green : red, data.m_InputState.m_Release, reset,
+			data.m_InputState.m_Hold ? green : red, data.m_InputState.m_Hold, reset,
+			data.m_InputState.m_Repeat ? green : red, data.m_InputState.m_Repeat, reset,
+			data.m_InputState.m_Tap ? green : red, data.m_InputState.m_Tap, reset,
+			data.m_InputState.m_MultiTap ? green : red, data.m_InputState.m_MultiTap, reset,
+			data.m_InputState.m_LongPress ? green : red, data.m_InputState.m_LongPress, reset,
 			yellow, data.m_RepeatCount, reset,
+			yellow, data.m_TapCount, reset);
+	}
+
+	void InputHandler::LogMouseEvents(const MouseButton& mouseButton, const InputData& data)
+	{
+		const char* red = "\x1b[31m";
+		const char* green = "\x1b[32m";
+		const char* yellow = "\x1b[33m";
+		const char* reset = "\x1b[0m";
+		RD_CORE_TRACE("{}: Press[{}{}{}],Release[{}{}{}],Hold[{}{}{}],Tap[{}{}{}],MulTap[{}{}{}],LongPress[{}{}{}],TapCnt[{}{}{}]",
+			s_ButtonToStrMap.at(mouseButton),
+			data.m_InputState.m_Press ? green : red, data.m_InputState.m_Press, reset,
+			data.m_InputState.m_Release ? green : red, data.m_InputState.m_Release, reset,
+			data.m_InputState.m_Hold ? green : red, data.m_InputState.m_Hold, reset,
+			data.m_InputState.m_Tap ? green : red, data.m_InputState.m_Tap, reset,
+			data.m_InputState.m_MultiTap ? green : red, data.m_InputState.m_MultiTap, reset,
+			data.m_InputState.m_LongPress ? green : red, data.m_InputState.m_LongPress, reset,
 			yellow, data.m_TapCount, reset);
 	}
 #endif

@@ -1,5 +1,5 @@
 # Keyboard Inputs
-The input handler will respond to the input events raised by the Window through the application. The keystates that are returned from GLFW are
+The input handler will respond to the input events raised by the Window through the application. The InputStates that are returned from GLFW are
 - ```GLFW_PRESS``` : The key is down
 - ```GLFW_RELEASE``` : The key was down, and then became up
 - ```GLFW_REPEAT``` : The key is held down, raised at intervals similar to how key hold is like for typing.
@@ -37,10 +37,10 @@ bool Application::OnKeyPressed(KeyPressedEvent& event)
 }
 ```
 ## Key Inputs
-Since there are hundreds of keys, I try my best to keep the data size used to keep track of the key states to a minimun size. I managed to reduce the size of ```KeyData``` to 16 bytes. The states that I keep track of are:
+Since there are hundreds of keys, I try my best to keep the data size used to keep track of the key states to a minimun size. I managed to reduce the size of ```InputData``` to 16 bytes. The states that I keep track of are:
 ```cpp
 //in Ragdoll/src/Ragdoll/Input/InputHandler.h
-struct KeyState
+struct InputState
 {
 	unsigned int m_Press : 1 { 0 };                     //press
 	unsigned int m_Release : 1 { 0 };                   //release
@@ -57,16 +57,16 @@ struct KeyState
 	unsigned int : 23;                                  //anonymous unused bitfield
 };
 ```
-This key state will share bits with the multi tap counter, which in this case is 23 bits. If I need more flags in the future, I can cannibalize more bits from the tap counter. I doubt the user will tap more than a couple hundred thousand times. The ```KeyData``` struct will then contain the rest of the information I need, such as repeat count and timers.
+This key state will share bits with the multi tap counter, which in this case is 23 bits. If I need more flags in the future, I can cannibalize more bits from the tap counter. I doubt the user will tap more than a couple hundred thousand times. The ```InputData``` struct will then contain the rest of the information I need, such as repeat count and timers.
 ```cpp
 //in Ragdoll/src/Ragdoll/Input/InputHandler.h
-struct KeyData
+struct InputData
 {
     //anonmyous union
 	union
 	{
-        //keystate already padded the next 23 bits for use for tap count
-		KeyState m_KeyState;
+        //InputState already padded the next 23 bits for use for tap count
+		InputState m_InputState;
 		struct
 		{
 			unsigned int : 9;   //anonmymouse bitfield for states
@@ -79,8 +79,8 @@ struct KeyData
 	unsigned int m_RepeatCount{ 0 };
 
     //constructor needed to initialize all of the values to be 0 for the bitfields
-	KeyData() : m_KeyState{ 0 } {}
-	~KeyData() {}
+	InputData() : m_InputState{ 0 } {}
+	~InputData() {}
 };
 ```
 With these information, I will be able to do the additional functionality for the special key presses. The time needed to trigger these special presses are defined as ```const static``` variables in the input handler, and can be changed in code.
@@ -92,9 +92,9 @@ inline const static float s_MultiTapTime = 0.2f;
 //time before a key hold is considered not a tap when released
 inline const static float s_TapTime = 0.3f;
 ```
-All of the ```KeyData``` will be stored in a big array, where I can direct access them using the value of the key enums.
+All of the ```InputData``` will be stored in a big array, where I can direct access them using the value of the key enums.
 ```cpp
-KeyData m_Keys[static_cast<int>(Key::MaxKey)];
+InputData m_Keys[static_cast<int>(Key::MaxKey)];
 ```
 ```cpp
 enum class Key
@@ -103,7 +103,7 @@ enum class Key
 	A = 65, //in this case it will be index 65
     //more enums...
 ```
-So onto how I set the keystates for use in the engine. I won't delve into the code here, but I will give some concepts that I used to write the features.
+So onto how I set the InputStates for use in the engine. I won't delve into the code here, but I will give some concepts that I used to write the features.
 - ```m_Press```:
     - ```1```: ```m_Hold``` is ```0``` and ```GLFW_PRESS``` is triggered.
     - ```0```: Otherwise.
@@ -136,4 +136,4 @@ So onto how I set the keystates for use in the engine. I won't delve into the co
     - ```Note```:  Increments ```m_TapCount``` as well when ```1```. ```m_IncrementMultiTapTimer``` will be set to ```1``` whenever ```m_Release``` is ```1```. ```m_IncrementMultiTapTimer``` will run ```m_MultiTapTimer```.
 ![Release](resources/6_MultiTap.png)
 
-With this, the input handler just needs to be used by other systems of the engine which I won't go into in this blog. You can try to write your own implementation on how to use the ```KeyData``` here in your own engine.
+With this, the input handler just needs to be used by other systems of the engine which I won't go into in this blog. You can try to write your own implementation on how to use the ```InputData``` here in your own engine.

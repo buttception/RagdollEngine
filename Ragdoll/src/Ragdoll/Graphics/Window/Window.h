@@ -29,9 +29,7 @@
 __________________________________________________________________________________*/
 #pragma once
 
-#include "Ragdoll/Math/Vector2.h"
-#include "Ragdoll/Math/Vector3.h"
-#include "Ragdoll/Math/IVector2.h"
+#include "Ragdoll/Math/RagdollMath.h"
 #include "Ragdoll/Event/Event.h"
 
 struct GLFWwindow;
@@ -48,9 +46,9 @@ namespace Ragdoll
 			std::string m_Title{ "Ragdoll Engine" };
 			int m_Width{ 800 };
 			int m_Height{ 600 };
-			IVector2 m_Position{};
+			iVec2 m_Position{};
 			int m_NumSamplesMSAA{ 0 };
-			Vector3 m_BackgroundColor{};
+			Vec3 m_BackgroundColor{};
 			float m_Opacity{ 1.f };
 			bool m_Resizable{ true };
 			bool m_Visible{ true };
@@ -71,9 +69,9 @@ namespace Ragdoll
 		const std::string& getTitle() const { return m_Properties.m_Title; }
 		int getWidth() const { return m_Properties.m_Width; }
 		int getHeight() const { return m_Properties.m_Height; }
-		const IVector2& getPosition() const { return m_Properties.m_Position; }
+		const iVec2& getPosition() const { return m_Properties.m_Position; }
 		int getNumSamplesMSAA() const { return m_Properties.m_NumSamplesMSAA; }
-		const Vector3& getBackgroundColor() const { return m_Properties.m_BackgroundColor; }
+		const Vec3& getBackgroundColor() const { return m_Properties.m_BackgroundColor; }
 		float getOpacity() const { return m_Properties.m_Opacity; }
 		bool isResizable() const { return m_Properties.m_Resizable; }
 		bool isVisible() const { return m_Properties.m_Visible; }

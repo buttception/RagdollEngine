@@ -1,6 +1,6 @@
 ﻿/*!
-\file		IVector2.h
-\date		06/08/2024
+\file		Math.h
+\date		07/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -28,28 +28,26 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
+#define GLM_FORCE_SSE2
+
+#ifdef RAGDOLL_DEBUG
+	#define GLM_FORCE_MESSAGES
+	#define GLM_FORCE_CTOR_INIT
+#else
+#define GLM_FORCE_INLINE
+#endif
+
+#include "glm/glm.hpp"
 
 namespace Ragdoll
 {
-	union IVector2
-	{
-		int m_Data[2]{};
-		struct { int x, y; };
-
-		IVector2() = default;
-		IVector2(const IVector2& other) : x(other.x), y(other.y) {}
-		IVector2(IVector2&&) = default;
-
-		IVector2(const int _x, const int _y) : x(_x), y(_y) {}
-		IVector2(const int f) : x(f), y(f) {}
-		~IVector2() = default;
-
-		operator int* () { return m_Data; }
-		operator const int* () const { return m_Data; }
-
-		IVector2& operator=(const IVector2& rhs) = default;
-		IVector2& operator=(IVector2&& rhs) = default;
-
-	};
-	inline std::ostream& operator<<(std::ostream& os, const IVector2& vector) { os << "(" << vector.x << ", " << vector.y << ")"; return os; }
+	typedef glm::ivec2 iVec2;
+	typedef glm::ivec3 iVec3;
+	typedef glm::ivec4 iVec4;
+	typedef glm::vec2 Vec2;
+	typedef glm::vec3 Vec3;
+	typedef glm::vec4 Vec4;
+	typedef glm::dvec2 dVec2;
+	typedef glm::dvec3 dVec3;
+	typedef glm::dvec4 dVec4;
 }
