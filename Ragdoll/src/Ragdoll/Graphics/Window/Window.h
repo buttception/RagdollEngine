@@ -66,43 +66,45 @@ namespace Ragdoll
 		};
 
 		// Getters
-		const std::string& getTitle() const { return m_Properties.m_Title; }
-		int getWidth() const { return m_Properties.m_Width; }
-		int getHeight() const { return m_Properties.m_Height; }
-		const iVec2& getPosition() const { return m_Properties.m_Position; }
-		int getNumSamplesMSAA() const { return m_Properties.m_NumSamplesMSAA; }
-		const Vec3& getBackgroundColor() const { return m_Properties.m_BackgroundColor; }
-		float getOpacity() const { return m_Properties.m_Opacity; }
-		bool isResizable() const { return m_Properties.m_Resizable; }
-		bool isVisible() const { return m_Properties.m_Visible; }
-		bool isFocused() const { return m_Properties.m_Focused; }
-		bool isFullscreen() const { return m_Properties.m_Fullscreen; }
-		bool isDecorated() const { return m_Properties.m_Decorated; }
-		bool isTopmost() const { return m_Properties.m_Topmost; }
-		bool isFocusOnShow() const { return m_Properties.m_FocusOnShow; }
+		const std::string& GetTitle() const { return m_Properties.m_Title; }
+		int GetWidth() const { return m_Properties.m_Width; }
+		int GetHeight() const { return m_Properties.m_Height; }
+		const iVec2& GetPosition() const { return m_Properties.m_Position; }
+		int GetNumSamplesMSAA() const { return m_Properties.m_NumSamplesMSAA; }
+		const Vec3& GetBackgroundColor() const { return m_Properties.m_BackgroundColor; }
+		float GetOpacity() const { return m_Properties.m_Opacity; }
+		bool IsResizable() const { return m_Properties.m_Resizable; }
+		bool IsVisible() const { return m_Properties.m_Visible; }
+		bool IsFocused() const { return m_Properties.m_Focused; }
+		bool IsFullscreen() const { return m_Properties.m_Fullscreen; }
+		bool IsDecorated() const { return m_Properties.m_Decorated; }
+		bool IsTopmost() const { return m_Properties.m_Topmost; }
+		bool IsFocusOnShow() const { return m_Properties.m_FocusOnShow; }
 
 		// Personal preference getters
-		bool isDisplayDetailsInTitle() const { return m_Properties.m_DisplayDetailsInTitle; }
-		bool isDisplayFpsInTitle() const { return m_Properties.m_DisplayFpsInTitle; }
-		bool isDisplayFrameCountInTitle() const { return m_Properties.m_DisplayFrameCountInTitle; }
-		bool isDisplayFrameTimeInTitle() const { return m_Properties.m_DisplayFrameTimeInTitle; }
+		bool IsDisplayDetailsInTitle() const { return m_Properties.m_DisplayDetailsInTitle; }
+		bool IsDisplayFpsInTitle() const { return m_Properties.m_DisplayFpsInTitle; }
+		bool IsDisplayFrameCountInTitle() const { return m_Properties.m_DisplayFrameCountInTitle; }
+		bool IsDisplayFrameTimeInTitle() const { return m_Properties.m_DisplayFrameTimeInTitle; }
 
 		// Getters for static members
-		static GLFWmonitor* getPrimaryMonitor() { return m_PrimaryMonitor; }
-		static GLFWvidmode* getPrimaryMonitorInfo() { return m_PrimaryMonitorInfo; }
+		static GLFWmonitor* GetPrimaryMonitor() { return m_PrimaryMonitor; }
+		static GLFWvidmode* GetPrimaryMonitorInfo() { return m_PrimaryMonitorInfo; }
 
 		// Getters for non-static members
-		int getBufferWidth() const { return m_BufferWidth; }
-		int getBufferHeight() const { return m_BufferHeight; }
+		int GetBufferWidth() const { return m_BufferWidth; }
+		int GetBufferHeight() const { return m_BufferHeight; }
 
-		bool isInitialized() const { return m_Initialized; }
+		bool IsInitialized() const { return m_Initialized; }
 
-		unsigned long getFrame() const { return m_Frame; }
-		int getFps() const { return m_Fps; }
-		int getFpsCounter() const { return m_FpsCounter; }
-		std::chrono::time_point<std::chrono::steady_clock> getLastFrameTime() const { return m_LastFrameTime; }
-		double getTimer() const { return m_Timer; }
-		double getDeltaTime() const { return m_DeltaTime; }
+		unsigned long GetFrame() const { return m_Frame; }
+		int GetFps() const { return m_Fps; }
+		int GetFpsCounter() const { return m_FpsCounter; }
+		std::chrono::time_point<std::chrono::steady_clock> GetLastFrameTime() const { return m_LastFrameTime; }
+		double GetTimer() const { return m_Timer; }
+		double GetDeltaTime() const { return m_DeltaTime; }
+
+		GLFWwindow* GetGlfwWindow() const { return m_GlfwWindow; }
 
 		Window();
 		Window(const WindowProperties& properties);

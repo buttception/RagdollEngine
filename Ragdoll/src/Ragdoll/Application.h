@@ -31,6 +31,7 @@ ________________________________________________________________________________
 
 namespace Ragdoll
 {
+	class RenderGraph;
 	class WindowMoveEvent;
 	class WindowResizeEvent;
 	class WindowCloseEvent;
@@ -79,8 +80,9 @@ namespace Ragdoll
 	private:
 		bool m_Running{ true };
 
-		std::unique_ptr<Window> m_PrimaryWindow;
-		std::unique_ptr<InputHandler> m_InputHandler;
+		std::shared_ptr<Window> m_PrimaryWindow;
+		std::shared_ptr<InputHandler> m_InputHandler;
+		std::shared_ptr<RenderGraph> m_RenderGraph;
 	};
 
 	/**

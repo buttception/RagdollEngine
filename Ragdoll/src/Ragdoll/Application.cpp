@@ -40,6 +40,7 @@ ________________________________________________________________________________
 #include "Event/KeyEvents.h"
 #include "Event/MouseEvent.h"
 #include "Input/InputHandler.h"
+#include "Graphics/Renderer/RenderGraph.h"
 
 namespace Ragdoll
 {
@@ -50,12 +51,16 @@ namespace Ragdoll
 
 		GLFWContext::Init();
 
-		m_PrimaryWindow = std::make_unique<Window>();
+		m_PrimaryWindow = std::make_shared<Window>();
 		m_PrimaryWindow->Init();
 		//bind the application callback to the window
 		m_PrimaryWindow->SetEventCallback(RD_BIND_EVENT_FN(Application::OnEvent));
 		//setup input handler
-		m_InputHandler = std::make_unique<InputHandler>();
+		m_InputHandler = std::make_shared<InputHandler>();
+		m_InputHandler->Init();
+		//create the render graph
+		m_RenderGraph = std::make_shared<RenderGraph>();
+		m_RenderGraph->Init(m_PrimaryWindow);
 	}
 
 	void Application::Run()
@@ -63,7 +68,7 @@ namespace Ragdoll
 		while(m_Running)
 		{
 			//input update must be called before window polls for inputs
-			m_InputHandler->Update(m_PrimaryWindow->getDeltaTime());
+			m_InputHandler->Update(m_PrimaryWindow->GetDeltaTime());
 			m_PrimaryWindow->StartRender();
 
 			m_PrimaryWindow->EndRender();

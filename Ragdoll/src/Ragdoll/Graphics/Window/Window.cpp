@@ -67,7 +67,7 @@ namespace Ragdoll
 		if (m_PrimaryMonitorInfo == nullptr) m_PrimaryMonitorInfo = const_cast<GLFWvidmode*>(glfwGetVideoMode(m_PrimaryMonitor));
 
 		m_GlfwWindow = glfwCreateWindow(m_Properties.m_Width, m_Properties.m_Height, m_Properties.m_Title.c_str(), nullptr, nullptr);
-		RD_ASSERT(m_GlfwWindow == nullptr, "Window failed to initialize");
+		RD_CRITICAL_ASSERT(m_GlfwWindow == nullptr, "Window failed to initialize");
 		if(!m_GlfwWindow)
 		{
 			return false;

@@ -69,8 +69,10 @@ ________________________________________________________________________________
 // Assert macros
 #ifdef RAGDOLL_ENABLE_ASSERTS
 	#define RD_ASSERT(x, ...) do { if(x) { RD_CORE_FATAL("Assertion failed!"); RD_CORE_ERROR(__VA_ARGS__); __debugbreak(); } } while (0)
+	#define RD_CRITICAL_ASSERT(x, ...) RD_ASSERT(x, __VA_ARGS__)
 #else
 	#define RD_ASSERT(x, ...) do { if(x) { RD_CORE_FATAL("Assertion failed!"); RD_CORE_ERROR(__VA_ARGS__); } } while (0)
+	#define RD_CRITICAL_ASSERT(x, ...) RD_ASSERT(x, __VA_ARGS__) if(!x) { RD_CORE_FATAL("Fatal error occured, please consult the logs") exit(EXIT_FAILURE); }
 #endif
 
 // Bit macro helper
@@ -88,4 +90,4 @@ namespace Ragdoll
 using EventCallbackFn = std::function<void(Ragdoll::Event&)>;
 
 #define RD_LOG_EVENT 0
-#define RD_LOG_INPUT 1
+#define RD_LOG_INPUT 0
