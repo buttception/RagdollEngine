@@ -438,10 +438,12 @@ namespace Ragdoll
 
 	void InputHandler::Update(double _dt)
 	{
+		//reset scroll boolean
+		m_ScrollThisFrame = false;
 		for(unsigned int i{}; i < static_cast<int>(Key::MaxKey); ++i)
 		{
-			auto& key = m_Keys[i];
 #if RD_LOG_INPUT
+			auto& key = m_Keys[i];
 			//this log is one frame late
 			if (key.m_InputState.m_Hold || key.m_InputState.m_Tap || key.m_InputState.m_LongPress || key.m_InputState.m_MultiTap)
 				LogKeyEvents(static_cast<Key>(i), key);
@@ -451,8 +453,8 @@ namespace Ragdoll
 
 		for(unsigned int i{}; i < static_cast<int>(MouseButton::MaxButton); ++i)
 		{
-			auto& mbtn = m_MouseButtons[i];
 #if RD_LOG_INPUT
+			auto& mbtn = m_MouseButtons[i];
 			//this log is one frame late
 			if (mbtn.m_InputState.m_Hold || mbtn.m_InputState.m_Tap || mbtn.m_InputState.m_LongPress || mbtn.m_InputState.m_MultiTap)
 				LogMouseEvents(static_cast<MouseButton>(i), mbtn);

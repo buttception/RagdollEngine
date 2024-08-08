@@ -40,22 +40,30 @@ ________________________________________________________________________________
 #include "Event/KeyEvents.h"
 #include "Event/MouseEvent.h"
 #include "Input/InputHandler.h"
+#include "Graphics/Renderer/RenderGraph.h"
+
+#include "glad/glad.h"
 
 namespace Ragdoll
 {
 	void Application::Init(const ApplicationConfig& config)
 	{
+		UNREFERENCED_PARAMETER(config);
 		Logger::Init();
 		RD_CORE_INFO("spdlog initialized for use.");
 
 		GLFWContext::Init();
 
-		m_PrimaryWindow = std::make_unique<Window>();
+		m_PrimaryWindow = std::make_shared<Window>();
 		m_PrimaryWindow->Init();
 		//bind the application callback to the window
 		m_PrimaryWindow->SetEventCallback(RD_BIND_EVENT_FN(Application::OnEvent));
 		//setup input handler
-		m_InputHandler = std::make_unique<InputHandler>();
+		m_InputHandler = std::make_shared<InputHandler>();
+		m_InputHandler->Init();
+		//create the render graph
+		m_RenderGraph = std::make_shared<RenderGraph>();
+		m_RenderGraph->Init(m_PrimaryWindow);
 	}
 
 	void Application::Run()
@@ -63,8 +71,99 @@ namespace Ragdoll
 		while(m_Running)
 		{
 			//input update must be called before window polls for inputs
-			m_InputHandler->Update(m_PrimaryWindow->getDeltaTime());
+			m_InputHandler->Update(m_PrimaryWindow->GetDeltaTime());
 			m_PrimaryWindow->StartRender();
+			// Vertex shader source code
+			const char* vertexShaderSource = R"(
+				#version 460 core
+				layout (location = 0) in vec3 aPos;
+
+				void main()
+				{
+				    gl_Position = vec4(aPos, 1.0);
+				}
+			)";
+
+			// Fragment shader source code
+			const char* fragmentShaderSource = R"(
+				#version 460 core
+				out vec4 FragColor;
+
+				void main()
+				{
+				    FragColor = vec4(1.0, 0.5, 0.2, 1.0);
+				}
+			)";
+			GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+			glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+			glCompileShader(vertexShader);
+			GLint success;
+			GLchar infoLog[512];
+			glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+			if (!success) {
+				glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
+				std::cerr << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << "\n";
+			}
+
+			// Fragment shader
+			GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+			glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+			glCompileShader(fragmentShader);
+			glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+			if (!success) {
+				glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
+				std::cerr << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << "\n";
+			}
+
+			// Link shaders
+			GLuint shaderProgram = glCreateProgram();
+			glAttachShader(shaderProgram, vertexShader);
+			glAttachShader(shaderProgram, fragmentShader);
+			glLinkProgram(shaderProgram);
+			glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+			if (!success) {
+				glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
+				std::cerr << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << "\n";
+			}
+
+			glDeleteShader(vertexShader);
+			glDeleteShader(fragmentShader);
+
+			static glm::vec3 top{ 0.f, 0.5f, 0.f };
+			static glm::vec3 botLeft{ -0.5f, -0.5f, 0.0f };
+			static glm::vec3 botRight{ 0.5f, -0.5f, 0.0f };
+			// Set up vertex data and buffers and configure vertex attributes
+			GLfloat vertices[] = {
+				top.x, top.y, top.z, // Top
+				botLeft.x, botLeft.y, botLeft.z, // Bottom Left
+				botRight.x, botRight.y, botRight.z  // Bottom Right
+			};
+
+			GLuint VBO, VAO;
+			glGenVertexArrays(1, &VAO);
+			glGenBuffers(1, &VBO);
+
+			// Bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
+			glBindVertexArray(VAO);
+
+			glBindBuffer(GL_ARRAY_BUFFER, VBO);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+			// Position attribute
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+			glEnableVertexAttribArray(0);
+
+			// Note that this is allowed, the call to glVertexAttribPointer registered VBO as the currently bound vertex buffer object so afterwards we can safely unbind
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+			// Unbind VAO
+			glBindVertexArray(0);
+
+			// Draw our first triangle
+			glUseProgram(shaderProgram);
+			glBindVertexArray(VAO);
+			glDrawArrays(GL_TRIANGLES, 0, 3);
+			glBindVertexArray(0);
 
 			m_PrimaryWindow->EndRender();
 		}
@@ -104,6 +203,7 @@ namespace Ragdoll
 
 	bool Application::OnWindowResize(WindowResizeEvent& event)
 	{
+		UNREFERENCED_PARAMETER(event);
 #if RD_LOG_EVENT
 		RD_CORE_TRACE("Event: {}", event.ToString());
 #endif
@@ -112,6 +212,7 @@ namespace Ragdoll
 
 	bool Application::OnWindowMove(WindowMoveEvent& event)
 	{
+		UNREFERENCED_PARAMETER(event);
 #if RD_LOG_EVENT
 		RD_CORE_TRACE("Event: {}", event.ToString());
 #endif

@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Math.h
-\date		07/08/2024
+\file		RenderGraph.cpp
+\date		08/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,14 +27,24 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-#pragma once
-#define GLM_FORCE_SSE2
 
-#ifdef RAGDOLL_DEBUG
-	#define GLM_FORCE_MESSAGES
-	#define GLM_FORCE_CTOR_INIT
-#else
-	#define GLM_FORCE_INLINE
-#endif
+#include "ragdollpch.h"
 
-#include "glm/glm.hpp"
+#include "RenderGraph.h"
+
+#include "Ragdoll/Graphics/OpenGLContext.h"
+
+namespace Ragdoll
+{
+	void RenderGraph::Init(std::shared_ptr<Window> window)
+	{
+		m_Window = window;
+		m_Context = std::make_shared<OpenGLContext>();
+		m_Context->Init(window);
+	}
+
+	void RenderGraph::SwapBuffers()
+	{
+		m_Context->SwapBuffers();
+	}
+}

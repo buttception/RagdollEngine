@@ -69,8 +69,10 @@ ________________________________________________________________________________
 // Assert macros
 #ifdef RAGDOLL_ENABLE_ASSERTS
 	#define RD_ASSERT(x, ...) do { if(x) { RD_CORE_FATAL("Assertion failed!"); RD_CORE_ERROR(__VA_ARGS__); __debugbreak(); } } while (0)
+	#define RD_CRITICAL_ASSERT(x, ...) RD_ASSERT(x, __VA_ARGS__)
 #else
 	#define RD_ASSERT(x, ...) do { if(x) { RD_CORE_FATAL("Assertion failed!"); RD_CORE_ERROR(__VA_ARGS__); } } while (0)
+	#define RD_CRITICAL_ASSERT(x, ...) RD_ASSERT(x, __VA_ARGS__) if(!x) { RD_CORE_FATAL("Fatal error occured, please consult the logs") exit(EXIT_FAILURE); }
 #endif
 
 // Bit macro helper
@@ -88,4 +90,9 @@ namespace Ragdoll
 using EventCallbackFn = std::function<void(Ragdoll::Event&)>;
 
 #define RD_LOG_EVENT 0
-#define RD_LOG_INPUT 1
+#define RD_LOG_INPUT 0
+#define RD_OPENGL_DEBUG_LEVEL 1 //0 for errors, //1 for medium, //2 for low, //3 for notifications
+
+//ignore warnings
+#pragma warning(push)
+#pragma warning(disable : 4201) // Disable warning C4201: nonstandard extension used: nameless struct/union

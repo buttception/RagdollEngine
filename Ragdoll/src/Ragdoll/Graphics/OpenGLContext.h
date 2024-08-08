@@ -1,5 +1,5 @@
 ﻿/*!
-\file		Math.h
+\file		OpenGLContext.h
 \date		07/08/2024
 
 \author		Devin Tan
@@ -28,13 +28,23 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
-#define GLM_FORCE_SSE2
+#include "glad/glad.h"
+
+namespace Ragdoll
+{
+	class Window;
+	class OpenGLContext
+	{
+	public:
+		void Init(std::shared_ptr<Window> window);
+		void SwapBuffers();
+
+	private:
+		std::shared_ptr<Window> m_Window;
+	};
 
 #ifdef RAGDOLL_DEBUG
-	#define GLM_FORCE_MESSAGES
-	#define GLM_FORCE_CTOR_INIT
-#else
-	#define GLM_FORCE_INLINE
+	void GLAPIENTRY OpenGLErrorCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam);
+	const char* GLenumErrorToString(const GLenum& errorCode);
 #endif
-
-#include "glm/glm.hpp"
+}
