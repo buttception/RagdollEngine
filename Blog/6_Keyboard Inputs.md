@@ -28,6 +28,7 @@ glfwSetKeyCallback(m_GlfwWindow, [](GLFWwindow* window, int _key, int _scancode,
 });
 ```
 Once the application callback is called, it will call the relevant input handler function.
+
 ```cpp
 //in Ragdool/src/Ragdoll/Application.cpp
 bool Application::OnKeyPressed(KeyPressedEvent& event)
@@ -36,8 +37,10 @@ bool Application::OnKeyPressed(KeyPressedEvent& event)
     return false;
 }
 ```
+
 ## Key Inputs
 Since there are hundreds of keys, I try my best to keep the data size used to keep track of the key states to a minimun size. I managed to reduce the size of ```InputData``` to 16 bytes. The states that I keep track of are:
+
 ```cpp
 //in Ragdoll/src/Ragdoll/Input/InputHandler.h
 struct InputState
@@ -57,7 +60,9 @@ struct InputState
 	unsigned int : 23;                                  //anonymous unused bitfield
 };
 ```
+
 This key state will share bits with the multi tap counter, which in this case is 23 bits. If I need more flags in the future, I can cannibalize more bits from the tap counter. I doubt the user will tap more than a couple hundred thousand times. The ```InputData``` struct will then contain the rest of the information I need, such as repeat count and timers.
+
 ```cpp
 //in Ragdoll/src/Ragdoll/Input/InputHandler.h
 struct InputData
@@ -83,7 +88,9 @@ struct InputData
 	~InputData() {}
 };
 ```
+
 With these information, I will be able to do the additional functionality for the special key presses. The time needed to trigger these special presses are defined as ```const static``` variables in the input handler, and can be changed in code.
+
 ```cpp
 //how long the key is held down for a long press to be triggered
 inline const static float s_LongPressTime = 0.5f;
@@ -92,10 +99,13 @@ inline const static float s_MultiTapTime = 0.2f;
 //time before a key hold is considered not a tap when released
 inline const static float s_TapTime = 0.3f;
 ```
+
 All of the ```InputData``` will be stored in a big array, where I can direct access them using the value of the key enums.
+
 ```cpp
 InputData m_Keys[static_cast<int>(Key::MaxKey)];
 ```
+
 ```cpp
 enum class Key
 {
@@ -103,37 +113,38 @@ enum class Key
 	A = 65, //in this case it will be index 65
     //more enums...
 ```
+
 So onto how I set the InputStates for use in the engine. I won't delve into the code here, but I will give some concepts that I used to write the features.
 - ```m_Press```:
     - ```1```: ```m_Hold``` is ```0``` and ```GLFW_PRESS``` is triggered.
     - ```0```: Otherwise.
-![Press](resources/6_Press.png)
+![Press](resources/6_press.png)
 - ```m_Release```:
     - ```1```: ```GLFW_RELEASE``` is triggered.
     - ```0```: Otherwise.
-![Release](resources/6_Release.png)
+![Release](resources/6_release.png)
 - ```m_Hold```:
     - ```1```: ```GLFW_PRESS``` is triggered.
     - ```0```: ```GLFW_RELEASE``` is detected.
-![Release](resources/6_Hold.png)
+![Release](resources/6_hold.png)
 - ```m_Repeat```:
     - ```1```: When ```GLFW_REPEAT``` is triggered.
     - ```0```: Otherwise.
     - ```Note```: Increments ```m_RepeatCount``` when ```1```
-![Release](resources/6_Repeat.png)
+![Release](resources/6_repeat.png)
 - ```m_LongPress```:
     - ```1```: If ```m_Hold``` is still ```1``` once ```m_HeldTimer``` > ```s_LongPressTime```.
     - ```0```: Otherwise. ```m_LongPressTriggered``` will be set to ```0``` when ```GLFW_RELEASE``` is triggered.
     - ```Note```: When ```m_Hold``` is ```1``` and ```m_LongPressTriggered``` is ```0```, ```m_HeldTimer``` will run. Set ```m_LongPressTriggered``` to ```1``` when ```1```.
-![Release](resources/6_LongPress.png)
+![Release](resources/6_long_press.png)
 - ```m_Tap```:
     - ```1```: When ```m_Release``` is ```1``` and ```m_HeldTimer``` < ```s_TapTime```.
     - ```0```: Otherwise.
-![Release](resources/6_Tap.png)
+![Release](resources/6_tap.png)
 - ```m_MultiTap```:
     - ```1```: When ```m_Press``` is ```1```, ```m_IncrementMultiTapTimer``` is ```1``` and ```m_MultiTapTimer``` < ```s_MultiTapTime```.
     - ```0```: Otherwise.
     - ```Note```:  Increments ```m_TapCount``` as well when ```1```. ```m_IncrementMultiTapTimer``` will be set to ```1``` whenever ```m_Release``` is ```1```. ```m_IncrementMultiTapTimer``` will run ```m_MultiTapTimer```.
-![Release](resources/6_MultiTap.png)
+![Release](resources/6_multi_tap.png)
 
 With this, the input handler just needs to be used by other systems of the engine which I won't go into in this blog. You can try to write your own implementation on how to use the ```InputData``` here in your own engine.

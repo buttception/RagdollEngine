@@ -98,7 +98,7 @@ namespace Ragdoll
 		glfwSetWindowPosCallback(m_GlfwWindow, [](GLFWwindow* window, int _x, int _y)
 		{
 			Window& data = *static_cast<Window*>(glfwGetWindowUserPointer(window));
-			data.m_Properties.m_Position = iVec2(_x, _y);
+			data.m_Properties.m_Position = glm::vec2(_x, _y);
 
 			WindowMoveEvent event{_x, _y};
 			data.m_Callback(event);
@@ -226,6 +226,10 @@ namespace Ragdoll
 		m_Frame++;
 		m_FpsCounter++;
 		glfwPollEvents();
+
+		//clear the screen
+		glClearColor(m_Properties.m_BackgroundColor.x, m_Properties.m_BackgroundColor.y, m_Properties.m_BackgroundColor.z, 1.f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
 
 	void Window::EndRender()

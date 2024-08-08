@@ -34,20 +34,7 @@ ________________________________________________________________________________
 	#define GLM_FORCE_MESSAGES
 	#define GLM_FORCE_CTOR_INIT
 #else
-#define GLM_FORCE_INLINE
+	#define GLM_FORCE_INLINE
 #endif
 
 #include "glm/glm.hpp"
-
-namespace Ragdoll
-{
-	typedef glm::ivec2 iVec2;
-	typedef glm::ivec3 iVec3;
-	typedef glm::ivec4 iVec4;
-	typedef glm::vec2 Vec2;
-	typedef glm::vec3 Vec3;
-	typedef glm::vec4 Vec4;
-	typedef glm::dvec2 dVec2;
-	typedef glm::dvec3 dVec3;
-	typedef glm::dvec4 dVec4;
-}

@@ -104,6 +104,11 @@ namespace Ragdoll
 		bool IsMouseButtonMultiTap(MouseButton _button) const { return m_MouseButtons[static_cast<int>(_button)].m_InputState.m_MultiTap; }
 		unsigned int GetMouseButtonTapCount(MouseButton _button) const { return m_MouseButtons[static_cast<int>(_button)].m_TapCount; }
 
+		glm::ivec2 GetMousePosition() const { return m_MousePos; }
+		glm::ivec2 GetMouseDelta() const { return m_MouseDeltas; }
+		glm::ivec2 GetScrollDelta() const { return m_ScrollDeltas; }
+		bool IsScrollThisFrame() const { return m_ScrollThisFrame; }
+
 	private:
 		const static std::unordered_map<char, Key> s_CharToKeyMap;
 		const static std::unordered_map<Key, char> s_KeyToCharMap;
@@ -121,10 +126,10 @@ namespace Ragdoll
 		InputData m_Keys[static_cast<int>(Key::MaxKey)];
 		InputData m_MouseButtons[static_cast<int>(MouseButton::MaxButton)];
 
-		iVec2 m_MousePos{};
-		iVec2 m_LastMousePos{};
-		iVec2 m_MouseDeltas{};
-		iVec2 m_ScrollDeltas{};
+		glm::ivec2 m_MousePos{};
+		glm::ivec2 m_LastMousePos{};
+		glm::ivec2 m_MouseDeltas{};
+		glm::ivec2 m_ScrollDeltas{};
 		bool m_ScrollThisFrame{};
 
 		//functions to update states based on the event
