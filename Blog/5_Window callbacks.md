@@ -238,7 +238,7 @@ bool Application::OnWindowResize(WindowResizeEvent& event)
 }
 ```
 
-<video src="[resources/5_window_move.mp4](https://github.com/buttception/RagdollEngine/blob/0fa38616d49e289b674606326282d1213201fada/Blog/resources/5_window_move.mp4)" placeholder="" autoplay loop controls muted title="Window resize event"></video>
+<video src="https://github.com/buttception/RagdollEngine/blob/0fa38616d49e289b674606326282d1213201fada/Blog/resources/5_window_move.mp4" placeholder="" autoplay loop controls muted title="Window resize event"></video>
 
 ![Test Video](https://github.com/buttception/RagdollEngine/blob/642c15339005171610e814afe88122a1f881c7f1/Blog/resources/5_window_move.mp4)
 
