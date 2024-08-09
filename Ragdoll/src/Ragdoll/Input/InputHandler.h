@@ -29,7 +29,7 @@
 __________________________________________________________________________________*/
 #pragma once
 
-#include "Ragdoll/Enums.h"
+#include "InputEnums.h"
 #include "Ragdoll/Event/KeyEvents.h"
 #include "Ragdoll/Event/MouseEvent.h"
 #include "Ragdoll/Math/RagdollMath.h"

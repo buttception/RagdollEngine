@@ -1,6 +1,6 @@
 ﻿/*!
-\file		KeyEvents.h
-\date		06/08/2024
+\file		Layer.h
+\date		09/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -28,73 +28,37 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
-#include "Event.h"
+#include "Ragdoll/Core/Logger.h"
 
 namespace Ragdoll
 {
-	class KeyEvent : public Event
+	class Event;
+
+	class Layer
 	{
 	public:
-		inline int GetKeyCode() const { return m_KeyCode; }
+		Layer() = default;
+		virtual ~Layer() = default;
 
-		EVENT_CLASS_CATEGORY(EventCategoryKeyboard | EventCategoryInput)
-	protected:
-		KeyEvent(int _keycode)
-			: m_KeyCode(_keycode) {}
+		virtual void Init() = 0;
+		virtual void Shutdown() = 0;
+		virtual void PreUpdate(float _dt) {}
+		virtual void Update(float _dt) = 0;
+		virtual void PostUpdate(float _dt) {}
+		virtual void OnEvent(Event& e) { UNREFERENCED_PARAMETER(e); }
 
-		int m_KeyCode;
-	};
+		bool IsEnabled() const { return m_Enabled; }
+		void SetEnabled(bool enabled) { m_Enabled = enabled; }
+#ifdef RAGDOLL_DEBUG
+		const std::string& GetDebugName() const { return m_DebugName; }
+		void SetDebugName(const std::string& name) { m_DebugName = name; }
+#endif
 
-	class KeyPressedEvent : public KeyEvent
-	{
-	public:
-		KeyPressedEvent(int _keycode, int _repeatCount)
-			: KeyEvent(_keycode), m_RepeatCount(_repeatCount) {}
-
-		inline int GetRepeatCount() const { return m_RepeatCount; }
-
-		std::string ToString() const override
-		{
-			std::stringstream ss;
-			ss << "KeyPressedEvent: " << m_KeyCode << " (" << m_RepeatCount << " repeats)";
-			return ss.str();
-		}
-
-		EVENT_CLASS_TYPE(KeyPressed)
 	private:
-		int m_RepeatCount;
-	};
+		bool m_Enabled = true;
 
-	class KeyTypedEvent : public KeyEvent
-	{
-	public:
-		KeyTypedEvent(int _keycode)
-			: KeyEvent(_keycode) {}
-
-		std::string ToString() const override
-		{
-			std::stringstream ss;
-			ss << "KeyTypedEvent: " << m_KeyCode;
-			return ss.str();
-		}
-
-		EVENT_CLASS_TYPE(KeyTyped)
-	private:
-	};
-
-	class KeyReleasedEvent : public KeyEvent
-	{
-	public:
-		KeyReleasedEvent(int _keycode)
-			: KeyEvent(_keycode) {}
-
-		std::string ToString() const override
-		{
-			std::stringstream ss;
-			ss << "KeyReleasedEvent: " << m_KeyCode;
-			return ss.str();
-		}
-
-		EVENT_CLASS_TYPE(KeyReleased)
+#ifdef RAGDOLL_DEBUG
+		std::string m_DebugName;
+#endif
 	};
 }

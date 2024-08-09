@@ -1,6 +1,6 @@
 ﻿/*!
-\file		KeyEvents.h
-\date		06/08/2024
+\file		LayerStack.h
+\date		09/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -28,73 +28,33 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
-#include "Event.h"
 
 namespace Ragdoll
 {
-	class KeyEvent : public Event
+	class Layer;
+	class LayerStack
 	{
 	public:
-		inline int GetKeyCode() const { return m_KeyCode; }
+		void Init();
+		void Shutdown();
 
-		EVENT_CLASS_CATEGORY(EventCategoryKeyboard | EventCategoryInput)
-	protected:
-		KeyEvent(int _keycode)
-			: m_KeyCode(_keycode) {}
+		void PushLayer(std::shared_ptr<Layer> layer);
+		void PushOverlay(std::shared_ptr<Layer> overlay);
+		void PopLayer(std::shared_ptr<Layer> layer);
+		void PopOverlay(std::shared_ptr<Layer> overlay);
 
-		int m_KeyCode;
-	};
+		std::vector<std::shared_ptr<Layer>>::iterator begin() { return m_Layers.begin(); }
+		std::vector<std::shared_ptr<Layer>>::iterator end() { return m_Layers.end(); }
+		std::vector<std::shared_ptr<Layer>>::reverse_iterator rbegin() { return m_Layers.rbegin(); }
+		std::vector<std::shared_ptr<Layer>>::reverse_iterator rend() { return m_Layers.rend(); }
 
-	class KeyPressedEvent : public KeyEvent
-	{
-	public:
-		KeyPressedEvent(int _keycode, int _repeatCount)
-			: KeyEvent(_keycode), m_RepeatCount(_repeatCount) {}
-
-		inline int GetRepeatCount() const { return m_RepeatCount; }
-
-		std::string ToString() const override
-		{
-			std::stringstream ss;
-			ss << "KeyPressedEvent: " << m_KeyCode << " (" << m_RepeatCount << " repeats)";
-			return ss.str();
-		}
-
-		EVENT_CLASS_TYPE(KeyPressed)
+		std::vector<std::shared_ptr<Layer>>::const_iterator begin() const { return m_Layers.begin(); }
+		std::vector<std::shared_ptr<Layer>>::const_iterator end()	const { return m_Layers.end(); }
+		std::vector<std::shared_ptr<Layer>>::const_reverse_iterator rbegin() const { return m_Layers.rbegin(); }
+		std::vector<std::shared_ptr<Layer>>::const_reverse_iterator rend() const { return m_Layers.rend(); }
 	private:
-		int m_RepeatCount;
-	};
-
-	class KeyTypedEvent : public KeyEvent
-	{
-	public:
-		KeyTypedEvent(int _keycode)
-			: KeyEvent(_keycode) {}
-
-		std::string ToString() const override
-		{
-			std::stringstream ss;
-			ss << "KeyTypedEvent: " << m_KeyCode;
-			return ss.str();
-		}
-
-		EVENT_CLASS_TYPE(KeyTyped)
-	private:
-	};
-
-	class KeyReleasedEvent : public KeyEvent
-	{
-	public:
-		KeyReleasedEvent(int _keycode)
-			: KeyEvent(_keycode) {}
-
-		std::string ToString() const override
-		{
-			std::stringstream ss;
-			ss << "KeyReleasedEvent: " << m_KeyCode;
-			return ss.str();
-		}
-
-		EVENT_CLASS_TYPE(KeyReleased)
+		std::vector<std::shared_ptr<Layer>> m_Layers;
+		//index to insert from the rear
+		uint32_t m_LayerInsertIndex{ 0 };
 	};
 }

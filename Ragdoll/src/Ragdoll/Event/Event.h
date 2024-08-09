@@ -28,7 +28,7 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
-#include "Ragdoll/Enums.h"
+#include "Ragdoll/Event/EventEnums.h"
 
 namespace Ragdoll
 {
