@@ -34,7 +34,7 @@ ________________________________________________________________________________
 #include "Ragdoll/Event/MouseEvent.h"
 #include "Ragdoll/Math/RagdollMath.h"
 
-namespace Ragdoll
+namespace ragdoll
 {
 	struct InputState
 	{

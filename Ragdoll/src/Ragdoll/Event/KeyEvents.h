@@ -30,7 +30,7 @@ ________________________________________________________________________________
 #pragma once
 #include "Event.h"
 
-namespace Ragdoll
+namespace ragdoll
 {
 	class KeyEvent : public Event
 	{

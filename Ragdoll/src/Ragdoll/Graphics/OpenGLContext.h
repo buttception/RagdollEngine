@@ -30,7 +30,7 @@ ________________________________________________________________________________
 #pragma once
 #include "glad/glad.h"
 
-namespace Ragdoll
+namespace ragdoll
 {
 	class Window;
 	class OpenGLContext

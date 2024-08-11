@@ -29,7 +29,7 @@
 __________________________________________________________________________________*/
 #pragma once
 
-namespace Ragdoll
+namespace ragdoll
 {
 	class GLFWContext
 	{

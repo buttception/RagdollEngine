@@ -31,7 +31,7 @@ ________________________________________________________________________________
 
 #include "Event.h"
 
-namespace Ragdoll
+namespace ragdoll
 {
 	class WindowResizeEvent : public Event
 	{

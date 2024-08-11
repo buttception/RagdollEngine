@@ -32,7 +32,7 @@ ________________________________________________________________________________
 
 #include "Transform.h"
 
-namespace Ragdoll
+namespace ragdoll
 {
 	
 }

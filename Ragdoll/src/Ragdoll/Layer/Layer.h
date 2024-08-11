@@ -30,14 +30,15 @@ ________________________________________________________________________________
 #pragma once
 #include "Ragdoll/Core/Logger.h"
 
-namespace Ragdoll
+namespace ragdoll
 {
 	class Event;
+	class EntityManager;
 
 	class Layer
 	{
 	public:
-		Layer() = default;
+		Layer(std::shared_ptr<EntityManager> entManager) : m_EntityManager{ entManager } {}
 		virtual ~Layer() = default;
 
 		virtual void Init() = 0;
@@ -54,8 +55,9 @@ namespace Ragdoll
 		void SetDebugName(const std::string& name) { m_DebugName = name; }
 #endif
 
-	private:
+	protected:
 		bool m_Enabled = true;
+		std::shared_ptr<EntityManager> m_EntityManager;
 
 #ifdef RAGDOLL_DEBUG
 		std::string m_DebugName;

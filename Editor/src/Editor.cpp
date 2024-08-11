@@ -31,7 +31,7 @@ ________________________________________________________________________________
 #include "ragdollpch.h"
 #include "Ragdoll.h"
 
-class Editor : public Ragdoll::Application
+class Editor : public ragdoll::Application
 {
 public:
 	Editor() = default;
@@ -48,7 +48,7 @@ public:
  * \brief Creates the editor application
  * \return The editor application
  */
-Ragdoll::Application* Ragdoll::CreateApplication()
+ragdoll::Application* ragdoll::CreateApplication()
 {
 	return new Editor();
 }

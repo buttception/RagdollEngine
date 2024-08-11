@@ -34,7 +34,7 @@ ________________________________________________________________________________
 	#ifdef _WIN64
 		#define RAGDOLL_PLATFORM_WINDOWS
 	#else
-		#error "x86 Builds are not supported for Ragdoll Engine."
+		#error "x86 Builds are not supported for ragdoll Engine."
 	#endif
 #elif defined(__APPLE__) || defined (__MACH__)
 	#include <TargetConditionals.h>
@@ -83,11 +83,11 @@ ________________________________________________________________________________
 
 // Function pointer binding with std::functions
 #define RD_BIND_EVENT_FN(fn) std::bind(&fn, this, std::placeholders::_1)
-namespace Ragdoll
+namespace ragdoll
 {
 	class Event;
 }
-using EventCallbackFn = std::function<void(Ragdoll::Event&)>;
+using EventCallbackFn = std::function<void(ragdoll::Event&)>;
 
 #define RD_LOG_EVENT 0
 #define RD_LOG_INPUT 0

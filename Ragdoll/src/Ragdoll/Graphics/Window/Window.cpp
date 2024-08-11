@@ -43,7 +43,7 @@ ________________________________________________________________________________
 
 #include "Ragdoll/Event/WindowEvents.h"
 
-namespace Ragdoll
+namespace ragdoll
 {
 	Window::Window()
 	{

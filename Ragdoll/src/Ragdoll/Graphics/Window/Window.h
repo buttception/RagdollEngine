@@ -36,14 +36,14 @@ struct GLFWwindow;
 struct GLFWmonitor;
 struct GLFWvidmode;
 
-namespace Ragdoll
+namespace ragdoll
 {
 	class Window
 	{
 	public:
 		struct WindowProperties
 		{
-			std::string m_Title{ "Ragdoll Engine" };
+			std::string m_Title{ "ragdoll Engine" };
 			int m_Width{ 800 };
 			int m_Height{ 600 };
 			glm::ivec2 m_Position{};

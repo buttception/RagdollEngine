@@ -34,7 +34,7 @@ ________________________________________________________________________________
 
 #include "Layer.h"
 
-namespace Ragdoll
+namespace ragdoll
 {
 	void LayerStack::Init()
 	{

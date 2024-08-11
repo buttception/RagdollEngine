@@ -238,9 +238,7 @@ bool Application::OnWindowResize(WindowResizeEvent& event)
 }
 ```
 
-<video src="https://github.com/buttception/RagdollEngine/blob/0fa38616d49e289b674606326282d1213201fada/Blog/resources/5_window_move.mp4" placeholder="" autoplay loop controls muted title="Window resize event"></video>
-
-![Test Video](https://github.com/buttception/RagdollEngine/blob/642c15339005171610e814afe88122a1f881c7f1/Blog/resources/5_window_move.mp4)
+<video src="resources/5_window_move.mp4" placeholder="" autoplay loop controls muted title="Window resize event"></video>
 
 ## Framerate
 I added a quick way to tell what the current framerate of the engine is, as well as some relevant information that maybe needed. ```std::chrono``` is used to be able to get the delta time between frames. ```Timestep``` is a helper class to easily get my time in seconds or milliseconds.
@@ -270,4 +268,4 @@ if(m_Timer >= 1.f)
 
 I then set the title of the window with these informations. Future debug information may go into the title bar as well.
 
-<video src="resources/5_window_fps.mp4" placeholder="" autoplay loop controls muted title="Window title"></video>
+![Window Fps](resources/5_window_fps.png)

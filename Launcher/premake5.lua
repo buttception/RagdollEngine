@@ -28,6 +28,7 @@ project "Launcher"
         "%{wks.location}/Ragdoll/src",
 		"%{IncludesDir.glm}",
 		"%{IncludesDir.spdlog}",
+		"%{IncludesDir.entt}",
     }
 
 	postbuildcommands

@@ -30,7 +30,7 @@ ________________________________________________________________________________
 #pragma once
 #include "Ragdoll/Core/Core.h"
 
-namespace Ragdoll
+namespace ragdoll
 {
 	enum class EventType
 	{

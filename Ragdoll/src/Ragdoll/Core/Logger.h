@@ -29,9 +29,10 @@
 __________________________________________________________________________________*/
 #pragma once
 
+#include "Guid.h"
 #include "spdlog/spdlog.h"
 
-namespace Ragdoll
+namespace ragdoll
 {
 	class Logger
 	{
@@ -67,17 +68,17 @@ namespace Ragdoll
 		static inline std::shared_ptr<spdlog::logger> s_ClientLogger;
 	};
 }
-#define RD_CORE_TRACE(...) ::Ragdoll::Logger::GetCoreLogger()->trace(__VA_ARGS__)
-#define RD_CORE_INFO(...) ::Ragdoll::Logger::GetCoreLogger()->info(__VA_ARGS__)
-#define RD_CORE_WARN(...) ::Ragdoll::Logger::GetCoreLogger()->warn(__VA_ARGS__)
-#define RD_CORE_ERROR(...) ::Ragdoll::Logger::GetCoreLogger()->error(__VA_ARGS__)
-#define RD_CORE_FATAL(...) ::Ragdoll::Logger::GetCoreLogger()->critical(__VA_ARGS__)
+#define RD_CORE_TRACE(...) ::ragdoll::Logger::GetCoreLogger()->trace(__VA_ARGS__)
+#define RD_CORE_INFO(...) ::ragdoll::Logger::GetCoreLogger()->info(__VA_ARGS__)
+#define RD_CORE_WARN(...) ::ragdoll::Logger::GetCoreLogger()->warn(__VA_ARGS__)
+#define RD_CORE_ERROR(...) ::ragdoll::Logger::GetCoreLogger()->error(__VA_ARGS__)
+#define RD_CORE_FATAL(...) ::ragdoll::Logger::GetCoreLogger()->critical(__VA_ARGS__)
 
-#define RD_CLIENT_TRACE(...) ::Ragdoll::Logger::GetClientLogger()->trace(__VA_ARGS__)
-#define RD_CLIENT_INFO(...) ::Ragdoll::Logger::GetClientLogger()->info(__VA_ARGS__)
-#define RD_CLIENT_WARN(...) ::Ragdoll::Logger::GetClientLogger()->warn(__VA_ARGS__)
-#define RD_CLIENT_ERROR(...) ::Ragdoll::Logger::GetClientLogger()->error(__VA_ARGS__)
-#define RD_CLIENT_FATAL(...) ::Ragdoll::Logger::GetClientLogger()->critical(__VA_ARGS__)
+#define RD_CLIENT_TRACE(...) ::ragdoll::Logger::GetClientLogger()->trace(__VA_ARGS__)
+#define RD_CLIENT_INFO(...) ::ragdoll::Logger::GetClientLogger()->info(__VA_ARGS__)
+#define RD_CLIENT_WARN(...) ::ragdoll::Logger::GetClientLogger()->warn(__VA_ARGS__)
+#define RD_CLIENT_ERROR(...) ::ragdoll::Logger::GetClientLogger()->error(__VA_ARGS__)
+#define RD_CLIENT_FATAL(...) ::ragdoll::Logger::GetClientLogger()->critical(__VA_ARGS__)
 
 #include "spdlog/fmt/bundled/ostream.h"
 #include "Ragdoll/Math/RagdollMath.h"
@@ -96,3 +97,5 @@ RD_LOG_OVERLOAD_USERTYPE(glm::dvec4, vec, "(" << vec.x << "," << vec.y << ", " <
 RD_LOG_OVERLOAD_USERTYPE(glm::vec2, vec, "(" << vec.x << "," << vec.y << ")");
 RD_LOG_OVERLOAD_USERTYPE(glm::vec3, vec, "(" << vec.x << "," << vec.y << ", " << vec.z << ")");
 RD_LOG_OVERLOAD_USERTYPE(glm::vec4, vec, "(" << vec.x << "," << vec.y << ", " << vec.z << ", " << vec.w << ")");
+
+RD_LOG_OVERLOAD_USERTYPE(ragdoll::Guid, id, id.m_RawId);

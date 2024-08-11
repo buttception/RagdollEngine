@@ -31,7 +31,7 @@ ________________________________________________________________________________
 
 #include "Application.h"
 
-extern Ragdoll::Application* Ragdoll::CreateApplication();
+extern ragdoll::Application* ragdoll::CreateApplication();
 
 int main()
 {
@@ -40,9 +40,9 @@ int main()
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
 
-	auto app = Ragdoll::CreateApplication();
+	auto app = ragdoll::CreateApplication();
 
-	Ragdoll::Application::ApplicationConfig config;
+	ragdoll::Application::ApplicationConfig config;
 	app->Init(config);
 	app->Run();
 	app->Shutdown();
