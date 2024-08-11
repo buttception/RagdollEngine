@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Launcher.cpp
-\date		05/08/2024
+\file		Transform.h
+\date		10/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,27 +27,28 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
+#pragma once
+#include "glm/gtc/quaternion.hpp"
+#include "Ragdoll/Math/RagdollMath.h"
+#include "Ragdoll/Entity/Component.h"
+#include "Ragdoll/Core/Guid.h"
 
-#include "ragdollpch.h"
-#include "Ragdoll.h"
-
-class Launcher : public ragdoll::Application
+namespace ragdoll
 {
-public:
-	Launcher() = default;
-	~Launcher() override = default;
-
-	void Init(const ApplicationConfig& config) override
+	struct Transform : Component
 	{
-		Application::Init(config);
+		glm::vec3 m_LocalPosition{};
+		glm::vec3 m_LocalScale{ 1.f,1.f,1.f };
+		glm::quat m_LocalRotation{ 1.f, 0.f,0.f,0.f };
 
-	}
-};
-/**
- * \brief Creates the editor application
- * \return The editor application
- */
-ragdoll::Application* ragdoll::CreateApplication()
-{
-	return new Launcher();
+		//cached as shaders need this always
+		glm::mat4 m_ModelToWorld;
+
+		//let child right sibling system
+		Guid m_Parent{};
+		Guid m_Child{};
+		Guid m_Sibling{};
+
+		bool m_Dirty{ true };
+	};
 }

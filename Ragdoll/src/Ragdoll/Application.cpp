@@ -34,17 +34,25 @@ ________________________________________________________________________________
 
 #include "Core/Logger.h"
 #include "Core/Core.h"
+#include "Entity/EntityManager.h"
 #include "Graphics/Window/Window.h"
 #include "Graphics/GLFWContext.h"
 #include "Event/WindowEvents.h"
 #include "Event/KeyEvents.h"
 #include "Event/MouseEvent.h"
+#include "glad/glad.h"
 #include "Input/InputHandler.h"
 #include "Graphics/Renderer/RenderGraph.h"
+#include "Graphics/Transform/Transform.h"
+#include "Layer/LayerStack.h"
+#include "Graphics/Transform/TransformLayer.h"
 
-#include "glad/glad.h"
+#include "glm/gtc/type_ptr.hpp"
+GLuint VAO, VBO, EBO;
+GLuint shaderProgram;
+ragdoll::Transform* t1, *t2, *t3, *t4, *t5;
 
-namespace Ragdoll
+namespace ragdoll
 {
 	void Application::Init(const ApplicationConfig& config)
 	{
@@ -61,9 +69,131 @@ namespace Ragdoll
 		//setup input handler
 		m_InputHandler = std::make_shared<InputHandler>();
 		m_InputHandler->Init();
+		//create the entity manager
+		m_EntityManager = std::make_shared<EntityManager>();
 		//create the render graph
 		m_RenderGraph = std::make_shared<RenderGraph>();
 		m_RenderGraph->Init(m_PrimaryWindow);
+
+		//layers stuff
+		m_LayerStack = std::make_shared<LayerStack>();
+		m_TransformLayer = std::make_shared<TransformLayer>(m_EntityManager);
+		m_LayerStack->PushLayer(m_TransformLayer);
+
+		//init all layers
+		m_LayerStack->Init();
+
+		//test the transform layer
+		auto e1 = m_EntityManager->CreateEntity();
+		auto e2 = m_EntityManager->CreateEntity();
+		auto e3 = m_EntityManager->CreateEntity();
+		auto e4 = m_EntityManager->CreateEntity();
+		auto e5 = m_EntityManager->CreateEntity();
+		t1 = m_EntityManager->AddComponent<Transform>(e1);
+		t1->m_LocalPosition = { 0.3f, 0.f, 0.f };
+		m_TransformLayer->SetEntityAsRoot(m_EntityManager->GetGuid(e1));
+		t2 = m_EntityManager->AddComponent<Transform>(e2);
+		t2->m_LocalPosition = { 0.3f, 0.f, 0.f };
+		t2->m_Parent = m_EntityManager->GetGuid(e1);
+		t1->m_Child = m_EntityManager->GetGuid(e2);
+		t3 = m_EntityManager->AddComponent<Transform>(e3);
+		t3->m_LocalPosition = { 0.3f, 0.f, 0.f };
+		t3->m_Parent = m_EntityManager->GetGuid(e2);
+		t2->m_Child = m_EntityManager->GetGuid(e3);
+		t4 = m_EntityManager->AddComponent<Transform>(e4);
+		t4->m_LocalPosition = { 0.f, 0.3f, 0.f };
+		t4->m_Parent = m_EntityManager->GetGuid(e1);
+		t2->m_Sibling = m_EntityManager->GetGuid(e4);
+		t5 = m_EntityManager->AddComponent<Transform>(e5);
+		t5->m_LocalPosition = { 0.f, 0.3f, 0.f };
+		t5->m_Parent = m_EntityManager->GetGuid(e4);
+		t4->m_Child = m_EntityManager->GetGuid(e5);
+
+		//testing opengl code
+		// Vertex and fragment shader source code
+		const char* vertexShaderSource = R"(
+			#version 330 core
+			layout(location = 0) in vec3 aPos;
+			layout(location = 1) in vec3 aColor;
+			out vec3 fragColor;
+			uniform mat4 model;
+			void main()
+			{
+			    gl_Position = model * vec4(aPos, 1.0);
+			    fragColor = aColor;
+			}
+			)";
+
+		const char* fragmentShaderSource = R"(
+			#version 330 core
+			in vec3 fragColor;
+			out vec4 color;
+			void main()
+			{
+			    color = vec4(fragColor, 1.0);
+			}
+			)";
+		// Cube vertices
+		float vertices[] = {
+			// positions          // colors
+			-0.1f, -0.1f, -0.1f, 0.2f, 0.0f, 0.0f, // back face
+			 0.1f, -0.1f, -0.1f, 0.0f, 0.2f, 0.0f,
+			 0.1f,  0.1f, -0.1f, 0.0f, 0.0f, 0.2f,
+			-0.1f,  0.1f, -0.1f, 0.2f, 0.2f, 0.0f,
+
+			-0.1f, -0.1f,  0.1f, 0.2f, 0.0f, 0.2f, // front face
+			 0.1f, -0.1f,  0.1f, 0.0f, 0.2f, 0.2f,
+			 0.1f,  0.1f,  0.1f, 0.2f, 0.2f, 0.2f,
+			-0.1f,  0.1f,  0.1f, 0.1f, 0.1f, 0.1f
+		};
+
+		// Cube indices
+		unsigned int indices[] = {
+			0, 1, 2, 2, 3, 0, // back face
+			4, 5, 6, 6, 7, 4, // front face
+			0, 1, 5, 5, 4, 0, // bottom face
+			2, 3, 7, 7, 6, 2, // top face
+			0, 3, 7, 7, 4, 0, // left face
+			1, 2, 6, 6, 5, 1  // right face
+		};
+
+		// Compile and link shaders
+		GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+		glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+		glCompileShader(vertexShader);
+
+		GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+		glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+		glCompileShader(fragmentShader);
+
+		shaderProgram = glCreateProgram();
+		glAttachShader(shaderProgram, vertexShader);
+		glAttachShader(shaderProgram, fragmentShader);
+		glLinkProgram(shaderProgram);
+
+		glDeleteShader(vertexShader);
+		glDeleteShader(fragmentShader);
+
+		// Generate and bind VAO, VBO, and EBO
+		glGenVertexArrays(1, &VAO);
+		glGenBuffers(1, &VBO);
+		glGenBuffers(1, &EBO);
+
+		glBindVertexArray(VAO);
+
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(0);
+
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(1);
+
+		glBindVertexArray(0);
 	}
 
 	void Application::Run()
@@ -73,97 +203,29 @@ namespace Ragdoll
 			//input update must be called before window polls for inputs
 			m_InputHandler->Update(m_PrimaryWindow->GetDeltaTime());
 			m_PrimaryWindow->StartRender();
-			// Vertex shader source code
-			const char* vertexShaderSource = R"(
-				#version 460 core
-				layout (location = 0) in vec3 aPos;
 
-				void main()
-				{
-				    gl_Position = vec4(aPos, 1.0);
-				}
-			)";
-
-			// Fragment shader source code
-			const char* fragmentShaderSource = R"(
-				#version 460 core
-				out vec4 FragColor;
-
-				void main()
-				{
-				    FragColor = vec4(1.0, 0.5, 0.2, 1.0);
-				}
-			)";
-			GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-			glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-			glCompileShader(vertexShader);
-			GLint success;
-			GLchar infoLog[512];
-			glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-			if (!success) {
-				glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-				std::cerr << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << "\n";
+			for(auto& layer : *m_LayerStack)
+			{
+				layer->Update(static_cast<float>(m_PrimaryWindow->GetDeltaTime()));
 			}
 
-			// Fragment shader
-			GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-			glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-			glCompileShader(fragmentShader);
-			glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-			if (!success) {
-				glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-				std::cerr << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << "\n";
-			}
-
-			// Link shaders
-			GLuint shaderProgram = glCreateProgram();
-			glAttachShader(shaderProgram, vertexShader);
-			glAttachShader(shaderProgram, fragmentShader);
-			glLinkProgram(shaderProgram);
-			glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-			if (!success) {
-				glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-				std::cerr << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << "\n";
-			}
-
-			glDeleteShader(vertexShader);
-			glDeleteShader(fragmentShader);
-
-			static glm::vec3 top{ 0.f, 0.5f, 0.f };
-			static glm::vec3 botLeft{ -0.5f, -0.5f, 0.0f };
-			static glm::vec3 botRight{ 0.5f, -0.5f, 0.0f };
-			// Set up vertex data and buffers and configure vertex attributes
-			GLfloat vertices[] = {
-				top.x, top.y, top.z, // Top
-				botLeft.x, botLeft.y, botLeft.z, // Bottom Left
-				botRight.x, botRight.y, botRight.z  // Bottom Right
-			};
-
-			GLuint VBO, VAO;
-			glGenVertexArrays(1, &VAO);
-			glGenBuffers(1, &VBO);
-
-			// Bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
-			glBindVertexArray(VAO);
-
-			glBindBuffer(GL_ARRAY_BUFFER, VBO);
-			glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-			// Position attribute
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-			glEnableVertexAttribArray(0);
-
-			// Note that this is allowed, the call to glVertexAttribPointer registered VBO as the currently bound vertex buffer object so afterwards we can safely unbind
-			glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-			// Unbind VAO
-			glBindVertexArray(0);
-
-			// Draw our first triangle
 			glUseProgram(shaderProgram);
+
+			// Pass the model matrix to the vertex shader
+			GLuint modelLoc = glGetUniformLocation(shaderProgram, "model");
+			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(t1->m_ModelToWorld));
+
 			glBindVertexArray(VAO);
-			glDrawArrays(GL_TRIANGLES, 0, 3);
-			glBindVertexArray(0);
+			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+
+			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(t2->m_ModelToWorld));
+			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(t3->m_ModelToWorld));
+			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(t4->m_ModelToWorld));
+			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(t5->m_ModelToWorld));
+			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 
 			m_PrimaryWindow->EndRender();
 		}
@@ -173,7 +235,7 @@ namespace Ragdoll
 	{
 		m_PrimaryWindow->Shutdown();
 		GLFWContext::Shutdown();
-		RD_CORE_INFO("Ragdoll Engine application shut down successfull");
+		RD_CORE_INFO("ragdoll Engine application shut down successfull");
 	}
 
 	void Application::OnEvent(Event& event)
@@ -189,6 +251,12 @@ namespace Ragdoll
 		RD_DISPATCH_EVENT(dispatcher, MouseButtonPressedEvent, event, Application::OnMouseButtonPressed);
 		RD_DISPATCH_EVENT(dispatcher, MouseButtonReleasedEvent, event, Application::OnMouseButtonReleased);
 		RD_DISPATCH_EVENT(dispatcher, MouseScrolledEvent, event, Application::OnMouseScrolled);
+
+		//run the event on all layers
+		for(auto& layer : *m_LayerStack)
+		{
+			layer->OnEvent(event);
+		}
 	}
 
 	bool Application::OnWindowClose(WindowCloseEvent& event)

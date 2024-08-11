@@ -28,9 +28,9 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
-#include "Ragdoll/Enums.h"
+#include "Ragdoll/Event/EventEnums.h"
 
-namespace Ragdoll
+namespace ragdoll
 {
 #define EVENT_CLASS_TYPE(type) static EventType GetStaticType() { return EventType::type; }\
 								virtual EventType GetEventType() const override { return GetStaticType(); }\

@@ -48,6 +48,7 @@ project "Ragdoll"
 		"%{IncludesDir.glfw}",
 		"%{IncludesDir.glad}",
 		"%{IncludesDir.glm}",
+		"%{IncludesDir.entt}",
     }
 
 	filter "system:windows"

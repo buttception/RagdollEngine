@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Launcher.cpp
-\date		05/08/2024
+\file		EntityManager.cpp
+\date		10/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -29,25 +29,36 @@
 __________________________________________________________________________________*/
 
 #include "ragdollpch.h"
-#include "Ragdoll.h"
 
-class Launcher : public ragdoll::Application
+#include "EntityManager.h"
+
+#include "Ragdoll/Core/Logger.h"
+#include "Ragdoll/Core/Guid.h"
+
+namespace ragdoll
 {
-public:
-	Launcher() = default;
-	~Launcher() override = default;
-
-	void Init(const ApplicationConfig& config) override
+	entt::entity EntityManager::CreateEntity()
 	{
-		Application::Init(config);
-
+		entt::entity entity = m_Registry.create();
+		auto guid = GuidGenerator::GenerateGuid();
+		m_GuidToEntity.insert({ guid, entity });
+		m_EntityToGuid.insert({ entity, guid });
+		return entity;
 	}
-};
-/**
- * \brief Creates the editor application
- * \return The editor application
- */
-ragdoll::Application* ragdoll::CreateApplication()
-{
-	return new Launcher();
+
+	entt::entity EntityManager::GetEntity(const Guid& guid)
+	{
+		if(m_GuidToEntity.find(guid) != m_GuidToEntity.end())
+			return m_GuidToEntity[guid];
+		RD_CORE_WARN("Entity {} does not exist, returning entt::null");
+		return entt::null;
+	}
+
+	Guid EntityManager::GetGuid(const entt::entity& entity)
+	{
+		if(m_EntityToGuid.find(entity) != m_EntityToGuid.end())
+			return m_EntityToGuid[entity];
+		RD_CORE_WARN("Entity does not exist, returning Guid::null");
+		return 0;
+	}
 }

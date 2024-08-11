@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Launcher.cpp
-\date		05/08/2024
+\file		TransformLayer.h
+\date		10/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,27 +27,38 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
+#pragma once
+#include "Ragdoll/Layer/Layer.h"
+#include "Ragdoll/Core/Guid.h"
 
-#include "ragdollpch.h"
-#include "Ragdoll.h"
-
-class Launcher : public ragdoll::Application
+namespace ragdoll
 {
-public:
-	Launcher() = default;
-	~Launcher() override = default;
-
-	void Init(const ApplicationConfig& config) override
+	struct Transform;
+	class TransformLayer : public Layer
 	{
-		Application::Init(config);
+	public:
+		TransformLayer(std::shared_ptr<EntityManager> reg);
+		~TransformLayer() override = default;
 
-	}
-};
-/**
- * \brief Creates the editor application
- * \return The editor application
- */
-ragdoll::Application* ragdoll::CreateApplication()
-{
-	return new Launcher();
+		void Init() override;
+		void Update(float _dt) override;
+		void Shutdown() override;
+
+		void SetEntityAsRoot(Guid entityId) { m_RootEntity = entityId; }
+
+	private:
+		std::stack<glm::mat4> m_ModelStack;
+
+		//the root details
+		Guid m_RootEntity;
+		Guid m_RootSibling;
+		//state
+		bool m_DirtyOnwards{ false };
+
+		//some helper functions
+		void TraverseTreeAndUpdateTransforms();
+		void TraverseNode(const Guid& guid);
+
+		glm::mat4 GetLocalModelMatrix(const Transform& trans);
+	};
 }

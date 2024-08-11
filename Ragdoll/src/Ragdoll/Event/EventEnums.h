@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Launcher.cpp
-\date		05/08/2024
+\file		EventEnums.h
+\date		09/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,27 +27,26 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
+#pragma once
+#include "Ragdoll/Core/Core.h"
 
-#include "ragdollpch.h"
-#include "Ragdoll.h"
-
-class Launcher : public ragdoll::Application
+namespace ragdoll
 {
-public:
-	Launcher() = default;
-	~Launcher() override = default;
-
-	void Init(const ApplicationConfig& config) override
+	enum class EventType
 	{
-		Application::Init(config);
+		None = 0,
+		WindowClose, WindowResize, WindowFocus, WindowLostFocus, WindowMoved,
+		KeyPressed, KeyReleased, KeyTyped,
+		MouseButtonPressed, MouseButtonReleased, MouseMoved, MouseScrolled
+	};
 
-	}
-};
-/**
- * \brief Creates the editor application
- * \return The editor application
- */
-ragdoll::Application* ragdoll::CreateApplication()
-{
-	return new Launcher();
+	enum EventCategory
+	{
+		None = 0,
+		EventCategoryApplication = BIT(0),
+		EventCategoryInput = BIT(1),
+		EventCategoryKeyboard = BIT(2),
+		EventCategoryMouse = BIT(3),
+		EventCategoryMouseButton = BIT(4)
+	};
 }

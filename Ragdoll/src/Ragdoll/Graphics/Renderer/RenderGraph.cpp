@@ -34,7 +34,7 @@ ________________________________________________________________________________
 
 #include "Ragdoll/Graphics/OpenGLContext.h"
 
-namespace Ragdoll
+namespace ragdoll
 {
 	void RenderGraph::Init(std::shared_ptr<Window> window)
 	{

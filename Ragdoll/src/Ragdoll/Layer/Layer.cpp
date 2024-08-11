@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Launcher.cpp
-\date		05/08/2024
+\file		Layer.cpp
+\date		09/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -29,25 +29,10 @@
 __________________________________________________________________________________*/
 
 #include "ragdollpch.h"
-#include "Ragdoll.h"
 
-class Launcher : public ragdoll::Application
+#include "Layer.h"
+
+namespace ragdoll
 {
-public:
-	Launcher() = default;
-	~Launcher() override = default;
-
-	void Init(const ApplicationConfig& config) override
-	{
-		Application::Init(config);
-
-	}
-};
-/**
- * \brief Creates the editor application
- * \return The editor application
- */
-ragdoll::Application* ragdoll::CreateApplication()
-{
-	return new Launcher();
+	
 }

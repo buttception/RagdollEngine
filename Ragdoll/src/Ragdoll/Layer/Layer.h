@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Launcher.cpp
-\date		05/08/2024
+\file		Layer.h
+\date		09/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,27 +27,40 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
+#pragma once
+#include "Ragdoll/Core/Logger.h"
 
-#include "ragdollpch.h"
-#include "Ragdoll.h"
-
-class Launcher : public ragdoll::Application
+namespace ragdoll
 {
-public:
-	Launcher() = default;
-	~Launcher() override = default;
+	class Event;
+	class EntityManager;
 
-	void Init(const ApplicationConfig& config) override
+	class Layer
 	{
-		Application::Init(config);
+	public:
+		Layer(std::shared_ptr<EntityManager> entManager) : m_EntityManager{ entManager } {}
+		virtual ~Layer() = default;
 
-	}
-};
-/**
- * \brief Creates the editor application
- * \return The editor application
- */
-ragdoll::Application* ragdoll::CreateApplication()
-{
-	return new Launcher();
+		virtual void Init() = 0;
+		virtual void Shutdown() = 0;
+		virtual void PreUpdate(float _dt) {}
+		virtual void Update(float _dt) = 0;
+		virtual void PostUpdate(float _dt) {}
+		virtual void OnEvent(Event& e) { UNREFERENCED_PARAMETER(e); }
+
+		bool IsEnabled() const { return m_Enabled; }
+		void SetEnabled(bool enabled) { m_Enabled = enabled; }
+#ifdef RAGDOLL_DEBUG
+		const std::string& GetDebugName() const { return m_DebugName; }
+		void SetDebugName(const std::string& name) { m_DebugName = name; }
+#endif
+
+	protected:
+		bool m_Enabled = true;
+		std::shared_ptr<EntityManager> m_EntityManager;
+
+#ifdef RAGDOLL_DEBUG
+		std::string m_DebugName;
+#endif
+	};
 }

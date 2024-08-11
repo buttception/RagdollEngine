@@ -29,6 +29,7 @@
 __________________________________________________________________________________*/
 #pragma once
 #define GLM_FORCE_SSE2
+#define GLM_ENABLE_EXPERIMENTAL
 
 #ifdef RAGDOLL_DEBUG
 	#define GLM_FORCE_MESSAGES

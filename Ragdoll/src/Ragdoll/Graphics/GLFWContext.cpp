@@ -36,7 +36,7 @@ ________________________________________________________________________________
 #include "GLFW/glfw3.h"
 #include "Ragdoll/Core/Core.h"
 
-namespace Ragdoll
+namespace ragdoll
 {
 	bool GLFWContext::Init()
 	{

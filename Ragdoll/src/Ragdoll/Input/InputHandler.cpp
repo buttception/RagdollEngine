@@ -34,7 +34,7 @@ ________________________________________________________________________________
 
 #include "Ragdoll/Core/Logger.h"
 
-namespace Ragdoll
+namespace ragdoll
 {
 	const std::unordered_map<char, Key> InputHandler::s_CharToKeyMap = {
 	{ ' ', Key::Space },
@@ -143,7 +143,7 @@ namespace Ragdoll
 	};
 
 	const std::unordered_map<const char*, Key> InputHandler::s_StrToKeyMap = {
-		{ "Null", Key::Null },
+		{ "null", Key::Null },
 		{ "Unknown", Key::Unknown },
 		{ "Space", Key::Space },
 		{ "Apostrophe", Key::Apostrophe },
@@ -269,7 +269,7 @@ namespace Ragdoll
 	};
 
 	const std::unordered_map<Key, const char*> InputHandler::s_KeyToStrMap = {
-		{ Key::Null, "Null" },
+		{ Key::Null, "null" },
 		{ Key::Unknown, "Unknown" },
 		{ Key::Space, "Space" },
 		{ Key::Apostrophe, "Apostrophe" },
@@ -395,7 +395,7 @@ namespace Ragdoll
 	};
 
 	const std::unordered_map<const char*, MouseButton> InputHandler::s_StrToButtonMap = {
-		{ "Null", MouseButton::Null },
+		{ "null", MouseButton::Null },
 		{ "Unknown", MouseButton::Unknown },
 		{ "Button1", MouseButton::Button1 },
 		{ "Button2", MouseButton::Button2 },
@@ -414,7 +414,7 @@ namespace Ragdoll
 	};
 
 	const std::unordered_map<MouseButton, const char*> InputHandler::s_ButtonToStrMap = {
-		{ MouseButton::Null, "Null" },
+		{ MouseButton::Null, "null" },
 		{ MouseButton::Unknown, "Unknown" },
 		{ MouseButton::Button1, "Button1" },
 		{ MouseButton::Button2, "Button2" },

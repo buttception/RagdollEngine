@@ -268,4 +268,4 @@ if(m_Timer >= 1.f)
 
 I then set the title of the window with these informations. Future debug information may go into the title bar as well.
 
-<video src="resources/5_window_fps.mp4" placeholder="" autoplay loop controls muted title="Window title"></video>
+![Window Fps](resources/5_window_fps.png)

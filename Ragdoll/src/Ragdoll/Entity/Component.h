@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Launcher.cpp
-\date		05/08/2024
+\file		Component.h
+\date		10/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -28,26 +28,12 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 
-#include "ragdollpch.h"
-#include "Ragdoll.h"
+#pragma once
 
-class Launcher : public ragdoll::Application
+namespace ragdoll
 {
-public:
-	Launcher() = default;
-	~Launcher() override = default;
-
-	void Init(const ApplicationConfig& config) override
+	struct Component
 	{
-		Application::Init(config);
-
-	}
-};
-/**
- * \brief Creates the editor application
- * \return The editor application
- */
-ragdoll::Application* ragdoll::CreateApplication()
-{
-	return new Launcher();
+		bool m_Active;
+	};
 }

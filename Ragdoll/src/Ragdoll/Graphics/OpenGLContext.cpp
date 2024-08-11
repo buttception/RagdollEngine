@@ -37,7 +37,7 @@ ________________________________________________________________________________
 #include "Ragdoll/Core/Logger.h"
 #include "Ragdoll/Graphics/Window/Window.h"
 
-namespace Ragdoll
+namespace ragdoll
 {
 	void OpenGLContext::Init(std::shared_ptr<Window> window)
 	{
@@ -59,7 +59,7 @@ namespace Ragdoll
 		glGetIntegerv(GL_MAJOR_VERSION, &versionMajor);
 		glGetIntegerv(GL_MINOR_VERSION, &versionMinor);
 
-		RD_CRITICAL_ASSERT(versionMajor != 4 || versionMinor < 6, "Ragdoll Engine requires OpenGL version 4.6");
+		RD_CRITICAL_ASSERT(versionMajor != 4 || versionMinor < 6, "ragdoll Engine requires OpenGL version 4.6");
 
 #ifdef RAGDOLL_DEBUG
 		//setup opengl debug output

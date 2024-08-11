@@ -29,9 +29,8 @@
 __________________________________________________________________________________*/
 #pragma once
 #include "Event.h"
-#include "Ragdoll/Enums.h"
 
-namespace Ragdoll
+namespace ragdoll
 {
 	class KeyEvent : public Event
 	{

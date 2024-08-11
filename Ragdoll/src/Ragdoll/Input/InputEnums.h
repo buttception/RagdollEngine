@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Enums.h
-\date		06/08/2024
+\file		InputEnums.h
+\date		09/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -28,30 +28,9 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
-#include "Ragdoll/Core/Core.h"
 
-namespace Ragdoll
+namespace ragdoll
 {
-#pragma region EventEnums
-	enum class EventType
-	{
-		None = 0,
-		WindowClose, WindowResize, WindowFocus, WindowLostFocus, WindowMoved,
-		KeyPressed, KeyReleased, KeyTyped,
-		MouseButtonPressed, MouseButtonReleased, MouseMoved, MouseScrolled
-	};
-
-	enum EventCategory
-	{
-		None = 0,
-		EventCategoryApplication = BIT(0),
-		EventCategoryInput = BIT(1),
-		EventCategoryKeyboard = BIT(2),
-		EventCategoryMouse = BIT(3),
-		EventCategoryMouseButton = BIT(4)
-	};
-#pragma endregion
-#pragma region input
 	enum class Key
 	{
 		Null = 0,
@@ -231,5 +210,4 @@ namespace Ragdoll
 		RightTrigger = 5,
 		MaxAxis = RightTrigger
 	};
-#pragma endregion
 }
