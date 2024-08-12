@@ -28,12 +28,13 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
-#include "RenderCommand.h"
+#include "Ragdoll/Graphics/Renderer/RenderData.h"
 
 namespace ragdoll
 {
 	class OpenGLContext;
 	class Window;
+	class RenderPass;
 
 	class RenderGraph
 	{
@@ -45,6 +46,6 @@ namespace ragdoll
 		std::shared_ptr<OpenGLContext> m_Context;
 		std::shared_ptr<Window> m_Window;
 
-		std::unordered_map<const char*, std::vector<RenderCommand>> m_RenderCommands;
+		std::unordered_map<const char*, std::vector<RenderData>> m_RenderData;
 	};
 }

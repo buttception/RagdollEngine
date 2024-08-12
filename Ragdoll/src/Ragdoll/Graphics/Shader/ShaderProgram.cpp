@@ -275,7 +275,7 @@ namespace ragdoll
 
 	void ShaderProgram::PrintAttributes()
 	{
-		RD_CORE_TRACE("[{}] uniforms:", m_Name);
+		RD_CORE_TRACE("[{}] attributes:", m_Name);
 		GLint maxLength, attribsCount;
 		glGetProgramiv(m_RendererId, GL_ACTIVE_ATTRIBUTE_MAX_LENGTH, &maxLength);
 		glGetProgramiv(m_RendererId, GL_ACTIVE_ATTRIBUTES, &attribsCount);

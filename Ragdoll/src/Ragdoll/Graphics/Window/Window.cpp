@@ -35,8 +35,6 @@ ________________________________________________________________________________
 #include "glad/glad.h"
 #include "GLFW/glfw3.h"
 
-#include "Ragdoll/Core/Core.h"
-#include "Ragdoll/Core/Logger.h"
 #include "Ragdoll/Core/Timestep.h"
 #include "Ragdoll/Event/KeyEvents.h"
 #include "Ragdoll/Event/MouseEvent.h"

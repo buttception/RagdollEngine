@@ -30,11 +30,19 @@ ________________________________________________________________________________
 #pragma once
 
 #include "RenderCommand.h"
+#include "RenderState.h"
 
 namespace ragdoll
 {
-	struct RenderPass
+	class RenderPass
 	{
+	public:
+
+		void AddCommand(const RenderCommand& renderCmd);
+		void Execute();
+
+	private:
+		RenderState m_RenderState;
 		std::vector<RenderCommand> m_CommandBuffer;
 		const char* m_Name;
 	};

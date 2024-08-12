@@ -28,7 +28,6 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
-#include "Ragdoll/Core/Core.h"
 
 namespace ragdoll
 {

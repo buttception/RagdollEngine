@@ -30,8 +30,6 @@ ________________________________________________________________________________
 #pragma once
 
 #include "entt/entt.hpp"
-#include "Ragdoll/Core/Guid.h"
-#include "Ragdoll/Core/Logger.h"
 
 namespace ragdoll
 {

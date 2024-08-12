@@ -30,7 +30,6 @@ ________________________________________________________________________________
 #pragma once
 
 #include "Ragdoll/Math/RagdollMath.h"
-#include "Ragdoll/Event/Event.h"
 
 struct GLFWwindow;
 struct GLFWmonitor;

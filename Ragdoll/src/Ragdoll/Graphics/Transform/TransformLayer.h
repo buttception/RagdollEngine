@@ -30,6 +30,7 @@ ________________________________________________________________________________
 #pragma once
 #include "Ragdoll/Layer/Layer.h"
 #include "Ragdoll/Core/Guid.h"
+#include "Ragdoll/Math/RagdollMath.h"
 
 namespace ragdoll
 {

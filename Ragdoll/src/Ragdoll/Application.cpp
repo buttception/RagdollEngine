@@ -49,7 +49,10 @@ ________________________________________________________________________________
 
 #include "glm/gtc/type_ptr.hpp"
 #include "Ragdoll/Graphics/Shader/ShaderProgram.h"
-GLuint VAO, VBO, EBO;
+#include "Ragdoll/Graphics/Containers/VertexArray.h"
+#include "Ragdoll/Graphics/Containers/VertexBuffer.h"
+#include "Ragdoll/Graphics/Containers/IndexBuffer.h"
+std::shared_ptr<ragdoll::VertexArray> vao;
 std::shared_ptr<ragdoll::ShaderProgram> sp;
 ragdoll::Transform* t1, *t2, *t3, *t4, *t5;
 
@@ -137,14 +140,14 @@ namespace ragdoll
 		// Cube vertices
 		float vertices[] = {
 			// positions          // colors
-			-0.1f, -0.1f, -0.1f, 0.2f, 0.0f, 0.0f, // back face
-			 0.1f, -0.1f, -0.1f, 0.0f, 0.2f, 0.0f,
-			 0.1f,  0.1f, -0.1f, 0.0f, 0.0f, 0.2f,
-			-0.1f,  0.1f, -0.1f, 0.2f, 0.2f, 0.0f,
+			-0.1f, -0.1f, -0.1f, 1.f, 0.0f, 0.0f, // back face
+			 0.1f, -0.1f, -0.1f, 0.0f, 1.f, 0.0f,
+			 0.1f,  0.1f, -0.1f, 0.0f, 0.0f, 1.f,
+			-0.1f,  0.1f, -0.1f, 1.f, 1.f, 0.0f,
 
-			-0.1f, -0.1f,  0.1f, 0.2f, 0.0f, 0.2f, // front face
-			 0.1f, -0.1f,  0.1f, 0.0f, 0.2f, 0.2f,
-			 0.1f,  0.1f,  0.1f, 0.2f, 0.2f, 0.2f,
+			-0.1f, -0.1f,  0.1f, 1.f, 0.0f, 1.f, // front face
+			 0.1f, -0.1f,  0.1f, 0.0f, 1.f, 1.f,
+			 0.1f,  0.1f,  0.1f, 1.f, 1.f, 1.f,
 			-0.1f,  0.1f,  0.1f, 0.1f, 0.1f, 0.1f
 		};
 
@@ -167,25 +170,15 @@ namespace ragdoll
 		sp->PrintUniforms();
 
 		// Generate and bind VAO, VBO, and EBO
-		glGenVertexArrays(1, &VAO);
-		glGenBuffers(1, &VBO);
-		glGenBuffers(1, &EBO);
-
-		glBindVertexArray(VAO);
-
-		glBindBuffer(GL_ARRAY_BUFFER, VBO);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-		glEnableVertexAttribArray(0);
-
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-		glEnableVertexAttribArray(1);
-
-		glBindVertexArray(0);
+		vao = std::make_shared<VertexArray>();
+		std::shared_ptr<VertexBuffer> vbo = std::make_shared<VertexBuffer>(vertices, sizeof(vertices), GL_STATIC_DRAW);
+		vbo->SetLayout({
+			{ ShaderDataType::Float3, "aPos" },
+			{ ShaderDataType::Float3, "aColor" }
+			});
+		std::shared_ptr<IndexBuffer> ibo = std::make_shared<IndexBuffer>(indices, sizeof(indices));
+		vao->AddVertexBuffer(vbo);
+		vao->SetIndexBuffer(ibo);
 	}
 
 	void Application::Run()
@@ -201,8 +194,7 @@ namespace ragdoll
 				layer->Update(static_cast<float>(m_PrimaryWindow->GetDeltaTime()));
 			}
 
-
-			glBindVertexArray(VAO);
+			vao->Bind();
 			sp->Bind();
 			sp->UploadUniform("model", ShaderDataType::Mat4, glm::value_ptr(t1->m_ModelToWorld));
 			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);

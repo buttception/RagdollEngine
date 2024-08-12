@@ -1,5 +1,5 @@
 ﻿/*!
-\file		RenderCommand.cpp
+\file		RenderData.h
 \date		12/08/2024
 
 \author		Devin Tan
@@ -27,12 +27,17 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
+#pragma once
 
-#include "ragdollpch.h"
-
-#include "RenderCommand.h"
+#include "Ragdoll/Core/Guid.h"
 
 namespace ragdoll
 {
-	
+	union RenderData
+	{
+		struct DrawMesh
+		{
+			Guid MeshId;
+		};
+	};
 }

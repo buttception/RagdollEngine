@@ -28,7 +28,6 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
-#include "Ragdoll/Core/Logger.h"
 
 namespace ragdoll
 {
@@ -43,10 +42,10 @@ namespace ragdoll
 
 		virtual void Init() = 0;
 		virtual void Shutdown() = 0;
-		virtual void PreUpdate(float _dt) { UNREFERENCED_PARAMETER(_dt); }
+		virtual void PreUpdate(float _dt);
 		virtual void Update(float _dt) = 0;
-		virtual void PostUpdate(float _dt) { UNREFERENCED_PARAMETER(_dt); }
-		virtual void OnEvent(Event& e) { UNREFERENCED_PARAMETER(e); }
+		virtual void PostUpdate(float _dt);
+		virtual void OnEvent(Event& e);
 
 		bool IsEnabled() const { return m_Enabled; }
 		void SetEnabled(bool enabled) { m_Enabled = enabled; }

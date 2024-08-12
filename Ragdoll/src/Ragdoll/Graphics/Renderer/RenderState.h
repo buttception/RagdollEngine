@@ -35,6 +35,5 @@ namespace ragdoll
 	struct RenderState
 	{
 		
-		
 	};
 }

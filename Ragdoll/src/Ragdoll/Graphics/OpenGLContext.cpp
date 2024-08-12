@@ -90,17 +90,17 @@ namespace ragdoll
 			break;
 			case GL_DEBUG_SEVERITY_MEDIUM:
 #if RD_OPENGL_DEBUG_LEVEL >= 1
-				RD_CORE_WARN("[OpenGL Error] src: {} | type: {} | id: {}\nmessage: {}", GLenumErrorToString(source), GLenumErrorToString(type), GLenumErrorToString(id), message);
+				RD_CORE_WARN("[OpenGL Warning] src: {} | type: {} | id: {}\nmessage: {}", GLenumErrorToString(source), GLenumErrorToString(type), GLenumErrorToString(id), message);
 #endif
 			break;
 			case GL_DEBUG_SEVERITY_LOW:
 #if RD_OPENGL_DEBUG_LEVEL >= 2
-				RD_CORE_INFO("[OpenGL Error] src: {} | type: {} | id: {}\nmessage: {}", GLenumErrorToString(source), GLenumErrorToString(type), GLenumErrorToString(id), message);
+				RD_CORE_INFO("[OpenGL Info] src: {} | type: {} | id: {}\nmessage: {}", GLenumErrorToString(source), GLenumErrorToString(type), GLenumErrorToString(id), message);
 #endif
 			break;
 			case GL_DEBUG_SEVERITY_NOTIFICATION:
 #if RD_OPENGL_DEBUG_LEVEL >= 3
-				RD_CORE_TRACE("[OpenGL Error] src: {} | type: {} | id: {}\nmessage: {}", GLenumErrorToString(source), GLenumErrorToString(type), GLenumErrorToString(id), message);
+				RD_CORE_TRACE("[OpenGL Log] src: {} | type: {} | id: {}\nmessage: {}", GLenumErrorToString(source), GLenumErrorToString(type), GLenumErrorToString(id), message);
 #endif
 			break;
 			default:

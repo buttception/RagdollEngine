@@ -27,14 +27,25 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-
 #pragma once
+
+#include "glad/glad.h"
 
 namespace ragdoll
 {
-	struct IndexBuffer
+	class IndexBuffer
 	{
-		
-		
+	public:
+		IndexBuffer(uint32_t* indices, const uint32_t& size);
+		~IndexBuffer();
+
+		void Bind();
+		void Unbind();
+
+		GLuint GetRendererId() const { return m_RendererId; }
+		uint32_t GetCount() const { return m_Count; }
+	private:
+		GLuint m_RendererId;
+		uint32_t m_Count;
 	};
 }
