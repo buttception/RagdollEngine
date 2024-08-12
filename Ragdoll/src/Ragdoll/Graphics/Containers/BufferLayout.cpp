@@ -1,6 +1,6 @@
 ﻿/*!
-\file		RenderGraph.h
-\date		08/08/2024
+\file		BufferLayout.cpp
+\date		12/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,24 +27,11 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-#pragma once
-#include "RenderCommand.h"
+
+#include "ragdollpch.h"
+
+#include "BufferLayout.h"
 
 namespace ragdoll
 {
-	class OpenGLContext;
-	class Window;
-
-	class RenderGraph
-	{
-	public:
-		void Init(std::shared_ptr<Window> window);
-		void SwapBuffers();
-
-	private:
-		std::shared_ptr<OpenGLContext> m_Context;
-		std::shared_ptr<Window> m_Window;
-
-		std::unordered_map<const char*, std::vector<RenderCommand>> m_RenderCommands;
-	};
 }

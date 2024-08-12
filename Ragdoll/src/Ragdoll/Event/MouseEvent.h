@@ -79,20 +79,20 @@ namespace ragdoll
 	class MouseButtonEvent : public Event
 	{
 	public:
-		inline int GetMouseButton() const { return m_Button; }
+		inline int32_t GetMouseButton() const { return m_Button; }
 
 		EVENT_CLASS_CATEGORY(EventCategoryMouse | EventCategoryInput)
 	protected:
-		MouseButtonEvent(int button)
+		MouseButtonEvent(int32_t button)
 			: m_Button(button) {}
 
-		int m_Button;
+		int32_t m_Button;
 	};
 
 	class MouseButtonPressedEvent : public MouseButtonEvent
 	{
 	public:
-		MouseButtonPressedEvent(int button)
+		MouseButtonPressedEvent(int32_t button)
 			: MouseButtonEvent(button) {}
 
 		std::string ToString() const override
@@ -108,7 +108,7 @@ namespace ragdoll
 	class MouseButtonReleasedEvent : public MouseButtonEvent
 	{
 	public:
-		MouseButtonReleasedEvent(int button)
+		MouseButtonReleasedEvent(int32_t button)
 			: MouseButtonEvent(button) {}
 
 		std::string ToString() const override
@@ -118,6 +118,6 @@ namespace ragdoll
 			return ss.str();
 		}
 
-		EVENT_CLASS_TYPE(MouseButtonReleased);
+		EVENT_CLASS_TYPE(MouseButtonReleased)
 	};
 }

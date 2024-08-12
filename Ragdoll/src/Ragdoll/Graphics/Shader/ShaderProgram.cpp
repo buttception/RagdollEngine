@@ -1,6 +1,6 @@
 ﻿/*!
-\file		RenderGraph.h
-\date		08/08/2024
+\file		ShaderProgram.cpp
+\date		12/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,24 +27,29 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-#pragma once
-#include "RenderCommand.h"
+
+#include "ragdollpch.h"
+
+#include "ShaderProgram.h"
 
 namespace ragdoll
 {
-	class OpenGLContext;
-	class Window;
-
-	class RenderGraph
+	Shader::Shader(const char* name) :
+		m_Name{ name },
+		m_Type{ ShaderType::None }
 	{
-	public:
-		void Init(std::shared_ptr<Window> window);
-		void SwapBuffers();
+		//shouldn't create a shader here because if it is not compiled it's not used
+	}
 
-	private:
-		std::shared_ptr<OpenGLContext> m_Context;
-		std::shared_ptr<Window> m_Window;
+	Shader::~Shader()
+	{
+		if(m_RendererId > 0)
+			glDeleteShader(m_RendererId);
+		m_RendererId = 0;
+	}
 
-		std::unordered_map<const char*, std::vector<RenderCommand>> m_RenderCommands;
-	};
+	bool Shader::Compile(const char* source, ShaderType type)
+	{
+		return false;
+	}
 }

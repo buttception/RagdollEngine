@@ -44,7 +44,7 @@ namespace ragdoll
 		//load glad
 		m_Window = window;
 		glfwMakeContextCurrent(window->GetGlfwWindow());
-		int status = gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress));
+		int32_t status = gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress));
 		RD_CRITICAL_ASSERT(!status, "Failed to initialize Glad.");
 		RD_CORE_INFO("OpenGL context created successfully.");
 
@@ -55,7 +55,7 @@ namespace ragdoll
 		RD_CORE_INFO("   Version: {0}", reinterpret_cast<const char*>(glGetString(GL_VERSION)));
 		RD_CORE_INFO("   Shader: {0}", reinterpret_cast<const char*>(glGetString(GL_SHADING_LANGUAGE_VERSION)));
 
-		int versionMajor, versionMinor;
+		GLint versionMajor, versionMinor;
 		glGetIntegerv(GL_MAJOR_VERSION, &versionMajor);
 		glGetIntegerv(GL_MINOR_VERSION, &versionMinor);
 

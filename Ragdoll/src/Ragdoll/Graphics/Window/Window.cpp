@@ -77,7 +77,7 @@ namespace ragdoll
 		glfwSetWindowUserPointer(m_GlfwWindow, this);
 
 		//glfw callbacks using lambda functions
-		glfwSetWindowSizeCallback(m_GlfwWindow, [](GLFWwindow* window, int _width, int _height)
+		glfwSetWindowSizeCallback(m_GlfwWindow, [](GLFWwindow* window, int32_t _width, int32_t _height)
 		{
 			Window& data = *static_cast<Window*>(glfwGetWindowUserPointer(window));
 			data.m_BufferWidth = _width;
@@ -95,7 +95,7 @@ namespace ragdoll
 			data.m_Callback(event);
 		});
 
-		glfwSetWindowPosCallback(m_GlfwWindow, [](GLFWwindow* window, int _x, int _y)
+		glfwSetWindowPosCallback(m_GlfwWindow, [](GLFWwindow* window, int32_t _x, int32_t _y)
 		{
 			Window& data = *static_cast<Window*>(glfwGetWindowUserPointer(window));
 			data.m_Properties.m_Position = glm::vec2(_x, _y);
@@ -104,7 +104,7 @@ namespace ragdoll
 			data.m_Callback(event);
 		});
 
-		glfwSetKeyCallback(m_GlfwWindow, [](GLFWwindow* window, int _key, int _scancode, int _action, int _mods)
+		glfwSetKeyCallback(m_GlfwWindow, [](GLFWwindow* window, int32_t _key, int32_t _scancode, int32_t _action, int32_t _mods)
 		{
 			UNREFERENCED_PARAMETER(_scancode);
 			UNREFERENCED_PARAMETER(_mods);
@@ -137,7 +137,7 @@ namespace ragdoll
 			}
 		});
 
-		glfwSetCharCallback(m_GlfwWindow, [](GLFWwindow* window, unsigned int keycode)
+		glfwSetCharCallback(m_GlfwWindow, [](GLFWwindow* window, uint32_t keycode)
 		{
 			Window& data = *static_cast<Window*>(glfwGetWindowUserPointer(window));
 			KeyTypedEvent event(keycode);
@@ -145,7 +145,7 @@ namespace ragdoll
 				data.m_Callback(event);
 		});
 
-		glfwSetMouseButtonCallback(m_GlfwWindow, [](GLFWwindow* window, int _button, int _action, int _mods)
+		glfwSetMouseButtonCallback(m_GlfwWindow, [](GLFWwindow* window, int32_t _button, int32_t _action, int32_t _mods)
 		{
 			UNREFERENCED_PARAMETER(_mods);
 

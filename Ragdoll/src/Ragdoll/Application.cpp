@@ -148,7 +148,7 @@ namespace ragdoll
 		};
 
 		// Cube indices
-		unsigned int indices[] = {
+		uint32_t indices[] = {
 			0, 1, 2, 2, 3, 0, // back face
 			4, 5, 6, 6, 7, 4, // front face
 			0, 1, 5, 5, 4, 0, // bottom face

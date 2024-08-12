@@ -440,7 +440,7 @@ namespace ragdoll
 	{
 		//reset scroll boolean
 		m_ScrollThisFrame = false;
-		for(unsigned int i{}; i < static_cast<int>(Key::MaxKey); ++i)
+		for(uint32_t i{}; i < static_cast<int32_t>(Key::MaxKey); ++i)
 		{
 #if RD_LOG_INPUT
 			auto& key = m_Keys[i];
@@ -451,7 +451,7 @@ namespace ragdoll
 			UpdateDataStatesAndTimers(static_cast<Key>(i), _dt);
 		}
 
-		for(unsigned int i{}; i < static_cast<int>(MouseButton::MaxButton); ++i)
+		for(uint32_t i{}; i < static_cast<int32_t>(MouseButton::MaxButton); ++i)
 		{
 #if RD_LOG_INPUT
 			auto& mbtn = m_MouseButtons[i];
@@ -561,12 +561,12 @@ namespace ragdoll
 
 	void InputHandler::UpdateDataStatesAndTimers(Key _key, double _dt)
 	{
-		UpdateDataStatesAndTimers(m_Keys[static_cast<int>(_key)], _dt);
+		UpdateDataStatesAndTimers(m_Keys[static_cast<int32_t>(_key)], _dt);
 	}
 
 	void InputHandler::UpdateDataStatesAndTimers(MouseButton _mousebtn, double _dt)
 	{
-		UpdateDataStatesAndTimers(m_MouseButtons[static_cast<int>(_mousebtn)], _dt);
+		UpdateDataStatesAndTimers(m_MouseButtons[static_cast<int32_t>(_mousebtn)], _dt);
 	}
 
 	void InputHandler::UpdateDataStatesAndTimers(InputData& _data, double _dt)
