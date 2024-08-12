@@ -40,12 +40,12 @@ namespace ragdoll
 	enum class ShaderType
 	{
 		None = 0,
-		VertexShader,
-		FragmentShader,
-		GeometryShader,
-		TessellationControlShader,
-		TessellationEvaluationShader,
-		ComputeShader,
+		Vertex,
+		Fragment,
+		Geometry,
+		TessellationControl,
+		TessellationEvaluation,
+		Compute,
 
 		SHADER_COUNT
 	};
@@ -92,6 +92,62 @@ namespace ragdoll
 
 	namespace ShaderUtils
 	{
+		static const char* ShaderTypeToString(ShaderType type)
+		{
+			switch (type)
+			{
+			case ShaderType::None:                  return "None";
+			case ShaderType::Vertex:          return "Vertex";
+			case ShaderType::Fragment:        return "Fragment";
+			case ShaderType::Geometry:        return "Geometry";
+			case ShaderType::TessellationControl: return "Tessellation Control";
+			case ShaderType::TessellationEvaluation: return "Tessellation Evaluation";
+			case ShaderType::Compute:         return "Compute";
+			default: RD_ASSERT(true, "Invalid shader type chosen."); return "Invalid";
+			}
+		}
+		static const char* ShaderDataTypeToString(ShaderDataType type)
+		{
+			switch(type)
+			{
+			case ShaderDataType::None:              return "None";
+			case ShaderDataType::Float:             return "Float";
+			case ShaderDataType::Float2:            return "Float2";
+			case ShaderDataType::Float3:            return "Float3";
+			case ShaderDataType::Float4:            return "Float4";
+			case ShaderDataType::Int:               return "Int";
+			case ShaderDataType::Int2:              return "Int2";
+			case ShaderDataType::Int3:              return "Int3";
+			case ShaderDataType::Int4:              return "Int4";
+			case ShaderDataType::UInt:              return "UInt";
+			case ShaderDataType::UInt2:             return "UInt2";
+			case ShaderDataType::UInt3:             return "UInt3";
+			case ShaderDataType::UInt4:             return "UInt4";
+			case ShaderDataType::Bool:              return "Bool";
+			case ShaderDataType::Mat2:              return "Mat2";
+			case ShaderDataType::Mat3:              return "Mat3";
+			case ShaderDataType::Mat4:              return "Mat4";
+			case ShaderDataType::FloatArr:          return "FloatArr";
+			case ShaderDataType::IntArr:            return "IntArr";
+			case ShaderDataType::UIntArr:           return "UIntArr";
+			case ShaderDataType::BoolArr:           return "BoolArr";
+			case ShaderDataType::Sampler1D:         return "Sampler1D";
+			case ShaderDataType::Sampler2D:         return "Sampler2D";
+			case ShaderDataType::Sampler3D:         return "Sampler3D";
+			case ShaderDataType::SamplerCube:       return "SamplerCube";
+			case ShaderDataType::Sampler2DArray:    return "Sampler2DArray";
+			case ShaderDataType::Sampler1DShadow:   return "Sampler1DShadow";
+			case ShaderDataType::Sampler2DShadow:   return "Sampler2DShadow";
+			case ShaderDataType::Image1D:           return "Image1D";
+			case ShaderDataType::Image2D:           return "Image2D";
+			case ShaderDataType::Image3D:           return "Image3D";
+			case ShaderDataType::ImageCube:         return "ImageCube";
+			case ShaderDataType::Image2DArray:      return "Image2DArray";
+			case ShaderDataType::AtomicUInt:        return "AtomicUInt";
+			case ShaderDataType::DATA_TYPE_COUNT:   return "DataTypeCount";
+			default: RD_ASSERT(true, "Unknown shader data type chosen."); return "Invalid";
+			}
+		}
 		static uint32_t ShaderDataTypeSize(const ShaderDataType& type)
 		{
 			switch (type)
@@ -177,12 +233,12 @@ namespace ragdoll
 			switch (type)
 			{
 			case ShaderType::None: RD_ASSERT(true, "ShaderType::None is not supported."); return 0;
-			case ShaderType::VertexShader:          return GL_VERTEX_SHADER;
-			case ShaderType::FragmentShader:        return GL_FRAGMENT_SHADER;
-			case ShaderType::GeometryShader:        return GL_GEOMETRY_SHADER;
-			case ShaderType::TessellationControlShader: return GL_TESS_CONTROL_SHADER;
-			case ShaderType::TessellationEvaluationShader: return GL_TESS_EVALUATION_SHADER;
-			case ShaderType::ComputeShader:         return GL_COMPUTE_SHADER;
+			case ShaderType::Vertex:          return GL_VERTEX_SHADER;
+			case ShaderType::Fragment:        return GL_FRAGMENT_SHADER;
+			case ShaderType::Geometry:        return GL_GEOMETRY_SHADER;
+			case ShaderType::TessellationControl: return GL_TESS_CONTROL_SHADER;
+			case ShaderType::TessellationEvaluation: return GL_TESS_EVALUATION_SHADER;
+			case ShaderType::Compute:         return GL_COMPUTE_SHADER;
 			default: RD_ASSERT(true, "Invalid shader type chosen."); return 0;
 			}
 		}

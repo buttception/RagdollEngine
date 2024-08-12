@@ -48,8 +48,9 @@ ________________________________________________________________________________
 #include "Graphics/Transform/TransformLayer.h"
 
 #include "glm/gtc/type_ptr.hpp"
+#include "Ragdoll/Graphics/Shader/ShaderProgram.h"
 GLuint VAO, VBO, EBO;
-GLuint shaderProgram;
+std::shared_ptr<ragdoll::ShaderProgram> sp;
 ragdoll::Transform* t1, *t2, *t3, *t4, *t5;
 
 namespace ragdoll
@@ -158,21 +159,12 @@ namespace ragdoll
 		};
 
 		// Compile and link shaders
-		GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-		glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-		glCompileShader(vertexShader);
-
-		GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-		glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-		glCompileShader(fragmentShader);
-
-		shaderProgram = glCreateProgram();
-		glAttachShader(shaderProgram, vertexShader);
-		glAttachShader(shaderProgram, fragmentShader);
-		glLinkProgram(shaderProgram);
-
-		glDeleteShader(vertexShader);
-		glDeleteShader(fragmentShader);
+		std::shared_ptr<Shader> vs = std::make_shared<Shader>("test vertex shader", vertexShaderSource, ShaderType::Vertex);
+		std::shared_ptr<Shader> fs = std::make_shared<Shader>("test fragment shader", fragmentShaderSource, ShaderType::Fragment);
+		sp = std::make_shared<ShaderProgram>("test shader program");
+		sp->AttachShaders({ vs, fs });
+		sp->PrintAttributes();
+		sp->PrintUniforms();
 
 		// Generate and bind VAO, VBO, and EBO
 		glGenVertexArrays(1, &VAO);
@@ -209,22 +201,18 @@ namespace ragdoll
 				layer->Update(static_cast<float>(m_PrimaryWindow->GetDeltaTime()));
 			}
 
-			glUseProgram(shaderProgram);
-
-			// Pass the model matrix to the vertex shader
-			GLuint modelLoc = glGetUniformLocation(shaderProgram, "model");
-			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(t1->m_ModelToWorld));
 
 			glBindVertexArray(VAO);
+			sp->Bind();
+			sp->UploadUniform("model", ShaderDataType::Mat4, glm::value_ptr(t1->m_ModelToWorld));
 			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-
-			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(t2->m_ModelToWorld));
+			sp->UploadUniform("model", ShaderDataType::Mat4, glm::value_ptr(t2->m_ModelToWorld));
 			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(t3->m_ModelToWorld));
+			sp->UploadUniform("model", ShaderDataType::Mat4, glm::value_ptr(t3->m_ModelToWorld));
 			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(t4->m_ModelToWorld));
+			sp->UploadUniform("model", ShaderDataType::Mat4, glm::value_ptr(t4->m_ModelToWorld));
 			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(t5->m_ModelToWorld));
+			sp->UploadUniform("model", ShaderDataType::Mat4, glm::value_ptr(t5->m_ModelToWorld));
 			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 
 			m_PrimaryWindow->EndRender();

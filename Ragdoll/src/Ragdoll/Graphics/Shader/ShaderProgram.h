@@ -36,9 +36,13 @@ namespace ragdoll
 	struct Shader
 	{
 		Shader(const char* name);
+		Shader(const char* name, const char* source, ShaderType type);
 		~Shader();
 
 		bool Compile(const char* source, ShaderType type);
+
+		//helpers
+		bool CheckCompilationStatus(GLuint shaderId, ShaderType type) const;
 
 		GLuint m_RendererId{};
 		const char* m_Name;
@@ -53,6 +57,8 @@ namespace ragdoll
 		void Bind() const;
 		void Unbind() const;
 
+		bool AttachShaders(std::initializer_list<std::shared_ptr<Shader>> shaders);
+		void DetachShaders();
 		bool Link() const;
 		bool Validate() const;
 
@@ -67,7 +73,8 @@ namespace ragdoll
 
 		GLuint m_RendererId{};
 		const char* m_Name;
-		std::vector<Shader> m_Shaders;
+		bool m_Ready{ false };
+		std::vector<std::shared_ptr<Shader>> m_Shaders;
 		std::vector<std::pair<const char*, ShaderDataType>> m_Uniforms;
 	};
 }
