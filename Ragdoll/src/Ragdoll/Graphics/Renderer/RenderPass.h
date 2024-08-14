@@ -44,6 +44,6 @@ namespace ragdoll
 	private:
 		RenderState m_RenderState;
 		std::vector<RenderCommand> m_CommandBuffer;
-		const char* m_Name;
+		const char* m_Name{};
 	};
 }

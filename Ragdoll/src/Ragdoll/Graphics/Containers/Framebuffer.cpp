@@ -331,6 +331,17 @@ namespace ragdoll
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
+	void Framebuffer::Clear()
+	{
+		Bind();
+		if(GL_COLOR_BUFFER_BIT & m_ClearSetting)
+			for(const auto& it : m_ColorAttachments)
+				if(it.m_RendererId)
+					glClearTexImage(it.m_RendererId, 0, it.m_Specs.m_Format, it.m_Specs.m_Type, &it.m_Specs.m_ClearColor.m_Data);
+		glClear(m_ClearSetting & ~GL_COLOR_BUFFER_BIT);
+		Unbind();
+	}
+
 	void Framebuffer::Resize(uint32_t width, uint32_t height)
 	{
 		// Update the size of all color attachments

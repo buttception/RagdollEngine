@@ -202,6 +202,7 @@ namespace ragdoll
 			}
 
 			fb->Bind();
+			fb->Clear();
 			vao->Bind();
 			sp->Bind();
 			sp->UploadUniform("model", ShaderDataType::Mat4, glm::value_ptr(t1->m_ModelToWorld));
@@ -225,6 +226,7 @@ namespace ragdoll
 				GL_COLOR_BUFFER_BIT, // Bitmask of buffers to copy
 				GL_NEAREST // Filtering method
 			);
+			fb->Unbind();
 
 			m_PrimaryWindow->EndRender();
 		}

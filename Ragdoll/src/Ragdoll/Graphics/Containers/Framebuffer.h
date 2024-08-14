@@ -60,6 +60,14 @@ namespace ragdoll
 			GLuint m_MipmapBase{ 0 };				//mipmap base level
 			GLuint m_MipmapMax{ 0 };				//mipmap max level
 			GLfloat m_LodBias{ 0.0f };				//level of detail bias
+
+			union ClearColor
+			{
+				GLfloat m_Floats[4] = {0.f, 0.f, 0.f, 0.f};
+				GLubyte m_Bytes[4];
+				GLuint m_Ints[4];
+				uint8_t m_Data[16];
+			} m_ClearColor;
 		};	
 		struct DepthAttachmentSpecification : AttachmentSpecification		//depth texture specification
 		{
@@ -104,6 +112,7 @@ namespace ragdoll
 		//bind with GL_FRAMEBUFFER
 		void Bind() const;
 		void Unbind() const;
+		void Clear();
 
 		void Resize(uint32_t width, uint32_t height);	//resizes all attachments
 
@@ -121,5 +130,6 @@ namespace ragdoll
 		DepthAttachment m_DepthAttachment;
 		StencilAttachment m_StencilAttachment;
 		DepthStencilAttachment m_DepthStencilAttachment;	//if this is available, depth and stencil attachments won't be used
+		GLenum m_ClearSetting{ GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT };
 	};
 }
