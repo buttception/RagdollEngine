@@ -56,7 +56,7 @@ namespace ragdoll
 			case ShaderDataType::Float4:	return 4;
 			case ShaderDataType::Mat2:		return 4;
 			case ShaderDataType::Mat3:		return 9;
-			case ShaderDataType::Mat4:		return 12;
+			case ShaderDataType::Mat4:		return 16;
 			case ShaderDataType::Int:		return 1;
 			case ShaderDataType::Int2:		return 2;
 			case ShaderDataType::Int3:		return 3;

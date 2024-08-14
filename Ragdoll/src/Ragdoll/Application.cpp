@@ -52,8 +52,10 @@ ________________________________________________________________________________
 #include "Ragdoll/Graphics/Containers/VertexArray.h"
 #include "Ragdoll/Graphics/Containers/VertexBuffer.h"
 #include "Ragdoll/Graphics/Containers/IndexBuffer.h"
+#include "Ragdoll/Graphics/Containers/Framebuffer.h"
 std::shared_ptr<ragdoll::VertexArray> vao;
 std::shared_ptr<ragdoll::ShaderProgram> sp;
+std::shared_ptr<ragdoll::Framebuffer> fb;
 ragdoll::Transform* t1, *t2, *t3, *t4, *t5;
 
 namespace ragdoll
@@ -179,6 +181,11 @@ namespace ragdoll
 		std::shared_ptr<IndexBuffer> ibo = std::make_shared<IndexBuffer>(indices, sizeof(indices));
 		vao->AddVertexBuffer(vbo);
 		vao->SetIndexBuffer(ibo);
+
+		//create the fb
+		fb = std::make_shared<Framebuffer>("test");
+		fb->CreateColorAttachment({ {"Color", m_PrimaryWindow->GetWidth(), m_PrimaryWindow->GetHeight(), GL_TEXTURE_2D, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE } });
+		fb->CreateDepthAttachment({ {"Depth", m_PrimaryWindow->GetWidth(), m_PrimaryWindow->GetHeight(), GL_TEXTURE_2D, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE } });
 	}
 
 	void Application::Run()
@@ -194,6 +201,7 @@ namespace ragdoll
 				layer->Update(static_cast<float>(m_PrimaryWindow->GetDeltaTime()));
 			}
 
+			fb->Bind();
 			vao->Bind();
 			sp->Bind();
 			sp->UploadUniform("model", ShaderDataType::Mat4, glm::value_ptr(t1->m_ModelToWorld));
@@ -206,6 +214,17 @@ namespace ragdoll
 			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 			sp->UploadUniform("model", ShaderDataType::Mat4, glm::value_ptr(t5->m_ModelToWorld));
 			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+			sp->Unbind();
+			vao->Unbind();
+
+			glNamedFramebufferReadBuffer(fb->GetRendererId(), GL_COLOR_ATTACHMENT0);
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+			glBlitFramebuffer(
+				0, 0, fb->GetColorAttachment(0).m_Specs.m_Width, fb->GetColorAttachment(0).m_Specs.m_Height, // Source rectangle
+				0, 0, m_PrimaryWindow->GetBufferWidth(), m_PrimaryWindow->GetBufferHeight(), // Destination rectangle
+				GL_COLOR_BUFFER_BIT, // Bitmask of buffers to copy
+				GL_NEAREST // Filtering method
+			);
 
 			m_PrimaryWindow->EndRender();
 		}

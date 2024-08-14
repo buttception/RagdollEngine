@@ -27,13 +27,14 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-
 #pragma once
+
+#include "glad/glad.h"
 
 namespace ragdoll
 {
 	struct RenderState
 	{
-		
+		GLint m_StencilClearValue{ 0 };
 	};
 }
