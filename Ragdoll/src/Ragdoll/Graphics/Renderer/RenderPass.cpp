@@ -50,7 +50,6 @@ namespace ragdoll
 		auto& sp = m_ResourceManager->GetShaderProgram("test shader program");
 		auto& fb = m_ResourceManager->GetFramebuffer("test");
 		auto& vao = m_ResourceManager->GetPrimitiveMesh("cube");
-		fb.Clear();
 		fb.Bind();
 		vao.Bind();
 		sp.Bind();
