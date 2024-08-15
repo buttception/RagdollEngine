@@ -31,8 +31,30 @@ ________________________________________________________________________________
 
 namespace ragdoll
 {
+	class Framebuffer;
+	class ShaderProgram;
+	class Window;
+	class VertexArray;
+	struct RenderData;
 	class ResourceManager
 	{
-		
+	public:
+		void Init(std::shared_ptr<Window> window);
+
+		void AddRenderData(const char* datasetName, std::vector<RenderData>&& data);
+		std::vector<RenderData>& GetRenderData(const char* datasetName);
+
+		std::unordered_map<const char*, std::shared_ptr<Framebuffer>>& GetFramebuffers() { return m_Framebuffers; }
+		Framebuffer& GetFramebuffer(const char* name);
+		ShaderProgram& GetShaderProgram(const char* name);
+		VertexArray& GetPrimitiveMesh(const char* name);
+
+	private:
+		std::shared_ptr<Window> m_PrimaryWindow;
+
+		std::unordered_map<const char*, std::vector<RenderData>> m_RenderData;
+		std::unordered_map<const char*, std::shared_ptr<Framebuffer>> m_Framebuffers;
+		std::unordered_map<const char*, std::shared_ptr<ShaderProgram>> m_ShaderPrograms;
+		std::unordered_map<const char*, std::shared_ptr<VertexArray>> m_PrimitiveMeshes;
 	};
 }

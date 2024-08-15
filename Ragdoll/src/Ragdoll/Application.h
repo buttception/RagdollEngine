@@ -35,6 +35,8 @@ namespace ragdoll
 	class EntityManager;
 	class TransformLayer;
 	class RenderGraph;
+	class OpenGLContext;
+	class ResourceManager;
 	class WindowMoveEvent;
 	class WindowResizeEvent;
 	class WindowCloseEvent;
@@ -86,8 +88,10 @@ namespace ragdoll
 
 		GuidGenerator m_GuidGenerator{};
 		std::shared_ptr<Window> m_PrimaryWindow;
+		std::shared_ptr<OpenGLContext> m_Context;
 		std::shared_ptr<InputHandler> m_InputHandler;
 		std::shared_ptr<EntityManager> m_EntityManager;
+		std::shared_ptr<ResourceManager> m_ResourceManager;
 		std::shared_ptr<RenderGraph> m_RenderGraph;
 
 		std::shared_ptr<LayerStack> m_LayerStack;

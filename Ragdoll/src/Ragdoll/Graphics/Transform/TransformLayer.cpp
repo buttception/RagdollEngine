@@ -34,9 +34,6 @@ ________________________________________________________________________________
 
 #include "Transform.h"
 
-#include "entt/entt.hpp"
-#include "glm/gtx/quaternion.hpp"
-
 #include "Ragdoll/Layer/Layer.h"
 #include "Ragdoll/Entity/EntityManager.h"
 

@@ -51,6 +51,7 @@ namespace ragdoll
 			bool m_FixedSampleLocations{ true };	//whether the samples are at fixed locations
 
 			bool m_ResizeWithWindow{ true };		//controls whether the attachment should be resized with the window
+			bool m_ClearPerFrame{ true };			//controls whether the attachment should be cleared per frame
 		};
 
 		//only GL_TEXTURE_2D, GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_CUBE_MAP
@@ -112,7 +113,7 @@ namespace ragdoll
 		//bind with GL_FRAMEBUFFER
 		void Bind() const;
 		void Unbind() const;
-		void Clear();
+		void Clear() const;
 
 		void Resize(uint32_t width, uint32_t height);	//resizes all attachments
 
@@ -130,6 +131,6 @@ namespace ragdoll
 		DepthAttachment m_DepthAttachment;
 		StencilAttachment m_StencilAttachment;
 		DepthStencilAttachment m_DepthStencilAttachment;	//if this is available, depth and stencil attachments won't be used
-		GLenum m_ClearSetting{ GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT };
+		GLenum m_ClearSetting{ GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_COLOR_BUFFER_BIT };
 	};
 }

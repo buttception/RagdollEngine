@@ -33,11 +33,15 @@ ________________________________________________________________________________
 
 namespace ragdoll
 {
-	union RenderData
+	struct RenderData
 	{
-		struct DrawMesh
+		union
 		{
-			Guid MeshId;
+			struct DrawMesh
+			{
+				Guid m_EntityGuid;
+				Guid m_MeshId;
+			} m_DrawMesh;
 		};
 	};
 }

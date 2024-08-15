@@ -331,7 +331,7 @@ namespace ragdoll
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
-	void Framebuffer::Clear()
+	void Framebuffer::Clear() const
 	{
 		Bind();
 		if(GL_COLOR_BUFFER_BIT & m_ClearSetting)

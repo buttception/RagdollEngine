@@ -37,6 +37,7 @@ ________________________________________________________________________________
 #include "Entity/EntityManager.h"
 #include "Graphics/Window/Window.h"
 #include "Graphics/GLFWContext.h"
+#include "Graphics/OpenGLContext.h"
 #include "Event/WindowEvents.h"
 #include "Event/KeyEvents.h"
 #include "Event/MouseEvent.h"
@@ -46,16 +47,9 @@ ________________________________________________________________________________
 #include "Graphics/Transform/Transform.h"
 #include "Layer/LayerStack.h"
 #include "Graphics/Transform/TransformLayer.h"
+#include "Resource/ResourceManager.h"
 
-#include "glm/gtc/type_ptr.hpp"
-#include "Ragdoll/Graphics/Shader/ShaderProgram.h"
-#include "Ragdoll/Graphics/Containers/VertexArray.h"
-#include "Ragdoll/Graphics/Containers/VertexBuffer.h"
-#include "Ragdoll/Graphics/Containers/IndexBuffer.h"
-#include "Ragdoll/Graphics/Containers/Framebuffer.h"
-std::shared_ptr<ragdoll::VertexArray> vao;
-std::shared_ptr<ragdoll::ShaderProgram> sp;
-std::shared_ptr<ragdoll::Framebuffer> fb;
+#include "Ragdoll/Graphics/Renderer/RenderData.h"
 ragdoll::Transform* t1, *t2, *t3, *t4, *t5;
 
 namespace ragdoll
@@ -72,17 +66,24 @@ namespace ragdoll
 		m_PrimaryWindow->Init();
 		//bind the application callback to the window
 		m_PrimaryWindow->SetEventCallback(RD_BIND_EVENT_FN(Application::OnEvent));
+		//setup opengl context
+		m_Context = std::make_shared<OpenGLContext>();
+		m_Context->Init(m_PrimaryWindow);
 		//setup input handler
 		m_InputHandler = std::make_shared<InputHandler>();
 		m_InputHandler->Init();
 		//create the entity manager
 		m_EntityManager = std::make_shared<EntityManager>();
+		//create the resource manager
+		m_ResourceManager = std::make_shared<ResourceManager>();
+		m_ResourceManager->Init(m_PrimaryWindow);
 		//create the render graph
 		m_RenderGraph = std::make_shared<RenderGraph>();
-		m_RenderGraph->Init(m_PrimaryWindow);
+		m_RenderGraph->Init(m_PrimaryWindow, m_ResourceManager, m_EntityManager);
 
 		//layers stuff
 		m_LayerStack = std::make_shared<LayerStack>();
+		//adding the transform layer
 		m_TransformLayer = std::make_shared<TransformLayer>(m_EntityManager);
 		m_LayerStack->PushLayer(m_TransformLayer);
 
@@ -115,77 +116,14 @@ namespace ragdoll
 		t5->m_Parent = m_EntityManager->GetGuid(e4);
 		t4->m_Child = m_EntityManager->GetGuid(e5);
 
-		//testing opengl code
-		// Vertex and fragment shader source code
-		const char* vertexShaderSource = R"(
-			#version 330 core
-			layout(location = 0) in vec3 aPos;
-			layout(location = 1) in vec3 aColor;
-			out vec3 fragColor;
-			uniform mat4 model;
-			void main()
-			{
-			    gl_Position = model * vec4(aPos, 1.0);
-			    fragColor = aColor;
-			}
-			)";
-
-		const char* fragmentShaderSource = R"(
-			#version 330 core
-			in vec3 fragColor;
-			out vec4 color;
-			void main()
-			{
-			    color = vec4(fragColor, 1.0);
-			}
-			)";
-		// Cube vertices
-		float vertices[] = {
-			// positions          // colors
-			-0.1f, -0.1f, -0.1f, 1.f, 0.0f, 0.0f, // back face
-			 0.1f, -0.1f, -0.1f, 0.0f, 1.f, 0.0f,
-			 0.1f,  0.1f, -0.1f, 0.0f, 0.0f, 1.f,
-			-0.1f,  0.1f, -0.1f, 1.f, 1.f, 0.0f,
-
-			-0.1f, -0.1f,  0.1f, 1.f, 0.0f, 1.f, // front face
-			 0.1f, -0.1f,  0.1f, 0.0f, 1.f, 1.f,
-			 0.1f,  0.1f,  0.1f, 1.f, 1.f, 1.f,
-			-0.1f,  0.1f,  0.1f, 0.1f, 0.1f, 0.1f
-		};
-
-		// Cube indices
-		uint32_t indices[] = {
-			0, 1, 2, 2, 3, 0, // back face
-			4, 5, 6, 6, 7, 4, // front face
-			0, 1, 5, 5, 4, 0, // bottom face
-			2, 3, 7, 7, 6, 2, // top face
-			0, 3, 7, 7, 4, 0, // left face
-			1, 2, 6, 6, 5, 1  // right face
-		};
-
-		// Compile and link shaders
-		std::shared_ptr<Shader> vs = std::make_shared<Shader>("test vertex shader", vertexShaderSource, ShaderType::Vertex);
-		std::shared_ptr<Shader> fs = std::make_shared<Shader>("test fragment shader", fragmentShaderSource, ShaderType::Fragment);
-		sp = std::make_shared<ShaderProgram>("test shader program");
-		sp->AttachShaders({ vs, fs });
-		sp->PrintAttributes();
-		sp->PrintUniforms();
-
-		// Generate and bind VAO, VBO, and EBO
-		vao = std::make_shared<VertexArray>();
-		std::shared_ptr<VertexBuffer> vbo = std::make_shared<VertexBuffer>(vertices, sizeof(vertices), GL_STATIC_DRAW);
-		vbo->SetLayout({
-			{ ShaderDataType::Float3, "aPos" },
-			{ ShaderDataType::Float3, "aColor" }
-			});
-		std::shared_ptr<IndexBuffer> ibo = std::make_shared<IndexBuffer>(indices, sizeof(indices));
-		vao->AddVertexBuffer(vbo);
-		vao->SetIndexBuffer(ibo);
-
-		//create the fb
-		fb = std::make_shared<Framebuffer>("test");
-		fb->CreateColorAttachment({ {"Color", m_PrimaryWindow->GetWidth(), m_PrimaryWindow->GetHeight(), GL_TEXTURE_2D, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE } });
-		fb->CreateDepthAttachment({ {"Depth", m_PrimaryWindow->GetWidth(), m_PrimaryWindow->GetHeight(), GL_TEXTURE_2D, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE } });
+		//add all of this into the render graph data
+		std::vector<RenderData> renderData;
+		renderData.push_back({.m_DrawMesh{ m_EntityManager->GetGuid(e1), 0 }});
+		renderData.push_back({.m_DrawMesh{ m_EntityManager->GetGuid(e2), 0 }});
+		renderData.push_back({.m_DrawMesh{ m_EntityManager->GetGuid(e3), 0 }});
+		renderData.push_back({.m_DrawMesh{ m_EntityManager->GetGuid(e4), 0 }});
+		renderData.push_back({.m_DrawMesh{ m_EntityManager->GetGuid(e5), 0 }});
+		m_ResourceManager->AddRenderData("test", std::move(renderData));
 	}
 
 	void Application::Run()
@@ -201,32 +139,7 @@ namespace ragdoll
 				layer->Update(static_cast<float>(m_PrimaryWindow->GetDeltaTime()));
 			}
 
-			fb->Bind();
-			fb->Clear();
-			vao->Bind();
-			sp->Bind();
-			sp->UploadUniform("model", ShaderDataType::Mat4, glm::value_ptr(t1->m_ModelToWorld));
-			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-			sp->UploadUniform("model", ShaderDataType::Mat4, glm::value_ptr(t2->m_ModelToWorld));
-			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-			sp->UploadUniform("model", ShaderDataType::Mat4, glm::value_ptr(t3->m_ModelToWorld));
-			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-			sp->UploadUniform("model", ShaderDataType::Mat4, glm::value_ptr(t4->m_ModelToWorld));
-			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-			sp->UploadUniform("model", ShaderDataType::Mat4, glm::value_ptr(t5->m_ModelToWorld));
-			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-			sp->Unbind();
-			vao->Unbind();
-
-			glNamedFramebufferReadBuffer(fb->GetRendererId(), GL_COLOR_ATTACHMENT0);
-			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-			glBlitFramebuffer(
-				0, 0, fb->GetColorAttachment(0).m_Specs.m_Width, fb->GetColorAttachment(0).m_Specs.m_Height, // Source rectangle
-				0, 0, m_PrimaryWindow->GetBufferWidth(), m_PrimaryWindow->GetBufferHeight(), // Destination rectangle
-				GL_COLOR_BUFFER_BIT, // Bitmask of buffers to copy
-				GL_NEAREST // Filtering method
-			);
-			fb->Unbind();
+			m_RenderGraph->Execute();
 
 			m_PrimaryWindow->EndRender();
 		}
