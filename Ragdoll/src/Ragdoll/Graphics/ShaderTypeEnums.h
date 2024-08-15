@@ -1,6 +1,6 @@
 ﻿/*!
-\file		WindowEvents.h
-\date		06/08/2024
+\file		ShaderTypeEnums.h
+\date		12/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -29,62 +29,71 @@
 __________________________________________________________________________________*/
 #pragma once
 
-#include "Event.h"
+#include <glad/glad.h>
 
 namespace ragdoll
 {
-	class WindowResizeEvent : public Event
+	// Types of shader
+	enum class ShaderType
 	{
-	public:
-		WindowResizeEvent(int32_t _width, int32_t _height)
-			: m_Width(_width), m_Height(_height) {}
+		None = 0,
+		Vertex,
+		Fragment,
+		Geometry,
+		TessellationControl,
+		TessellationEvaluation,
+		Compute,
 
-		inline uint32_t GetWidth() const { return m_Width; }
-		inline uint32_t GetHeight() const { return m_Height; }
-
-		std::string ToString() const override
-		{
-			std::stringstream ss;
-			ss << "WindowResizeEvent: " << m_Width << ", " << m_Height;
-			return ss.str();
-		}
-
-		// Sets the types and category for the event
-		EVENT_CLASS_TYPE(WindowResize)
-		EVENT_CLASS_CATEGORY(EventCategoryApplication)
-	private:
-		int32_t m_Width, m_Height;
+		SHADER_COUNT
 	};
 
-	class WindowCloseEvent : public Event
+	enum class ShaderDataType
 	{
-	public:
-		WindowCloseEvent() {}
+		None = 0,
+		Float,
+		Float2,
+		Float3,
+		Float4,
+		Int,
+		Int2,
+		Int3,
+		Int4,
+		UInt,
+		UInt2,
+		UInt3,
+		UInt4,
+		Bool,
+		Mat2,
+		Mat3,
+		Mat4,
+		FloatArr,
+		IntArr,
+		UIntArr,
+		BoolArr,
+		Sampler1D,
+		Sampler2D,
+		Sampler3D,
+		SamplerCube,
+		Sampler2DArray,
+		Sampler1DShadow,
+		Sampler2DShadow,
+		Image1D,
+		Image2D,
+		Image3D,
+		ImageCube,
+		Image2DArray,
+		AtomicUInt,
 
-		EVENT_CLASS_TYPE(WindowClose)
-		EVENT_CLASS_CATEGORY(EventCategoryApplication)
+		DATA_TYPE_COUNT
 	};
 
-	class WindowMoveEvent : public Event
+	namespace ShaderUtils
 	{
-	public:
-		WindowMoveEvent(int32_t _x, int32_t _y)
-			: m_PosX(_x), m_PosY(_y) {}
-
-		inline int32_t GetX() const { return m_PosX; }
-		inline int32_t GetY() const { return m_PosY; }
-
-		std::string ToString() const override
-		{
-			std::stringstream ss;
-			ss << "WindowMoveEvent: " << m_PosX << ", " << m_PosY;
-			return ss.str();
-		}
-
-		EVENT_CLASS_TYPE(WindowMoved)
-		EVENT_CLASS_CATEGORY(EventCategoryApplication)
-
-	private:
-		int32_t m_PosX, m_PosY;
-	};
+		const char* ShaderTypeToString(ShaderType type);
+		const char* ShaderDataTypeToString(ShaderDataType type);
+		uint32_t ShaderDataTypeSize(const ShaderDataType& type);
+		GLenum ShaderDataTypeToOpenGLType(ShaderDataType type);
+		GLenum ShaderTypeToOpenGLType(ShaderType type);
+		ShaderDataType OpenGLTypeToShaderType(GLenum type);
+	}
 }

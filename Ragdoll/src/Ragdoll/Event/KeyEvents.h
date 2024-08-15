@@ -35,23 +35,23 @@ namespace ragdoll
 	class KeyEvent : public Event
 	{
 	public:
-		inline int GetKeyCode() const { return m_KeyCode; }
+		inline uint32_t GetKeyCode() const { return m_KeyCode; }
 
 		EVENT_CLASS_CATEGORY(EventCategoryKeyboard | EventCategoryInput)
 	protected:
-		KeyEvent(int _keycode)
+		KeyEvent(uint32_t _keycode)
 			: m_KeyCode(_keycode) {}
 
-		int m_KeyCode;
+		uint32_t m_KeyCode;
 	};
 
 	class KeyPressedEvent : public KeyEvent
 	{
 	public:
-		KeyPressedEvent(int _keycode, int _repeatCount)
+		KeyPressedEvent(uint32_t _keycode, uint32_t _repeatCount)
 			: KeyEvent(_keycode), m_RepeatCount(_repeatCount) {}
 
-		inline int GetRepeatCount() const { return m_RepeatCount; }
+		inline uint32_t GetRepeatCount() const { return m_RepeatCount; }
 
 		std::string ToString() const override
 		{
@@ -62,13 +62,13 @@ namespace ragdoll
 
 		EVENT_CLASS_TYPE(KeyPressed)
 	private:
-		int m_RepeatCount;
+		uint32_t m_RepeatCount;
 	};
 
 	class KeyTypedEvent : public KeyEvent
 	{
 	public:
-		KeyTypedEvent(int _keycode)
+		KeyTypedEvent(uint32_t _keycode)
 			: KeyEvent(_keycode) {}
 
 		std::string ToString() const override
@@ -85,7 +85,7 @@ namespace ragdoll
 	class KeyReleasedEvent : public KeyEvent
 	{
 	public:
-		KeyReleasedEvent(int _keycode)
+		KeyReleasedEvent(uint32_t _keycode)
 			: KeyEvent(_keycode) {}
 
 		std::string ToString() const override

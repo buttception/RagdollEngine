@@ -33,8 +33,6 @@ ________________________________________________________________________________
 #include "OpenGLContext.h"
 
 #include "GLFW/glfw3.h"
-#include "Ragdoll/Core/Core.h"
-#include "Ragdoll/Core/Logger.h"
 #include "Ragdoll/Graphics/Window/Window.h"
 
 namespace ragdoll
@@ -44,7 +42,7 @@ namespace ragdoll
 		//load glad
 		m_Window = window;
 		glfwMakeContextCurrent(window->GetGlfwWindow());
-		int status = gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress));
+		int32_t status = gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress));
 		RD_CRITICAL_ASSERT(!status, "Failed to initialize Glad.");
 		RD_CORE_INFO("OpenGL context created successfully.");
 
@@ -55,7 +53,7 @@ namespace ragdoll
 		RD_CORE_INFO("   Version: {0}", reinterpret_cast<const char*>(glGetString(GL_VERSION)));
 		RD_CORE_INFO("   Shader: {0}", reinterpret_cast<const char*>(glGetString(GL_SHADING_LANGUAGE_VERSION)));
 
-		int versionMajor, versionMinor;
+		GLint versionMajor, versionMinor;
 		glGetIntegerv(GL_MAJOR_VERSION, &versionMajor);
 		glGetIntegerv(GL_MINOR_VERSION, &versionMinor);
 
@@ -84,23 +82,23 @@ namespace ragdoll
 		{
 			case GL_DEBUG_SEVERITY_HIGH:
 #if RD_OPENGL_DEBUG_LEVEL >= 0
-				RD_CORE_ERROR("[OpenGL Error] src: {} | type: {} | id: {}\nmessage: {}", GLenumErrorToString(source), GLenumErrorToString(type), GLenumErrorToString(id), message);
+				RD_CORE_ERROR("[OpenGL Error] src: {} | type: {} | id: {}\nmessage: {}", GLenumErrorToString(source), GLenumErrorToString(type), id, message);
 				RD_ASSERT(true, "Debug mode enabled, breaking...");
 #endif
 			break;
 			case GL_DEBUG_SEVERITY_MEDIUM:
 #if RD_OPENGL_DEBUG_LEVEL >= 1
-				RD_CORE_WARN("[OpenGL Error] src: {} | type: {} | id: {}\nmessage: {}", GLenumErrorToString(source), GLenumErrorToString(type), GLenumErrorToString(id), message);
+				RD_CORE_WARN("[OpenGL Warning] src: {} | type: {} | id: {}\nmessage: {}", GLenumErrorToString(source), GLenumErrorToString(type), id, message);
 #endif
 			break;
 			case GL_DEBUG_SEVERITY_LOW:
 #if RD_OPENGL_DEBUG_LEVEL >= 2
-				RD_CORE_INFO("[OpenGL Error] src: {} | type: {} | id: {}\nmessage: {}", GLenumErrorToString(source), GLenumErrorToString(type), GLenumErrorToString(id), message);
+				RD_CORE_INFO("[OpenGL Info] src: {} | type: {} | id: {}\nmessage: {}", GLenumErrorToString(source), GLenumErrorToString(type), id, message);
 #endif
 			break;
 			case GL_DEBUG_SEVERITY_NOTIFICATION:
 #if RD_OPENGL_DEBUG_LEVEL >= 3
-				RD_CORE_TRACE("[OpenGL Error] src: {} | type: {} | id: {}\nmessage: {}", GLenumErrorToString(source), GLenumErrorToString(type), GLenumErrorToString(id), message);
+				RD_CORE_TRACE("[OpenGL Log] src: {} | type: {} | id: {}\nmessage: {}", GLenumErrorToString(source), GLenumErrorToString(type), id, message);
 #endif
 			break;
 			default:

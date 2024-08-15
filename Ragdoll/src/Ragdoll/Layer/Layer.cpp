@@ -34,5 +34,18 @@ ________________________________________________________________________________
 
 namespace ragdoll
 {
-	
+	void Layer::PreUpdate(float _dt)
+	{
+		UNREFERENCED_PARAMETER(_dt);
+	}
+
+	void Layer::PostUpdate(float _dt)
+	{
+		UNREFERENCED_PARAMETER(_dt);
+	}
+
+	void Layer::OnEvent(Event& e)
+	{
+		UNREFERENCED_PARAMETER(e);
+	}
 }

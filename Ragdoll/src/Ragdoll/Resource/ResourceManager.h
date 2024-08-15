@@ -1,6 +1,6 @@
 ﻿/*!
-\file		RenderGraph.h
-\date		08/08/2024
+\file		ResourceManager.h
+\date		12/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -31,47 +31,30 @@ ________________________________________________________________________________
 
 namespace ragdoll
 {
-	class EntityManager;
-	class OpenGLContext;
-	class Window;
-	class RenderPass;
-	struct RenderData;
 	class Framebuffer;
 	class ShaderProgram;
-	class ResourceManager;
-
-	class RenderGraph
+	class Window;
+	class VertexArray;
+	struct RenderData;
+	class ResourceManager
 	{
 	public:
-		void Init(std::shared_ptr<Window> window, std::shared_ptr<ResourceManager> resManager, std::shared_ptr<EntityManager> entManager);
-		void Execute();
+		void Init(std::shared_ptr<Window> window);
 
-		void CreateRenderPasses();
+		void AddRenderData(const char* datasetName, std::vector<RenderData>&& data);
+		std::vector<RenderData>& GetRenderData(const char* datasetName);
 
-		template<typename T>
-		std::shared_ptr<T> AddRenderPass(bool source = false)
-		{
-			std::shared_ptr<T> renderPass = std::make_shared<T>();
-			m_RenderPasses.push_back(renderPass);
-			if (source)
-			{
-				m_Sources.push_back(renderPass);
-			}
-			return renderPass;
-		}
-		void CreateDependency(std::shared_ptr<RenderPass> from, std::shared_ptr<RenderPass> to);
+		std::unordered_map<const char*, std::shared_ptr<Framebuffer>>& GetFramebuffers() { return m_Framebuffers; }
+		Framebuffer& GetFramebuffer(const char* name);
+		ShaderProgram& GetShaderProgram(const char* name);
+		VertexArray& GetPrimitiveMesh(const char* name);
 
 	private:
 		std::shared_ptr<Window> m_PrimaryWindow;
-		std::shared_ptr<ResourceManager> m_ResourceManager;
-		std::shared_ptr<EntityManager> m_EntityManager;
 
-		std::vector<std::shared_ptr<RenderPass>> m_RenderPasses;	//all render passes in the pipeline
-		std::vector<std::shared_ptr<RenderPass>> m_Sources;	//start of the pipeline
-		std::unordered_map<std::shared_ptr<RenderPass>, std::vector<std::shared_ptr<RenderPass>>> m_DependencyGraph;
-
-		void TopologicalSort(std::vector<std::shared_ptr<RenderPass>>& sorted);
-
-		std::shared_ptr<RenderPass> CreateTestRenderPass(const char* name);
+		std::unordered_map<const char*, std::vector<RenderData>> m_RenderData;
+		std::unordered_map<const char*, std::shared_ptr<Framebuffer>> m_Framebuffers;
+		std::unordered_map<const char*, std::shared_ptr<ShaderProgram>> m_ShaderPrograms;
+		std::unordered_map<const char*, std::shared_ptr<VertexArray>> m_PrimitiveMeshes;
 	};
 }

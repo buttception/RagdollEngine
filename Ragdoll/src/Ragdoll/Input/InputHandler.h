@@ -38,16 +38,16 @@ namespace ragdoll
 {
 	struct InputState
 	{
-		unsigned int m_Press : 1 { 0 };
-		unsigned int m_Release : 1 { 0 };
-		unsigned int m_Hold : 1 { 0 };
-		unsigned int m_Repeat : 1 { 0 };
-		unsigned int m_LongPress : 1 { 0 };
-		unsigned int m_Tap : 1 { 0 };
-		unsigned int m_MultiTap : 1 { 0 };
-		unsigned int m_LongPressTriggered : 1 { 0 };
-		unsigned int m_IncrementMultiTapTimer : 1 { 0 };
-		unsigned int : 23;
+		uint32_t m_Press : 1 { 0 };
+		uint32_t m_Release : 1 { 0 };
+		uint32_t m_Hold : 1 { 0 };
+		uint32_t m_Repeat : 1 { 0 };
+		uint32_t m_LongPress : 1 { 0 };
+		uint32_t m_Tap : 1 { 0 };
+		uint32_t m_MultiTap : 1 { 0 };
+		uint32_t m_LongPressTriggered : 1 { 0 };
+		uint32_t m_IncrementMultiTapTimer : 1 { 0 };
+		uint32_t : 23;
 	};
 
 	struct InputData
@@ -57,13 +57,13 @@ namespace ragdoll
 			InputState m_InputState;
 			struct
 			{
-				unsigned int : 9;
-				unsigned int m_TapCount : 23;
+				uint32_t : 9;
+				uint32_t m_TapCount : 23;
 			};
 		};
 		float m_HeldTimer{ 0.f };
 		float m_MultiTapTimer{ 0.f };
-		unsigned int m_RepeatCount{ 0 };
+		uint32_t m_RepeatCount{ 0 };
 
 		InputData() : m_InputState{ 0 } {}
 		~InputData() {}
@@ -85,24 +85,24 @@ namespace ragdoll
 		const static char* GetStringFromButton(MouseButton _button) { return s_ButtonToStrMap.at(_button); }
 
 		//functions for getting key states
-		bool IsKeyPressed(Key _key) const { return m_Keys[static_cast<int>(_key)].m_InputState.m_Press; }
-		bool IsKeyDown(Key _key) const { return m_Keys[static_cast<int>(_key)].m_InputState.m_Hold; }
-		bool IsKeyReleased(Key _key) const { return m_Keys[static_cast<int>(_key)].m_InputState.m_Release; }
-		bool IsKeyRepeated(Key _key) const { return m_Keys[static_cast<int>(_key)].m_InputState.m_Repeat; }
-		unsigned int GetKeyRepeatCount(Key _key) const { return m_Keys[static_cast<int>(_key)].m_RepeatCount; }
-		bool IsKeyLongPressed(Key _key) const { return m_Keys[static_cast<int>(_key)].m_InputState.m_LongPress; }
-		bool IsKeyTapped(Key _key) const { return m_Keys[static_cast<int>(_key)].m_InputState.m_Tap; }
-		bool IsKeyMultiTap(Key _key) const { return m_Keys[static_cast<int>(_key)].m_InputState.m_MultiTap; }
-		unsigned int GetKeyTapCount(Key _key) const { return m_Keys[static_cast<int>(_key)].m_TapCount; }
+		bool IsKeyPressed(Key _key) const { return m_Keys[static_cast<int32_t>(_key)].m_InputState.m_Press; }
+		bool IsKeyDown(Key _key) const { return m_Keys[static_cast<int32_t>(_key)].m_InputState.m_Hold; }
+		bool IsKeyReleased(Key _key) const { return m_Keys[static_cast<int32_t>(_key)].m_InputState.m_Release; }
+		bool IsKeyRepeated(Key _key) const { return m_Keys[static_cast<int32_t>(_key)].m_InputState.m_Repeat; }
+		uint32_t GetKeyRepeatCount(Key _key) const { return m_Keys[static_cast<int32_t>(_key)].m_RepeatCount; }
+		bool IsKeyLongPressed(Key _key) const { return m_Keys[static_cast<int32_t>(_key)].m_InputState.m_LongPress; }
+		bool IsKeyTapped(Key _key) const { return m_Keys[static_cast<int32_t>(_key)].m_InputState.m_Tap; }
+		bool IsKeyMultiTap(Key _key) const { return m_Keys[static_cast<int32_t>(_key)].m_InputState.m_MultiTap; }
+		uint32_t GetKeyTapCount(Key _key) const { return m_Keys[static_cast<int32_t>(_key)].m_TapCount; }
 
 		//functions for getting mouse states
-		bool IsMouseButtonPressed(MouseButton _button) const { return m_MouseButtons[static_cast<int>(_button)].m_InputState.m_Press; }
-		bool IsMouseButtonDown(MouseButton _button) const { return m_MouseButtons[static_cast<int>(_button)].m_InputState.m_Hold; }
-		bool IsMouseButtonReleased(MouseButton _button) const { return m_MouseButtons[static_cast<int>(_button)].m_InputState.m_Release; }
-		bool IsMouseButtonLongPressed(MouseButton _button) const { return m_MouseButtons[static_cast<int>(_button)].m_InputState.m_LongPress; }
-		bool IsMouseButtonTapped(MouseButton _button) const { return m_MouseButtons[static_cast<int>(_button)].m_InputState.m_Tap; }
-		bool IsMouseButtonMultiTap(MouseButton _button) const { return m_MouseButtons[static_cast<int>(_button)].m_InputState.m_MultiTap; }
-		unsigned int GetMouseButtonTapCount(MouseButton _button) const { return m_MouseButtons[static_cast<int>(_button)].m_TapCount; }
+		bool IsMouseButtonPressed(MouseButton _button) const { return m_MouseButtons[static_cast<int32_t>(_button)].m_InputState.m_Press; }
+		bool IsMouseButtonDown(MouseButton _button) const { return m_MouseButtons[static_cast<int32_t>(_button)].m_InputState.m_Hold; }
+		bool IsMouseButtonReleased(MouseButton _button) const { return m_MouseButtons[static_cast<int32_t>(_button)].m_InputState.m_Release; }
+		bool IsMouseButtonLongPressed(MouseButton _button) const { return m_MouseButtons[static_cast<int32_t>(_button)].m_InputState.m_LongPress; }
+		bool IsMouseButtonTapped(MouseButton _button) const { return m_MouseButtons[static_cast<int32_t>(_button)].m_InputState.m_Tap; }
+		bool IsMouseButtonMultiTap(MouseButton _button) const { return m_MouseButtons[static_cast<int32_t>(_button)].m_InputState.m_MultiTap; }
+		uint32_t GetMouseButtonTapCount(MouseButton _button) const { return m_MouseButtons[static_cast<int32_t>(_button)].m_TapCount; }
 
 		glm::ivec2 GetMousePosition() const { return m_MousePos; }
 		glm::ivec2 GetMouseDelta() const { return m_MouseDeltas; }

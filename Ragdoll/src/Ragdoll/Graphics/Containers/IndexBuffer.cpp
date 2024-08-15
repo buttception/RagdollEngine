@@ -1,6 +1,6 @@
 ﻿/*!
-\file		EventEnums.h
-\date		09/08/2024
+\file		IndexBuffer.cpp
+\date		12/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,25 +27,34 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-#pragma once
+
+#include "ragdollpch.h"
+
+#include "IndexBuffer.h"
+
+#include "BufferLayout.h"
 
 namespace ragdoll
 {
-	enum class EventType
+	IndexBuffer::IndexBuffer(uint32_t* indices, const uint32_t& size)
 	{
-		None = 0,
-		WindowClose, WindowResize, WindowFocus, WindowLostFocus, WindowMoved,
-		KeyPressed, KeyReleased, KeyTyped,
-		MouseButtonPressed, MouseButtonReleased, MouseMoved, MouseScrolled
-	};
+		glCreateBuffers(1, &m_RendererId);
+		glNamedBufferData(m_RendererId, size, indices, GL_STATIC_DRAW);
+	}
 
-	enum EventCategory
+	IndexBuffer::~IndexBuffer()
 	{
-		None = 0,
-		EventCategoryApplication = BIT(0),
-		EventCategoryInput = BIT(1),
-		EventCategoryKeyboard = BIT(2),
-		EventCategoryMouse = BIT(3),
-		EventCategoryMouseButton = BIT(4)
-	};
+		glDeleteBuffers(1, &m_RendererId);
+		m_RendererId = 0;
+	}
+
+	void IndexBuffer::Bind()
+	{
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_RendererId);
+	}
+
+	void IndexBuffer::Unbind()
+	{
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	}
 }

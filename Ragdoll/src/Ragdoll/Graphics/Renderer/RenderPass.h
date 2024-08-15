@@ -1,6 +1,6 @@
 ﻿/*!
-\file		RenderGraph.h
-\date		08/08/2024
+\file		RenderPass.h
+\date		11/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -29,49 +29,46 @@
 __________________________________________________________________________________*/
 #pragma once
 
+#include "RenderState.h"
+
 namespace ragdoll
 {
-	class EntityManager;
-	class OpenGLContext;
-	class Window;
-	class RenderPass;
-	struct RenderData;
 	class Framebuffer;
-	class ShaderProgram;
 	class ResourceManager;
-
-	class RenderGraph
+	class EntityManager;
+	class Window;
+	class RenderGraph;
+	class RenderPass
 	{
 	public:
-		void Init(std::shared_ptr<Window> window, std::shared_ptr<ResourceManager> resManager, std::shared_ptr<EntityManager> entManager);
-		void Execute();
+		RenderPass(const char* name) : m_Name{ name } {}
 
-		void CreateRenderPasses();
+		const char* GetName() const { return m_Name; }
 
-		template<typename T>
-		std::shared_ptr<T> AddRenderPass(bool source = false)
+		void Init(const std::shared_ptr<Window>& win,
+			const std::shared_ptr<ResourceManager>& resourceManager,
+			const std::shared_ptr<EntityManager>& entityManager)
 		{
-			std::shared_ptr<T> renderPass = std::make_shared<T>();
-			m_RenderPasses.push_back(renderPass);
-			if (source)
-			{
-				m_Sources.push_back(renderPass);
-			}
-			return renderPass;
+			m_PrimaryWindow = win;
+			m_ResourceManager = resourceManager;
+			m_EntityManager = entityManager;
 		}
-		void CreateDependency(std::shared_ptr<RenderPass> from, std::shared_ptr<RenderPass> to);
+		void SetRenderState(const RenderState& renderState) { m_RenderState = renderState; }
+		virtual void Execute() = 0;
 
-	private:
+	protected:
+		const char* m_Name{};
+		RenderState m_RenderState;
 		std::shared_ptr<Window> m_PrimaryWindow;
 		std::shared_ptr<ResourceManager> m_ResourceManager;
 		std::shared_ptr<EntityManager> m_EntityManager;
+		std::shared_ptr<RenderGraph> m_RenderGraph;
+	};
 
-		std::vector<std::shared_ptr<RenderPass>> m_RenderPasses;	//all render passes in the pipeline
-		std::vector<std::shared_ptr<RenderPass>> m_Sources;	//start of the pipeline
-		std::unordered_map<std::shared_ptr<RenderPass>, std::vector<std::shared_ptr<RenderPass>>> m_DependencyGraph;
-
-		void TopologicalSort(std::vector<std::shared_ptr<RenderPass>>& sorted);
-
-		std::shared_ptr<RenderPass> CreateTestRenderPass(const char* name);
+	class TestRenderPass : public RenderPass
+	{
+	public:
+		TestRenderPass() : RenderPass("test") {}
+		void Execute() override;
 	};
 }

@@ -37,6 +37,7 @@ ________________________________________________________________________________
 #include "Entity/EntityManager.h"
 #include "Graphics/Window/Window.h"
 #include "Graphics/GLFWContext.h"
+#include "Graphics/OpenGLContext.h"
 #include "Event/WindowEvents.h"
 #include "Event/KeyEvents.h"
 #include "Event/MouseEvent.h"
@@ -46,10 +47,9 @@ ________________________________________________________________________________
 #include "Graphics/Transform/Transform.h"
 #include "Layer/LayerStack.h"
 #include "Graphics/Transform/TransformLayer.h"
+#include "Resource/ResourceManager.h"
 
-#include "glm/gtc/type_ptr.hpp"
-GLuint VAO, VBO, EBO;
-GLuint shaderProgram;
+#include "Ragdoll/Graphics/Renderer/RenderData.h"
 ragdoll::Transform* t1, *t2, *t3, *t4, *t5;
 
 namespace ragdoll
@@ -66,17 +66,24 @@ namespace ragdoll
 		m_PrimaryWindow->Init();
 		//bind the application callback to the window
 		m_PrimaryWindow->SetEventCallback(RD_BIND_EVENT_FN(Application::OnEvent));
+		//setup opengl context
+		m_Context = std::make_shared<OpenGLContext>();
+		m_Context->Init(m_PrimaryWindow);
 		//setup input handler
 		m_InputHandler = std::make_shared<InputHandler>();
 		m_InputHandler->Init();
 		//create the entity manager
 		m_EntityManager = std::make_shared<EntityManager>();
+		//create the resource manager
+		m_ResourceManager = std::make_shared<ResourceManager>();
+		m_ResourceManager->Init(m_PrimaryWindow);
 		//create the render graph
 		m_RenderGraph = std::make_shared<RenderGraph>();
-		m_RenderGraph->Init(m_PrimaryWindow);
+		m_RenderGraph->Init(m_PrimaryWindow, m_ResourceManager, m_EntityManager);
 
 		//layers stuff
 		m_LayerStack = std::make_shared<LayerStack>();
+		//adding the transform layer
 		m_TransformLayer = std::make_shared<TransformLayer>(m_EntityManager);
 		m_LayerStack->PushLayer(m_TransformLayer);
 
@@ -109,91 +116,14 @@ namespace ragdoll
 		t5->m_Parent = m_EntityManager->GetGuid(e4);
 		t4->m_Child = m_EntityManager->GetGuid(e5);
 
-		//testing opengl code
-		// Vertex and fragment shader source code
-		const char* vertexShaderSource = R"(
-			#version 330 core
-			layout(location = 0) in vec3 aPos;
-			layout(location = 1) in vec3 aColor;
-			out vec3 fragColor;
-			uniform mat4 model;
-			void main()
-			{
-			    gl_Position = model * vec4(aPos, 1.0);
-			    fragColor = aColor;
-			}
-			)";
-
-		const char* fragmentShaderSource = R"(
-			#version 330 core
-			in vec3 fragColor;
-			out vec4 color;
-			void main()
-			{
-			    color = vec4(fragColor, 1.0);
-			}
-			)";
-		// Cube vertices
-		float vertices[] = {
-			// positions          // colors
-			-0.1f, -0.1f, -0.1f, 0.2f, 0.0f, 0.0f, // back face
-			 0.1f, -0.1f, -0.1f, 0.0f, 0.2f, 0.0f,
-			 0.1f,  0.1f, -0.1f, 0.0f, 0.0f, 0.2f,
-			-0.1f,  0.1f, -0.1f, 0.2f, 0.2f, 0.0f,
-
-			-0.1f, -0.1f,  0.1f, 0.2f, 0.0f, 0.2f, // front face
-			 0.1f, -0.1f,  0.1f, 0.0f, 0.2f, 0.2f,
-			 0.1f,  0.1f,  0.1f, 0.2f, 0.2f, 0.2f,
-			-0.1f,  0.1f,  0.1f, 0.1f, 0.1f, 0.1f
-		};
-
-		// Cube indices
-		unsigned int indices[] = {
-			0, 1, 2, 2, 3, 0, // back face
-			4, 5, 6, 6, 7, 4, // front face
-			0, 1, 5, 5, 4, 0, // bottom face
-			2, 3, 7, 7, 6, 2, // top face
-			0, 3, 7, 7, 4, 0, // left face
-			1, 2, 6, 6, 5, 1  // right face
-		};
-
-		// Compile and link shaders
-		GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-		glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-		glCompileShader(vertexShader);
-
-		GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-		glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-		glCompileShader(fragmentShader);
-
-		shaderProgram = glCreateProgram();
-		glAttachShader(shaderProgram, vertexShader);
-		glAttachShader(shaderProgram, fragmentShader);
-		glLinkProgram(shaderProgram);
-
-		glDeleteShader(vertexShader);
-		glDeleteShader(fragmentShader);
-
-		// Generate and bind VAO, VBO, and EBO
-		glGenVertexArrays(1, &VAO);
-		glGenBuffers(1, &VBO);
-		glGenBuffers(1, &EBO);
-
-		glBindVertexArray(VAO);
-
-		glBindBuffer(GL_ARRAY_BUFFER, VBO);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-		glEnableVertexAttribArray(0);
-
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-		glEnableVertexAttribArray(1);
-
-		glBindVertexArray(0);
+		//add all of this into the render graph data
+		std::vector<RenderData> renderData;
+		renderData.push_back({.m_DrawMesh{ m_EntityManager->GetGuid(e1), 0 }});
+		renderData.push_back({.m_DrawMesh{ m_EntityManager->GetGuid(e2), 0 }});
+		renderData.push_back({.m_DrawMesh{ m_EntityManager->GetGuid(e3), 0 }});
+		renderData.push_back({.m_DrawMesh{ m_EntityManager->GetGuid(e4), 0 }});
+		renderData.push_back({.m_DrawMesh{ m_EntityManager->GetGuid(e5), 0 }});
+		m_ResourceManager->AddRenderData("test", std::move(renderData));
 	}
 
 	void Application::Run()
@@ -209,23 +139,7 @@ namespace ragdoll
 				layer->Update(static_cast<float>(m_PrimaryWindow->GetDeltaTime()));
 			}
 
-			glUseProgram(shaderProgram);
-
-			// Pass the model matrix to the vertex shader
-			GLuint modelLoc = glGetUniformLocation(shaderProgram, "model");
-			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(t1->m_ModelToWorld));
-
-			glBindVertexArray(VAO);
-			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-
-			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(t2->m_ModelToWorld));
-			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(t3->m_ModelToWorld));
-			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(t4->m_ModelToWorld));
-			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(t5->m_ModelToWorld));
-			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+			m_RenderGraph->Execute();
 
 			m_PrimaryWindow->EndRender();
 		}

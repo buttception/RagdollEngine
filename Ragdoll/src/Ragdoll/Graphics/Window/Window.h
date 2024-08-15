@@ -30,7 +30,6 @@ ________________________________________________________________________________
 #pragma once
 
 #include "Ragdoll/Math/RagdollMath.h"
-#include "Ragdoll/Event/Event.h"
 
 struct GLFWwindow;
 struct GLFWmonitor;
@@ -44,10 +43,10 @@ namespace ragdoll
 		struct WindowProperties
 		{
 			std::string m_Title{ "ragdoll Engine" };
-			int m_Width{ 800 };
-			int m_Height{ 600 };
+			int32_t m_Width{ 800 };
+			int32_t m_Height{ 600 };
 			glm::ivec2 m_Position{};
-			int m_NumSamplesMSAA{ 0 };
+			int32_t m_NumSamplesMSAA{ 0 };
 			glm::vec3 m_BackgroundColor{};
 			float m_Opacity{ 1.f };
 			bool m_Resizable{ true };
@@ -67,10 +66,10 @@ namespace ragdoll
 
 		// Getters
 		const std::string& GetTitle() const { return m_Properties.m_Title; }
-		int GetWidth() const { return m_Properties.m_Width; }
-		int GetHeight() const { return m_Properties.m_Height; }
+		int32_t GetWidth() const { return m_Properties.m_Width; }
+		int32_t GetHeight() const { return m_Properties.m_Height; }
 		const glm::ivec2& GetPosition() const { return m_Properties.m_Position; }
-		int GetNumSamplesMSAA() const { return m_Properties.m_NumSamplesMSAA; }
+		int32_t GetNumSamplesMSAA() const { return m_Properties.m_NumSamplesMSAA; }
 		const glm::vec3& GetBackgroundColor() const { return m_Properties.m_BackgroundColor; }
 		float GetOpacity() const { return m_Properties.m_Opacity; }
 		bool IsResizable() const { return m_Properties.m_Resizable; }
@@ -92,14 +91,14 @@ namespace ragdoll
 		static GLFWvidmode* GetPrimaryMonitorInfo() { return m_PrimaryMonitorInfo; }
 
 		// Getters for non-static members
-		int GetBufferWidth() const { return m_BufferWidth; }
-		int GetBufferHeight() const { return m_BufferHeight; }
+		int32_t GetBufferWidth() const { return m_BufferWidth; }
+		int32_t GetBufferHeight() const { return m_BufferHeight; }
 
 		bool IsInitialized() const { return m_Initialized; }
 
-		unsigned long GetFrame() const { return m_Frame; }
-		int GetFps() const { return m_Fps; }
-		int GetFpsCounter() const { return m_FpsCounter; }
+		uint64_t GetFrame() const { return m_Frame; }
+		int32_t GetFps() const { return m_Fps; }
+		int32_t GetFpsCounter() const { return m_FpsCounter; }
 		std::chrono::time_point<std::chrono::steady_clock> GetLastFrameTime() const { return m_LastFrameTime; }
 		double GetTimer() const { return m_Timer; }
 		double GetDeltaTime() const { return m_DeltaTime; }
@@ -124,13 +123,13 @@ namespace ragdoll
 		EventCallbackFn m_Callback{ nullptr };
 		inline static GLFWmonitor* m_PrimaryMonitor{};
 		inline static GLFWvidmode* m_PrimaryMonitorInfo{};
-		int m_BufferWidth{}, m_BufferHeight{};
+		int32_t m_BufferWidth{}, m_BufferHeight{};
 
 		bool m_Initialized{ false };
 
-		unsigned long m_Frame{};
-		int m_Fps{};
-		int m_FpsCounter{};
+		uint64_t m_Frame{};
+		int32_t m_Fps{};
+		int32_t m_FpsCounter{};
 		std::chrono::time_point<std::chrono::steady_clock> m_LastFrameTime{ std::chrono::steady_clock::now() };
 		double m_Timer{};
 		double m_DeltaTime{};

@@ -1,6 +1,6 @@
 ﻿/*!
-\file		WindowEvents.h
-\date		06/08/2024
+\file		RenderState.h
+\date		12/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -29,62 +29,29 @@
 __________________________________________________________________________________*/
 #pragma once
 
-#include "Event.h"
+#include "glad/glad.h"
 
 namespace ragdoll
 {
-	class WindowResizeEvent : public Event
+	//state that is used to prepare a render pass
+	struct RenderState
 	{
-	public:
-		WindowResizeEvent(int32_t _width, int32_t _height)
-			: m_Width(_width), m_Height(_height) {}
+		bool m_CullFaceEnabled{ false };		// Face culling enabled/disabled
+		GLenum m_CullFaceMode{ GL_BACK };		// Face culling mode (e.g., GL_BACK, GL_FRONT)
+		GLenum m_FrontFace{ GL_CCW };			// Front face winding order (e.g., GL_CCW, GL_CW)
 
-		inline uint32_t GetWidth() const { return m_Width; }
-		inline uint32_t GetHeight() const { return m_Height; }
+		bool m_DepthTestEnabled{ false };		// Depth testing enabled/disabled
+		GLenum m_DepthFunc{ GL_LESS };			// Depth function (e.g., GL_LESS, GL_EQUAL)
 
-		std::string ToString() const override
-		{
-			std::stringstream ss;
-			ss << "WindowResizeEvent: " << m_Width << ", " << m_Height;
-			return ss.str();
-		}
+		bool m_BlendEnabled{ false };			// Blending enabled/disabled
+		GLenum m_BlendSrcFactor{ GL_ONE };		// Source blend factor
+		GLenum m_BlendDstFactor{ GL_ZERO };		// Destination blend factor
+		GLenum m_BlendEquation{ GL_FUNC_ADD };	// Blend equation
 
-		// Sets the types and category for the event
-		EVENT_CLASS_TYPE(WindowResize)
-		EVENT_CLASS_CATEGORY(EventCategoryApplication)
-	private:
-		int32_t m_Width, m_Height;
-	};
+		bool m_ScissorTestEnabled{ false };		// Scissor testing enabled/disabled
 
-	class WindowCloseEvent : public Event
-	{
-	public:
-		WindowCloseEvent() {}
+		bool m_WireframeEnabled{ false };
 
-		EVENT_CLASS_TYPE(WindowClose)
-		EVENT_CLASS_CATEGORY(EventCategoryApplication)
-	};
-
-	class WindowMoveEvent : public Event
-	{
-	public:
-		WindowMoveEvent(int32_t _x, int32_t _y)
-			: m_PosX(_x), m_PosY(_y) {}
-
-		inline int32_t GetX() const { return m_PosX; }
-		inline int32_t GetY() const { return m_PosY; }
-
-		std::string ToString() const override
-		{
-			std::stringstream ss;
-			ss << "WindowMoveEvent: " << m_PosX << ", " << m_PosY;
-			return ss.str();
-		}
-
-		EVENT_CLASS_TYPE(WindowMoved)
-		EVENT_CLASS_CATEGORY(EventCategoryApplication)
-
-	private:
-		int32_t m_PosX, m_PosY;
+		void Execute();
 	};
 }

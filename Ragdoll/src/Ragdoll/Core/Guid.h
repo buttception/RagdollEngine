@@ -46,18 +46,16 @@ namespace ragdoll
 		bool operator<(const Guid& rhs) const { return m_RawId < rhs.m_RawId; }
 		Guid& operator=(const Guid& rhs) = default;
 		operator uint64_t() const { return m_RawId; }
-
-		//inline const static Guid null = 0;
 	};
 
 	class GuidGenerator
 	{
 		//The number of bits to represent time
-		static constexpr inline unsigned int BitLenTime{ 39 };
+		static constexpr inline uint32_t BitLenTime{ 39 };
 		//The number of bits to represent sequence
-		static constexpr inline unsigned int BitLenSequence{ 8 };
+		static constexpr inline uint32_t BitLenSequence{ 8 };
 		//The number of bits to represent machine id
-		static constexpr inline unsigned int BitLenMachineId{ 63 - BitLenTime - BitLenSequence };
+		static constexpr inline uint32_t BitLenMachineId{ 63 - BitLenTime - BitLenSequence };
 		//Mask
 		static constexpr inline uint16_t MaskSequence{ (1 << BitLenSequence) - 1 };
 

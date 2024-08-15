@@ -1,6 +1,6 @@
 ﻿/*!
-\file		WindowEvents.h
-\date		06/08/2024
+\file		VertexArray.h
+\date		12/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,64 +27,33 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-#pragma once
 
-#include "Event.h"
+#pragma once
+#include "glad/glad.h"
 
 namespace ragdoll
 {
-	class WindowResizeEvent : public Event
+	class VertexBuffer;
+	class IndexBuffer;
+	class VertexArray
 	{
 	public:
-		WindowResizeEvent(int32_t _width, int32_t _height)
-			: m_Width(_width), m_Height(_height) {}
+		VertexArray();
+		~VertexArray();
 
-		inline uint32_t GetWidth() const { return m_Width; }
-		inline uint32_t GetHeight() const { return m_Height; }
+		void Bind() const;
+		void Unbind() const;
 
-		std::string ToString() const override
-		{
-			std::stringstream ss;
-			ss << "WindowResizeEvent: " << m_Width << ", " << m_Height;
-			return ss.str();
-		}
+		GLuint GetRendererId() const { return m_RendererId; }
+		void AddVertexBuffer(const std::shared_ptr<VertexBuffer>& vertexBuffer);
+		void SetIndexBuffer(const std::shared_ptr<IndexBuffer>& indexBuffer);
 
-		// Sets the types and category for the event
-		EVENT_CLASS_TYPE(WindowResize)
-		EVENT_CLASS_CATEGORY(EventCategoryApplication)
-	private:
-		int32_t m_Width, m_Height;
-	};
-
-	class WindowCloseEvent : public Event
-	{
-	public:
-		WindowCloseEvent() {}
-
-		EVENT_CLASS_TYPE(WindowClose)
-		EVENT_CLASS_CATEGORY(EventCategoryApplication)
-	};
-
-	class WindowMoveEvent : public Event
-	{
-	public:
-		WindowMoveEvent(int32_t _x, int32_t _y)
-			: m_PosX(_x), m_PosY(_y) {}
-
-		inline int32_t GetX() const { return m_PosX; }
-		inline int32_t GetY() const { return m_PosY; }
-
-		std::string ToString() const override
-		{
-			std::stringstream ss;
-			ss << "WindowMoveEvent: " << m_PosX << ", " << m_PosY;
-			return ss.str();
-		}
-
-		EVENT_CLASS_TYPE(WindowMoved)
-		EVENT_CLASS_CATEGORY(EventCategoryApplication)
+		const std::shared_ptr<IndexBuffer>& GetIndexBuffer() const { return m_IndexBuffer; }
+		const std::vector<std::shared_ptr<VertexBuffer>>& GetVertexBuffers() const { return m_VertexBuffers; }
 
 	private:
-		int32_t m_PosX, m_PosY;
+		GLuint m_RendererId;
+		std::vector<std::shared_ptr<VertexBuffer>> m_VertexBuffers;
+		std::shared_ptr<IndexBuffer> m_IndexBuffer;
 	};
 }

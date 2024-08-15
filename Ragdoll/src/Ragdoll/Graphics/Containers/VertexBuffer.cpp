@@ -1,6 +1,6 @@
 ﻿/*!
-\file		EventEnums.h
-\date		09/08/2024
+\file		VertexBuffer.cpp
+\date		12/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,25 +27,44 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-#pragma once
+
+#include "ragdollpch.h"
+
+#include "VertexBuffer.h"
 
 namespace ragdoll
 {
-	enum class EventType
+	VertexBuffer::VertexBuffer(void* data, uint32_t size, GLenum drawType)
 	{
-		None = 0,
-		WindowClose, WindowResize, WindowFocus, WindowLostFocus, WindowMoved,
-		KeyPressed, KeyReleased, KeyTyped,
-		MouseButtonPressed, MouseButtonReleased, MouseMoved, MouseScrolled
-	};
+		glCreateBuffers(1, &m_RendererId);
+		glNamedBufferData(m_RendererId, size, data, drawType);
+	}
 
-	enum EventCategory
+	VertexBuffer::~VertexBuffer()
 	{
-		None = 0,
-		EventCategoryApplication = BIT(0),
-		EventCategoryInput = BIT(1),
-		EventCategoryKeyboard = BIT(2),
-		EventCategoryMouse = BIT(3),
-		EventCategoryMouseButton = BIT(4)
-	};
+		glDeleteBuffers(1, &m_RendererId);
+		m_RendererId = 0;
+	}
+
+	void VertexBuffer::Bind() const
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, m_RendererId);
+	}
+
+	void VertexBuffer::Unbind() const
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
+
+	void VertexBuffer::SetLayout(const BufferLayout& layout)
+	{
+		m_Layout = layout;
+	}
+
+	void VertexBuffer::SetData(void* data, uint32_t size)
+	{
+		Bind();
+		glBufferSubData(GL_ARRAY_BUFFER, 0, size, data);
+		Unbind();
+	}
 }
