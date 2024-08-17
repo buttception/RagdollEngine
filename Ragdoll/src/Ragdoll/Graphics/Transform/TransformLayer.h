@@ -48,6 +48,8 @@ namespace ragdoll
 		void SetEntityAsRoot(Guid entityId) { m_RootEntity = entityId; }
 
 	private:
+		std::shared_ptr<EntityManager> m_EntityManager;
+
 		std::stack<glm::mat4> m_ModelStack;
 
 		//the root details

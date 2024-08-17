@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Editor.cpp
-\date		05/08/2024
+\file		GuiWindow.h
+\date		17/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,40 +27,17 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-
-#include <backends/imgui_impl_glfw.h>
-#include <backends/imgui_impl_opengl3.h>
-
-#include "ragdollpch.h"
-#include "Ragdoll.h"
-#include "Imgui/GuiLayer.h"
-#include "Ragdoll/Layer/LayerStack.h"
+#pragma once
 
 namespace ragdoll
 {
-	class Editor : public Application
+	class GuiWindow
 	{
 	public:
-		Editor() = default;
-		~Editor() override = default;
+		virtual void Init() = 0;
+		virtual void Draw() = 0;
+		virtual void Shutdown() = 0;
 
-		void Init(const ApplicationConfig& config) override
-		{
-			Application::Init(config);
-			// Do editor specific initialization here
-			//add the imgui layer
-			auto imGuiLayer = std::make_shared<GuiLayer>(m_PrimaryWindow, m_EntityManager);
-			imGuiLayer->Init();
-			m_LayerStack->PushLayer(imGuiLayer);
-		}
+	protected:
 	};
-}
-
-/**
- * \brief Creates the editor application
- * \return The editor application
- */
-ragdoll::Application* ragdoll::CreateApplication()
-{
-	return new Editor();
 }

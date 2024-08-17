@@ -37,7 +37,7 @@ namespace ragdoll
 	class Layer
 	{
 	public:
-		Layer(std::shared_ptr<EntityManager> entManager) : m_EntityManager{ entManager } {}
+		Layer(const char* name) : m_DebugName{ name } {};
 		virtual ~Layer() = default;
 
 		virtual void Init() = 0;
@@ -49,17 +49,11 @@ namespace ragdoll
 
 		bool IsEnabled() const { return m_Enabled; }
 		void SetEnabled(bool enabled) { m_Enabled = enabled; }
-#ifdef RAGDOLL_DEBUG
-		const std::string& GetDebugName() const { return m_DebugName; }
-		void SetDebugName(const std::string& name) { m_DebugName = name; }
-#endif
+		const char* GetDebugName() const { return m_DebugName; }
 
 	protected:
 		bool m_Enabled = true;
-		std::shared_ptr<EntityManager> m_EntityManager;
 
-#ifdef RAGDOLL_DEBUG
-		std::string m_DebugName;
-#endif
+		const char* m_DebugName;
 	};
 }

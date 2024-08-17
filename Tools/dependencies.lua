@@ -5,4 +5,6 @@ IncludesDir["glad"] = "%{wks.location}/Ragdoll/dependencies/glad/include"
 IncludesDir["glm"] = "%{wks.location}/Ragdoll/dependencies/glm"
 IncludesDir["entt"] = "%{wks.location}/Ragdoll/dependencies/entt/single_include"
 
+IncludesDir["imgui"] = "%{wks.location}/Editor/dependencies/imgui"
+
 LibDirs = {}

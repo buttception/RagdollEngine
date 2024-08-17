@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Editor.cpp
-\date		05/08/2024
+\file		EditorViewRenderPass.cpp
+\date		17/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -28,39 +28,9 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 
-#include <backends/imgui_impl_glfw.h>
-#include <backends/imgui_impl_opengl3.h>
-
-#include "ragdollpch.h"
-#include "Ragdoll.h"
-#include "Imgui/GuiLayer.h"
-#include "Ragdoll/Layer/LayerStack.h"
+#include "EditorViewRenderPass.h"
 
 namespace ragdoll
 {
-	class Editor : public Application
-	{
-	public:
-		Editor() = default;
-		~Editor() override = default;
-
-		void Init(const ApplicationConfig& config) override
-		{
-			Application::Init(config);
-			// Do editor specific initialization here
-			//add the imgui layer
-			auto imGuiLayer = std::make_shared<GuiLayer>(m_PrimaryWindow, m_EntityManager);
-			imGuiLayer->Init();
-			m_LayerStack->PushLayer(imGuiLayer);
-		}
-	};
-}
-
-/**
- * \brief Creates the editor application
- * \return The editor application
- */
-ragdoll::Application* ragdoll::CreateApplication()
-{
-	return new Editor();
+	
 }

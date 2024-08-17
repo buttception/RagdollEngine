@@ -39,11 +39,9 @@ ________________________________________________________________________________
 
 namespace ragdoll
 {
-	TransformLayer::TransformLayer(std::shared_ptr<EntityManager> reg) : Layer(reg)
+	TransformLayer::TransformLayer(std::shared_ptr<EntityManager> reg) : Layer{ "TransformLayer" }, m_EntityManager { reg }
 	{
-#ifdef RAGDOLL_DEBUG
-		m_DebugName = "Transform Layer";
-#endif
+
 	}
 
 	void TransformLayer::Init()

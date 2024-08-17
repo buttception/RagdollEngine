@@ -19,3 +19,4 @@ Launcher/assets/
 *.csproj.user
 
 #Specific files
+imgui.ini

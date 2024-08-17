@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Editor.cpp
-\date		05/08/2024
+\file		ImguiLayer.h
+\date		17/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,40 +27,32 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-
-#include <backends/imgui_impl_glfw.h>
-#include <backends/imgui_impl_opengl3.h>
-
-#include "ragdollpch.h"
-#include "Ragdoll.h"
-#include "Imgui/GuiLayer.h"
-#include "Ragdoll/Layer/LayerStack.h"
+#pragma once
+#include "Ragdoll/Layer/Layer.h"
+#include "imgui.h"
 
 namespace ragdoll
 {
-	class Editor : public Application
+	class Window;
+	class GuiWindow;
+
+	class GuiLayer : public Layer
 	{
 	public:
-		Editor() = default;
-		~Editor() override = default;
+		GuiLayer(std::shared_ptr<Window> window, std::shared_ptr<EntityManager> reg);
 
-		void Init(const ApplicationConfig& config) override
-		{
-			Application::Init(config);
-			// Do editor specific initialization here
-			//add the imgui layer
-			auto imGuiLayer = std::make_shared<GuiLayer>(m_PrimaryWindow, m_EntityManager);
-			imGuiLayer->Init();
-			m_LayerStack->PushLayer(imGuiLayer);
-		}
+		void Init() override;
+		void Update(float _dt) override;
+		void Shutdown() override;
+
+		void GuiBeginRender();
+		void GuiEndRender();
+
+	private:
+		std::shared_ptr<Window> m_PrimaryWindow;
+		std::shared_ptr<EntityManager> m_EntityManager;
+		std::vector<std::shared_ptr<GuiWindow>> m_Windows;
+
+		ImGuiIO* m_ImGuiIO;
 	};
-}
-
-/**
- * \brief Creates the editor application
- * \return The editor application
- */
-ragdoll::Application* ragdoll::CreateApplication()
-{
-	return new Editor();
 }
