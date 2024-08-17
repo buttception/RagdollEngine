@@ -89,9 +89,9 @@ namespace ragdoll
 }
 using EventCallbackFn = std::function<void(ragdoll::Event&)>;
 
-#define RD_LOG_EVENT 0
-#define RD_LOG_INPUT 0
-#define RD_OPENGL_DEBUG_LEVEL 3 //0 for errors, //1 for medium, //2 for low, //3 for notifications
+#define RD_LOG_EVENT false
+#define RD_LOG_INPUT false
+#define RD_OPENGL_DEBUG_LEVEL 1 //0 for errors, //1 for medium, //2 for low, //3 for notifications
 
 //ignore warnings
 #pragma warning(push)
