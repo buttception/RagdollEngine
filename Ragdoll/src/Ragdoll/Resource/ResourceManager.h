@@ -36,6 +36,7 @@ namespace ragdoll
 	class Window;
 	class VertexArray;
 	struct RenderData;
+	class IResource;
 	class ResourceManager
 	{
 	public:
@@ -52,9 +53,13 @@ namespace ragdoll
 	private:
 		std::shared_ptr<Window> m_PrimaryWindow;
 
+		// non-asset related resources, ie. render data, framebuffers, hardcoded primitive meshes
 		std::unordered_map<const char*, std::vector<RenderData>> m_RenderData;
 		std::unordered_map<const char*, std::shared_ptr<Framebuffer>> m_Framebuffers;
-		std::unordered_map<const char*, std::shared_ptr<ShaderProgram>> m_ShaderPrograms;
 		std::unordered_map<const char*, std::shared_ptr<VertexArray>> m_PrimitiveMeshes;
+
+		// asset related resources, ie. shaders, textures, models
+		std::unordered_map<uint64_t, std::shared_ptr<IResource>> m_ResourceRegistry;	//keep tracks of all loaded assets
+		std::unordered_map<const char*, std::shared_ptr<ShaderProgram>> m_ShaderPrograms;
 	};
 }

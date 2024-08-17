@@ -32,6 +32,7 @@ ________________________________________________________________________________
 
 #include "ResourceManager.h"
 
+#include "Resource.h"
 #include "glad/glad.h"
 #include "Ragdoll/Graphics/Containers/Framebuffer.h"
 #include "Ragdoll/Graphics/Containers/IndexBuffer.h"

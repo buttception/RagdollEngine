@@ -41,6 +41,8 @@ ________________________________________________________________________________
 
 namespace ragdoll
 {
+	const Guid Guid::null{ 0 };
+
 	GuidGenerator::GuidGenerator()
 	{
 		auto now = std::chrono::system_clock::now();

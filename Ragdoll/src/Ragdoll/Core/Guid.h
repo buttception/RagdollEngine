@@ -36,10 +36,9 @@ namespace ragdoll
 		Guid() = default;
 		Guid(const uint64_t& id) : m_RawId(id) {}
 
-		/**
-		 * \brief The raw id value
-		 */
 		uint64_t m_RawId{};
+
+		static const Guid null;
 
 		bool operator==(const Guid& rhs) const { return m_RawId == rhs.m_RawId; }
 		bool operator!=(const Guid& rhs) const { return m_RawId != rhs.m_RawId; }
