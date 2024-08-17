@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Editor.cpp
-\date		05/08/2024
+\file		imgui.cpp
+\date		17/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,44 +27,8 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
+// Specify to imgui to build with glad
+#define IMGUI_IMPL_OPENGL_LOADER_GLAD
 
-#include <backends/imgui_impl_glfw.h>
-#include <backends/imgui_impl_opengl3.h>
-
-#include "ragdollpch.h"
-#include "Ragdoll.h"
-#include "Imgui/GuiLayer.h"
-#include "Ragdoll/Layer/LayerStack.h"
-
-namespace ragdoll
-{
-	class Editor : public Application
-	{
-	public:
-		Editor() = default;
-		~Editor() override = default;
-
-		void Init(const ApplicationConfig& config) override
-		{
-			Application::Init(config);
-			// Do editor specific initialization here
-			//add the imgui layer
-			auto imGuiLayer = std::make_shared<GuiLayer>(m_EntityManager);
-			imGuiLayer->Init();
-			m_LayerStack->PushLayer(imGuiLayer);
-
-			// Set up platform/renderer bindings
-			ImGui_ImplGlfw_InitForOpenGL(m_PrimaryWindow->GetGlfwWindow(), true);
-			ImGui_ImplOpenGL3_Init("#version 410");
-		}
-	};
-}
-
-/**
- * \brief Creates the editor application
- * \return The editor application
- */
-ragdoll::Application* ragdoll::CreateApplication()
-{
-	return new Editor();
-}
+#include "backends/imgui_impl_opengl3.cpp"
+#include "backends/imgui_impl_glfw.cpp"

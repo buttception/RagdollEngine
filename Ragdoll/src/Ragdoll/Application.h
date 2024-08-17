@@ -83,7 +83,7 @@ namespace ragdoll
 		bool OnMouseButtonReleased(MouseButtonReleasedEvent& event);
 		bool OnMouseScrolled(MouseScrolledEvent& event);
 
-	private:
+	protected:
 		bool m_Running{ true };
 
 		GuidGenerator m_GuidGenerator{};

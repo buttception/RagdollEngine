@@ -25,7 +25,8 @@ project "Editor"
 
 	links
 	{
-		"Ragdoll"
+		"Ragdoll",
+		"imgui"
 	}
 
     includedirs
@@ -34,6 +35,9 @@ project "Editor"
 		"%{IncludesDir.glm}",
 		"%{IncludesDir.spdlog}",
 		"%{IncludesDir.entt}",
+		"%{IncludesDir.imgui}",
+		"%{IncludesDir.glfw}",
+		"%{IncludesDir.glad}",
     }
 
 	postbuildcommands

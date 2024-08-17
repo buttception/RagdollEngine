@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Editor.cpp
-\date		05/08/2024
+\file		ImguiLayer.cpp
+\date		17/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,44 +27,42 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-
-#include <backends/imgui_impl_glfw.h>
-#include <backends/imgui_impl_opengl3.h>
-
 #include "ragdollpch.h"
-#include "Ragdoll.h"
-#include "Imgui/GuiLayer.h"
-#include "Ragdoll/Layer/LayerStack.h"
+
+#include "GuiLayer.h"
+
 
 namespace ragdoll
 {
-	class Editor : public Application
+	GuiLayer::GuiLayer(std::shared_ptr<EntityManager> reg) : Layer{ "GuiLayer" }, m_EntityManager { reg }
 	{
-	public:
-		Editor() = default;
-		~Editor() override = default;
 
-		void Init(const ApplicationConfig& config) override
+	}
+
+	void GuiLayer::Init()
+	{
+		IMGUI_CHECKVERSION();
+		ImGui::CreateContext();
+		m_ImGuiIO = &ImGui::GetIO(); (void)m_ImGuiIO;
+		m_ImGuiIO->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;	// Enable Keyboard Controls
+		m_ImGuiIO->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;	// Enable Gamepad Controls
+		m_ImGuiIO->ConfigFlags |= ImGuiConfigFlags_DockingEnable;		// Enable Docking
+		//m_ImGuiIO->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;		// Enable Multi-Viewport / Platform Windows
+
+		// ImGui style
+		ImGuiStyle& style = ImGui::GetStyle();
+		if (m_ImGuiIO->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 		{
-			Application::Init(config);
-			// Do editor specific initialization here
-			//add the imgui layer
-			auto imGuiLayer = std::make_shared<GuiLayer>(m_EntityManager);
-			imGuiLayer->Init();
-			m_LayerStack->PushLayer(imGuiLayer);
-
-			// Set up platform/renderer bindings
-			ImGui_ImplGlfw_InitForOpenGL(m_PrimaryWindow->GetGlfwWindow(), true);
-			ImGui_ImplOpenGL3_Init("#version 410");
+			style.WindowRounding = 0.f;
+			style.Colors[ImGuiCol_WindowBg].w = 1.f;
 		}
-	};
-}
+	}
 
-/**
- * \brief Creates the editor application
- * \return The editor application
- */
-ragdoll::Application* ragdoll::CreateApplication()
-{
-	return new Editor();
+	void GuiLayer::Update(float _dt)
+	{
+	}
+
+	void GuiLayer::Shutdown()
+	{
+	}
 }
