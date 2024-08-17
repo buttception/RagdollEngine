@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Editor.cpp
-\date		05/08/2024
+\file		MemoryAllocator.cpp
+\date		16/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -29,29 +29,9 @@
 __________________________________________________________________________________*/
 
 #include "ragdollpch.h"
-#include "Ragdoll.h"
+
+#include "RagdollAllocator.h"
 
 namespace ragdoll
 {
-	class Editor : public Application
-	{
-	public:
-		Editor() = default;
-		~Editor() override = default;
-
-		void Init(const ApplicationConfig& config) override
-		{
-			Application::Init(config);
-			// Do editor specific initialization here
-		}
-	};
-}
-
-/**
- * \brief Creates the editor application
- * \return The editor application
- */
-ragdoll::Application* ragdoll::CreateApplication()
-{
-	return new Editor();
 }

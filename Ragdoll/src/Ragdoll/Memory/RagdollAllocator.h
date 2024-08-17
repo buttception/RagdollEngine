@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Editor.cpp
-\date		05/08/2024
+\file		MemoryAllocator.h
+\date		16/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,31 +27,33 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-
-#include "ragdollpch.h"
-#include "Ragdoll.h"
+#pragma once
+#include "MemoryManager.h"
 
 namespace ragdoll
 {
-	class Editor : public Application
+	template<typename T>
+	struct RagdollAllocator
 	{
-	public:
-		Editor() = default;
-		~Editor() override = default;
+		typedef T value_type;
 
-		void Init(const ApplicationConfig& config) override
+		RagdollAllocator() noexcept = default;
+		template <class U> constexpr RagdollAllocator(const RagdollAllocator <U>&) noexcept {}
+
+		[[nodiscard]] T* allocate(size_t n)
 		{
-			Application::Init(config);
-			// Do editor specific initialization here
+			if (n > std::numeric_limits<std::size_t>::max() / sizeof(T))
+				throw std::bad_array_new_length();
+			if (T* p = static_cast<T*>(MemoryManager::GetInstance().Allocate<T>(n))) {
+				return p;
+			}
+
+			throw std::bad_alloc();
+		}
+		void deallocate(T* p, size_t n) const
+		{
+			UNREFERENCED_PARAMETER(n);
+			MemoryManager::GetInstance().Deallocate<T>(p);
 		}
 	};
-}
-
-/**
- * \brief Creates the editor application
- * \return The editor application
- */
-ragdoll::Application* ragdoll::CreateApplication()
-{
-	return new Editor();
 }

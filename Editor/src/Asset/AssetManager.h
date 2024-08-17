@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Editor.cpp
-\date		05/08/2024
+\file		AssetManager.h
+\date		16/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,31 +27,15 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-
-#include "ragdollpch.h"
-#include "Ragdoll.h"
+#pragma once
 
 namespace ragdoll
 {
-	class Editor : public Application
+	//incharge editor style of managing assets and populates the engine resource manager
+	class AssetManager
 	{
 	public:
-		Editor() = default;
-		~Editor() override = default;
 
-		void Init(const ApplicationConfig& config) override
-		{
-			Application::Init(config);
-			// Do editor specific initialization here
-		}
+	private:
 	};
-}
-
-/**
- * \brief Creates the editor application
- * \return The editor application
- */
-ragdoll::Application* ragdoll::CreateApplication()
-{
-	return new Editor();
 }

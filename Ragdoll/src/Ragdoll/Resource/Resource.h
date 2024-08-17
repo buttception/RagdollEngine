@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Editor.cpp
-\date		05/08/2024
+\file		Resource.h
+\date		16/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,31 +27,35 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-
-#include "ragdollpch.h"
-#include "Ragdoll.h"
+#pragma once
 
 namespace ragdoll
 {
-	class Editor : public Application
+	struct IResource	//interface to share common functionality between different resource types
 	{
-	public:
-		Editor() = default;
-		~Editor() override = default;
+		Guid m_Guid;
+		//the dependencies it has
+		std::vector<Guid> m_Dependencies;
+	};
 
-		void Init(const ApplicationConfig& config) override
+	template<typename T>
+	struct Resource : IResource
+	{
+		inline const static std::shared_ptr<T> null{ nullptr };
+		//pointer to the actual resource type
+		std::shared_ptr<T> m_Data;
+
+		//this will only take bytes to load into the resource
+		bool Load(const char* data, uint32_t size)
 		{
-			Application::Init(config);
-			// Do editor specific initialization here
+			//behavior on what to do will be up to constructors
+			m_Data = std::make_shared<T>(data, size);
+		}
+		//this will free the resource`
+		bool Unload()
+		{
+			//behavior on what to do will be up to destructors
+			m_Data.reset();
 		}
 	};
-}
-
-/**
- * \brief Creates the editor application
- * \return The editor application
- */
-ragdoll::Application* ragdoll::CreateApplication()
-{
-	return new Editor();
 }

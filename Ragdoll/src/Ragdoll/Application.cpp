@@ -48,6 +48,7 @@ ________________________________________________________________________________
 #include "Layer/LayerStack.h"
 #include "Graphics/Transform/TransformLayer.h"
 #include "Resource/ResourceManager.h"
+#include "File/FileManager.h"
 
 #include "Ragdoll/Graphics/Renderer/RenderData.h"
 ragdoll::Transform* t1, *t2, *t3, *t4, *t5;
@@ -80,6 +81,16 @@ namespace ragdoll
 		//create the render graph
 		m_RenderGraph = std::make_shared<RenderGraph>();
 		m_RenderGraph->Init(m_PrimaryWindow, m_ResourceManager, m_EntityManager);
+		//create the file manager
+		m_FileManager = std::make_shared<FileManager>();
+		m_FileManager->Init();
+		RD_CORE_INFO("{}", m_FileManager->GetRoot().string());
+		Guid guid = GuidGenerator::GenerateGuid();
+		m_FileManager->QueueRequest(FileIORequest{ guid, "vertexshader.vtx", [](Guid id, const uint8_t* data, uint32_t size)
+		{
+			//remember to null terminate the string since it is loaded in binary
+			RD_CORE_TRACE("size:{} -> {}", size, std::string(reinterpret_cast<const char*>(data), size));
+		}});
 
 		//layers stuff
 		m_LayerStack = std::make_shared<LayerStack>();
@@ -132,6 +143,7 @@ namespace ragdoll
 		{
 			//input update must be called before window polls for inputs
 			m_InputHandler->Update(m_PrimaryWindow->GetDeltaTime());
+			m_FileManager->Update();
 			m_PrimaryWindow->StartRender();
 
 			for(auto& layer : *m_LayerStack)

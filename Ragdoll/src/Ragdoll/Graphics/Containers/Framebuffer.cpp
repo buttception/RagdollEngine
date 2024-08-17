@@ -336,7 +336,7 @@ namespace ragdoll
 		Bind();
 		if(GL_COLOR_BUFFER_BIT & m_ClearSetting)
 			for(const auto& it : m_ColorAttachments)
-				if(it.m_RendererId)
+				if(it.m_RendererId && it.m_Specs.m_ClearPerFrame)
 					glClearTexImage(it.m_RendererId, 0, it.m_Specs.m_Format, it.m_Specs.m_Type, &it.m_Specs.m_ClearColor.m_Data);
 		glClear(m_ClearSetting & ~GL_COLOR_BUFFER_BIT);
 		Unbind();
