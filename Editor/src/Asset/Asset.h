@@ -1,6 +1,6 @@
 ﻿/*!
-\file		EntityManager.cpp
-\date		10/08/2024
+\file		Asset.h
+\date		17/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,38 +27,24 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-
-#include "ragdollpch.h"
-
-#include "EntityManager.h"
-
-#include "Ragdoll/Core/Logger.h"
-#include "Ragdoll/Core/Guid.h"
+#pragma once
+#include "Descriptors/Descriptor.h"
 
 namespace ragdoll
 {
-	entt::entity EntityManager::CreateEntity()
+	struct IAsset
 	{
-		entt::entity entity = m_Registry.create();
-		auto guid = GuidGenerator::Generate();
-		m_GuidToEntity.insert({ guid, entity });
-		m_EntityToGuid.insert({ entity, guid });
-		return entity;
-	}
+		virtual ~IAsset() = default;
 
-	entt::entity EntityManager::GetEntity(const Guid& guid)
-	{
-		if(m_GuidToEntity.find(guid) != m_GuidToEntity.end())
-			return m_GuidToEntity[guid];
-		RD_CORE_WARN("Entity {} does not exist, returning entt::null");
-		return entt::null;
-	}
+		std::filesystem::file_time_type m_LastWriteTime;
+	};
 
-	Guid EntityManager::GetGuid(const entt::entity& entity)
+	template<typename T>
+	struct Asset : IAsset
 	{
-		if(m_EntityToGuid.find(entity) != m_EntityToGuid.end())
-			return m_EntityToGuid[entity];
-		RD_CORE_WARN("Entity does not exist, returning Guid::null");
-		return 0;
-	}
+		Descriptor<T> m_Descriptor;
+
+		//load asset from disk into engine resource manager
+		void LoadResource();
+	};
 }

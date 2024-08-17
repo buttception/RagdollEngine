@@ -68,8 +68,8 @@ namespace ragdoll
 	public:
 		GuidGenerator();
 
-		static uint64_t GenerateGuid();
-		static uint64_t GenerateGuid(const std::chrono::utc_clock::time_point& timestamp);
+		static uint64_t Generate();
+		static uint64_t Generate(const std::chrono::utc_clock::time_point& timestamp);
 
 		static uint64_t GetTime(const uint64_t& uuid);
 		static uint16_t GetSequence(const uint64_t& uuid);

@@ -85,7 +85,7 @@ namespace ragdoll
 		m_FileManager = std::make_shared<FileManager>();
 		m_FileManager->Init();
 		RD_CORE_INFO("{}", m_FileManager->GetRoot().string());
-		Guid guid = GuidGenerator::GenerateGuid();
+		Guid guid = GuidGenerator::Generate();
 		m_FileManager->QueueRequest(FileIORequest{ guid, "vertexshader.vtx", [](Guid id, const uint8_t* data, uint32_t size)
 		{
 			//remember to null terminate the string since it is loaded in binary

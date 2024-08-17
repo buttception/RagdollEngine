@@ -90,6 +90,8 @@ namespace ragdoll
 		file.read(reinterpret_cast<char*>(m_Data.data()), size);
 		m_Status = Status::Callback;
 		//once done get main thread to call the callback
+		if(m_Request.m_Promise)
+			m_Request.m_Promise->set_value();
 	}
 
 	void FileManager::Init()

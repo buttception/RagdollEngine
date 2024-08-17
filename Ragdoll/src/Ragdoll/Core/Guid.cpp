@@ -62,7 +62,7 @@ namespace ragdoll
 		m_Initialized = true;
 	}
 
-	uint64_t GuidGenerator::GenerateGuid()
+	uint64_t GuidGenerator::Generate()
 	{
 		RD_ASSERT(!m_Initialized, "Guid generator not initialized");
 		const auto currentTime = ConvertTime(std::chrono::utc_clock::now()) - m_StartTime;
@@ -87,7 +87,7 @@ namespace ragdoll
 		return m_ElapsedTime << (BitLenSequence + BitLenMachineId) | static_cast<uint64_t>(m_Sequence) << BitLenMachineId | static_cast<uint64_t>(m_MachineID);
 	}
 
-	uint64_t GuidGenerator::GenerateGuid(const std::chrono::utc_clock::time_point& timestamp)
+	uint64_t GuidGenerator::Generate(const std::chrono::utc_clock::time_point& timestamp)
 	{
 		RD_ASSERT(!m_Initialized, "Guid generator not initialized");
 		const auto timestampElapsed = ConvertTime(timestamp) - m_StartTime;
