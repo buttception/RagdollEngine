@@ -84,13 +84,13 @@ namespace ragdoll
 		//create the file manager
 		m_FileManager = std::make_shared<FileManager>();
 		m_FileManager->Init();
-		RD_CORE_INFO("{}", m_FileManager->GetRoot().string());
-		Guid guid = GuidGenerator::Generate();
-		m_FileManager->QueueRequest(FileIORequest{ guid, "vertexshader.vtx", [](Guid id, const uint8_t* data, uint32_t size)
-		{
-			//remember to null terminate the string since it is loaded in binary
-			RD_CORE_TRACE("size:{} -> {}", size, std::string(reinterpret_cast<const char*>(data), size));
-		}});
+		//RD_CORE_INFO("{}", m_FileManager->GetRoot().string());
+		//Guid guid = GuidGenerator::Generate();
+		//m_FileManager->QueueRequest(FileIORequest{ guid, "vertexshader.vtx", [](Guid id, const uint8_t* data, uint32_t size)
+		//{
+		//	//remember to null terminate the string since it is loaded in binary
+		//	RD_CORE_TRACE("size:{} -> {}", size, std::string(reinterpret_cast<const char*>(data), size));
+		//}});
 
 		//layers stuff
 		m_LayerStack = std::make_shared<LayerStack>();
@@ -159,6 +159,7 @@ namespace ragdoll
 
 	void Application::Shutdown()
 	{
+		m_FileManager->Shutdown();
 		m_PrimaryWindow->Shutdown();
 		GLFWContext::Shutdown();
 		RD_CORE_INFO("ragdoll Engine application shut down successfull");

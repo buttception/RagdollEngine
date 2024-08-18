@@ -28,14 +28,23 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
+#include <unordered_map>
+
+#include "Descriptors/Descriptor.h"
 
 namespace ragdoll
 {
+	class FileManager;
+
 	//incharge editor style of managing assets and populates the engine resource manager
 	class AssetManager
 	{
 	public:
+		void Init(std::shared_ptr<FileManager> fileManager);
+		void LoadDatabase();
 
 	private:
+		std::shared_ptr<FileManager> m_FileManager;
+		std::unordered_map<uint64_t, std::shared_ptr<IDescriptor>> m_Descriptors;
 	};
 }

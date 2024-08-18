@@ -29,7 +29,7 @@
 __________________________________________________________________________________*/
 #pragma once
 
-#include "Ragdoll/Memory/RagdollAllocator.h"
+//#include "Ragdoll/Memory/RagdollAllocator.h"
 
 namespace ragdoll
 {
@@ -102,11 +102,13 @@ namespace ragdoll
 				Callback,
 			} m_Status{ Status::Idle };
 			FileIORequest m_Request;
-			std::vector<uint8_t, RagdollAllocator<uint8_t>> m_Data;
+			std::vector<uint8_t> m_Data;
 
 			void Load(std::filesystem::path root);
 		};
 	public:
+		FileManager();
+
 		void Init();
 		//checks when the file manager is done loading then can call the callbacks
 		void Update();
@@ -131,7 +133,7 @@ namespace ragdoll
 				}
 		};
 		//mutex for the queue
-		std::mutex m_QueueMutex;
+		std::unique_ptr<std::mutex> m_QueueMutex{};
 		//double buffering loading system with a loader thread
 		Buffer m_Buffer[2]{};
 		//thread to do IO

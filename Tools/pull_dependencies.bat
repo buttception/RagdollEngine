@@ -11,6 +11,8 @@ call :pull_dependency "entt" "https://github.com/buttception/entt.git"
 
 set "dependencies_path=%~dp0\..\Editor\dependencies"
 call :pull_dependency "imgui" "--branch docking https://github.com/buttception/imgui.git"
+call :pull_dependency "rapidjson" "https://github.com/buttception/rapidjson.git"
+
 
 call :exit
 pause >nul

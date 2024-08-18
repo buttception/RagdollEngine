@@ -43,6 +43,7 @@ namespace ragdoll
 			m_ReadCallback = std::move(other.m_ReadCallback);
 			m_Guid = other.m_Guid;
 			m_Type = other.m_Type;
+			m_Promise = other.m_Promise;
 		}
 		return *this;
 	}
@@ -56,6 +57,7 @@ namespace ragdoll
 			m_ReadCallback = other.m_ReadCallback;
 			m_Guid = other.m_Guid;
 			m_Type = other.m_Type;
+			m_Promise = other.m_Promise;
 		}
 		return *this;
 	}
@@ -94,20 +96,23 @@ namespace ragdoll
 			m_Request.m_Promise->set_value();
 	}
 
+	FileManager::FileManager()
+	{
+		m_QueueMutex = std::make_unique<std::mutex>();
+	}
+
 	void FileManager::Init()
 	{
 		//TODO: should be config next time
-		m_Root = m_Root.parent_path() / "build";
-		//define the path to the asset folder
-		std::filesystem::path assetFolderPath = m_Root / "assets";
+		m_Root = m_Root.parent_path() / "assets";
 		//check if the asset folder exists
-		if (!std::filesystem::exists(assetFolderPath))
+		if (!std::filesystem::exists(m_Root))
 		{
 			//if not, create the folder
 			try
 			{
-				std::filesystem::create_directory(assetFolderPath);
-				RD_CORE_INFO("Asset folder created at: {}", assetFolderPath.string());;
+				std::filesystem::create_directory(m_Root);
+				RD_CORE_INFO("Asset folder created at: {}", m_Root.string());;
 			}
 			catch (const std::filesystem::filesystem_error& e)
 			{
@@ -116,13 +121,9 @@ namespace ragdoll
 			}
 		}
 
-		//set the root to the asset folder
-		m_Root = assetFolderPath;
-
 		//start the io thread
 		m_Running = true;
 		m_IOThread = std::thread(&FileManager::ThreadUpdate, this);
-		m_IOThread.detach();
 	}
 
 	void FileManager::Update()
@@ -140,8 +141,9 @@ namespace ragdoll
 
 	void FileManager::ThreadUpdate()
 	{
-		while(true)
+		while(m_Running)
 		{
+			std::lock_guard<std::mutex> lock(*m_QueueMutex);
 			//check if there are any requests
 			if (m_RequestQueue.empty())
 			{
@@ -171,7 +173,6 @@ namespace ragdoll
 					// Load the file
 					freeBuffer->m_Request = request;
 					freeBuffer->Load(m_Root);
-					std::lock_guard<std::mutex> lock(m_QueueMutex);
 					m_RequestQueue.pop();
 				}
 				else
@@ -192,12 +193,14 @@ namespace ragdoll
 
 	void FileManager::QueueRequest(FileIORequest request)
 	{
-		std::lock_guard<std::mutex>lock(m_QueueMutex);
+		std::lock_guard<std::mutex>lock(*m_QueueMutex);
 		m_RequestQueue.push(request);
 	}
 
 	void FileManager::Shutdown()
 	{
 		m_Running = false;
+		if(m_IOThread.joinable())
+			m_IOThread.join();
 	}
 }
