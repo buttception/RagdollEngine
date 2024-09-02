@@ -43,7 +43,6 @@ namespace ragdoll
 			m_ReadCallback = std::move(other.m_ReadCallback);
 			m_Guid = other.m_Guid;
 			m_Type = other.m_Type;
-			m_Promise = other.m_Promise;
 		}
 		return *this;
 	}
@@ -57,12 +56,11 @@ namespace ragdoll
 			m_ReadCallback = other.m_ReadCallback;
 			m_Guid = other.m_Guid;
 			m_Type = other.m_Type;
-			m_Promise = other.m_Promise;
 		}
 		return *this;
 	}
 
-	void FileManager::Buffer::Load(std::filesystem::path root)
+	void FileManager::Buffer::Load(const std::filesystem::path& root)
 	{
 		m_Status = Status::Executing;
 		std::filesystem::path path = root / m_Request.m_Path;
@@ -91,14 +89,14 @@ namespace ragdoll
 		m_Data.resize(size);
 		file.read(reinterpret_cast<char*>(m_Data.data()), size);
 		m_Status = Status::Callback;
-		//once done get main thread to call the callback
-		if(m_Request.m_Promise)
-			m_Request.m_Promise->set_value();
 	}
 
 	FileManager::FileManager()
 	{
 		m_QueueMutex = std::make_unique<std::mutex>();
+		m_FileIOMutex = std::make_unique<std::mutex>();
+		m_FileIONextAccessMutex = std::make_unique<std::mutex>();
+		m_FileIOLowPriorityMutex = std::make_unique<std::mutex>();
 	}
 
 	void FileManager::Init()
@@ -154,6 +152,11 @@ namespace ragdoll
 
 			// Get the next request
 			FileIORequest request = m_RequestQueue.top();
+			//all threaded loads are lower priority compared to immediate loading
+			m_FileIOLowPriorityMutex->lock();	//lock l
+			m_FileIONextAccessMutex->lock();	//lock n
+			m_FileIOMutex->lock();				//lock m
+			m_FileIONextAccessMutex->unlock();	//unlock n
 			if(request.m_Type == FileIORequest::Type::Read)
 			{
 				// Check for available buffers
@@ -188,6 +191,9 @@ namespace ragdoll
 
 				//no callbacks for writing because it should be fire and forget
 			}
+			//unlocks all mutex
+			m_FileIOMutex->unlock();
+			m_FileIOLowPriorityMutex->unlock();
 		}
 	}
 
@@ -195,6 +201,22 @@ namespace ragdoll
 	{
 		std::lock_guard<std::mutex>lock(*m_QueueMutex);
 		m_RequestQueue.push(request);
+	}
+
+	void FileManager::ImmediateLoad(FileIORequest request)
+	{
+		//high priority immediate loading blocking
+		m_FileIONextAccessMutex->lock();
+		m_FileIOMutex->lock();
+		m_FileIONextAccessMutex->unlock();
+		//main thread do not need to care about buffer status
+		if (request.m_Type == FileIORequest::Type::Read) 
+		{
+			m_ImmediateBuffer.m_Request = request;
+			m_ImmediateBuffer.Load(m_Root);
+		}
+		//unlock all mutex
+		m_FileIOMutex->unlock();
 	}
 
 	void FileManager::Shutdown()

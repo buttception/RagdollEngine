@@ -58,12 +58,6 @@ namespace ragdoll
 			if (m_Guid == Guid::null)
 				RD_ASSERT(true, "Please generate a guid for your request and keep track of it");
 		}
-		FileIORequest(Guid guid, std::filesystem::path path, std::function<void(Guid, const uint8_t*, uint32_t)> callback, std::shared_ptr<std::promise<void>> promise, uint64_t offset = 0, uint64_t size = 0, Type type = Type::Read, Priority priority = Priority::Normal)
-			: m_Guid{ guid }, m_Path(path), m_ReadCallback(callback), m_Promise(promise), m_Offset(offset), m_Size(size), m_Type(type), m_Priority(priority)
-		{
-			if (m_Guid == Guid::null)
-				RD_ASSERT(true, "Please generate a guid for your request and keep track of it");
-		}
 		FileIORequest(Guid guid, std::filesystem::path path, uint8_t* data, uint32_t size, Type type = Type::Write, Priority priority = Priority::Normal)
 			: m_Guid{ guid }, m_Path(path), m_WriteData(data), m_WriteSize(size), m_Type(type), m_Priority(priority)
 		{
@@ -85,7 +79,6 @@ namespace ragdoll
 		//data ptr and size for write
 		uint8_t* m_WriteData{ nullptr };
 		uint32_t m_WriteSize{ 0 };
-		std::shared_ptr<std::promise<void>> m_Promise{ nullptr };
 
 		FileIORequest& operator=(FileIORequest&& other) noexcept;
 		FileIORequest& operator=(const FileIORequest& other);
@@ -104,7 +97,7 @@ namespace ragdoll
 			FileIORequest m_Request;
 			std::vector<uint8_t> m_Data;
 
-			void Load(std::filesystem::path root);
+			void Load(const std::filesystem::path& root);
 		};
 	public:
 		FileManager();
@@ -115,6 +108,7 @@ namespace ragdoll
 		//check queue status and will load async, callback will be called when done in main thread
 		void ThreadUpdate();
 		void QueueRequest(FileIORequest request);
+		void ImmediateLoad(FileIORequest request);
 
 		void Shutdown();
 
@@ -134,8 +128,13 @@ namespace ragdoll
 		};
 		//mutex for the queue
 		std::unique_ptr<std::mutex> m_QueueMutex{};
+		//mutex for read writes with triple mutex prioritisation
+		std::unique_ptr<std::mutex> m_FileIOMutex{};
+		std::unique_ptr<std::mutex> m_FileIONextAccessMutex{};
+		std::unique_ptr<std::mutex> m_FileIOLowPriorityMutex{};
 		//double buffering loading system with a loader thread
 		Buffer m_Buffer[2]{};
+		Buffer m_ImmediateBuffer{};
 		//thread to do IO
 		std::thread m_IOThread;
 	};
