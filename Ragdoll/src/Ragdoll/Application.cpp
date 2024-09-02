@@ -52,6 +52,14 @@ ________________________________________________________________________________
 
 #include "Ragdoll/Graphics/Renderer/RenderData.h"
 ragdoll::Transform* t1, *t2, *t3, *t4, *t5;
+#include "nvrhi/d3d12.h"
+#include <dxgi1_5.h>
+#include <dxgidebug.h>
+#include <Windows.h>
+#include <DXGI.h>
+#include <nvrhi/d3d12.h>
+#include <nvrhi/validation.h>
+using nvrhi::RefCountPtr;
 
 namespace ragdoll
 {
@@ -84,19 +92,15 @@ namespace ragdoll
 		//create the file manager
 		m_FileManager = std::make_shared<FileManager>();
 		m_FileManager->Init();
-		//RD_CORE_INFO("{}", m_FileManager->GetRoot().string());
-		//Guid guid = GuidGenerator::Generate();
-		//m_FileManager->QueueRequest(FileIORequest{ guid, "vertexshader.vtx", [](Guid id, const uint8_t* data, uint32_t size)
-		//{
-		//	//remember to null terminate the string since it is loaded in binary
-		//	RD_CORE_TRACE("size:{} -> {}", size, std::string(reinterpret_cast<const char*>(data), size));
-		//}});
 
 		//layers stuff
 		m_LayerStack = std::make_shared<LayerStack>();
 		//adding the transform layer
 		m_TransformLayer = std::make_shared<TransformLayer>(m_EntityManager);
 		m_LayerStack->PushLayer(m_TransformLayer);
+
+		//testing d3d12
+		CreateDevice();
 
 		//init all layers
 		m_LayerStack->Init();
@@ -275,5 +279,207 @@ namespace ragdoll
 #endif
 		m_InputHandler->OnMouseScrolled(event);
 		return false;
+	}
+
+	//=====================================================================================================
+	struct InstanceParameters
+	{
+		bool enableDebugRuntime = false;
+		bool headlessDevice = false;
+
+#if DONUT_WITH_VULKAN
+		std::vector<std::string> requiredVulkanInstanceExtensions;
+		std::vector<std::string> requiredVulkanLayers;
+		std::vector<std::string> optionalVulkanInstanceExtensions;
+		std::vector<std::string> optionalVulkanLayers;
+#endif
+	};
+	struct DeviceCreationParameters : public InstanceParameters
+	{
+		bool startMaximized = false;
+		bool startFullscreen = false;
+		bool allowModeSwitch = true;
+		int windowPosX = -1;            // -1 means use default placement
+		int windowPosY = -1;
+		uint32_t backBufferWidth = 1280;
+		uint32_t backBufferHeight = 720;
+		uint32_t refreshRate = 0;
+		uint32_t swapChainBufferCount = 3;
+		nvrhi::Format swapChainFormat = nvrhi::Format::SRGBA8_UNORM;
+		uint32_t swapChainSampleCount = 1;
+		uint32_t swapChainSampleQuality = 0;
+		uint32_t maxFramesInFlight = 2;
+		bool enableNvrhiValidationLayer = false;
+		bool vsyncEnabled = false;
+		bool enableRayTracingExtensions = false; // for vulkan
+		bool enableComputeQueue = false;
+		bool enableCopyQueue = false;
+
+		// Severity of the information log messages from the device manager, like the device name or enabled extensions.
+		//log::Severity infoLogSeverity = log::Severity::Info;
+
+		// Index of the adapter (DX11, DX12) or physical device (Vk) on which to initialize the device.
+		// Negative values mean automatic detection.
+		// The order of indices matches that returned by DeviceManager::EnumerateAdapters.
+		int adapterIndex = -1;
+
+		// set to true to enable DPI scale factors to be computed per monitor
+		// this will keep the on-screen window size in pixels constant
+		//
+		// if set to false, the DPI scale factors will be constant but the system
+		// may scale the contents of the window based on DPI
+		//
+		// note that the backbuffer size is never updated automatically; if the app
+		// wishes to scale up rendering based on DPI, then it must set this to true
+		// and respond to DPI scale factor changes by resizing the backbuffer explicitly
+		bool enablePerMonitorDPI = false;
+
+		DXGI_USAGE swapChainUsage = DXGI_USAGE_SHADER_INPUT | DXGI_USAGE_RENDER_TARGET_OUTPUT;
+		D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_1;
+	};
+
+	class IRenderPass;
+
+	struct AdapterInfo
+	{
+		std::string name;
+		uint32_t vendorID = 0;
+		uint32_t deviceID = 0;
+		uint64_t dedicatedVideoMemory = 0;
+		nvrhi::RefCountPtr<IDXGIAdapter> dxgiAdapter;
+	};
+	struct DefaultMessageCallback : public nvrhi::IMessageCallback
+	{
+		static DefaultMessageCallback& GetInstance() { return s_Instance; }
+
+		void message(nvrhi::MessageSeverity severity, const char* messageText) override {
+			switch (severity) {
+			case nvrhi::MessageSeverity::Info:
+				RD_CORE_INFO(messageText);
+				break;
+			case nvrhi::MessageSeverity::Warning:
+				RD_CORE_WARN(messageText);
+				break;
+			case nvrhi::MessageSeverity::Error:
+				RD_CORE_ERROR(messageText);
+				break;
+			case nvrhi::MessageSeverity::Fatal:
+				RD_CORE_FATAL(messageText);
+				break;
+			}
+		}
+
+		static DefaultMessageCallback s_Instance;
+	};
+	DefaultMessageCallback DefaultMessageCallback::s_Instance;
+	
+	bool Application::CreateDevice()
+	{
+#define HR_RETURN(hr) if(FAILED(hr)) return false;
+		DeviceCreationParameters m_DeviceParams;
+		if (m_DeviceParams.enableDebugRuntime)
+		{
+			RefCountPtr<ID3D12Debug> pDebug;
+			HRESULT hr = D3D12GetDebugInterface(IID_PPV_ARGS(&pDebug));
+			pDebug->EnableDebugLayer();
+		}
+		int adapterIndex = m_DeviceParams.adapterIndex;
+		if (adapterIndex < 0)
+			adapterIndex = 0;
+		//create factory
+		RefCountPtr<IDXGIFactory2> m_DxgiFactory2;
+		RefCountPtr<IDXGIAdapter> m_DxgiAdapter;
+		RefCountPtr<ID3D12CommandQueue> m_GraphicsQueue;
+		RefCountPtr<ID3D12Device> m_Device12;
+		RefCountPtr<ID3D12CommandQueue> m_ComputeQueue;
+		RefCountPtr<ID3D12CommandQueue> m_CopyQueue;
+		nvrhi::DeviceHandle m_NvrhiDevice;
+		HRESULT res = CreateDXGIFactory2(0, IID_PPV_ARGS(&m_DxgiFactory2));
+		if (res != S_OK)
+			__debugbreak();
+
+		if (m_DxgiFactory2->EnumAdapters(adapterIndex, &m_DxgiAdapter))
+		{
+			if (adapterIndex == 0)
+				RD_CORE_ERROR("Cannot find any DXGI adapters in the system.");
+			else
+				RD_CORE_ERROR("The specified DXGI adapter %d does not exist.", adapterIndex);
+			__debugbreak();
+		}
+
+		{
+			DXGI_ADAPTER_DESC aDesc;
+			m_DxgiAdapter->GetDesc(&aDesc);
+		}
+
+		HRESULT hr = D3D12CreateDevice(
+			m_DxgiAdapter,
+			m_DeviceParams.featureLevel,
+			IID_PPV_ARGS(&m_Device12));
+
+			if (m_DeviceParams.enableDebugRuntime)
+			{
+				RefCountPtr<ID3D12InfoQueue> pInfoQueue;
+				m_Device12->QueryInterface(&pInfoQueue);
+
+				if (pInfoQueue)
+				{
+#ifdef _DEBUG
+					pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
+					pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+#endif
+
+					D3D12_MESSAGE_ID disableMessageIDs[] = {
+						D3D12_MESSAGE_ID_CLEARDEPTHSTENCILVIEW_MISMATCHINGCLEARVALUE,
+						D3D12_MESSAGE_ID_COMMAND_LIST_STATIC_DESCRIPTOR_RESOURCE_DIMENSION_MISMATCH, // descriptor validation doesn't understand acceleration structures
+					};
+
+					D3D12_INFO_QUEUE_FILTER filter = {};
+					filter.DenyList.pIDList = disableMessageIDs;
+					filter.DenyList.NumIDs = sizeof(disableMessageIDs) / sizeof(disableMessageIDs[0]);
+					pInfoQueue->AddStorageFilterEntries(&filter);
+				}
+			}
+
+		D3D12_COMMAND_QUEUE_DESC queueDesc;
+		ZeroMemory(&queueDesc, sizeof(queueDesc));
+		queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+		queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+		queueDesc.NodeMask = 1;
+		hr = m_Device12->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_GraphicsQueue));
+		HR_RETURN(hr)
+			m_GraphicsQueue->SetName(L"Graphics Queue");
+
+		if (m_DeviceParams.enableComputeQueue)
+		{
+			queueDesc.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
+			hr = m_Device12->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_ComputeQueue));
+			HR_RETURN(hr)
+				m_ComputeQueue->SetName(L"Compute Queue");
+		}
+
+		if (m_DeviceParams.enableCopyQueue)
+		{
+			queueDesc.Type = D3D12_COMMAND_LIST_TYPE_COPY;
+			hr = m_Device12->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_CopyQueue));
+			HR_RETURN(hr)
+				m_CopyQueue->SetName(L"Copy Queue");
+		}
+
+		nvrhi::d3d12::DeviceDesc deviceDesc;
+		deviceDesc.errorCB = &DefaultMessageCallback::GetInstance();
+		deviceDesc.pDevice = m_Device12;
+		deviceDesc.pGraphicsCommandQueue = m_GraphicsQueue;
+		deviceDesc.pComputeCommandQueue = m_ComputeQueue;
+		deviceDesc.pCopyCommandQueue = m_CopyQueue;
+
+		m_NvrhiDevice = nvrhi::d3d12::createDevice(deviceDesc);
+
+		if (m_DeviceParams.enableNvrhiValidationLayer)
+		{
+			m_NvrhiDevice = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
+		}
+
+		return true;
 	}
 }

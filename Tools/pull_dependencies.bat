@@ -8,7 +8,6 @@ call :pull_dependency "glfw" "https://github.com/buttception/glfw.git"
 call :pull_dependency "glad" "https://github.com/buttception/Glad.git"
 call :pull_dependency "glm" "https://github.com/buttception/glm.git"
 call :pull_dependency "entt" "https://github.com/buttception/entt.git"
-call :pull_dependency "nvrhi" "https://github.com/NVIDIAGameWorks/nvrhi.git"
 
 set "dependencies_path=%~dp0\..\Editor\dependencies"
 call :pull_dependency "imgui" "--branch docking https://github.com/buttception/imgui.git"

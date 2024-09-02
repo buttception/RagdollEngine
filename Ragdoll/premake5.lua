@@ -38,7 +38,10 @@ project "Ragdoll"
 	links
 	{
 		"GLFW",
-		"Glad"
+		"Glad",
+		"d3d12",
+		"dxgi",
+		"d3dcompiler",
 	}
 
     includedirs
@@ -49,6 +52,7 @@ project "Ragdoll"
 		"%{IncludesDir.glad}",
 		"%{IncludesDir.glm}",
 		"%{IncludesDir.entt}",
+		"%{IncludesDir.nvrhi}",
     }
 
 	filter "system:windows"

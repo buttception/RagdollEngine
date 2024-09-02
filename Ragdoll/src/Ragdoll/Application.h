@@ -83,6 +83,9 @@ namespace ragdoll
 		bool OnMouseButtonReleased(MouseButtonReleasedEvent& event);
 		bool OnMouseScrolled(MouseScrolledEvent& event);
 
+		//spam
+		bool CreateDevice(); 
+
 	protected:
 		bool m_Running{ true };
 
@@ -94,7 +97,6 @@ namespace ragdoll
 		std::shared_ptr<ResourceManager> m_ResourceManager;
 		std::shared_ptr<RenderGraph> m_RenderGraph;
 		std::shared_ptr<FileManager> m_FileManager;
-
 		std::shared_ptr<LayerStack> m_LayerStack;
 		std::shared_ptr<TransformLayer> m_TransformLayer;
 	};

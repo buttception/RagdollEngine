@@ -6,7 +6,6 @@ set "ver=vs2022"
 
 echo [97mCreating solution[0m
 
-call cmake "../Ragdoll/dependencies/nvrhi"
 call premake\premake5.exe --file=%premake_path% %ver% 
 if errorlevel 1 (
     echo [91m [91mPremake failed[0m
