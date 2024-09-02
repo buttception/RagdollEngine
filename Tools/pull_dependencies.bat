@@ -5,7 +5,6 @@ echo [97mPulling all dependencies[0m
 
 call :pull_dependency "spdlog" "https://github.com/buttception/spdlog.git"
 call :pull_dependency "glfw" "https://github.com/buttception/glfw.git"
-call :pull_dependency "glad" "https://github.com/buttception/Glad.git"
 call :pull_dependency "glm" "https://github.com/buttception/glm.git"
 call :pull_dependency "entt" "https://github.com/buttception/entt.git"
 

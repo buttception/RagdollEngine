@@ -35,7 +35,6 @@ namespace ragdoll
 	class EntityManager;
 	class TransformLayer;
 	class RenderGraph;
-	class OpenGLContext;
 	class ResourceManager;
 	class WindowMoveEvent;
 	class WindowResizeEvent;
@@ -84,14 +83,15 @@ namespace ragdoll
 		bool OnMouseScrolled(MouseScrolledEvent& event);
 
 		//spam
-		bool CreateDevice(); 
+		bool CreateDevice();
+		bool CreateSwapChain();
+		bool CreateRenderTargets();
 
 	protected:
 		bool m_Running{ true };
 
 		GuidGenerator m_GuidGenerator{};
 		std::shared_ptr<Window> m_PrimaryWindow;
-		std::shared_ptr<OpenGLContext> m_Context;
 		std::shared_ptr<InputHandler> m_InputHandler;
 		std::shared_ptr<EntityManager> m_EntityManager;
 		std::shared_ptr<ResourceManager> m_ResourceManager;

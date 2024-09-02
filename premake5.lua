@@ -17,7 +17,6 @@ group ""
 
 group "Dependencies"
 	include "Ragdoll/dependencies/glfw"
-	include "Ragdoll/dependencies/glad"
 
 group "Application"
 	include "Editor"

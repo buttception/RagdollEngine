@@ -37,20 +37,16 @@ ________________________________________________________________________________
 #include "Entity/EntityManager.h"
 #include "Graphics/Window/Window.h"
 #include "Graphics/GLFWContext.h"
-#include "Graphics/OpenGLContext.h"
 #include "Event/WindowEvents.h"
 #include "Event/KeyEvents.h"
 #include "Event/MouseEvent.h"
-#include "glad/glad.h"
 #include "Input/InputHandler.h"
-#include "Graphics/Renderer/RenderGraph.h"
 #include "Graphics/Transform/Transform.h"
 #include "Layer/LayerStack.h"
 #include "Graphics/Transform/TransformLayer.h"
 #include "Resource/ResourceManager.h"
 #include "File/FileManager.h"
 
-#include "Ragdoll/Graphics/Renderer/RenderData.h"
 ragdoll::Transform* t1, *t2, *t3, *t4, *t5;
 #include "nvrhi/d3d12.h"
 #include <dxgi1_5.h>
@@ -75,9 +71,6 @@ namespace ragdoll
 		m_PrimaryWindow->Init();
 		//bind the application callback to the window
 		m_PrimaryWindow->SetEventCallback(RD_BIND_EVENT_FN(Application::OnEvent));
-		//setup opengl context
-		m_Context = std::make_shared<OpenGLContext>();
-		m_Context->Init(m_PrimaryWindow);
 		//setup input handler
 		m_InputHandler = std::make_shared<InputHandler>();
 		m_InputHandler->Init();
@@ -86,9 +79,6 @@ namespace ragdoll
 		//create the resource manager
 		m_ResourceManager = std::make_shared<ResourceManager>();
 		m_ResourceManager->Init(m_PrimaryWindow);
-		//create the render graph
-		m_RenderGraph = std::make_shared<RenderGraph>();
-		m_RenderGraph->Init(m_PrimaryWindow, m_ResourceManager, m_EntityManager);
 		//create the file manager
 		m_FileManager = std::make_shared<FileManager>();
 		m_FileManager->Init();
@@ -101,6 +91,7 @@ namespace ragdoll
 
 		//testing d3d12
 		CreateDevice();
+		CreateSwapChain();
 
 		//init all layers
 		m_LayerStack->Init();
@@ -130,15 +121,6 @@ namespace ragdoll
 		t5->m_LocalPosition = { 0.f, 0.3f, 0.f };
 		t5->m_Parent = m_EntityManager->GetGuid(e4);
 		t4->m_Child = m_EntityManager->GetGuid(e5);
-
-		//add all of this into the render graph data
-		std::vector<RenderData> renderData;
-		renderData.push_back({.m_DrawMesh{ m_EntityManager->GetGuid(e1), 0 }});
-		renderData.push_back({.m_DrawMesh{ m_EntityManager->GetGuid(e2), 0 }});
-		renderData.push_back({.m_DrawMesh{ m_EntityManager->GetGuid(e3), 0 }});
-		renderData.push_back({.m_DrawMesh{ m_EntityManager->GetGuid(e4), 0 }});
-		renderData.push_back({.m_DrawMesh{ m_EntityManager->GetGuid(e5), 0 }});
-		m_ResourceManager->AddRenderData("test", std::move(renderData));
 	}
 
 	void Application::Run()
@@ -154,8 +136,6 @@ namespace ragdoll
 			{
 				layer->Update(static_cast<float>(m_PrimaryWindow->GetDeltaTime()));
 			}
-
-			m_RenderGraph->Execute();
 
 			m_PrimaryWindow->EndRender();
 		}
@@ -282,18 +262,47 @@ namespace ragdoll
 	}
 
 	//=====================================================================================================
+
 	struct InstanceParameters
 	{
 		bool enableDebugRuntime = false;
 		bool headlessDevice = false;
-
-#if DONUT_WITH_VULKAN
-		std::vector<std::string> requiredVulkanInstanceExtensions;
-		std::vector<std::string> requiredVulkanLayers;
-		std::vector<std::string> optionalVulkanInstanceExtensions;
-		std::vector<std::string> optionalVulkanLayers;
-#endif
 	};
+
+	class IRenderPass;
+
+	struct AdapterInfo
+	{
+		std::string name;
+		uint32_t vendorID = 0;
+		uint32_t deviceID = 0;
+		uint64_t dedicatedVideoMemory = 0;
+		nvrhi::RefCountPtr<IDXGIAdapter> dxgiAdapter;
+	};
+	struct DefaultMessageCallback : public nvrhi::IMessageCallback
+	{
+		static DefaultMessageCallback& GetInstance() { return s_Instance; }
+
+		void message(nvrhi::MessageSeverity severity, const char* messageText) override {
+			switch (severity) {
+			case nvrhi::MessageSeverity::Info:
+				RD_CORE_INFO(messageText);
+				break;
+			case nvrhi::MessageSeverity::Warning:
+				RD_CORE_WARN(messageText);
+				break;
+			case nvrhi::MessageSeverity::Error:
+				RD_CORE_ERROR(messageText);
+				break;
+			case nvrhi::MessageSeverity::Fatal:
+				RD_CORE_FATAL(messageText);
+				break;
+			}
+		}
+
+		static DefaultMessageCallback s_Instance;
+	};
+	DefaultMessageCallback DefaultMessageCallback::s_Instance;
 	struct DeviceCreationParameters : public InstanceParameters
 	{
 		bool startMaximized = false;
@@ -337,46 +346,64 @@ namespace ragdoll
 		DXGI_USAGE swapChainUsage = DXGI_USAGE_SHADER_INPUT | DXGI_USAGE_RENDER_TARGET_OUTPUT;
 		D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_1;
 	};
+	DeviceCreationParameters m_DeviceParams;
+	RefCountPtr<IDXGIFactory2> m_DxgiFactory2;
+	RefCountPtr<IDXGIAdapter> m_DxgiAdapter;
+	RefCountPtr<ID3D12CommandQueue> m_GraphicsQueue;
+	RefCountPtr<ID3D12Device> m_Device12;
+	RefCountPtr<ID3D12CommandQueue> m_ComputeQueue;
+	RefCountPtr<ID3D12CommandQueue> m_CopyQueue;
+	nvrhi::DeviceHandle m_NvrhiDevice;
+	HWND m_hWnd = nullptr;
+	DXGI_SWAP_CHAIN_DESC1 m_SwapChainDesc{};
+	RefCountPtr<IDXGISwapChain3> m_SwapChain;
+	DXGI_SWAP_CHAIN_FULLSCREEN_DESC m_FullScreenDesc{};
+	bool m_TearingSupported = false;
+	RefCountPtr<ID3D12Fence> m_FrameFence;
+	std::vector<HANDLE> m_FrameFenceEvents;
+	std::vector<RefCountPtr<ID3D12Resource>>    m_SwapChainBuffers;
+	std::vector<nvrhi::TextureHandle>           m_RhiSwapChainBuffers;
 
-	class IRenderPass;
-
-	struct AdapterInfo
+	static bool MoveWindowOntoAdapter(IDXGIAdapter* targetAdapter, RECT& rect)
 	{
-		std::string name;
-		uint32_t vendorID = 0;
-		uint32_t deviceID = 0;
-		uint64_t dedicatedVideoMemory = 0;
-		nvrhi::RefCountPtr<IDXGIAdapter> dxgiAdapter;
-	};
-	struct DefaultMessageCallback : public nvrhi::IMessageCallback
-	{
-		static DefaultMessageCallback& GetInstance() { return s_Instance; }
+		assert(targetAdapter != NULL);
 
-		void message(nvrhi::MessageSeverity severity, const char* messageText) override {
-			switch (severity) {
-			case nvrhi::MessageSeverity::Info:
-				RD_CORE_INFO(messageText);
-				break;
-			case nvrhi::MessageSeverity::Warning:
-				RD_CORE_WARN(messageText);
-				break;
-			case nvrhi::MessageSeverity::Error:
-				RD_CORE_ERROR(messageText);
-				break;
-			case nvrhi::MessageSeverity::Fatal:
-				RD_CORE_FATAL(messageText);
-				break;
+		HRESULT hres = S_OK;
+		unsigned int outputNo = 0;
+		while (SUCCEEDED(hres))
+		{
+			nvrhi::RefCountPtr<IDXGIOutput> pOutput;
+			hres = targetAdapter->EnumOutputs(outputNo++, &pOutput);
+
+			if (SUCCEEDED(hres) && pOutput)
+			{
+				DXGI_OUTPUT_DESC OutputDesc;
+				pOutput->GetDesc(&OutputDesc);
+				const RECT desktop = OutputDesc.DesktopCoordinates;
+				const int centreX = (int)desktop.left + (int)(desktop.right - desktop.left) / 2;
+				const int centreY = (int)desktop.top + (int)(desktop.bottom - desktop.top) / 2;
+				const int winW = rect.right - rect.left;
+				const int winH = rect.bottom - rect.top;
+				const int left = centreX - winW / 2;
+				const int right = left + winW;
+				const int top = centreY - winH / 2;
+				const int bottom = top + winH;
+				rect.left = std::max(left, (int)desktop.left);
+				rect.right = std::min(right, (int)desktop.right);
+				rect.bottom = std::min(bottom, (int)desktop.bottom);
+				rect.top = std::max(top, (int)desktop.top);
+
+				// If there is more than one output, go with the first found.  Multi-monitor support could go here.
+				return true;
 			}
 		}
 
-		static DefaultMessageCallback s_Instance;
-	};
-	DefaultMessageCallback DefaultMessageCallback::s_Instance;
+		return false;
+	}
 	
 	bool Application::CreateDevice()
 	{
 #define HR_RETURN(hr) if(FAILED(hr)) return false;
-		DeviceCreationParameters m_DeviceParams;
 		if (m_DeviceParams.enableDebugRuntime)
 		{
 			RefCountPtr<ID3D12Debug> pDebug;
@@ -387,13 +414,6 @@ namespace ragdoll
 		if (adapterIndex < 0)
 			adapterIndex = 0;
 		//create factory
-		RefCountPtr<IDXGIFactory2> m_DxgiFactory2;
-		RefCountPtr<IDXGIAdapter> m_DxgiAdapter;
-		RefCountPtr<ID3D12CommandQueue> m_GraphicsQueue;
-		RefCountPtr<ID3D12Device> m_Device12;
-		RefCountPtr<ID3D12CommandQueue> m_ComputeQueue;
-		RefCountPtr<ID3D12CommandQueue> m_CopyQueue;
-		nvrhi::DeviceHandle m_NvrhiDevice;
 		HRESULT res = CreateDXGIFactory2(0, IID_PPV_ARGS(&m_DxgiFactory2));
 		if (res != S_OK)
 			__debugbreak();
@@ -478,6 +498,125 @@ namespace ragdoll
 		if (m_DeviceParams.enableNvrhiValidationLayer)
 		{
 			m_NvrhiDevice = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
+		}
+
+		return true;
+	}
+
+	bool Application::CreateSwapChain()
+	{
+		UINT windowStyle = m_DeviceParams.startFullscreen
+			? (WS_POPUP | WS_SYSMENU | WS_VISIBLE)
+			: m_DeviceParams.startMaximized
+			? (WS_OVERLAPPEDWINDOW | WS_VISIBLE | WS_MAXIMIZE)
+			: (WS_OVERLAPPEDWINDOW | WS_VISIBLE);
+
+		RECT rect = { 0, 0, LONG(m_DeviceParams.backBufferWidth), LONG(m_DeviceParams.backBufferHeight) };
+		AdjustWindowRect(&rect, windowStyle, FALSE);
+
+		if (MoveWindowOntoAdapter(m_DxgiAdapter, rect))
+		{
+			glfwSetWindowPos(m_PrimaryWindow->GetGlfwWindow(), rect.left, rect.top);
+		}
+		m_hWnd = glfwGetWin32Window(m_PrimaryWindow->GetGlfwWindow());
+
+		HRESULT hr = E_FAIL;
+
+		RECT clientRect;
+		GetClientRect(m_hWnd, &clientRect);
+		UINT width = clientRect.right - clientRect.left;
+		UINT height = clientRect.bottom - clientRect.top;
+
+		ZeroMemory(&m_SwapChainDesc, sizeof(m_SwapChainDesc));
+		m_SwapChainDesc.Width = width;
+		m_SwapChainDesc.Height = height;
+		m_SwapChainDesc.SampleDesc.Count = m_DeviceParams.swapChainSampleCount;
+		m_SwapChainDesc.SampleDesc.Quality = 0;
+		m_SwapChainDesc.BufferUsage = m_DeviceParams.swapChainUsage;
+		m_SwapChainDesc.BufferCount = m_DeviceParams.swapChainBufferCount;
+		m_SwapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+		m_SwapChainDesc.Flags = m_DeviceParams.allowModeSwitch ? DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH : 0;
+
+		// Special processing for sRGB swap chain formats.
+		// DXGI will not create a swap chain with an sRGB format, but its contents will be interpreted as sRGB.
+		// So we need to use a non-sRGB format here, but store the true sRGB format for later framebuffer creation.
+		switch (m_DeviceParams.swapChainFormat)  // NOLINT(clang-diagnostic-switch-enum)
+		{
+		case nvrhi::Format::SRGBA8_UNORM:
+			m_SwapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			break;
+		case nvrhi::Format::SBGRA8_UNORM:
+			m_SwapChainDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+			break;
+		default:
+			m_SwapChainDesc.Format = nvrhi::d3d12::convertFormat(m_DeviceParams.swapChainFormat);
+			break;
+		}
+
+		RefCountPtr<IDXGIFactory5> pDxgiFactory5;
+		if (SUCCEEDED(m_DxgiFactory2->QueryInterface(IID_PPV_ARGS(&pDxgiFactory5))))
+		{
+			BOOL supported = 0;
+			if (SUCCEEDED(pDxgiFactory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &supported, sizeof(supported))))
+				m_TearingSupported = (supported != 0);
+		}
+
+		if (m_TearingSupported)
+		{
+			m_SwapChainDesc.Flags |= DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
+		}
+
+		m_FullScreenDesc = {};
+		m_FullScreenDesc.RefreshRate.Numerator = m_DeviceParams.refreshRate;
+		m_FullScreenDesc.RefreshRate.Denominator = 1;
+		m_FullScreenDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_PROGRESSIVE;
+		m_FullScreenDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+		m_FullScreenDesc.Windowed = !m_DeviceParams.startFullscreen;
+
+		RefCountPtr<IDXGISwapChain1> pSwapChain1;
+		hr = m_DxgiFactory2->CreateSwapChainForHwnd(m_GraphicsQueue, m_hWnd, &m_SwapChainDesc, &m_FullScreenDesc, nullptr, &pSwapChain1);
+		HR_RETURN(hr)
+
+			hr = pSwapChain1->QueryInterface(IID_PPV_ARGS(&m_SwapChain));
+		HR_RETURN(hr)
+
+			if (!CreateRenderTargets())
+				return false;
+
+		hr = m_Device12->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_FrameFence));
+		HR_RETURN(hr)
+
+			for (UINT bufferIndex = 0; bufferIndex < m_SwapChainDesc.BufferCount; bufferIndex++)
+			{
+				m_FrameFenceEvents.push_back(CreateEvent(nullptr, false, true, nullptr));
+			}
+
+		return true;
+	}
+
+	bool Application::CreateRenderTargets()
+	{
+		m_SwapChainBuffers.resize(m_SwapChainDesc.BufferCount);
+		m_RhiSwapChainBuffers.resize(m_SwapChainDesc.BufferCount);
+
+		for (UINT n = 0; n < m_SwapChainDesc.BufferCount; n++)
+		{
+			const HRESULT hr = m_SwapChain->GetBuffer(n, IID_PPV_ARGS(&m_SwapChainBuffers[n]));
+			HR_RETURN(hr)
+
+				nvrhi::TextureDesc textureDesc;
+			textureDesc.width = m_DeviceParams.backBufferWidth;
+			textureDesc.height = m_DeviceParams.backBufferHeight;
+			textureDesc.sampleCount = m_DeviceParams.swapChainSampleCount;
+			textureDesc.sampleQuality = m_DeviceParams.swapChainSampleQuality;
+			textureDesc.format = m_DeviceParams.swapChainFormat;
+			textureDesc.debugName = "SwapChainBuffer";
+			textureDesc.isRenderTarget = true;
+			textureDesc.isUAV = false;
+			textureDesc.initialState = nvrhi::ResourceStates::Present;
+			textureDesc.keepInitialState = true;
+
+			m_RhiSwapChainBuffers[n] = m_NvrhiDevice->createHandleForNativeTexture(nvrhi::ObjectTypes::D3D12_Resource, nvrhi::Object(m_SwapChainBuffers[n]), textureDesc);
 		}
 
 		return true;

@@ -32,7 +32,6 @@ ________________________________________________________________________________
 
 #include "Window.h"
 
-#include "glad/glad.h"
 #include "GLFW/glfw3.h"
 
 #include "Ragdoll/Core/Timestep.h"
@@ -224,16 +223,12 @@ namespace ragdoll
 		m_Frame++;
 		m_FpsCounter++;
 		glfwPollEvents();
-
-		//clear the back buffer
-		glClearColor(m_Properties.m_BackgroundColor.x, m_Properties.m_BackgroundColor.y, m_Properties.m_BackgroundColor.z, 1.f);
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
 
 	void Window::EndRender()
 	{
-		glfwSwapBuffers(m_GlfwWindow);
+		//update with d3d12 swap
+		//glfwSwapBuffers(m_GlfwWindow);
 	}
 
 	void Window::Close()
