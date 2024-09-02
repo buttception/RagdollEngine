@@ -1,6 +1,6 @@
 ﻿/*!
-\file		AssetManager.h
-\date		16/08/2024
+\file		Asset.h
+\date		17/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -28,23 +28,23 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
-#include <unordered_map>
-
 #include "Descriptors/Descriptor.h"
 
 namespace ragdoll
 {
-	class FileManager;
-
-	//incharge editor style of managing assets and populates the engine resource manager
-	class AssetManager
+	struct IAsset
 	{
-	public:
-		void Init(std::shared_ptr<FileManager> fileManager);
-		void LoadDatabase();
+		virtual ~IAsset() = default;
 
-	private:
-		std::shared_ptr<FileManager> m_FileManager;
-		std::unordered_map<uint64_t, std::shared_ptr<IDescriptor>> m_Descriptors;
+		std::filesystem::file_time_type m_LastWriteTime;
+	};
+
+	template<typename T>
+	struct Asset : IAsset
+	{
+		Descriptor<T> m_Descriptor;
+
+		//load asset from disk into engine resource manager
+		void LoadResource();
 	};
 }

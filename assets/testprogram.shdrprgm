@@ -1,0 +1,6 @@
+{
+    "id": 1,
+    "type": 0,
+    "vertex": "vertexshader",
+    "fragment": "fragmentshader"
+}

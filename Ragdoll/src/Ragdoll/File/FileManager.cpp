@@ -60,7 +60,7 @@ namespace ragdoll
 		return *this;
 	}
 
-	void FileManager::Buffer::Load(std::filesystem::path root)
+	void FileManager::Buffer::Load(const std::filesystem::path& root)
 	{
 		m_Status = Status::Executing;
 		std::filesystem::path path = root / m_Request.m_Path;
@@ -89,23 +89,28 @@ namespace ragdoll
 		m_Data.resize(size);
 		file.read(reinterpret_cast<char*>(m_Data.data()), size);
 		m_Status = Status::Callback;
-		//once done get main thread to call the callback
+	}
+
+	FileManager::FileManager()
+	{
+		m_QueueMutex = std::make_unique<std::mutex>();
+		m_FileIOMutex = std::make_unique<std::mutex>();
+		m_FileIONextAccessMutex = std::make_unique<std::mutex>();
+		m_FileIOLowPriorityMutex = std::make_unique<std::mutex>();
 	}
 
 	void FileManager::Init()
 	{
 		//TODO: should be config next time
-		m_Root = m_Root.parent_path() / "build";
-		//define the path to the asset folder
-		std::filesystem::path assetFolderPath = m_Root / "assets";
+		m_Root = m_Root.parent_path() / "assets";
 		//check if the asset folder exists
-		if (!std::filesystem::exists(assetFolderPath))
+		if (!std::filesystem::exists(m_Root))
 		{
 			//if not, create the folder
 			try
 			{
-				std::filesystem::create_directory(assetFolderPath);
-				RD_CORE_INFO("Asset folder created at: {}", assetFolderPath.string());;
+				std::filesystem::create_directory(m_Root);
+				RD_CORE_INFO("Asset folder created at: {}", m_Root.string());;
 			}
 			catch (const std::filesystem::filesystem_error& e)
 			{
@@ -114,13 +119,9 @@ namespace ragdoll
 			}
 		}
 
-		//set the root to the asset folder
-		m_Root = assetFolderPath;
-
 		//start the io thread
 		m_Running = true;
 		m_IOThread = std::thread(&FileManager::ThreadUpdate, this);
-		m_IOThread.detach();
 	}
 
 	void FileManager::Update()
@@ -138,8 +139,9 @@ namespace ragdoll
 
 	void FileManager::ThreadUpdate()
 	{
-		while(true)
+		while(m_Running)
 		{
+			std::lock_guard<std::mutex> lock(*m_QueueMutex);
 			//check if there are any requests
 			if (m_RequestQueue.empty())
 			{
@@ -150,6 +152,11 @@ namespace ragdoll
 
 			// Get the next request
 			FileIORequest request = m_RequestQueue.top();
+			//all threaded loads are lower priority compared to immediate loading
+			m_FileIOLowPriorityMutex->lock();	//lock l
+			m_FileIONextAccessMutex->lock();	//lock n
+			m_FileIOMutex->lock();				//lock m
+			m_FileIONextAccessMutex->unlock();	//unlock n
 			if(request.m_Type == FileIORequest::Type::Read)
 			{
 				// Check for available buffers
@@ -169,7 +176,6 @@ namespace ragdoll
 					// Load the file
 					freeBuffer->m_Request = request;
 					freeBuffer->Load(m_Root);
-					std::lock_guard<std::mutex> lock(m_QueueMutex);
 					m_RequestQueue.pop();
 				}
 				else
@@ -185,17 +191,38 @@ namespace ragdoll
 
 				//no callbacks for writing because it should be fire and forget
 			}
+			//unlocks all mutex
+			m_FileIOMutex->unlock();
+			m_FileIOLowPriorityMutex->unlock();
 		}
 	}
 
 	void FileManager::QueueRequest(FileIORequest request)
 	{
-		std::lock_guard<std::mutex>lock(m_QueueMutex);
+		std::lock_guard<std::mutex>lock(*m_QueueMutex);
 		m_RequestQueue.push(request);
+	}
+
+	void FileManager::ImmediateLoad(FileIORequest request)
+	{
+		//high priority immediate loading blocking
+		m_FileIONextAccessMutex->lock();
+		m_FileIOMutex->lock();
+		m_FileIONextAccessMutex->unlock();
+		//main thread do not need to care about buffer status
+		if (request.m_Type == FileIORequest::Type::Read) 
+		{
+			m_ImmediateBuffer.m_Request = request;
+			m_ImmediateBuffer.Load(m_Root);
+		}
+		//unlock all mutex
+		m_FileIOMutex->unlock();
 	}
 
 	void FileManager::Shutdown()
 	{
 		m_Running = false;
+		if(m_IOThread.joinable())
+			m_IOThread.join();
 	}
 }

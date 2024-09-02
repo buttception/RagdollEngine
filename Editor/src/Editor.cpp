@@ -33,6 +33,7 @@ ________________________________________________________________________________
 
 #include "ragdollpch.h"
 #include "Ragdoll.h"
+#include "Asset/AssetManager.h"
 #include "Imgui/GuiLayer.h"
 #include "Ragdoll/Layer/LayerStack.h"
 
@@ -48,11 +49,16 @@ namespace ragdoll
 		{
 			Application::Init(config);
 			// Do editor specific initialization here
+			m_AssetManager = std::make_shared<AssetManager>();
+			m_AssetManager->Init(m_FileManager);
 			//add the imgui layer
 			auto imGuiLayer = std::make_shared<GuiLayer>(m_PrimaryWindow, m_EntityManager);
 			imGuiLayer->Init();
 			m_LayerStack->PushLayer(imGuiLayer);
 		}
+
+	private:
+		std::shared_ptr<AssetManager> m_AssetManager;
 	};
 }
 

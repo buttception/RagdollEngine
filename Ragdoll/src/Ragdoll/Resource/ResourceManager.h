@@ -32,11 +32,11 @@ ________________________________________________________________________________
 namespace ragdoll
 {
 	class Framebuffer;
-	class ShaderProgram;
+	struct ShaderProgram;
 	class Window;
 	class VertexArray;
 	struct RenderData;
-	class IResource;
+	struct IResource;
 	class ResourceManager
 	{
 	public:

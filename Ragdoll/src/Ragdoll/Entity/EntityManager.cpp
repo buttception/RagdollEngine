@@ -40,7 +40,7 @@ namespace ragdoll
 	entt::entity EntityManager::CreateEntity()
 	{
 		entt::entity entity = m_Registry.create();
-		auto guid = GuidGenerator::GenerateGuid();
+		auto guid = GuidGenerator::Generate();
 		m_GuidToEntity.insert({ guid, entity });
 		m_EntityToGuid.insert({ entity, guid });
 		return entity;

@@ -31,6 +31,13 @@ ________________________________________________________________________________
 
 namespace ragdoll
 {
+	enum class ResourceType
+	{
+		Shader,
+
+		TYPE_COUNT
+	};
+
 	struct IResource	//interface to share common functionality between different resource types
 	{
 		Guid m_Guid;
@@ -45,14 +52,16 @@ namespace ragdoll
 		//pointer to the actual resource type
 		std::shared_ptr<T> m_Data;
 
+		std::shared_ptr<T> operator->() const { return m_Data; }
+
 		//this will only take bytes to load into the resource
-		bool Load(const char* data, uint32_t size)
+		void Load(const char* data, uint32_t size)
 		{
 			//behavior on what to do will be up to constructors
 			m_Data = std::make_shared<T>(data, size);
 		}
 		//this will free the resource`
-		bool Unload()
+		void Unload()
 		{
 			//behavior on what to do will be up to destructors
 			m_Data.reset();

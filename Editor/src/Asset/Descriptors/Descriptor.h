@@ -1,6 +1,6 @@
 ﻿/*!
-\file		AssetManager.h
-\date		16/08/2024
+\file		Descriptor.h
+\date		17/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -28,23 +28,39 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
-#include <unordered_map>
-
-#include "Descriptors/Descriptor.h"
+#include <filesystem>
 
 namespace ragdoll
 {
-	class FileManager;
+	enum class AssetType
+	{
+		Shader,
+		ShaderProgram,
+		Texture,
+		Mesh,
+		Material,
+		Scene,
+		Animation,
+		Audio,
+		Font,
 
-	//incharge editor style of managing assets and populates the engine resource manager
-	class AssetManager
+		TYPE_COUNT
+	};
+
+	struct IDescriptor
 	{
 	public:
-		void Init(std::shared_ptr<FileManager> fileManager);
-		void LoadDatabase();
+		virtual ~IDescriptor() = default;
 
-	private:
-		std::shared_ptr<FileManager> m_FileManager;
-		std::unordered_map<uint64_t, std::shared_ptr<IDescriptor>> m_Descriptors;
+		AssetType m_Type;
+		std::filesystem::path m_Path;
+	};
+
+	//descriptors are used to store metadata about assets
+	template<typename T>
+	struct Descriptor : public IDescriptor
+	{
+	public:
+
 	};
 }

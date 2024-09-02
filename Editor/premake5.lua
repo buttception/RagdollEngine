@@ -38,6 +38,7 @@ project "Editor"
 		"%{IncludesDir.imgui}",
 		"%{IncludesDir.glfw}",
 		"%{IncludesDir.glad}",
+		"%{IncludesDir.rapidjson}",
     }
 
 	postbuildcommands

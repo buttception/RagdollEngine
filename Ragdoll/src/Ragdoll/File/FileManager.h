@@ -29,7 +29,7 @@
 __________________________________________________________________________________*/
 #pragma once
 
-#include "Ragdoll/Memory/RagdollAllocator.h"
+//#include "Ragdoll/Memory/RagdollAllocator.h"
 
 namespace ragdoll
 {
@@ -50,7 +50,7 @@ namespace ragdoll
 		FileIORequest()
 		{
 			if(m_Guid == Guid::null)
-				m_Guid = GuidGenerator::GenerateGuid();
+				m_Guid = GuidGenerator::Generate();
 		}
 		FileIORequest(Guid guid, std::filesystem::path path, std::function<void(Guid, const uint8_t*, uint32_t)> callback, uint64_t offset = 0, uint64_t size = 0, Type type = Type::Read, Priority priority = Priority::Normal)
 			: m_Guid{ guid }, m_Path(path), m_ReadCallback(callback), m_Offset(offset), m_Size(size), m_Type(type), m_Priority(priority)
@@ -95,17 +95,20 @@ namespace ragdoll
 				Callback,
 			} m_Status{ Status::Idle };
 			FileIORequest m_Request;
-			std::vector<uint8_t, RagdollAllocator<uint8_t>> m_Data;
+			std::vector<uint8_t> m_Data;
 
-			void Load(std::filesystem::path root);
+			void Load(const std::filesystem::path& root);
 		};
 	public:
+		FileManager();
+
 		void Init();
 		//checks when the file manager is done loading then can call the callbacks
 		void Update();
 		//check queue status and will load async, callback will be called when done in main thread
 		void ThreadUpdate();
 		void QueueRequest(FileIORequest request);
+		void ImmediateLoad(FileIORequest request);
 
 		void Shutdown();
 
@@ -124,9 +127,14 @@ namespace ragdoll
 				}
 		};
 		//mutex for the queue
-		std::mutex m_QueueMutex;
+		std::unique_ptr<std::mutex> m_QueueMutex{};
+		//mutex for read writes with triple mutex prioritisation
+		std::unique_ptr<std::mutex> m_FileIOMutex{};
+		std::unique_ptr<std::mutex> m_FileIONextAccessMutex{};
+		std::unique_ptr<std::mutex> m_FileIOLowPriorityMutex{};
 		//double buffering loading system with a loader thread
 		Buffer m_Buffer[2]{};
+		Buffer m_ImmediateBuffer{};
 		//thread to do IO
 		std::thread m_IOThread;
 	};
