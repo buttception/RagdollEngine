@@ -57,6 +57,109 @@ ragdoll::Transform* t1, *t2, *t3, *t4, *t5;
 #include <nvrhi/validation.h>
 using nvrhi::RefCountPtr;
 
+
+struct InstanceParameters
+{
+	bool enableDebugRuntime = false;
+	bool headlessDevice = false;
+};
+
+class IRenderPass;
+
+struct AdapterInfo
+{
+	std::string name;
+	uint32_t vendorID = 0;
+	uint32_t deviceID = 0;
+	uint64_t dedicatedVideoMemory = 0;
+	nvrhi::RefCountPtr<IDXGIAdapter> dxgiAdapter;
+};
+struct DefaultMessageCallback : public nvrhi::IMessageCallback
+{
+	static DefaultMessageCallback& GetInstance() { return s_Instance; }
+
+	void message(nvrhi::MessageSeverity severity, const char* messageText) override {
+		switch (severity) {
+		case nvrhi::MessageSeverity::Info:
+			RD_CORE_INFO(messageText);
+			break;
+		case nvrhi::MessageSeverity::Warning:
+			RD_CORE_WARN(messageText);
+			break;
+		case nvrhi::MessageSeverity::Error:
+			RD_CORE_ERROR(messageText);
+			break;
+		case nvrhi::MessageSeverity::Fatal:
+			RD_CORE_FATAL(messageText);
+			break;
+		}
+	}
+
+	static DefaultMessageCallback s_Instance;
+};
+DefaultMessageCallback DefaultMessageCallback::s_Instance;
+struct DeviceCreationParameters : public InstanceParameters
+{
+	bool startMaximized = false;
+	bool startFullscreen = false;
+	bool allowModeSwitch = true;
+	int windowPosX = -1;            // -1 means use default placement
+	int windowPosY = -1;
+	uint32_t backBufferWidth = 1280;
+	uint32_t backBufferHeight = 720;
+	uint32_t refreshRate = 0;
+	uint32_t swapChainBufferCount = 3;
+	nvrhi::Format swapChainFormat = nvrhi::Format::SRGBA8_UNORM;
+	uint32_t swapChainSampleCount = 1;
+	uint32_t swapChainSampleQuality = 0;
+	uint32_t maxFramesInFlight = 2;
+	bool enableNvrhiValidationLayer = false;
+	bool vsyncEnabled = false;
+	bool enableRayTracingExtensions = false; // for vulkan
+	bool enableComputeQueue = false;
+	bool enableCopyQueue = false;
+
+	// Severity of the information log messages from the device manager, like the device name or enabled extensions.
+	//log::Severity infoLogSeverity = log::Severity::Info;
+
+	// Index of the adapter (DX11, DX12) or physical device (Vk) on which to initialize the device.
+	// Negative values mean automatic detection.
+	// The order of indices matches that returned by DeviceManager::EnumerateAdapters.
+	int adapterIndex = -1;
+
+	// set to true to enable DPI scale factors to be computed per monitor
+	// this will keep the on-screen window size in pixels constant
+	//
+	// if set to false, the DPI scale factors will be constant but the system
+	// may scale the contents of the window based on DPI
+	//
+	// note that the backbuffer size is never updated automatically; if the app
+	// wishes to scale up rendering based on DPI, then it must set this to true
+	// and respond to DPI scale factor changes by resizing the backbuffer explicitly
+	bool enablePerMonitorDPI = false;
+
+	DXGI_USAGE swapChainUsage = DXGI_USAGE_SHADER_INPUT | DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_1;
+};
+DeviceCreationParameters m_DeviceParams;
+RefCountPtr<IDXGIFactory2> m_DxgiFactory2;
+RefCountPtr<IDXGIAdapter> m_DxgiAdapter;
+RefCountPtr<ID3D12CommandQueue> m_GraphicsQueue;
+RefCountPtr<ID3D12Device> m_Device12;
+RefCountPtr<ID3D12CommandQueue> m_ComputeQueue;
+RefCountPtr<ID3D12CommandQueue> m_CopyQueue;
+nvrhi::DeviceHandle m_NvrhiDevice;
+HWND m_hWnd = nullptr;
+DXGI_SWAP_CHAIN_DESC1 m_SwapChainDesc{};
+RefCountPtr<IDXGISwapChain3> m_SwapChain;
+DXGI_SWAP_CHAIN_FULLSCREEN_DESC m_FullScreenDesc{};
+bool m_TearingSupported = false;
+RefCountPtr<ID3D12Fence> m_FrameFence;
+std::vector<HANDLE> m_FrameFenceEvents;
+std::vector<RefCountPtr<ID3D12Resource>> m_SwapChainBuffers;
+std::vector<nvrhi::TextureHandle> m_RhiSwapChainBuffers;
+UINT64 m_FrameCount = 1;
+
 namespace ragdoll
 {
 	void Application::Init(const ApplicationConfig& config)
@@ -92,6 +195,7 @@ namespace ragdoll
 		//testing d3d12
 		CreateDevice();
 		CreateSwapChain();
+		CreateResource();
 
 		//init all layers
 		m_LayerStack->Init();
@@ -125,19 +229,50 @@ namespace ragdoll
 
 	void Application::Run()
 	{
+		nvrhi::TextureSubresourceSet subSet;
+		static double framerate = 1.0;
+		static double targetFrametime = 1.0 / framerate;
+		static double frametime = 0.0;
 		while(m_Running)
 		{
 			//input update must be called before window polls for inputs
 			m_InputHandler->Update(m_PrimaryWindow->GetDeltaTime());
 			m_FileManager->Update();
 			m_PrimaryWindow->StartRender();
-
-			for(auto& layer : *m_LayerStack)
-			{
-				layer->Update(static_cast<float>(m_PrimaryWindow->GetDeltaTime()));
+			frametime += m_PrimaryWindow->GetDeltaTime();
+			if (frametime > targetFrametime) {
+				
+				for (auto& layer : *m_LayerStack)
+				{
+					layer->Update(static_cast<float>(targetFrametime));
+				}
+				if (m_FrameCount % 3 == 0)
+				{
+					auto cmdList = m_NvrhiDevice->createCommandList();
+					cmdList->open();
+					cmdList->clearTextureFloat(m_RhiSwapChainBuffers[2], subSet, { 1.f,0.f,0.f,1.f });
+					cmdList->close();
+					m_NvrhiDevice->executeCommandList(cmdList);
+				}
+				if (m_FrameCount % 3 == 1)
+				{
+					auto cmdList = m_NvrhiDevice->createCommandList();
+					cmdList->open();
+					cmdList->clearTextureFloat(m_RhiSwapChainBuffers[0], subSet, { 0.f,1.f,0.f,1.f });
+					cmdList->close();
+					m_NvrhiDevice->executeCommandList(cmdList);
+				}
+				if (m_FrameCount % 3 == 2)
+				{
+					auto cmdList = m_NvrhiDevice->createCommandList();
+					cmdList->open();
+					cmdList->clearTextureFloat(m_RhiSwapChainBuffers[1], subSet, { 0.f,0.f,1.f,1.f });
+					cmdList->close();
+					m_NvrhiDevice->executeCommandList(cmdList);
+				}
+				Present();
+				frametime -= targetFrametime;
 			}
-
-			m_PrimaryWindow->EndRender();
 		}
 	}
 
@@ -263,107 +398,6 @@ namespace ragdoll
 
 	//=====================================================================================================
 
-	struct InstanceParameters
-	{
-		bool enableDebugRuntime = false;
-		bool headlessDevice = false;
-	};
-
-	class IRenderPass;
-
-	struct AdapterInfo
-	{
-		std::string name;
-		uint32_t vendorID = 0;
-		uint32_t deviceID = 0;
-		uint64_t dedicatedVideoMemory = 0;
-		nvrhi::RefCountPtr<IDXGIAdapter> dxgiAdapter;
-	};
-	struct DefaultMessageCallback : public nvrhi::IMessageCallback
-	{
-		static DefaultMessageCallback& GetInstance() { return s_Instance; }
-
-		void message(nvrhi::MessageSeverity severity, const char* messageText) override {
-			switch (severity) {
-			case nvrhi::MessageSeverity::Info:
-				RD_CORE_INFO(messageText);
-				break;
-			case nvrhi::MessageSeverity::Warning:
-				RD_CORE_WARN(messageText);
-				break;
-			case nvrhi::MessageSeverity::Error:
-				RD_CORE_ERROR(messageText);
-				break;
-			case nvrhi::MessageSeverity::Fatal:
-				RD_CORE_FATAL(messageText);
-				break;
-			}
-		}
-
-		static DefaultMessageCallback s_Instance;
-	};
-	DefaultMessageCallback DefaultMessageCallback::s_Instance;
-	struct DeviceCreationParameters : public InstanceParameters
-	{
-		bool startMaximized = false;
-		bool startFullscreen = false;
-		bool allowModeSwitch = true;
-		int windowPosX = -1;            // -1 means use default placement
-		int windowPosY = -1;
-		uint32_t backBufferWidth = 1280;
-		uint32_t backBufferHeight = 720;
-		uint32_t refreshRate = 0;
-		uint32_t swapChainBufferCount = 3;
-		nvrhi::Format swapChainFormat = nvrhi::Format::SRGBA8_UNORM;
-		uint32_t swapChainSampleCount = 1;
-		uint32_t swapChainSampleQuality = 0;
-		uint32_t maxFramesInFlight = 2;
-		bool enableNvrhiValidationLayer = false;
-		bool vsyncEnabled = false;
-		bool enableRayTracingExtensions = false; // for vulkan
-		bool enableComputeQueue = false;
-		bool enableCopyQueue = false;
-
-		// Severity of the information log messages from the device manager, like the device name or enabled extensions.
-		//log::Severity infoLogSeverity = log::Severity::Info;
-
-		// Index of the adapter (DX11, DX12) or physical device (Vk) on which to initialize the device.
-		// Negative values mean automatic detection.
-		// The order of indices matches that returned by DeviceManager::EnumerateAdapters.
-		int adapterIndex = -1;
-
-		// set to true to enable DPI scale factors to be computed per monitor
-		// this will keep the on-screen window size in pixels constant
-		//
-		// if set to false, the DPI scale factors will be constant but the system
-		// may scale the contents of the window based on DPI
-		//
-		// note that the backbuffer size is never updated automatically; if the app
-		// wishes to scale up rendering based on DPI, then it must set this to true
-		// and respond to DPI scale factor changes by resizing the backbuffer explicitly
-		bool enablePerMonitorDPI = false;
-
-		DXGI_USAGE swapChainUsage = DXGI_USAGE_SHADER_INPUT | DXGI_USAGE_RENDER_TARGET_OUTPUT;
-		D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_1;
-	};
-	DeviceCreationParameters m_DeviceParams;
-	RefCountPtr<IDXGIFactory2> m_DxgiFactory2;
-	RefCountPtr<IDXGIAdapter> m_DxgiAdapter;
-	RefCountPtr<ID3D12CommandQueue> m_GraphicsQueue;
-	RefCountPtr<ID3D12Device> m_Device12;
-	RefCountPtr<ID3D12CommandQueue> m_ComputeQueue;
-	RefCountPtr<ID3D12CommandQueue> m_CopyQueue;
-	nvrhi::DeviceHandle m_NvrhiDevice;
-	HWND m_hWnd = nullptr;
-	DXGI_SWAP_CHAIN_DESC1 m_SwapChainDesc{};
-	RefCountPtr<IDXGISwapChain3> m_SwapChain;
-	DXGI_SWAP_CHAIN_FULLSCREEN_DESC m_FullScreenDesc{};
-	bool m_TearingSupported = false;
-	RefCountPtr<ID3D12Fence> m_FrameFence;
-	std::vector<HANDLE> m_FrameFenceEvents;
-	std::vector<RefCountPtr<ID3D12Resource>>    m_SwapChainBuffers;
-	std::vector<nvrhi::TextureHandle>           m_RhiSwapChainBuffers;
-
 	static bool MoveWindowOntoAdapter(IDXGIAdapter* targetAdapter, RECT& rect)
 	{
 		assert(targetAdapter != NULL);
@@ -400,9 +434,25 @@ namespace ragdoll
 
 		return false;
 	}
+	static std::string GetAdapterName(DXGI_ADAPTER_DESC const& aDesc)
+	{
+		size_t length = wcsnlen(aDesc.Description, _countof(aDesc.Description));
+
+		std::string name;
+		name.resize(length);
+		WideCharToMultiByte(CP_ACP, 0, aDesc.Description, int(length), name.data(), int(name.size()), nullptr, nullptr);
+
+		return name;
+	}
+	static bool IsNvDeviceID(UINT id)
+	{
+		return id == 0x10DE;
+	}
 	
 	bool Application::CreateDevice()
 	{
+		m_DeviceParams.enableDebugRuntime = true;
+		m_DeviceParams.enableNvrhiValidationLayer = true;
 #define HR_RETURN(hr) if(FAILED(hr)) return false;
 		if (m_DeviceParams.enableDebugRuntime)
 		{
@@ -430,12 +480,18 @@ namespace ragdoll
 		{
 			DXGI_ADAPTER_DESC aDesc;
 			m_DxgiAdapter->GetDesc(&aDesc);
+
+			std::string name = GetAdapterName(aDesc);
+			bool isNvidia = IsNvDeviceID(aDesc.VendorId);
+			RD_CORE_INFO("Adapter name:{}", name);
+			RD_CORE_INFO("Is nvidia:{}", isNvidia);
 		}
 
 		HRESULT hr = D3D12CreateDevice(
 			m_DxgiAdapter,
 			m_DeviceParams.featureLevel,
 			IID_PPV_ARGS(&m_Device12));
+		HR_RETURN(hr)
 
 			if (m_DeviceParams.enableDebugRuntime)
 			{
@@ -620,5 +676,217 @@ namespace ragdoll
 		}
 
 		return true;
+	}
+
+	void Application::ReleaseRenderTargets()
+	{
+		// Make sure that all frames have finished rendering
+		m_NvrhiDevice->waitForIdle();
+
+		// Release all in-flight references to the render targets
+		m_NvrhiDevice->runGarbageCollection();
+
+		// Set the events so that WaitForSingleObject in OneFrame will not hang later
+		for (auto e : m_FrameFenceEvents)
+			SetEvent(e);
+
+		// Release the old buffers because ResizeBuffers requires that
+		m_RhiSwapChainBuffers.clear();
+		m_SwapChainBuffers.clear();
+	}
+
+	void Application::ResizeSwapChain()
+	{
+		ReleaseRenderTargets();
+
+		if (!m_NvrhiDevice)
+			return;
+
+		if (!m_SwapChain)
+			return;
+
+		const HRESULT hr = m_SwapChain->ResizeBuffers(m_DeviceParams.swapChainBufferCount,
+			m_DeviceParams.backBufferWidth,
+			m_DeviceParams.backBufferHeight,
+			m_SwapChainDesc.Format,
+			m_SwapChainDesc.Flags);
+
+		if (FAILED(hr))
+		{
+			RD_CORE_FATAL("Resize failed");
+		}
+
+		bool ret = CreateRenderTargets();
+		if (!ret)
+		{
+			RD_CORE_FATAL("CreateRenderTarget failed");
+		}
+	}
+
+	bool Application::BeginFrame()
+	{
+		DXGI_SWAP_CHAIN_DESC1 newSwapChainDesc;
+		DXGI_SWAP_CHAIN_FULLSCREEN_DESC newFullScreenDesc;
+		if (SUCCEEDED(m_SwapChain->GetDesc1(&newSwapChainDesc)) && SUCCEEDED(m_SwapChain->GetFullscreenDesc(&newFullScreenDesc)))
+		{
+			if (m_FullScreenDesc.Windowed != newFullScreenDesc.Windowed)
+			{
+				//BackBufferResizing();
+
+				m_FullScreenDesc = newFullScreenDesc;
+				m_SwapChainDesc = newSwapChainDesc;
+				m_DeviceParams.backBufferWidth = newSwapChainDesc.Width;
+				m_DeviceParams.backBufferHeight = newSwapChainDesc.Height;
+
+				if (newFullScreenDesc.Windowed)
+					glfwSetWindowMonitor(m_PrimaryWindow->GetGlfwWindow(), nullptr, 50, 50, newSwapChainDesc.Width, newSwapChainDesc.Height, 0);
+
+				ResizeSwapChain();
+				//BackBufferResized();
+			}
+
+		}
+
+		auto bufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
+
+		WaitForSingleObject(m_FrameFenceEvents[bufferIndex], INFINITE);
+
+		return true;
+	}
+
+	void Application::Present()
+	{
+		//if (!m_windowVisible)
+			//return;
+
+		auto bufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
+
+		UINT presentFlags = 0;
+		if (!m_DeviceParams.vsyncEnabled && m_FullScreenDesc.Windowed && m_TearingSupported)
+			presentFlags |= DXGI_PRESENT_ALLOW_TEARING;
+
+		m_SwapChain->Present(m_DeviceParams.vsyncEnabled ? 1 : 0, presentFlags);
+
+		m_FrameFence->SetEventOnCompletion(m_FrameCount, m_FrameFenceEvents[bufferIndex]);
+		m_GraphicsQueue->Signal(m_FrameFence, m_FrameCount);
+		m_FrameCount++;
+	}
+
+	const char* g_VertexShader = R"(
+		struct vertex_info
+		{
+			float3 position : POSITION;
+			float3 color : COLOR;
+		};
+
+		struct vertex_to_pixel
+		{
+			float4 position : SV_POSITION;
+			float3 color : COLOR;
+		};
+
+		vertex_to_pixel main(in vertex_info IN)
+		{
+			vertex_to_pixel OUT;
+
+			OUT.position = float4(IN.position, 1.0);
+			OUT.color = IN.color;
+
+			return OUT;
+		};
+	)";
+	const char* g_FragmentShader = R"(
+		struct input_from_vertex
+		{
+			float3 color : COLOR;
+		}
+
+		float4 main(in input_from_vertex IN) : COLOR
+		{
+			return float4(IN.color, 1.0);
+		};
+	)";
+
+	struct Vertex {
+		float position[3];
+		float color[3];
+	};
+
+	nvrhi::ShaderHandle vs;
+	nvrhi::ShaderHandle fs;
+	nvrhi::InputLayoutHandle inputLayout;
+	nvrhi::FramebufferHandle fb;
+	nvrhi::BindingLayoutHandle bindingLayout;
+	nvrhi::GraphicsPipelineHandle graphicsPipeline;
+
+	nvrhi::BufferHandle vb;
+	nvrhi::CommandListHandle cmdList;
+
+	static const Vertex vertices[] = {
+		{ {1.f,0.f,0.f},{1.f,0.f,0.f} },
+		{ {0.f, 1.f, 0.f},{0.f,1.f,0.f} },
+		{ {-1.f, 0.f, 0.f,},{0.f,0.f,1.f} },
+	};
+
+	void Application::CreateResource()
+	{
+		//nvrhi::VertexAttributeDesc attribs[] = {
+		//	nvrhi::VertexAttributeDesc()
+		//		.setName("POSITION")
+		//		.setFormat(nvrhi::Format::RGB32_FLOAT)
+		//		.setOffset(offsetof(Vertex, position))
+		//		.setElementStride(sizeof(Vertex)),
+		//	nvrhi::VertexAttributeDesc()
+		//		.setName("COLOR")
+		//		.setFormat(nvrhi::Format::RGB32_FLOAT)
+		//		.setOffset(offsetof(Vertex, color))
+		//		.setElementStride(sizeof(Vertex)),
+		//};
+		//vs = m_NvrhiDevice->createShader(
+		//	nvrhi::ShaderDesc(nvrhi::ShaderType::Vertex),
+		//	g_VertexShader, sizeof(g_VertexShader)
+
+		//);
+		//inputLayout = m_NvrhiDevice->createInputLayout(
+		//	attribs, uint32_t(std::size(attribs)), vs
+		//);
+		//fs = m_NvrhiDevice->createShader(
+		//	nvrhi::ShaderDesc(nvrhi::ShaderType::Pixel),
+		//	g_FragmentShader, sizeof(g_FragmentShader));
+		////create a depth buffer
+		//nvrhi::TextureDesc dbDesc;
+		//dbDesc.width = m_DeviceParams.backBufferWidth;
+		//dbDesc.height = m_DeviceParams.backBufferHeight;
+		//dbDesc.format = nvrhi::Format::D24S8;
+		//dbDesc.debugName = "DepthBuffer";
+		//dbDesc.isRenderTarget = true;
+		//dbDesc.isUAV = false;
+		//dbDesc.sampleCount = 1;
+		//auto db = m_NvrhiDevice->createTexture(dbDesc);
+		//auto fbDesc = nvrhi::FramebufferDesc()
+		//	.addColorAttachment(m_RhiSwapChainBuffers[0])
+		//	.setDepthAttachment(db);
+		//fb = m_NvrhiDevice->createFramebuffer(fbDesc);
+		////can set the requirements
+		//auto layoutDesc = nvrhi::BindingLayoutDesc()
+		//	.setVisibility(nvrhi::ShaderType::All);
+		//bindingLayout = m_NvrhiDevice->createBindingLayout(layoutDesc);
+
+		//auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
+		//auto hr = m_Device12->GetDeviceRemovedReason();
+		//graphicsPipeline = m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);
+		//auto vbDesc = nvrhi::BufferDesc()
+		//	.setByteSize(sizeof(vertices))
+		//	.setIsVertexBuffer(true)
+		//	.setInitialState(nvrhi::ResourceStates::VertexBuffer)
+		//	.setKeepInitialState(true)
+		//	.setDebugName("vb");
+		//vb = m_NvrhiDevice->createBuffer(vbDesc);
+		//cmdList = m_NvrhiDevice->createCommandList();
+		////create binding set to map resources, but i have none sooooo
+		//cmdList->open();
+		//cmdList->writeBuffer(vb, vertices, sizeof(vertices));
+		//cmdList->close();
+		//m_NvrhiDevice->executeCommandList(cmdList);
 	}
 }

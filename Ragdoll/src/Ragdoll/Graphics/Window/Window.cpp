@@ -69,7 +69,7 @@ namespace ragdoll
 		{
 			return false;
 		}
-		glfwMakeContextCurrent(m_GlfwWindow);
+		//glfwMakeContextCurrent(m_GlfwWindow);
 		glfwGetFramebufferSize(m_GlfwWindow, &m_BufferWidth, &m_BufferHeight);
 		glfwSetWindowUserPointer(m_GlfwWindow, this);
 

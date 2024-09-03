@@ -86,6 +86,11 @@ namespace ragdoll
 		bool CreateDevice();
 		bool CreateSwapChain();
 		bool CreateRenderTargets();
+		void ResizeSwapChain();
+		void ReleaseRenderTargets();
+		bool BeginFrame();
+		void Present();
+		void CreateResource();
 
 	protected:
 		bool m_Running{ true };
