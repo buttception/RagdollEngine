@@ -234,6 +234,7 @@ namespace ragdoll
 			nvrhi::GraphicsState state;
 			state.pipeline = m_GraphicsPipeline;
 			state.framebuffer = pipelineFb;
+			state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 			cmdList->setGraphicsState(state);
 			nvrhi::DrawArguments args;
 			args.vertexCount = 3;
@@ -426,6 +427,8 @@ namespace ragdoll
 		m_DeviceParams.enableDebugRuntime = true;
 		m_DeviceParams.enableNvrhiValidationLayer = true;
 		m_DeviceParams.swapChainBufferCount = 2;
+		m_DeviceParams.backBufferWidth = m_PrimaryWindow->GetBufferWidth();
+		m_DeviceParams.backBufferHeight = m_PrimaryWindow->GetBufferHeight();
 #define HR_RETURN(hr) if(FAILED(hr)) return false;
 		if (m_DeviceParams.enableDebugRuntime)
 		{
@@ -785,6 +788,7 @@ namespace ragdoll
 		pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
 		pipelineDesc.renderState.depthStencilState.stencilEnable = false;
 		pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+		pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
 
 		m_GraphicsPipeline = m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);
 	}
