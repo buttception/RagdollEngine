@@ -55,6 +55,8 @@ ragdoll::Transform* t1, *t2, *t3, *t4, *t5;
 #include <DXGI.h>
 #include <nvrhi/d3d12.h>
 #include <nvrhi/validation.h>
+#include <d3dcompiler.h>
+#include <wrl.h>
 using nvrhi::RefCountPtr;
 
 
@@ -158,7 +160,7 @@ RefCountPtr<ID3D12Fence> m_FrameFence;
 std::vector<HANDLE> m_FrameFenceEvents;
 std::vector<RefCountPtr<ID3D12Resource>> m_SwapChainBuffers;
 std::vector<nvrhi::TextureHandle> m_RhiSwapChainBuffers;
-UINT64 m_FrameCount = 1;
+UINT64 m_FrameCount = 0;
 
 namespace ragdoll
 {
@@ -195,7 +197,7 @@ namespace ragdoll
 		//testing d3d12
 		CreateDevice();
 		CreateSwapChain();
-		CreateResource();
+		//CreateResource();
 
 		//init all layers
 		m_LayerStack->Init();
@@ -230,49 +232,30 @@ namespace ragdoll
 	void Application::Run()
 	{
 		nvrhi::TextureSubresourceSet subSet;
-		static double framerate = 1.0;
-		static double targetFrametime = 1.0 / framerate;
-		static double frametime = 0.0;
+		auto cmdList = m_NvrhiDevice->createCommandList();
 		while(m_Running)
 		{
 			//input update must be called before window polls for inputs
 			m_InputHandler->Update(m_PrimaryWindow->GetDeltaTime());
 			m_FileManager->Update();
-			m_PrimaryWindow->StartRender();
-			frametime += m_PrimaryWindow->GetDeltaTime();
-			if (frametime > targetFrametime) {
-				
-				for (auto& layer : *m_LayerStack)
-				{
-					layer->Update(static_cast<float>(targetFrametime));
-				}
-				if (m_FrameCount % 3 == 0)
-				{
-					auto cmdList = m_NvrhiDevice->createCommandList();
-					cmdList->open();
-					cmdList->clearTextureFloat(m_RhiSwapChainBuffers[2], subSet, { 1.f,0.f,0.f,1.f });
-					cmdList->close();
-					m_NvrhiDevice->executeCommandList(cmdList);
-				}
-				if (m_FrameCount % 3 == 1)
-				{
-					auto cmdList = m_NvrhiDevice->createCommandList();
-					cmdList->open();
-					cmdList->clearTextureFloat(m_RhiSwapChainBuffers[0], subSet, { 0.f,1.f,0.f,1.f });
-					cmdList->close();
-					m_NvrhiDevice->executeCommandList(cmdList);
-				}
-				if (m_FrameCount % 3 == 2)
-				{
-					auto cmdList = m_NvrhiDevice->createCommandList();
-					cmdList->open();
-					cmdList->clearTextureFloat(m_RhiSwapChainBuffers[1], subSet, { 0.f,0.f,1.f,1.f });
-					cmdList->close();
-					m_NvrhiDevice->executeCommandList(cmdList);
-				}
-				Present();
-				frametime -= targetFrametime;
+			while (m_Frametime < m_TargetFrametime) {
+				m_PrimaryWindow->Update();
+				m_Frametime += m_PrimaryWindow->GetDeltaTime();
+				YieldProcessor();
 			}
+			for (auto& layer : *m_LayerStack)
+			{
+				layer->Update(static_cast<float>(m_TargetFrametime));
+			}
+			cmdList->open();
+			nvrhi::Color col{ m_FrameCount % 3 == 0 ? 1.f : 0.f, m_FrameCount % 3 == 1 ? 1.f : 0.f, m_FrameCount % 3 == 2 ? 1.f : 0.f, 1.f };
+			cmdList->clearTextureFloat(m_RhiSwapChainBuffers[m_FrameCount % 3], subSet, col);
+			cmdList->close();
+			m_NvrhiDevice->executeCommandList(cmdList);
+			Present();
+			m_PrimaryWindow->SetFrametime(m_TargetFrametime);
+			m_PrimaryWindow->IncFpsCounter();
+			m_Frametime -= m_TargetFrametime;
 		}
 	}
 
@@ -830,63 +813,67 @@ namespace ragdoll
 
 	void Application::CreateResource()
 	{
-		//nvrhi::VertexAttributeDesc attribs[] = {
-		//	nvrhi::VertexAttributeDesc()
-		//		.setName("POSITION")
-		//		.setFormat(nvrhi::Format::RGB32_FLOAT)
-		//		.setOffset(offsetof(Vertex, position))
-		//		.setElementStride(sizeof(Vertex)),
-		//	nvrhi::VertexAttributeDesc()
-		//		.setName("COLOR")
-		//		.setFormat(nvrhi::Format::RGB32_FLOAT)
-		//		.setOffset(offsetof(Vertex, color))
-		//		.setElementStride(sizeof(Vertex)),
-		//};
-		//vs = m_NvrhiDevice->createShader(
-		//	nvrhi::ShaderDesc(nvrhi::ShaderType::Vertex),
-		//	g_VertexShader, sizeof(g_VertexShader)
+		nvrhi::VertexAttributeDesc attribs[] = {
+			nvrhi::VertexAttributeDesc()
+				.setName("POSITION")
+				.setFormat(nvrhi::Format::RGB32_FLOAT)
+				.setOffset(offsetof(Vertex, position))
+				.setElementStride(sizeof(Vertex)),
+			nvrhi::VertexAttributeDesc()
+				.setName("COLOR")
+				.setFormat(nvrhi::Format::RGB32_FLOAT)
+				.setOffset(offsetof(Vertex, color))
+				.setElementStride(sizeof(Vertex)),
+		};
+		Microsoft::WRL::ComPtr<ID3DBlob> bytecode;
+		Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
+		//auto hr = D3DCompile(g_VertexShader, sizeof(g_VertexShader), nullptr, nullptr, nullptr, );
+		//HR_RETURN(hr);
+		vs = m_NvrhiDevice->createShader(
+			nvrhi::ShaderDesc(nvrhi::ShaderType::Vertex),
+			g_VertexShader, sizeof(g_VertexShader)
 
-		//);
-		//inputLayout = m_NvrhiDevice->createInputLayout(
-		//	attribs, uint32_t(std::size(attribs)), vs
-		//);
-		//fs = m_NvrhiDevice->createShader(
-		//	nvrhi::ShaderDesc(nvrhi::ShaderType::Pixel),
-		//	g_FragmentShader, sizeof(g_FragmentShader));
-		////create a depth buffer
-		//nvrhi::TextureDesc dbDesc;
-		//dbDesc.width = m_DeviceParams.backBufferWidth;
-		//dbDesc.height = m_DeviceParams.backBufferHeight;
-		//dbDesc.format = nvrhi::Format::D24S8;
-		//dbDesc.debugName = "DepthBuffer";
-		//dbDesc.isRenderTarget = true;
-		//dbDesc.isUAV = false;
-		//dbDesc.sampleCount = 1;
-		//auto db = m_NvrhiDevice->createTexture(dbDesc);
-		//auto fbDesc = nvrhi::FramebufferDesc()
-		//	.addColorAttachment(m_RhiSwapChainBuffers[0])
-		//	.setDepthAttachment(db);
-		//fb = m_NvrhiDevice->createFramebuffer(fbDesc);
-		////can set the requirements
-		//auto layoutDesc = nvrhi::BindingLayoutDesc()
-		//	.setVisibility(nvrhi::ShaderType::All);
-		//bindingLayout = m_NvrhiDevice->createBindingLayout(layoutDesc);
+		);
+		inputLayout = m_NvrhiDevice->createInputLayout(
+			attribs, uint32_t(std::size(attribs)), vs
+		);
+		fs = m_NvrhiDevice->createShader(
+			nvrhi::ShaderDesc(nvrhi::ShaderType::Pixel),
+			g_FragmentShader, sizeof(g_FragmentShader));
+		//create a depth buffer
+		nvrhi::TextureDesc dbDesc;
+		dbDesc.width = m_DeviceParams.backBufferWidth;
+		dbDesc.height = m_DeviceParams.backBufferHeight;
+		dbDesc.format = nvrhi::Format::D24S8;
+		dbDesc.debugName = "DepthBuffer";
+		dbDesc.isRenderTarget = true;
+		dbDesc.isUAV = false;
+		dbDesc.sampleCount = 1;
+		auto db = m_NvrhiDevice->createTexture(dbDesc);
+		auto fbDesc = nvrhi::FramebufferDesc()
+			.addColorAttachment(m_RhiSwapChainBuffers[0])
+			.setDepthAttachment(db);
+		fb = m_NvrhiDevice->createFramebuffer(fbDesc);
+		//can set the requirements
+		auto layoutDesc = nvrhi::BindingLayoutDesc()
+			.setVisibility(nvrhi::ShaderType::All);
+		bindingLayout = m_NvrhiDevice->createBindingLayout(layoutDesc);
 
-		//auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
-		//auto hr = m_Device12->GetDeviceRemovedReason();
-		//graphicsPipeline = m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);
-		//auto vbDesc = nvrhi::BufferDesc()
-		//	.setByteSize(sizeof(vertices))
-		//	.setIsVertexBuffer(true)
-		//	.setInitialState(nvrhi::ResourceStates::VertexBuffer)
-		//	.setKeepInitialState(true)
-		//	.setDebugName("vb");
-		//vb = m_NvrhiDevice->createBuffer(vbDesc);
-		//cmdList = m_NvrhiDevice->createCommandList();
-		////create binding set to map resources, but i have none sooooo
-		//cmdList->open();
-		//cmdList->writeBuffer(vb, vertices, sizeof(vertices));
-		//cmdList->close();
-		//m_NvrhiDevice->executeCommandList(cmdList);
+		auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
+		auto hr = m_Device12->GetDeviceRemovedReason();
+		graphicsPipeline = m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);
+		auto vbDesc = nvrhi::BufferDesc()
+			.setByteSize(sizeof(vertices))
+			.setIsVertexBuffer(true)
+			.setInitialState(nvrhi::ResourceStates::VertexBuffer)
+			.setKeepInitialState(true)
+			.setDebugName("vb");
+		vb = m_NvrhiDevice->createBuffer(vbDesc);
+		cmdList = m_NvrhiDevice->createCommandList();
+		//create binding set to map resources, but i have none sooooo
+		cmdList->open();
+		cmdList->writeBuffer(vb, vertices, sizeof(vertices));
+		cmdList->close();
+		m_NvrhiDevice->executeCommandList(cmdList);
 	}
 }

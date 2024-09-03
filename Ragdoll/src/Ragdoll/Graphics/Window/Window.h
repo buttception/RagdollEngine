@@ -96,9 +96,10 @@ namespace ragdoll
 
 		bool IsInitialized() const { return m_Initialized; }
 
-		uint64_t GetFrame() const { return m_Frame; }
 		int32_t GetFps() const { return m_Fps; }
 		int32_t GetFpsCounter() const { return m_FpsCounter; }
+		void IncFpsCounter();
+		void SetFrametime(double _ft) { m_Frametime = _ft; }
 		std::chrono::time_point<std::chrono::steady_clock> GetLastFrameTime() const { return m_LastFrameTime; }
 		double GetTimer() const { return m_Timer; }
 		double GetDeltaTime() const { return m_DeltaTime; }
@@ -109,7 +110,7 @@ namespace ragdoll
 		Window(const WindowProperties& properties);
 
 		bool Init();
-		void StartRender();
+		void Update();
 		void EndRender();
 		void Close();
 		void Shutdown();
@@ -127,9 +128,9 @@ namespace ragdoll
 
 		bool m_Initialized{ false };
 
-		uint64_t m_Frame{};
 		int32_t m_Fps{};
 		int32_t m_FpsCounter{};
+		double m_Frametime;
 		std::chrono::time_point<std::chrono::steady_clock> m_LastFrameTime{ std::chrono::steady_clock::now() };
 		double m_Timer{};
 		double m_DeltaTime{};

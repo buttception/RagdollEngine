@@ -42,6 +42,20 @@ ________________________________________________________________________________
 
 namespace ragdoll
 {
+	void Window::IncFpsCounter()
+	{
+		if (m_Properties.m_DisplayDetailsInTitle)
+		{
+			std::string title = m_Properties.m_Title + " | ";
+			if (m_Properties.m_DisplayFpsInTitle)
+				title += "FPS: " + std::to_string(m_Fps) + " | ";
+			if (m_Properties.m_DisplayFrameTimeInTitle)
+				title += "Frame Time: " + fmt::format("{:.2f}", m_Frametime * 1000.0) + "ms | ";
+			glfwSetWindowTitle(m_GlfwWindow, title.c_str());
+		}
+		m_FpsCounter++;
+		glfwPollEvents();
+	}
 	Window::Window()
 	{
 	}
@@ -193,7 +207,7 @@ namespace ragdoll
 		return true;
 	}
 
-	void Window::StartRender()
+	void Window::Update()
 	{
 		auto now = std::chrono::steady_clock::now();
 		Timestep timestep{ std::chrono::duration_cast<std::chrono::nanoseconds>(now - m_LastFrameTime).count() / 1000000000.0 };
@@ -207,22 +221,6 @@ namespace ragdoll
 			m_Fps = m_FpsCounter;
 			m_FpsCounter = 0;
 		}
-
-		if(m_Properties.m_DisplayDetailsInTitle)
-		{
-			std::string title = m_Properties.m_Title + " | ";
-			if(m_Properties.m_DisplayFpsInTitle)
-				title += "FPS: " + std::to_string(m_Fps) + " | ";
-			if(m_Properties.m_DisplayFrameCountInTitle)
-				title += "Frame: " + std::to_string(m_Frame) + " | ";
-			if(m_Properties.m_DisplayFrameTimeInTitle)
-				title += "Frame Time: " + fmt::format("{:.2f}", timestep.GetMilliseconds()) + "ms | ";
-			glfwSetWindowTitle(m_GlfwWindow, title.c_str());
-		}
-
-		m_Frame++;
-		m_FpsCounter++;
-		glfwPollEvents();
 	}
 
 	void Window::EndRender()

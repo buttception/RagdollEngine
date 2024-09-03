@@ -104,6 +104,10 @@ namespace ragdoll
 		std::shared_ptr<FileManager> m_FileManager;
 		std::shared_ptr<LayerStack> m_LayerStack;
 		std::shared_ptr<TransformLayer> m_TransformLayer;
+
+		double m_Framerate = 10.0;
+		double m_TargetFrametime = 1.0 / m_Framerate;
+		double m_Frametime = 0.0;
 	};
 
 	/**
