@@ -161,6 +161,7 @@ std::vector<HANDLE> m_FrameFenceEvents;
 std::vector<RefCountPtr<ID3D12Resource>> m_SwapChainBuffers;
 std::vector<nvrhi::TextureHandle> m_RhiSwapChainBuffers;
 UINT64 m_FrameCount = 0;
+nvrhi::GraphicsPipelineHandle m_GraphicsPipeline;
 
 namespace ragdoll
 {
@@ -197,36 +198,10 @@ namespace ragdoll
 		//testing d3d12
 		CreateDevice();
 		CreateSwapChain();
-		//CreateResource();
+		CreateResource();
 
 		//init all layers
 		m_LayerStack->Init();
-
-		//test the transform layer
-		auto e1 = m_EntityManager->CreateEntity();
-		auto e2 = m_EntityManager->CreateEntity();
-		auto e3 = m_EntityManager->CreateEntity();
-		auto e4 = m_EntityManager->CreateEntity();
-		auto e5 = m_EntityManager->CreateEntity();
-		t1 = m_EntityManager->AddComponent<Transform>(e1);
-		t1->m_LocalPosition = { 0.3f, 0.f, 0.f };
-		m_TransformLayer->SetEntityAsRoot(m_EntityManager->GetGuid(e1));
-		t2 = m_EntityManager->AddComponent<Transform>(e2);
-		t2->m_LocalPosition = { 0.3f, 0.f, 0.f };
-		t2->m_Parent = m_EntityManager->GetGuid(e1);
-		t1->m_Child = m_EntityManager->GetGuid(e2);
-		t3 = m_EntityManager->AddComponent<Transform>(e3);
-		t3->m_LocalPosition = { 0.3f, 0.f, 0.f };
-		t3->m_Parent = m_EntityManager->GetGuid(e2);
-		t2->m_Child = m_EntityManager->GetGuid(e3);
-		t4 = m_EntityManager->AddComponent<Transform>(e4);
-		t4->m_LocalPosition = { 0.f, 0.3f, 0.f };
-		t4->m_Parent = m_EntityManager->GetGuid(e1);
-		t2->m_Sibling = m_EntityManager->GetGuid(e4);
-		t5 = m_EntityManager->AddComponent<Transform>(e5);
-		t5->m_LocalPosition = { 0.f, 0.3f, 0.f };
-		t5->m_Parent = m_EntityManager->GetGuid(e4);
-		t4->m_Child = m_EntityManager->GetGuid(e5);
 	}
 
 	void Application::Run()
@@ -248,8 +223,22 @@ namespace ragdoll
 				layer->Update(static_cast<float>(m_TargetFrametime));
 			}
 			cmdList->open();
+			auto& tex = m_RhiSwapChainBuffers[m_SwapChain->GetCurrentBackBufferIndex()];
+			
 			nvrhi::Color col{ m_FrameCount % 3 == 0 ? 1.f : 0.f, m_FrameCount % 3 == 1 ? 1.f : 0.f, m_FrameCount % 3 == 2 ? 1.f : 0.f, 1.f };
-			cmdList->clearTextureFloat(m_RhiSwapChainBuffers[m_FrameCount % 3], subSet, col);
+			//cmdList->clearTextureFloat(tex, subSet, col);
+			//draw the triangle
+			auto fbDesc = nvrhi::FramebufferDesc()
+				.addColorAttachment(tex);
+			nvrhi::FramebufferHandle pipelineFb = m_NvrhiDevice->createFramebuffer(fbDesc);
+			nvrhi::GraphicsState state;
+			state.pipeline = m_GraphicsPipeline;
+			state.framebuffer = pipelineFb;
+			cmdList->setGraphicsState(state);
+			nvrhi::DrawArguments args;
+			args.vertexCount = 3;
+			cmdList->draw(args);
+
 			cmdList->close();
 			m_NvrhiDevice->executeCommandList(cmdList);
 			Present();
@@ -436,6 +425,7 @@ namespace ragdoll
 	{
 		m_DeviceParams.enableDebugRuntime = true;
 		m_DeviceParams.enableNvrhiValidationLayer = true;
+		m_DeviceParams.swapChainBufferCount = 2;
 #define HR_RETURN(hr) if(FAILED(hr)) return false;
 		if (m_DeviceParams.enableDebugRuntime)
 		{
@@ -755,125 +745,47 @@ namespace ragdoll
 		m_FrameCount++;
 	}
 
-	const char* g_VertexShader = R"(
-		struct vertex_info
-		{
-			float3 position : POSITION;
-			float3 color : COLOR;
-		};
-
-		struct vertex_to_pixel
-		{
-			float4 position : SV_POSITION;
-			float3 color : COLOR;
-		};
-
-		vertex_to_pixel main(in vertex_info IN)
-		{
-			vertex_to_pixel OUT;
-
-			OUT.position = float4(IN.position, 1.0);
-			OUT.color = IN.color;
-
-			return OUT;
-		};
-	)";
-	const char* g_FragmentShader = R"(
-		struct input_from_vertex
-		{
-			float3 color : COLOR;
-		}
-
-		float4 main(in input_from_vertex IN) : COLOR
-		{
-			return float4(IN.color, 1.0);
-		};
-	)";
-
-	struct Vertex {
-		float position[3];
-		float color[3];
-	};
-
 	nvrhi::ShaderHandle vs;
-	nvrhi::ShaderHandle fs;
+	nvrhi::ShaderHandle ps;
 	nvrhi::InputLayoutHandle inputLayout;
 	nvrhi::FramebufferHandle fb;
 	nvrhi::BindingLayoutHandle bindingLayout;
-	nvrhi::GraphicsPipelineHandle graphicsPipeline;
 
 	nvrhi::BufferHandle vb;
 	nvrhi::CommandListHandle cmdList;
 
-	static const Vertex vertices[] = {
-		{ {1.f,0.f,0.f},{1.f,0.f,0.f} },
-		{ {0.f, 1.f, 0.f},{0.f,1.f,0.f} },
-		{ {-1.f, 0.f, 0.f,},{0.f,0.f,1.f} },
-	};
-
 	void Application::CreateResource()
 	{
-		nvrhi::VertexAttributeDesc attribs[] = {
-			nvrhi::VertexAttributeDesc()
-				.setName("POSITION")
-				.setFormat(nvrhi::Format::RGB32_FLOAT)
-				.setOffset(offsetof(Vertex, position))
-				.setElementStride(sizeof(Vertex)),
-			nvrhi::VertexAttributeDesc()
-				.setName("COLOR")
-				.setFormat(nvrhi::Format::RGB32_FLOAT)
-				.setOffset(offsetof(Vertex, color))
-				.setElementStride(sizeof(Vertex)),
-		};
-		Microsoft::WRL::ComPtr<ID3DBlob> bytecode;
-		Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
-		//auto hr = D3DCompile(g_VertexShader, sizeof(g_VertexShader), nullptr, nullptr, nullptr, );
-		//HR_RETURN(hr);
-		vs = m_NvrhiDevice->createShader(
-			nvrhi::ShaderDesc(nvrhi::ShaderType::Vertex),
-			g_VertexShader, sizeof(g_VertexShader)
-
-		);
-		inputLayout = m_NvrhiDevice->createInputLayout(
-			attribs, uint32_t(std::size(attribs)), vs
-		);
-		fs = m_NvrhiDevice->createShader(
-			nvrhi::ShaderDesc(nvrhi::ShaderType::Pixel),
-			g_FragmentShader, sizeof(g_FragmentShader));
+		//load outputted shaders objects
+		m_FileManager->ImmediateLoad(FileIORequest(GuidGenerator::Generate(), "test.vs.cso", [&](Guid id, const uint8_t* data, uint32_t size) {
+			vs = m_NvrhiDevice->createShader(
+				nvrhi::ShaderDesc(nvrhi::ShaderType::Vertex),
+				data, size);
+			}
+		));
+		m_FileManager->ImmediateLoad(FileIORequest(GuidGenerator::Generate(), "test.ps.cso", [&](Guid id, const uint8_t* data, uint32_t size) {
+			ps = m_NvrhiDevice->createShader(
+				nvrhi::ShaderDesc(nvrhi::ShaderType::Pixel),
+				(char*)data, size);
+			}
+		));
 		//create a depth buffer
-		nvrhi::TextureDesc dbDesc;
-		dbDesc.width = m_DeviceParams.backBufferWidth;
-		dbDesc.height = m_DeviceParams.backBufferHeight;
-		dbDesc.format = nvrhi::Format::D24S8;
-		dbDesc.debugName = "DepthBuffer";
-		dbDesc.isRenderTarget = true;
-		dbDesc.isUAV = false;
-		dbDesc.sampleCount = 1;
-		auto db = m_NvrhiDevice->createTexture(dbDesc);
 		auto fbDesc = nvrhi::FramebufferDesc()
-			.addColorAttachment(m_RhiSwapChainBuffers[0])
-			.setDepthAttachment(db);
+			.addColorAttachment(m_RhiSwapChainBuffers[0]);
 		fb = m_NvrhiDevice->createFramebuffer(fbDesc);
 		//can set the requirements
 		auto layoutDesc = nvrhi::BindingLayoutDesc()
 			.setVisibility(nvrhi::ShaderType::All);
 		bindingLayout = m_NvrhiDevice->createBindingLayout(layoutDesc);
 
-		auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
-		auto hr = m_Device12->GetDeviceRemovedReason();
-		graphicsPipeline = m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);
-		auto vbDesc = nvrhi::BufferDesc()
-			.setByteSize(sizeof(vertices))
-			.setIsVertexBuffer(true)
-			.setInitialState(nvrhi::ResourceStates::VertexBuffer)
-			.setKeepInitialState(true)
-			.setDebugName("vb");
-		vb = m_NvrhiDevice->createBuffer(vbDesc);
-		cmdList = m_NvrhiDevice->createCommandList();
-		//create binding set to map resources, but i have none sooooo
-		cmdList->open();
-		cmdList->writeBuffer(vb, vertices, sizeof(vertices));
-		cmdList->close();
-		m_NvrhiDevice->executeCommandList(cmdList);
+		auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
+			.setVertexShader(vs)
+			.setPixelShader(ps);
+		//why does disabling depth crash
+		pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
+		pipelineDesc.renderState.depthStencilState.stencilEnable = false;
+		pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+
+		m_GraphicsPipeline = m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);
 	}
 }
