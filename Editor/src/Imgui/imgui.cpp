@@ -27,8 +27,4 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-// Specify to imgui to build with glad
-#define IMGUI_IMPL_OPENGL_LOADER_GLAD
 
-#include "backends/imgui_impl_opengl3.cpp"
-#include "backends/imgui_impl_glfw.cpp"

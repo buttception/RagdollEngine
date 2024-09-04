@@ -1,7 +1,6 @@
 IncludesDir = {}
 IncludesDir["spdlog"] = "%{wks.location}/Ragdoll/dependencies/spdlog/include"
 IncludesDir["glfw"] = "%{wks.location}/Ragdoll/dependencies/glfw/include"
-IncludesDir["glm"] = "%{wks.location}/Ragdoll/dependencies/glm"
 IncludesDir["entt"] = "%{wks.location}/Ragdoll/dependencies/entt/single_include"
 IncludesDir["nvrhi"] = "%{wks.location}/Ragdoll/src/nvrhi"
 

@@ -38,6 +38,7 @@ project "Ragdoll"
 	links
 	{
 		"GLFW",
+		"imgui",
 		"d3d12",
 		"dxgi",
 		"d3dcompiler",
@@ -49,6 +50,7 @@ project "Ragdoll"
 		"%{IncludesDir.spdlog}",
 		"%{IncludesDir.glfw}",
 		"%{IncludesDir.glm}",
+		"%{IncludesDir.imgui}",
 		"%{IncludesDir.entt}",
 		"%{IncludesDir.nvrhi}",
     }

@@ -28,7 +28,6 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
-#include "glm/gtc/quaternion.hpp"
 #include "Ragdoll/Math/RagdollMath.h"
 #include "Ragdoll/Entity/Component.h"
 #include "Ragdoll/Core/Guid.h"
@@ -37,12 +36,12 @@ namespace ragdoll
 {
 	struct Transform : Component
 	{
-		glm::vec3 m_LocalPosition{};
-		glm::vec3 m_LocalScale{ 1.f,1.f,1.f };
-		glm::quat m_LocalRotation{ 1.f, 0.f,0.f,0.f };
+		SimpleMath::Vector3 m_LocalPosition{};
+		SimpleMath::Vector3 m_LocalScale{ 1.f,1.f,1.f };
+		SimpleMath::Quaternion m_LocalRotation{ 1.f, 0.f,0.f,0.f };
 
 		//cached as shaders need this always
-		glm::mat4 m_ModelToWorld;
+		SimpleMath::Matrix m_ModelToWorld;
 
 		//let child right sibling system
 		Guid m_Parent{};

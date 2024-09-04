@@ -33,6 +33,7 @@ ________________________________________________________________________________
 #include "InputHandler.h"
 
 #include "Ragdoll/Core/Logger.h"
+#include <imgui.h>
 
 namespace ragdoll
 {
@@ -431,6 +432,129 @@ namespace ragdoll
 		{ MouseButton::SideFront, "SideFront" },
 		{ MouseButton::MaxButton, "MaxButton" }
 	};
+	const std::unordered_map<Key, int> InputHandler::s_KeyToImGuiKeyMap = {
+	{ Key::Space, ImGuiKey_Space },
+	{ Key::Apostrophe, ImGuiKey_Apostrophe },
+	{ Key::Comma, ImGuiKey_Comma },
+	{ Key::Minus, ImGuiKey_Minus },
+	{ Key::Period, ImGuiKey_Period },
+	{ Key::Slash, ImGuiKey_Slash },
+	{ Key::Num0, ImGuiKey_0 },
+	{ Key::Num1, ImGuiKey_1 },
+	{ Key::Num2, ImGuiKey_2 },
+	{ Key::Num3, ImGuiKey_3 },
+	{ Key::Num4, ImGuiKey_4 },
+	{ Key::Num5, ImGuiKey_5 },
+	{ Key::Num6, ImGuiKey_6 },
+	{ Key::Num7, ImGuiKey_7 },
+	{ Key::Num8, ImGuiKey_8 },
+	{ Key::Num9, ImGuiKey_9 },
+	{ Key::Semicolon, ImGuiKey_Semicolon },
+	{ Key::Equal, ImGuiKey_Equal },
+	{ Key::A, ImGuiKey_A },
+	{ Key::B, ImGuiKey_B },
+	{ Key::C, ImGuiKey_C },
+	{ Key::D, ImGuiKey_D },
+	{ Key::E, ImGuiKey_E },
+	{ Key::F, ImGuiKey_F },
+	{ Key::G, ImGuiKey_G },
+	{ Key::H, ImGuiKey_H },
+	{ Key::I, ImGuiKey_I },
+	{ Key::J, ImGuiKey_J },
+	{ Key::K, ImGuiKey_K },
+	{ Key::L, ImGuiKey_L },
+	{ Key::M, ImGuiKey_M },
+	{ Key::N, ImGuiKey_N },
+	{ Key::O, ImGuiKey_O },
+	{ Key::P, ImGuiKey_P },
+	{ Key::Q, ImGuiKey_Q },
+	{ Key::R, ImGuiKey_R },
+	{ Key::S, ImGuiKey_S },
+	{ Key::T, ImGuiKey_T },
+	{ Key::U, ImGuiKey_U },
+	{ Key::V, ImGuiKey_V },
+	{ Key::W, ImGuiKey_W },
+	{ Key::X, ImGuiKey_X },
+	{ Key::Y, ImGuiKey_Y },
+	{ Key::Z, ImGuiKey_Z },
+	{ Key::LeftBracket, ImGuiKey_LeftBracket },
+	{ Key::Backslash, ImGuiKey_Backslash },
+	{ Key::RightBracket, ImGuiKey_RightBracket },
+	{ Key::GraveAccent, ImGuiKey_GraveAccent },
+	{ Key::Escape, ImGuiKey_Escape },
+	{ Key::Enter, ImGuiKey_Enter },
+	{ Key::Tab, ImGuiKey_Tab },
+	{ Key::Backspace, ImGuiKey_Backspace },
+	{ Key::Insert, ImGuiKey_Insert },
+	{ Key::Delete, ImGuiKey_Delete },
+	{ Key::ArrowRight, ImGuiKey_RightArrow },
+	{ Key::ArrowLeft, ImGuiKey_LeftArrow },
+	{ Key::ArrowDown, ImGuiKey_DownArrow },
+	{ Key::ArrowUp, ImGuiKey_UpArrow },
+	{ Key::PageUp, ImGuiKey_PageUp },
+	{ Key::PageDown, ImGuiKey_PageDown },
+	{ Key::Home, ImGuiKey_Home },
+	{ Key::End, ImGuiKey_End },
+	{ Key::CapsLock, ImGuiKey_CapsLock },
+	{ Key::ScrollLock, ImGuiKey_ScrollLock },
+	{ Key::NumLock, ImGuiKey_NumLock },
+	{ Key::PrintScreen, ImGuiKey_PrintScreen },
+	{ Key::Pause, ImGuiKey_Pause },
+	{ Key::F1, ImGuiKey_F1 },
+	{ Key::F2, ImGuiKey_F2 },
+	{ Key::F3, ImGuiKey_F3 },
+	{ Key::F4, ImGuiKey_F4 },
+	{ Key::F5, ImGuiKey_F5 },
+	{ Key::F6, ImGuiKey_F6 },
+	{ Key::F7, ImGuiKey_F7 },
+	{ Key::F8, ImGuiKey_F8 },
+	{ Key::F9, ImGuiKey_F9 },
+	{ Key::F10, ImGuiKey_F10 },
+	{ Key::F11, ImGuiKey_F11 },
+	{ Key::F12, ImGuiKey_F12 },
+	{ Key::F13, ImGuiKey_F13 },
+	{ Key::F14, ImGuiKey_F14 },
+	{ Key::F15, ImGuiKey_F15 },
+	{ Key::F16, ImGuiKey_F16 },
+	{ Key::F17, ImGuiKey_F17 },
+	{ Key::F18, ImGuiKey_F18 },
+	{ Key::F19, ImGuiKey_F19 },
+	{ Key::F20, ImGuiKey_F20 },
+	{ Key::F21, ImGuiKey_F21 },
+	{ Key::F22, ImGuiKey_F22 },
+	{ Key::F23, ImGuiKey_F23 },
+	{ Key::F24, ImGuiKey_F24 },
+	{ Key::LeftShift, ImGuiKey_LeftShift },
+	{ Key::LeftControl, ImGuiKey_LeftCtrl },
+	{ Key::LeftAlt, ImGuiKey_LeftAlt },
+	{ Key::LeftSuper, ImGuiKey_LeftSuper },
+	{ Key::RightShift, ImGuiKey_RightShift },
+	{ Key::RightControl, ImGuiKey_RightCtrl },
+	{ Key::RightAlt, ImGuiKey_RightAlt },
+	{ Key::RightSuper, ImGuiKey_RightSuper },
+	{ Key::Menu, ImGuiKey_Menu },
+	{ Key::MaxKey, ImGuiKey_None } // Assuming no ImGuiKey for MaxKey
+	};
+
+	// Map for MouseButton enums to ImGui mouse button constants
+	const std::unordered_map<MouseButton, int> InputHandler::s_ButtonToImGuiMouseButtonMap = {
+		{ MouseButton::Null, ImGuiMouseButton_COUNT },
+		{ MouseButton::Unknown, ImGuiMouseButton_COUNT },
+		{ MouseButton::Button1, ImGuiMouseButton_Left },
+		{ MouseButton::Button2, ImGuiMouseButton_Right },
+		{ MouseButton::Button3, ImGuiMouseButton_Middle },
+		{ MouseButton::Button4, ImGuiMouseButton_COUNT },
+		{ MouseButton::Button5, ImGuiMouseButton_COUNT },
+		{ MouseButton::Button6, ImGuiMouseButton_COUNT },
+		{ MouseButton::Button7, ImGuiMouseButton_COUNT },
+		{ MouseButton::Button8, ImGuiMouseButton_COUNT },
+		{ MouseButton::Left, ImGuiMouseButton_Left },
+		{ MouseButton::Right, ImGuiMouseButton_Right },
+		{ MouseButton::Middle, ImGuiMouseButton_Middle },
+		{ MouseButton::SideBack, ImGuiMouseButton_COUNT },
+		{ MouseButton::SideFront, ImGuiMouseButton_COUNT },
+		{ MouseButton::MaxButton, ImGuiMouseButton_COUNT }
+	};
 
 	void InputHandler::Init()
 	{
@@ -460,6 +584,22 @@ namespace ragdoll
 				LogMouseEvents(static_cast<MouseButton>(i), mbtn);
 #endif
 			UpdateDataStatesAndTimers(static_cast<MouseButton>(i), _dt);
+		}
+
+		//reconcil with imgui io
+		auto& io = ImGui::GetIO();
+		io.MousePos = { m_MousePos.x, m_MousePos.y };
+		io.MouseWheel += m_ScrollDeltas.y;
+
+		for (const auto& key : s_KeyToImGuiKeyMap) {
+			if (key.second == ImGuiKey_COUNT)
+				continue;
+			io.KeysDown[(ImGuiKey)key.second] = m_Keys[(int)key.first].m_InputState.m_Hold;
+		}
+		for (const auto& key : s_ButtonToImGuiMouseButtonMap) {
+			if (key.second == ImGuiMouseButton_COUNT)
+				continue;
+			io.MouseDown[(ImGuiMouseButton_)key.second] = m_MouseButtons[(int)key.first].m_InputState.m_Hold;
 		}
 	}
 
@@ -507,12 +647,15 @@ namespace ragdoll
 	{
 		UNREFERENCED_PARAMETER(event);
 		//handle in the future in case character pressed is a unicode character, get the unicode value for text input
+		auto& io = ImGui::GetIO();
+
+		io.AddInputCharacter(event.GetKeyCode());
 	}
 
 	void InputHandler::OnMouseMove(MouseMovedEvent& event)
 	{
 		m_MousePos = { event.GetX(), event.GetY() };
-		m_MouseDeltas = m_MousePos - m_LastMousePos;
+		m_MouseDeltas = XMFLOAT2(m_MousePos.x - m_LastMousePos.x, m_MousePos.y - m_LastMousePos.y);
 		m_LastMousePos = m_MousePos;
 #if RD_LOG_INPUT
 		RD_CORE_TRACE("Mouse Pos: {}, Mouse Delta: {}", m_MousePos, m_MouseDeltas);

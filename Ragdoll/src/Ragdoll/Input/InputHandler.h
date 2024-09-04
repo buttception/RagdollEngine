@@ -104,9 +104,9 @@ namespace ragdoll
 		bool IsMouseButtonMultiTap(MouseButton _button) const { return m_MouseButtons[static_cast<int32_t>(_button)].m_InputState.m_MultiTap; }
 		uint32_t GetMouseButtonTapCount(MouseButton _button) const { return m_MouseButtons[static_cast<int32_t>(_button)].m_TapCount; }
 
-		glm::ivec2 GetMousePosition() const { return m_MousePos; }
-		glm::ivec2 GetMouseDelta() const { return m_MouseDeltas; }
-		glm::ivec2 GetScrollDelta() const { return m_ScrollDeltas; }
+		SimpleMath::Vector2 GetMousePosition() const { return m_MousePos; }
+		SimpleMath::Vector2 GetMouseDelta() const { return m_MouseDeltas; }
+		SimpleMath::Vector2 GetScrollDelta() const { return m_ScrollDeltas; }
 		bool IsScrollThisFrame() const { return m_ScrollThisFrame; }
 
 	private:
@@ -119,6 +119,9 @@ namespace ragdoll
 		const static std::unordered_map<const char*, MouseButton> s_StrToButtonMap;
 		const static std::unordered_map<MouseButton, const char*> s_ButtonToStrMap;
 
+		const static std::unordered_map<Key, int> s_KeyToImGuiKeyMap;
+		const static std::unordered_map<MouseButton, int> s_ButtonToImGuiMouseButtonMap;
+
 		inline const static float s_LongPressTime = 0.5f;
 		inline const static float s_MultiTapTime = 0.2f;
 		inline const static float s_TapTime = 0.3f;
@@ -126,10 +129,10 @@ namespace ragdoll
 		InputData m_Keys[static_cast<int>(Key::MaxKey)];
 		InputData m_MouseButtons[static_cast<int>(MouseButton::MaxButton)];
 
-		glm::ivec2 m_MousePos{};
-		glm::ivec2 m_LastMousePos{};
-		glm::ivec2 m_MouseDeltas{};
-		glm::ivec2 m_ScrollDeltas{};
+		SimpleMath::Vector2 m_MousePos{};
+		SimpleMath::Vector2 m_LastMousePos{};
+		SimpleMath::Vector2 m_MouseDeltas{};
+		SimpleMath::Vector2 m_ScrollDeltas{};
 		bool m_ScrollThisFrame{};
 
 		//functions to update states based on the event
