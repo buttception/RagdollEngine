@@ -47,7 +47,7 @@ ________________________________________________________________________________
 #include "Resource/ResourceManager.h"
 #include "File/FileManager.h"
 
-#include "Ragdoll/ImguiInterface.cpp"
+#include "Ragdoll/ImguiInterface.h"
 
 DirectXTest g_DirectXTest;
 ImguiInterface g_ImguiInterface(g_DirectXTest);
@@ -126,6 +126,7 @@ namespace ragdoll
 	void Application::Shutdown()
 	{
 		g_DirectXTest.Shutdown();
+		g_DirectXTest.~DirectXTest();
 		m_FileManager->Shutdown();
 		m_PrimaryWindow->Shutdown();
 		GLFWContext::Shutdown();
