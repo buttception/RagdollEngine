@@ -38,7 +38,9 @@ project "Ragdoll"
 	links
 	{
 		"GLFW",
-		"Glad"
+		"d3d12",
+		"dxgi",
+		"d3dcompiler",
 	}
 
     includedirs
@@ -46,9 +48,9 @@ project "Ragdoll"
         "src",
 		"%{IncludesDir.spdlog}",
 		"%{IncludesDir.glfw}",
-		"%{IncludesDir.glad}",
 		"%{IncludesDir.glm}",
 		"%{IncludesDir.entt}",
+		"%{IncludesDir.nvrhi}",
     }
 
 	filter "system:windows"

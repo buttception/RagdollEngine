@@ -35,7 +35,6 @@ namespace ragdoll
 	class EntityManager;
 	class TransformLayer;
 	class RenderGraph;
-	class OpenGLContext;
 	class ResourceManager;
 	class WindowMoveEvent;
 	class WindowResizeEvent;
@@ -83,20 +82,32 @@ namespace ragdoll
 		bool OnMouseButtonReleased(MouseButtonReleasedEvent& event);
 		bool OnMouseScrolled(MouseScrolledEvent& event);
 
+		//spam
+		bool CreateDevice();
+		bool CreateSwapChain();
+		bool CreateRenderTargets();
+		void ResizeSwapChain();
+		void ReleaseRenderTargets();
+		bool BeginFrame();
+		void Present();
+		void CreateResource();
+
 	protected:
 		bool m_Running{ true };
 
 		GuidGenerator m_GuidGenerator{};
 		std::shared_ptr<Window> m_PrimaryWindow;
-		std::shared_ptr<OpenGLContext> m_Context;
 		std::shared_ptr<InputHandler> m_InputHandler;
 		std::shared_ptr<EntityManager> m_EntityManager;
 		std::shared_ptr<ResourceManager> m_ResourceManager;
 		std::shared_ptr<RenderGraph> m_RenderGraph;
 		std::shared_ptr<FileManager> m_FileManager;
-
 		std::shared_ptr<LayerStack> m_LayerStack;
 		std::shared_ptr<TransformLayer> m_TransformLayer;
+
+		double m_Framerate = 10.0;
+		double m_TargetFrametime = 1.0 / m_Framerate;
+		double m_Frametime = 0.0;
 	};
 
 	/**

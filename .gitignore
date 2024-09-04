@@ -2,7 +2,9 @@
 .vs/
 build/
 build-int/
-dependencies/
+!dependencies/
+dependencies/*
+!dependencies/nvrhi/
 Editor/intermediates/
 Editor/compilers/
 Launcher/intermediates/

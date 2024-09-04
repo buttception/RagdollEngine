@@ -42,22 +42,6 @@ namespace ragdoll
 
 	void AssetManager::LoadDatabase()
 	{
-		//load all shaders first
-		Guid id{ GuidGenerator::Generate() };
-		m_FileManager->ImmediateLoad({id, "vertexshader.vert", [](Guid id, const uint8_t* data, uint32_t size)
-		{
-				//remember to null terminate the string since it is loaded in binary
-				RD_CORE_TRACE("size:{} -> {}", size, std::string(reinterpret_cast<const char*>(data), size));
-		}});
-		m_FileManager->ImmediateLoad({ id, "fragmentshader.frag", [](Guid id, const uint8_t* data, uint32_t size)
-		{
-				//remember to null terminate the string since it is loaded in binary
-				RD_CORE_TRACE("size:{} -> {}", size, std::string(reinterpret_cast<const char*>(data), size));
-		}});
-		m_FileManager->ImmediateLoad({ id, "testprogram.shdrprgm", [](Guid id, const uint8_t* data, uint32_t size)
-		{
-				//remember to null terminate the string since it is loaded in binary
-				RD_CORE_TRACE("size:{} -> {}", size, std::string(reinterpret_cast<const char*>(data), size));
-		}});
+
 	}
 }

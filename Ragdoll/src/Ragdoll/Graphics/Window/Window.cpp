@@ -32,7 +32,6 @@ ________________________________________________________________________________
 
 #include "Window.h"
 
-#include "glad/glad.h"
 #include "GLFW/glfw3.h"
 
 #include "Ragdoll/Core/Timestep.h"
@@ -43,6 +42,20 @@ ________________________________________________________________________________
 
 namespace ragdoll
 {
+	void Window::IncFpsCounter()
+	{
+		if (m_Properties.m_DisplayDetailsInTitle)
+		{
+			std::string title = m_Properties.m_Title + " | ";
+			if (m_Properties.m_DisplayFpsInTitle)
+				title += "FPS: " + std::to_string(m_Fps) + " | ";
+			if (m_Properties.m_DisplayFrameTimeInTitle)
+				title += "Frame Time: " + fmt::format("{:.2f}", m_Frametime * 1000.0) + "ms | ";
+			glfwSetWindowTitle(m_GlfwWindow, title.c_str());
+		}
+		m_FpsCounter++;
+		glfwPollEvents();
+	}
 	Window::Window()
 	{
 	}
@@ -70,7 +83,7 @@ namespace ragdoll
 		{
 			return false;
 		}
-		glfwMakeContextCurrent(m_GlfwWindow);
+		//glfwMakeContextCurrent(m_GlfwWindow);
 		glfwGetFramebufferSize(m_GlfwWindow, &m_BufferWidth, &m_BufferHeight);
 		glfwSetWindowUserPointer(m_GlfwWindow, this);
 
@@ -194,7 +207,7 @@ namespace ragdoll
 		return true;
 	}
 
-	void Window::StartRender()
+	void Window::Update()
 	{
 		auto now = std::chrono::steady_clock::now();
 		Timestep timestep{ std::chrono::duration_cast<std::chrono::nanoseconds>(now - m_LastFrameTime).count() / 1000000000.0 };
@@ -208,32 +221,12 @@ namespace ragdoll
 			m_Fps = m_FpsCounter;
 			m_FpsCounter = 0;
 		}
-
-		if(m_Properties.m_DisplayDetailsInTitle)
-		{
-			std::string title = m_Properties.m_Title + " | ";
-			if(m_Properties.m_DisplayFpsInTitle)
-				title += "FPS: " + std::to_string(m_Fps) + " | ";
-			if(m_Properties.m_DisplayFrameCountInTitle)
-				title += "Frame: " + std::to_string(m_Frame) + " | ";
-			if(m_Properties.m_DisplayFrameTimeInTitle)
-				title += "Frame Time: " + fmt::format("{:.2f}", timestep.GetMilliseconds()) + "ms | ";
-			glfwSetWindowTitle(m_GlfwWindow, title.c_str());
-		}
-
-		m_Frame++;
-		m_FpsCounter++;
-		glfwPollEvents();
-
-		//clear the back buffer
-		glClearColor(m_Properties.m_BackgroundColor.x, m_Properties.m_BackgroundColor.y, m_Properties.m_BackgroundColor.z, 1.f);
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
 
 	void Window::EndRender()
 	{
-		glfwSwapBuffers(m_GlfwWindow);
+		//update with d3d12 swap
+		//glfwSwapBuffers(m_GlfwWindow);
 	}
 
 	void Window::Close()

@@ -210,10 +210,11 @@ namespace ragdoll
 		m_FileIOMutex->lock();
 		m_FileIONextAccessMutex->unlock();
 		//main thread do not need to care about buffer status
-		if (request.m_Type == FileIORequest::Type::Read) 
+		if (request.m_Type == FileIORequest::Type::Read)
 		{
 			m_ImmediateBuffer.m_Request = request;
 			m_ImmediateBuffer.Load(m_Root);
+			request.m_ReadCallback(request.m_Guid, m_ImmediateBuffer.m_Data.data(), m_ImmediateBuffer.m_Data.size());
 		}
 		//unlock all mutex
 		m_FileIOMutex->unlock();
