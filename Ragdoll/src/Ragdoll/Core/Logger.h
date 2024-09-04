@@ -88,14 +88,4 @@ inline std::ostream& operator<<(std::ostream& os, const type& var){\
 }\
 template <> struct fmt::formatter<type> : ostream_formatter {}
 
-RD_LOG_OVERLOAD_USERTYPE(glm::ivec2, vec, "(" << vec.x << "," << vec.y << ")");
-RD_LOG_OVERLOAD_USERTYPE(glm::ivec3, vec, "(" << vec.x << "," << vec.y << ", " << vec.z <<  ")");
-RD_LOG_OVERLOAD_USERTYPE(glm::ivec4, vec, "(" << vec.x << "," << vec.y << ", " << vec.z << ", " << vec.w << ")");
-RD_LOG_OVERLOAD_USERTYPE(glm::dvec2, vec, "(" << vec.x << "," << vec.y << ")");
-RD_LOG_OVERLOAD_USERTYPE(glm::dvec3, vec, "(" << vec.x << "," << vec.y << ", " << vec.z << ")");
-RD_LOG_OVERLOAD_USERTYPE(glm::dvec4, vec, "(" << vec.x << "," << vec.y << ", " << vec.z << ", " << vec.w << ")");
-RD_LOG_OVERLOAD_USERTYPE(glm::vec2, vec, "(" << vec.x << "," << vec.y << ")");
-RD_LOG_OVERLOAD_USERTYPE(glm::vec3, vec, "(" << vec.x << "," << vec.y << ", " << vec.z << ")");
-RD_LOG_OVERLOAD_USERTYPE(glm::vec4, vec, "(" << vec.x << "," << vec.y << ", " << vec.z << ", " << vec.w << ")");
-
 RD_LOG_OVERLOAD_USERTYPE(ragdoll::Guid, id, id.m_RawId);

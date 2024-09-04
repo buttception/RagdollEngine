@@ -34,7 +34,6 @@ ________________________________________________________________________________
 #include "ragdollpch.h"
 #include "Ragdoll.h"
 #include "Asset/AssetManager.h"
-//#include "Imgui/GuiLayer.h"
 #include "Ragdoll/Layer/LayerStack.h"
 
 namespace ragdoll

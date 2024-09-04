@@ -50,7 +50,7 @@ namespace ragdoll
 	private:
 		std::shared_ptr<EntityManager> m_EntityManager;
 
-		std::stack<glm::mat4> m_ModelStack;
+		std::stack<SimpleMath::Matrix> m_ModelStack;
 
 		//the root details
 		Guid m_RootEntity;
@@ -62,6 +62,6 @@ namespace ragdoll
 		void TraverseTreeAndUpdateTransforms();
 		void TraverseNode(const Guid& guid);
 
-		glm::mat4 GetLocalModelMatrix(const Transform& trans);
+		SimpleMath::Matrix GetLocalModelMatrix(const Transform& trans);
 	};
 }

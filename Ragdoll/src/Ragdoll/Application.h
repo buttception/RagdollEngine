@@ -82,16 +82,6 @@ namespace ragdoll
 		bool OnMouseButtonReleased(MouseButtonReleasedEvent& event);
 		bool OnMouseScrolled(MouseScrolledEvent& event);
 
-		//spam
-		bool CreateDevice();
-		bool CreateSwapChain();
-		bool CreateRenderTargets();
-		void ResizeSwapChain();
-		void ReleaseRenderTargets();
-		bool BeginFrame();
-		void Present();
-		void CreateResource();
-
 	protected:
 		bool m_Running{ true };
 
@@ -105,7 +95,7 @@ namespace ragdoll
 		std::shared_ptr<LayerStack> m_LayerStack;
 		std::shared_ptr<TransformLayer> m_TransformLayer;
 
-		double m_Framerate = 10.0;
+		double m_Framerate = 60.0;
 		double m_TargetFrametime = 1.0 / m_Framerate;
 		double m_Frametime = 0.0;
 	};
