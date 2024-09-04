@@ -16,6 +16,7 @@ using nvrhi::RefCountPtr;
 #include "Ragdoll/Graphics/GLFWContext.h"
 #include "Ragdoll/Graphics/Window/Window.h"
 #include "Ragdoll/File/FileManager.h"
+#include <imgui.h>
 
 struct InstanceParameters
 {
@@ -129,6 +130,7 @@ public:
 
 	nvrhi::ShaderHandle ImguiVertexShader;
 	nvrhi::ShaderHandle ImguiPixelShader;
+	nvrhi::BindingLayoutHandle bindingLayout;
 
 	void Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr <ragdoll::FileManager> fm);
 	void Draw();
@@ -528,8 +530,19 @@ void DirectXTest::Draw()
 	auto& tex = m_RhiSwapChainBuffers[m_SwapChain->GetCurrentBackBufferIndex()];
 
 	auto bgCol = m_PrimaryWindow->GetBackgroundColor();
-	nvrhi::Color col = nvrhi::Color( bgCol.x, bgCol.y, bgCol.z, bgCol.w );
+	nvrhi::Color col = nvrhi::Color(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
 	m_CommandList->clearTextureFloat(tex, subSet, col);
+	struct Data {
+		SimpleMath::Vector2 translationOffset = { 0.f, 0.f };
+		SimpleMath::Vector2 scale = { 1.f, 1.f };
+		float radians = 0.f;
+	};
+	static Data data;
+	ImGui::Begin("Triangle Manipulate");
+	ImGui::DragFloat2("Translation", &data.translationOffset.x, 0.01f);
+	ImGui::DragFloat2("Scale", &data.scale.x, 0.01f);
+	ImGui::DragFloat("Rotate", &data.radians, 0.03f);
+	ImGui::End();
 	//draw the triangle
 	auto fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(tex);
@@ -538,7 +551,17 @@ void DirectXTest::Draw()
 	state.pipeline = m_GraphicsPipeline;
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
+
+	auto layoutDesc = nvrhi::BindingSetDesc();
+	layoutDesc.bindings = {
+		nvrhi::BindingSetItem::PushConstants(0, sizeof(Data)),
+	};
+	auto binding = m_NvrhiDevice->createBindingSet(layoutDesc, bindingLayout);
+	state.bindings = { binding };
+	assert(state.bindings[0]);
+
 	m_CommandList->setGraphicsState(state);
+	m_CommandList->setPushConstants(&data, sizeof(Data));
 	nvrhi::DrawArguments args;
 	args.vertexCount = 3;
 	m_CommandList->draw(args);
@@ -571,7 +594,6 @@ void DirectXTest::CreateResource()
 	nvrhi::ShaderHandle ps;
 	nvrhi::InputLayoutHandle inputLayout;
 	nvrhi::FramebufferHandle fb;
-	nvrhi::BindingLayoutHandle bindingLayout;
 
 	nvrhi::BufferHandle vb;
 	nvrhi::CommandListHandle cmdList;
@@ -605,13 +627,18 @@ void DirectXTest::CreateResource()
 		.addColorAttachment(m_RhiSwapChainBuffers[0]);
 	fb = m_NvrhiDevice->createFramebuffer(fbDesc);
 	//can set the requirements
-	auto layoutDesc = nvrhi::BindingLayoutDesc()
-		.setVisibility(nvrhi::ShaderType::All);
+	auto layoutDesc = nvrhi::BindingLayoutDesc();
+	layoutDesc.visibility = nvrhi::ShaderType::All;
+	layoutDesc.bindings = {
+		//bind slot 0 with 2 floats
+		nvrhi::BindingLayoutItem::PushConstants(0, sizeof(float) * 5),
+	};
 	bindingLayout = m_NvrhiDevice->createBindingLayout(layoutDesc);
 
-	auto pipelineDesc = nvrhi::GraphicsPipelineDesc()
-		.setVertexShader(vs)
-		.setPixelShader(ps);
+	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
+	pipelineDesc.addBindingLayout(bindingLayout);
+	pipelineDesc.setVertexShader(vs);
+	pipelineDesc.setFragmentShader(ps);
 	//why does disabling depth crash
 	pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
 	pipelineDesc.renderState.depthStencilState.stencilEnable = false;

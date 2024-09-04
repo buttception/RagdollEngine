@@ -107,9 +107,9 @@ namespace ragdoll
 			{
 				layer->Update(static_cast<float>(m_TargetFrametime));
 			}
+			g_ImguiInterface.BeginFrame();
 			g_DirectXTest.Draw();
 
-			g_ImguiInterface.BeginFrame();
 			static bool bShowDemo = true;
 			if (bShowDemo) {
 				ImGui::ShowDemoWindow(&bShowDemo);

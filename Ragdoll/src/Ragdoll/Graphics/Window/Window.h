@@ -43,8 +43,8 @@ namespace ragdoll
 		struct WindowProperties
 		{
 			std::string m_Title{ "ragdoll Engine" };
-			int32_t m_Width{ 800 };
-			int32_t m_Height{ 600 };
+			int32_t m_Width{ 1600 };
+			int32_t m_Height{ 900 };
 			SimpleMath::Vector2 m_Position{};
 			int32_t m_NumSamplesMSAA{ 0 };
 			SimpleMath::Color m_BackgroundColor{};
