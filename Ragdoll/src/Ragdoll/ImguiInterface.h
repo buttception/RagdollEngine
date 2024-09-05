@@ -11,28 +11,26 @@ public:
 	nvrhi::BindingLayoutHandle BindingLayout;
 	nvrhi::GraphicsPipelineDesc BasePSODesc;
 
-	nvrhi::GraphicsPipelineHandle pso;
-	std::unordered_map<nvrhi::ITexture*, nvrhi::BindingSetHandle> bindingsCache;
+	nvrhi::GraphicsPipelineHandle PSO;
+	std::unordered_map<nvrhi::ITexture*, nvrhi::BindingSetHandle> BindingsCache;
 
-	nvrhi::BufferHandle vertexBuffer;
-	nvrhi::BufferHandle indexBuffer;
-	std::vector<ImDrawVert> vtxBuffer;
-	std::vector<ImDrawIdx> idxBuffer;
+	nvrhi::BufferHandle VertexBufferHandle;
+	nvrhi::BufferHandle IndexBufferHandle;
+	std::vector<ImDrawVert> VertexBufferRaw;
+	std::vector<ImDrawIdx> IndexBufferRaw;
 
-	ImguiInterface(DirectXTest& directXTest) : m_DirectXTest(directXTest) {}
-
-	void Init();
+	void Init(DirectXTest* dx);
 	void BeginFrame();
 	void Render();
 	void BackbufferResizing();
 	void Shutdown();
 private:
-	DirectXTest& m_DirectXTest;
+	DirectXTest* m_DirectXTest;
 
-	bool reallocateBuffer(nvrhi::BufferHandle& buffer, size_t requiredSize, size_t reallocateSize, bool isIndexBuffer);
-	nvrhi::IGraphicsPipeline* getPSO(nvrhi::IFramebuffer* fb);
-	nvrhi::IBindingSet* getBindingSet(nvrhi::ITexture* texture);
-	bool updateGeometry(nvrhi::ICommandList* commandList);
+	bool ReallocateBuffer(nvrhi::BufferHandle& buffer, size_t requiredSize, size_t reallocateSize, bool isIndexBuffer);
+	nvrhi::IGraphicsPipeline* GetPSO(nvrhi::IFramebuffer* fb);
+	nvrhi::IBindingSet* GetBindingSet(nvrhi::ITexture* texture);
+	bool UpdateGeometry(nvrhi::ICommandList* commandList);
 
 	void CreateFontTexture();
 };

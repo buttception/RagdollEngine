@@ -36,12 +36,12 @@ namespace ragdoll
 {
 	struct Transform : Component
 	{
-		SimpleMath::Vector3 m_LocalPosition{};
-		SimpleMath::Vector3 m_LocalScale{ 1.f,1.f,1.f };
-		SimpleMath::Quaternion m_LocalRotation{ 1.f, 0.f,0.f,0.f };
+		Vector3 m_LocalPosition{};
+		Vector3 m_LocalScale{ 1.f,1.f,1.f };
+		Quaternion m_LocalRotation{ 1.f, 0.f,0.f,0.f };
 
 		//cached as shaders need this always
-		SimpleMath::Matrix m_ModelToWorld;
+		Matrix m_ModelToWorld;
 
 		//let child right sibling system
 		Guid m_Parent{};

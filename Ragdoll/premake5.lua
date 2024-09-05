@@ -41,7 +41,6 @@ project "Ragdoll"
 		"imgui",
 		"d3d12",
 		"dxgi",
-		"d3dcompiler",
 	}
 
     includedirs

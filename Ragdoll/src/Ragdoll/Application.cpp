@@ -47,11 +47,6 @@ ________________________________________________________________________________
 #include "Resource/ResourceManager.h"
 #include "File/FileManager.h"
 
-#include "Ragdoll/ImguiInterface.h"
-
-DirectXTest g_DirectXTest;
-ImguiInterface g_ImguiInterface(g_DirectXTest);
-
 namespace ragdoll
 {
 	void Application::Init(const ApplicationConfig& config)
@@ -84,8 +79,8 @@ namespace ragdoll
 		m_TransformLayer = std::make_shared<TransformLayer>(m_EntityManager);
 		m_LayerStack->PushLayer(m_TransformLayer);
 
-		g_DirectXTest.Init(m_PrimaryWindow, m_FileManager);
-		g_ImguiInterface.Init();
+		m_DirectXTest.Init(m_PrimaryWindow, m_FileManager, m_InputHandler);
+		m_ImguiInterface.Init(&m_DirectXTest);
 
 		//init all layers
 		m_LayerStack->Init();
@@ -95,8 +90,7 @@ namespace ragdoll
 	{
 		while (m_Running)
 		{
-			//input update must be called before window polls for inputs
-			m_InputHandler->Update(m_PrimaryWindow->GetDeltaTime());
+			//m_InputHandler->Update(m_PrimaryWindow->GetDeltaTime());
 			m_FileManager->Update();
 			while (m_Frametime < m_TargetFrametime) {
 				m_PrimaryWindow->Update();
@@ -107,16 +101,12 @@ namespace ragdoll
 			{
 				layer->Update(static_cast<float>(m_TargetFrametime));
 			}
-			g_ImguiInterface.BeginFrame();
-			g_DirectXTest.Draw();
+			m_ImguiInterface.BeginFrame();
+			m_DirectXTest.Draw();
 
-			static bool bShowDemo = true;
-			if (bShowDemo) {
-				ImGui::ShowDemoWindow(&bShowDemo);
-			}
-			g_ImguiInterface.Render();
+			m_ImguiInterface.Render();
+			m_DirectXTest.Present();
 
-			g_DirectXTest.Present();
 			m_PrimaryWindow->SetFrametime(m_TargetFrametime);
 			m_PrimaryWindow->IncFpsCounter();
 			m_Frametime -= m_TargetFrametime;
@@ -125,8 +115,8 @@ namespace ragdoll
 
 	void Application::Shutdown()
 	{
-		g_DirectXTest.Shutdown();
-		g_DirectXTest.~DirectXTest();
+		m_DirectXTest.Shutdown();
+		m_DirectXTest.~DirectXTest();
 		m_FileManager->Shutdown();
 		m_PrimaryWindow->Shutdown();
 		GLFWContext::Shutdown();

@@ -20,13 +20,15 @@ project "Launcher"
 
 	links
 	{
-		"Ragdoll"
+		"Ragdoll",
 	}
 
     includedirs
     {
         "%{wks.location}/Ragdoll/src",
-		"%{IncludesDir.glm}",
+        "%{IncludesDir.nvrhi}",
+        "%{IncludesDir.imgui}",
+        "%{IncludesDir.glfw}",
 		"%{IncludesDir.spdlog}",
 		"%{IncludesDir.entt}",
     }

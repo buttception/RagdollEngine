@@ -1,5 +1,17 @@
 #include "ragdollpch.h"
 #include "DirectXTest.h"
+#include <nvrhi/utils.h>
+
+//========================temp=======================
+struct Vertex
+{
+	Vector3 position;
+	Vector3 color;
+};
+struct CBuffer {
+	Matrix world;
+	Matrix viewProj;
+};
 
 DefaultMessageCallback DefaultMessageCallback::s_Instance;
 static bool MoveWindowOntoAdapter(IDXGIAdapter* targetAdapter, RECT& rect)
@@ -53,10 +65,11 @@ static bool IsNvDeviceID(UINT id)
 	return id == 0x10DE;
 }
 
-void DirectXTest::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm)
+void DirectXTest::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::InputHandler> hdl)
 {
 	m_PrimaryWindow = win;
 	m_FileManager = fm;
+	m_InputHandler = hdl;
 	CreateDevice();
 	CreateSwapChain();
 	CreateResource();
@@ -284,7 +297,7 @@ bool DirectXTest::CreateRenderTargets()
 		const HRESULT hr = m_SwapChain->GetBuffer(n, IID_PPV_ARGS(&m_SwapChainBuffers[n]));
 		HR_RETURN(hr)
 
-			nvrhi::TextureDesc textureDesc;
+		nvrhi::TextureDesc textureDesc;
 		textureDesc.width = m_DeviceParams.backBufferWidth;
 		textureDesc.height = m_DeviceParams.backBufferHeight;
 		textureDesc.sampleCount = m_DeviceParams.swapChainSampleCount;
@@ -388,39 +401,89 @@ void DirectXTest::Draw()
 	auto bgCol = m_PrimaryWindow->GetBackgroundColor();
 	nvrhi::Color col = nvrhi::Color(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
 	m_CommandList->clearTextureFloat(tex, subSet, col);
+	m_CommandList->clearDepthStencilTexture(DepthBuffer, subSet, true, 1.f, false, 0);
+
+	//manipulate the cube and camera
 	struct Data {
-		SimpleMath::Vector2 translationOffset = { 0.f, 0.f };
-		SimpleMath::Vector2 scale = { 1.f, 1.f };
-		float radians = 0.f;
+		Vector3 cubePosition = { 0.f, 0.f, 0.f };
+		Vector3 cubeScale = { 1.f, 1.f, 1.f };
+		Vector3 cubeEulers = { 0.f, 0.f, 0.f };
+		Vector3 cameraPos = { 0.f, 0.f, -5.f };
+		Vector2 cameraEulers = { 0.f, 0.f };
+		float cameraFov = 60.f;
+		float cameraNear = 0.01f;
+		float cameraFar = 100.f;
+		float cameraAspect = 16.f / 9.f;
+		float cameraSpeed = 1.f;
+		float cameraRotationSpeed = 5.f;
 	};
 	static Data data;
 	ImGui::Begin("Triangle Manipulate");
-	ImGui::DragFloat2("Translation", &data.translationOffset.x, 0.01f);
-	ImGui::DragFloat2("Scale", &data.scale.x, 0.01f);
-	ImGui::DragFloat("Rotate", &data.radians, 0.01f);
+	ImGui::DragFloat3("Translation", &data.cubePosition.x, 0.01f);
+	ImGui::DragFloat3("Scale", &data.cubeScale.x, 0.01f);
+	ImGui::DragFloat3("Rotate (Radians)", &data.cubeEulers.x, 0.01f);
+	ImGui::DragFloat("Camera FOV (Degrees)", &data.cameraFov, 1.f, 60.f, 120.f);
+	ImGui::DragFloat("Camera Near", &data.cameraNear, 0.01f, 0.01f, 1.f);
+	ImGui::DragFloat("Camera Far", &data.cameraFar, 10.f, 10.f, 10000.f);
+	ImGui::DragFloat("Camera Aspect Ratio", &data.cameraAspect, 0.01f, 0.01f, 5.f);
+	ImGui::DragFloat("Camera Speed", &data.cameraSpeed, 0.01f, 0.01f, 5.f);
+	ImGui::DragFloat("Camera Rotation Speed (Degrees)", &data.cameraRotationSpeed, 1.f, 10.f, 100.f);
 	ImGui::End();
+
+	CBuffer cbuf;
+	cbuf.world = Matrix::CreateTranslation(data.cubePosition);
+	cbuf.world *= Matrix::CreateScale(data.cubeScale);
+	cbuf.world *= Matrix::CreateFromYawPitchRoll(data.cubeEulers.x, data.cubeEulers.y, data.cubeEulers.z);
+	Matrix proj = Matrix::CreatePerspectiveFieldOfView(DirectX::XMConvertToRadians(data.cameraFov), data.cameraAspect, data.cameraNear, data.cameraFar);
+	Vector3 cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraEulers.x, data.cameraEulers.y, 0.f));
+	Matrix view = Matrix::CreateLookAt(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
+	cbuf.viewProj = view * proj;
+	
+	//hardcoded handling of movement now
+	if (!ImGui::IsAnyItemFocused() && !ImGui::IsAnyItemActive()) {
+		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_W))
+			data.cameraPos += cameraDir * data.cameraSpeed * m_PrimaryWindow->GetFrameTime();
+		else if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_S))
+			data.cameraPos -= cameraDir * data.cameraSpeed * m_PrimaryWindow->GetFrameTime();
+		Vector3 cameraRight = -cameraDir.Cross(Vector3(0.f, 1.f, 0.f));
+		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_A))
+			data.cameraPos += cameraRight * data.cameraSpeed * m_PrimaryWindow->GetFrameTime();
+		else if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_D))
+			data.cameraPos -= cameraRight * data.cameraSpeed * m_PrimaryWindow->GetFrameTime();
+		if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
+		{
+			auto& io = ImGui::GetIO();
+			data.cameraEulers.x -= io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * m_PrimaryWindow->GetFrameTime();
+			data.cameraEulers.y += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * m_PrimaryWindow->GetFrameTime();
+		}
+	}
+
 	//draw the triangle
 	auto fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(tex);
+		.addColorAttachment(tex)
+		.setDepthAttachment(DepthBuffer);
 	nvrhi::FramebufferHandle pipelineFb = m_NvrhiDevice->createFramebuffer(fbDesc);
 	nvrhi::GraphicsState state;
 	state.pipeline = m_GraphicsPipeline;
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
+	state.indexBuffer = { IndexBuffer, nvrhi::Format::R32_UINT, 0 };
+	state.vertexBuffers = { {VertexBuffer, 0, offsetof(Vertex, position)},
+	{VertexBuffer, 1, offsetof(Vertex, color)} };
 
 	auto layoutDesc = nvrhi::BindingSetDesc();
 	layoutDesc.bindings = {
-		nvrhi::BindingSetItem::PushConstants(0, sizeof(Data)),
+		nvrhi::BindingSetItem::PushConstants(0, sizeof(CBuffer)),
 	};
-	auto binding = m_NvrhiDevice->createBindingSet(layoutDesc, bindingLayout);
+	auto binding = m_NvrhiDevice->createBindingSet(layoutDesc, BindingLayout);
 	state.bindings = { binding };
 	assert(state.bindings[0]);
 
 	m_CommandList->setGraphicsState(state);
-	m_CommandList->setPushConstants(&data, sizeof(Data));
+	m_CommandList->setPushConstants(&cbuf, sizeof(CBuffer));
 	nvrhi::DrawArguments args;
-	args.vertexCount = 3;
-	m_CommandList->draw(args);
+	args.vertexCount = 36;
+	m_CommandList->drawIndexed(args);
 	m_CommandList->close();
 	m_NvrhiDevice->executeCommandList(m_CommandList);
 }
@@ -451,8 +514,6 @@ void DirectXTest::CreateResource()
 	nvrhi::InputLayoutHandle inputLayout;
 	nvrhi::FramebufferHandle fb;
 
-	nvrhi::BufferHandle vb;
-	nvrhi::CommandListHandle cmdList;
 	//load outputted shaders objects
 	m_FileManager->ImmediateLoad(ragdoll::FileIORequest(ragdoll::GuidGenerator::Generate(), "test.vs.cso", [&](ragdoll::Guid id, const uint8_t* data, uint32_t size) {
 		vs = m_NvrhiDevice->createShader(
@@ -479,26 +540,156 @@ void DirectXTest::CreateResource()
 		}
 	));
 	//create a depth buffer
+	nvrhi::TextureDesc depthBufferDesc;
+	depthBufferDesc.width = m_PrimaryWindow->GetBufferWidth();
+	depthBufferDesc.height = m_PrimaryWindow->GetBufferHeight();
+	depthBufferDesc.initialState = nvrhi::ResourceStates::DepthWrite;
+	depthBufferDesc.isRenderTarget = true;
+	depthBufferDesc.sampleCount = 1;
+	depthBufferDesc.dimension = nvrhi::TextureDimension::Texture2D;
+	depthBufferDesc.keepInitialState = true;
+	depthBufferDesc.mipLevels = 1;
+	depthBufferDesc.format = nvrhi::Format::D32;
+	depthBufferDesc.isTypeless = true;
+	depthBufferDesc.debugName = "Depth";
+	DepthBuffer = m_NvrhiDevice->createTexture(depthBufferDesc);
+
+	//create the fb for the graphics pipeline to draw on
 	auto fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(m_RhiSwapChainBuffers[0]);
+		.addColorAttachment(m_RhiSwapChainBuffers[0])
+		.setDepthAttachment(DepthBuffer);
 	fb = m_NvrhiDevice->createFramebuffer(fbDesc);
+
 	//can set the requirements
 	auto layoutDesc = nvrhi::BindingLayoutDesc();
 	layoutDesc.visibility = nvrhi::ShaderType::All;
 	layoutDesc.bindings = {
 		//bind slot 0 with 2 floats
-		nvrhi::BindingLayoutItem::PushConstants(0, sizeof(float) * 5),
+		nvrhi::BindingLayoutItem::PushConstants(0, sizeof(CBuffer)),
 	};
-	bindingLayout = m_NvrhiDevice->createBindingLayout(layoutDesc);
+	BindingLayout = m_NvrhiDevice->createBindingLayout(layoutDesc);
+
+	//create a cube first
+	Vertex vertices[] = {
+		// Position         // Normal        // Color
+		// Front face
+		{ {-1.0f, -1.0f,  1.0f},  {0.0f,  0.0f,  1.0f}},  // Vertex 0
+		{ { 1.0f, -1.0f,  1.0f},  {0.0f,  0.0f,  1.0f}},  // Vertex 1
+		{ { 1.0f,  1.0f,  1.0f},  {0.0f,  0.0f,  1.0f}},  // Vertex 2
+		{ {-1.0f,  1.0f,  1.0f},  {0.0f,  0.0f,  1.0f}},  // Vertex 3
+
+		// Back face
+		{ {-1.0f, -1.0f, -1.0f},  {0.0f,  1.0f, 1.0f}},  // Vertex 4
+		{ { 1.0f, -1.0f, -1.0f},  {0.0f,  1.0f, 1.0f}},  // Vertex 5
+		{ { 1.0f,  1.0f, -1.0f},  {0.0f,  1.0f, 1.0f}},  // Vertex 6
+		{ {-1.0f,  1.0f, -1.0f},  {0.0f,  1.0f, 1.0f}},  // Vertex 7
+
+		// Left face
+		{ {-1.0f, -1.0f, -1.0f},  {1.0f,  0.0f,  0.0f}},  // Vertex 8
+		{ {-1.0f, -1.0f,  1.0f},  {1.0f,  0.0f,  0.0f}},  // Vertex 9
+		{ {-1.0f,  1.0f,  1.0f},  {1.0f,  0.0f,  0.0f}},  // Vertex 10
+		{ {-1.0f,  1.0f, -1.0f},  {1.0f,  0.0f,  0.0f}},  // Vertex 11
+
+		// Right face
+		{ { 1.0f, -1.0f, -1.0f},  {1.0f,  1.0f,  0.0f}},  // Vertex 12
+		{ { 1.0f, -1.0f,  1.0f},  {1.0f,  1.0f,  0.0f}},  // Vertex 13
+		{ { 1.0f,  1.0f,  1.0f},  {1.0f,  1.0f,  0.0f}},  // Vertex 14
+		{ { 1.0f,  1.0f, -1.0f},  {1.0f,  1.0f,  0.0f}},  // Vertex 15
+
+		// Top face
+		{ {-1.0f,  1.0f, -1.0f},  {1.0f,  1.0f,  1.0f}},  // Vertex 16
+		{ { 1.0f,  1.0f, -1.0f},  {1.0f,  1.0f,  1.0f}},  // Vertex 17
+		{ { 1.0f,  1.0f,  1.0f},  {1.0f,  1.0f,  1.0f}},  // Vertex 18
+		{ {-1.0f,  1.0f,  1.0f},  {1.0f,  1.0f,  1.0f}},  // Vertex 19
+
+		// Bottom face
+		{ {-1.0f, -1.0f, -1.0f},  {0.0f, 1.0f,  0.0f}},  // Vertex 20
+		{ { 1.0f, -1.0f, -1.0f},  {0.0f, 1.0f,  0.0f}},  // Vertex 21
+		{ { 1.0f, -1.0f,  1.0f},  {0.0f, 1.0f,  0.0f}},  // Vertex 22
+		{ {-1.0f, -1.0f,  1.0f},  {0.0f, 1.0f,  0.0f}}   // Vertex 23
+	};
+	uint32_t indices[36] = {
+		// Front face
+		0, 1, 2,
+		0, 2, 3,
+
+		// Back face
+		4, 5, 6,
+		4, 6, 7,
+
+		// Left face
+		8, 9, 10,
+		8, 10, 11,
+
+		// Right face
+		12, 13, 14,
+		12, 14, 15,
+
+		// Top face
+		16, 17, 18,
+		16, 18, 19,
+
+		// Bottom face
+		20, 21, 22,
+		20, 22, 23
+	};
+	//push the data into the buffer
+	nvrhi::VertexAttributeDesc positionAttrib;
+	positionAttrib.name = "POSITION";
+	positionAttrib.format = nvrhi::Format::RGB32_FLOAT;
+	positionAttrib.offset = 0;
+	positionAttrib.bufferIndex = 0;
+	positionAttrib.elementStride = sizeof(Vertex);
+	nvrhi::VertexAttributeDesc colorAttrib;
+	colorAttrib.name = "ICOLOR";
+	colorAttrib.format = nvrhi::Format::RGB32_FLOAT;
+	colorAttrib.offset = 0;
+	colorAttrib.bufferIndex = 1;
+	colorAttrib.elementStride = sizeof(Vertex);
+	nvrhi::VertexAttributeDesc attribs[] = {
+		positionAttrib,
+		colorAttrib
+	};
+	nvrhi::InputLayoutHandle inputLayoutHandle = m_NvrhiDevice->createInputLayout(attribs, uint32_t(std::size(attribs)), vs);
+	//loading the data
+	m_CommandList->open();
+	nvrhi::BufferDesc vertexBufDesc;
+	vertexBufDesc.byteSize = sizeof(vertices);
+	vertexBufDesc.isVertexBuffer = true;
+	vertexBufDesc.debugName = "VertexBuffer";
+	vertexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;	//set as copy dest to copy over data
+	//smth smth syncrhonization need to be this state to be written
+
+	VertexBuffer = m_NvrhiDevice->createBuffer(vertexBufDesc);
+	//copy data over
+	m_CommandList->beginTrackingBufferState(VertexBuffer, nvrhi::ResourceStates::CopyDest);	//i tink this is to update nvrhi resource manager state tracker
+	m_CommandList->writeBuffer(VertexBuffer, vertices, sizeof(vertices));
+	m_CommandList->setPermanentBufferState(VertexBuffer, nvrhi::ResourceStates::VertexBuffer);	//now its a vb
+
+	nvrhi::BufferDesc indexBufDesc;
+	indexBufDesc.byteSize = sizeof(indices);
+	indexBufDesc.isIndexBuffer = true;
+	indexBufDesc.debugName = "IndexBuffer";
+	indexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;
+
+	IndexBuffer = m_NvrhiDevice->createBuffer(indexBufDesc);
+	m_CommandList->beginTrackingBufferState(IndexBuffer, nvrhi::ResourceStates::CopyDest);
+	m_CommandList->writeBuffer(IndexBuffer, indices, sizeof(indices));
+	m_CommandList->setPermanentBufferState(IndexBuffer, nvrhi::ResourceStates::IndexBuffer);
+
+	m_CommandList->close();
+	m_NvrhiDevice->executeCommandList(m_CommandList);
 
 	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
-	pipelineDesc.addBindingLayout(bindingLayout);
+	pipelineDesc.addBindingLayout(BindingLayout);
 	pipelineDesc.setVertexShader(vs);
 	pipelineDesc.setFragmentShader(ps);
-	//why does disabling depth crash
-	pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
+
+	pipelineDesc.renderState.depthStencilState.depthTestEnable = true;
 	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
-	pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+	pipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
+	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+	pipelineDesc.inputLayout = inputLayoutHandle;
 
 	m_GraphicsPipeline = m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);
 }
