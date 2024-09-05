@@ -6,6 +6,7 @@ echo [97mPulling all dependencies[0m
 call :pull_dependency "spdlog" "https://github.com/buttception/spdlog.git"
 call :pull_dependency "glfw" "https://github.com/buttception/glfw.git"
 call :pull_dependency "entt" "https://github.com/buttception/entt.git"
+call :pull_dependency "tinygltf" "https://github.com/syoyo/tinygltf.git"
 
 set "dependencies_path=%~dp0\..\Editor\dependencies"
 call :pull_dependency "imgui" "--branch docking https://github.com/buttception/imgui.git"

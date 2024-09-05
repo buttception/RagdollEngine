@@ -52,6 +52,7 @@ project "Ragdoll"
 		"%{IncludesDir.imgui}",
 		"%{IncludesDir.entt}",
 		"%{IncludesDir.nvrhi}",
+		"%{IncludesDir.tinygltf}",
     }
 
 	filter "system:windows"

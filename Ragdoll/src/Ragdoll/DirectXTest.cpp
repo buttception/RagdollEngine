@@ -12,6 +12,73 @@ struct CBuffer {
 	Matrix world;
 	Matrix viewProj;
 };
+namespace ragdoll {
+	struct Attributes {
+		std::vector<nvrhi::VertexAttributeDesc> AttribsDesc;
+		uint32_t AttribsTotalByteSize{};
+		nvrhi::InputLayoutHandle InputLayoutHandle;
+
+		void CreateInputLayoutHandle(nvrhi::DeviceHandle device, nvrhi::ShaderHandle vs) {
+
+			InputLayoutHandle = device->createInputLayout(AttribsDesc.data(), uint32_t(std::size(AttribsDesc)), vs);
+		}
+	};
+	struct Buffer {
+		Attributes Attribs;
+		uint32_t TotalByteSize{};
+		uint32_t IndicesByteOffset{};
+		nvrhi::Format IndexFormat;
+		nvrhi::BufferHandle VertexBuffer;
+		nvrhi::BufferHandle IndexBuffer;
+		//can decide if we want to keep in memory next time?
+
+		void CreateBuffers(DirectXTest& renderer, const uint8_t* bytes, const std::string meshName) {
+			//presume command list is open and will be closed and executed later
+			nvrhi::BufferDesc vertexBufDesc;
+			vertexBufDesc.byteSize = IndicesByteOffset;	//the offset is already the size of the vb
+			vertexBufDesc.isVertexBuffer = true;
+			vertexBufDesc.debugName = meshName + " Vertex Buffer";
+			vertexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;	//set as copy dest to copy over data
+			//smth smth syncrhonization need to be this state to be written
+
+			VertexBuffer = renderer.m_NvrhiDevice->createBuffer(vertexBufDesc);
+			//copy data over
+			renderer.m_CommandList->beginTrackingBufferState(VertexBuffer, nvrhi::ResourceStates::CopyDest);	//i tink this is to update nvrhi resource manager state tracker
+			renderer.m_CommandList->writeBuffer(VertexBuffer, bytes, vertexBufDesc.byteSize);
+			renderer.m_CommandList->setPermanentBufferState(VertexBuffer, nvrhi::ResourceStates::VertexBuffer);	//now its a vb
+
+			nvrhi::BufferDesc indexBufDesc;
+			indexBufDesc.byteSize = TotalByteSize - IndicesByteOffset;
+			indexBufDesc.isIndexBuffer = true;
+			indexBufDesc.debugName = meshName + " Index Buffer";
+			indexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;
+
+			IndexBuffer = renderer.m_NvrhiDevice->createBuffer(indexBufDesc);
+			renderer.m_CommandList->beginTrackingBufferState(IndexBuffer, nvrhi::ResourceStates::CopyDest);
+			renderer.m_CommandList->writeBuffer(IndexBuffer, bytes + IndicesByteOffset, indexBufDesc.byteSize);
+			renderer.m_CommandList->setPermanentBufferState(IndexBuffer, nvrhi::ResourceStates::IndexBuffer);
+		}
+	};
+	struct Mesh {
+		std::string Name;
+		//meshes refers to a bunch of primitives
+		//this will contain all the attributes and buffers
+		Buffer Buffers;
+		//TODO: it also refers to a material
+		
+
+	};
+}
+
+// Define these only in *one* .cc file.
+#define TINYGLTF_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+// #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
+#include "tiny_gltf.h"
+using namespace tinygltf;
+
+std::unordered_map<std::string, ragdoll::Mesh> Meshes;
 
 DefaultMessageCallback DefaultMessageCallback::s_Instance;
 static bool MoveWindowOntoAdapter(IDXGIAdapter* targetAdapter, RECT& rect)
@@ -467,9 +534,15 @@ void DirectXTest::Draw()
 	state.pipeline = m_GraphicsPipeline;
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
-	state.indexBuffer = { IndexBuffer, nvrhi::Format::R32_UINT, 0 };
-	state.vertexBuffers = { {VertexBuffer, 0, offsetof(Vertex, position)},
-	{VertexBuffer, 1, offsetof(Vertex, color)} };
+	//bind the test mesh
+	const auto& mesh = Meshes["Mesh"];
+	state.indexBuffer = { mesh.Buffers.IndexBuffer, mesh.Buffers.IndexFormat, 0 };
+	state.vertexBuffers = { 
+		{mesh.Buffers.VertexBuffer, 0, mesh.Buffers.Attribs.AttribsDesc[0].offset},
+		{mesh.Buffers.VertexBuffer, 1, mesh.Buffers.Attribs.AttribsDesc[1].offset}
+	};
+	//state.indexBuffer = { IndexBuffer, nvrhi::Format::R32_UINT, 0 };
+	//state.vertexBuffers = { {VertexBuffer, 0, offsetof(Vertex, position)}, {VertexBuffer, 1, offsetof(Vertex, color)} };
 
 	auto layoutDesc = nvrhi::BindingSetDesc();
 	layoutDesc.bindings = {
@@ -509,36 +582,99 @@ void DirectXTest::Present()
 void DirectXTest::CreateResource()
 {
 	m_CommandList = m_NvrhiDevice->createCommandList();
+	m_CommandList->open();
 	nvrhi::ShaderHandle vs;
 	nvrhi::ShaderHandle ps;
 	nvrhi::InputLayoutHandle inputLayout;
 	nvrhi::FramebufferHandle fb;
 
 	//load outputted shaders objects
-	m_FileManager->ImmediateLoad(ragdoll::FileIORequest(ragdoll::GuidGenerator::Generate(), "test.vs.cso", [&](ragdoll::Guid id, const uint8_t* data, uint32_t size) {
-		vs = m_NvrhiDevice->createShader(
-			nvrhi::ShaderDesc(nvrhi::ShaderType::Vertex),
-			data, size);
+	uint32_t size{};
+	const uint8_t* data = m_FileManager->ImmediateLoad("test.vs.cso", size);
+	vs = m_NvrhiDevice->createShader(
+		nvrhi::ShaderDesc(nvrhi::ShaderType::Vertex),
+		data, size);
+	data = m_FileManager->ImmediateLoad("test.ps.cso", size);
+	ps = m_NvrhiDevice->createShader(
+		nvrhi::ShaderDesc(nvrhi::ShaderType::Pixel),
+		data, size);
+	data = m_FileManager->ImmediateLoad("imgui.vs.cso", size);
+	ImguiVertexShader = m_NvrhiDevice->createShader(
+		nvrhi::ShaderDesc(nvrhi::ShaderType::Vertex),
+		data, size);
+	data = m_FileManager->ImmediateLoad("imgui.ps.cso", size);
+	ImguiPixelShader = m_NvrhiDevice->createShader(
+		nvrhi::ShaderDesc(nvrhi::ShaderType::Pixel),
+		data, size);
+
+	//test loading
+	TinyGLTF loader;
+	Model model;
+	std::string err, warn;
+	auto path = m_FileManager->GetRoot() / "Box.gltf";
+	bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, path.string());
+	RD_ASSERT(ret == false, "Issue loading {}", path.string());
+
+	//go downwards from meshes
+	for (const auto& itMesh : model.meshes) {
+		//for every mesh, create a new mesh object
+		Meshes[itMesh.name];
+		auto& mesh = Meshes[itMesh.name];
+		//keep track of what is the currently loaded buffer and data
+		int32_t bufferIndex = -1; //-1 is invalid index
+		uint32_t size = 0;
+		const uint8_t* data = nullptr;	//nullptr is invalid
+		for (const auto& itPrim : itMesh.primitives) {	//there can be more than 1 primitive???
+			//for every primitive in the mesh
+			for (const auto& itAttrib : itPrim.attributes) {
+				//for every attribute in the primitive, it points to the id of a assessor
+				const auto& accessor = model.accessors[itAttrib.second];
+				//the assessor contains the id to the bufferview
+				const auto& bufferView = model.bufferViews[accessor.bufferView];
+				//bufferView contains the id to the data
+				if (bufferIndex != bufferView.buffer) {
+					const auto& buffer = model.buffers[bufferView.buffer];
+					//buffer is currently not loaded
+					data = m_FileManager->ImmediateLoad(buffer.uri, size);
+					mesh.Buffers.TotalByteSize = size;
+				}
+				//create the attrib
+				nvrhi::VertexAttributeDesc attrib;
+				attrib.name = itAttrib.first;	//first is the name of the attrib
+				attrib.offset = accessor.byteOffset;
+				attrib.bufferIndex = 0; //using only one vb, if got more primitives need add
+				//set format by gltf type
+				switch (accessor.type) {
+				case TINYGLTF_TYPE_VEC3:
+					attrib.format = nvrhi::Format::RGB32_FLOAT;
+					//TODO: data is interleaved or not
+					//mesh.Buffers.Attribs.AttribsTotalByteSize += 3 * sizeof(float);
+					//RD_CORE_TRACE("total float size for attrib is {}", mesh.Buffers.Attribs.AttribsTotalByteSize);
+					break;
+				}
+				//push the attrib into the attribs
+				mesh.Buffers.Attribs.AttribsDesc.emplace_back(attrib);
+			}
+			//once done need to update all the element strides
+			for (auto& attribDesc : mesh.Buffers.Attribs.AttribsDesc) {
+				attribDesc.elementStride = 12;
+			}
+			//initialize the attributes
+			mesh.Buffers.Attribs.CreateInputLayoutHandle(m_NvrhiDevice, vs);
+			//now load the index buffer
+			const auto& accessor = model.accessors[itPrim.indices];
+			const auto& bufferView = model.bufferViews[accessor.bufferView];
+			mesh.Buffers.IndicesByteOffset = bufferView.byteOffset;
+			switch (accessor.componentType) {
+			case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+				mesh.Buffers.IndexFormat = nvrhi::Format::R16_UINT;
+				break;
+			}
+			//create the buffer
+			mesh.Buffers.CreateBuffers(*this, data, itMesh.name.c_str());
 		}
-	));
-	m_FileManager->ImmediateLoad(ragdoll::FileIORequest(ragdoll::GuidGenerator::Generate(), "test.ps.cso", [&](ragdoll::Guid id, const uint8_t* data, uint32_t size) {
-		ps = m_NvrhiDevice->createShader(
-			nvrhi::ShaderDesc(nvrhi::ShaderType::Pixel),
-			(char*)data, size);
-		}
-	));
-	m_FileManager->ImmediateLoad(ragdoll::FileIORequest(ragdoll::GuidGenerator::Generate(), "imgui.vs.cso", [&](ragdoll::Guid id, const uint8_t* data, uint32_t size) {
-		ImguiVertexShader = m_NvrhiDevice->createShader(
-			nvrhi::ShaderDesc(nvrhi::ShaderType::Vertex),
-			data, size);
-		}
-	));
-	m_FileManager->ImmediateLoad(ragdoll::FileIORequest(ragdoll::GuidGenerator::Generate(), "imgui.ps.cso", [&](ragdoll::Guid id, const uint8_t* data, uint32_t size) {
-		ImguiPixelShader = m_NvrhiDevice->createShader(
-			nvrhi::ShaderDesc(nvrhi::ShaderType::Pixel),
-			data, size);
-		}
-	));
+	}
+
 	//create a depth buffer
 	nvrhi::TextureDesc depthBufferDesc;
 	depthBufferDesc.width = m_PrimaryWindow->GetBufferWidth();
@@ -634,48 +770,47 @@ void DirectXTest::CreateResource()
 		20, 22, 23
 	};
 	//push the data into the buffer
-	nvrhi::VertexAttributeDesc positionAttrib;
-	positionAttrib.name = "POSITION";
-	positionAttrib.format = nvrhi::Format::RGB32_FLOAT;
-	positionAttrib.offset = 0;
-	positionAttrib.bufferIndex = 0;
-	positionAttrib.elementStride = sizeof(Vertex);
-	nvrhi::VertexAttributeDesc colorAttrib;
-	colorAttrib.name = "ICOLOR";
-	colorAttrib.format = nvrhi::Format::RGB32_FLOAT;
-	colorAttrib.offset = 0;
-	colorAttrib.bufferIndex = 1;
-	colorAttrib.elementStride = sizeof(Vertex);
-	nvrhi::VertexAttributeDesc attribs[] = {
-		positionAttrib,
-		colorAttrib
-	};
-	nvrhi::InputLayoutHandle inputLayoutHandle = m_NvrhiDevice->createInputLayout(attribs, uint32_t(std::size(attribs)), vs);
-	//loading the data
-	m_CommandList->open();
-	nvrhi::BufferDesc vertexBufDesc;
-	vertexBufDesc.byteSize = sizeof(vertices);
-	vertexBufDesc.isVertexBuffer = true;
-	vertexBufDesc.debugName = "VertexBuffer";
-	vertexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;	//set as copy dest to copy over data
-	//smth smth syncrhonization need to be this state to be written
+	//nvrhi::VertexAttributeDesc positionAttrib;
+	//positionAttrib.name = "POSITION";
+	//positionAttrib.format = nvrhi::Format::RGB32_FLOAT;
+	//positionAttrib.offset = offsetof(Vertex, position);
+	//positionAttrib.bufferIndex = 0;
+	//positionAttrib.elementStride = sizeof(Vertex);
+	//nvrhi::VertexAttributeDesc colorAttrib;
+	//colorAttrib.name = "ICOLOR";
+	//colorAttrib.format = nvrhi::Format::RGB32_FLOAT;
+	//colorAttrib.offset = offsetof(Vertex, color);
+	//colorAttrib.bufferIndex = 0;
+	//colorAttrib.elementStride = sizeof(Vertex);
+	//nvrhi::VertexAttributeDesc attribs[] = {
+	//	positionAttrib,
+	//	colorAttrib
+	//};
+	//nvrhi::InputLayoutHandle inputLayoutHandle = m_NvrhiDevice->createInputLayout(attribs, uint32_t(std::size(attribs)), vs);
+	////loading the data
+	//nvrhi::BufferDesc vertexBufDesc;
+	//vertexBufDesc.byteSize = sizeof(vertices);
+	//vertexBufDesc.isVertexBuffer = true;
+	//vertexBufDesc.debugName = "VertexBuffer";
+	//vertexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;	//set as copy dest to copy over data
+	////smth smth syncrhonization need to be this state to be written
 
-	VertexBuffer = m_NvrhiDevice->createBuffer(vertexBufDesc);
-	//copy data over
-	m_CommandList->beginTrackingBufferState(VertexBuffer, nvrhi::ResourceStates::CopyDest);	//i tink this is to update nvrhi resource manager state tracker
-	m_CommandList->writeBuffer(VertexBuffer, vertices, sizeof(vertices));
-	m_CommandList->setPermanentBufferState(VertexBuffer, nvrhi::ResourceStates::VertexBuffer);	//now its a vb
+	//VertexBuffer = m_NvrhiDevice->createBuffer(vertexBufDesc);
+	////copy data over
+	//m_CommandList->beginTrackingBufferState(VertexBuffer, nvrhi::ResourceStates::CopyDest);	//i tink this is to update nvrhi resource manager state tracker
+	//m_CommandList->writeBuffer(VertexBuffer, vertices, sizeof(vertices));
+	//m_CommandList->setPermanentBufferState(VertexBuffer, nvrhi::ResourceStates::VertexBuffer);	//now its a vb
 
-	nvrhi::BufferDesc indexBufDesc;
-	indexBufDesc.byteSize = sizeof(indices);
-	indexBufDesc.isIndexBuffer = true;
-	indexBufDesc.debugName = "IndexBuffer";
-	indexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;
+	//nvrhi::BufferDesc indexBufDesc;
+	//indexBufDesc.byteSize = sizeof(indices);
+	//indexBufDesc.isIndexBuffer = true;
+	//indexBufDesc.debugName = "IndexBuffer";
+	//indexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;
 
-	IndexBuffer = m_NvrhiDevice->createBuffer(indexBufDesc);
-	m_CommandList->beginTrackingBufferState(IndexBuffer, nvrhi::ResourceStates::CopyDest);
-	m_CommandList->writeBuffer(IndexBuffer, indices, sizeof(indices));
-	m_CommandList->setPermanentBufferState(IndexBuffer, nvrhi::ResourceStates::IndexBuffer);
+	//IndexBuffer = m_NvrhiDevice->createBuffer(indexBufDesc);
+	//m_CommandList->beginTrackingBufferState(IndexBuffer, nvrhi::ResourceStates::CopyDest);
+	//m_CommandList->writeBuffer(IndexBuffer, indices, sizeof(indices));
+	//m_CommandList->setPermanentBufferState(IndexBuffer, nvrhi::ResourceStates::IndexBuffer);
 
 	m_CommandList->close();
 	m_NvrhiDevice->executeCommandList(m_CommandList);
@@ -689,7 +824,7 @@ void DirectXTest::CreateResource()
 	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
 	pipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
 	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
-	pipelineDesc.inputLayout = inputLayoutHandle;
+	pipelineDesc.inputLayout = Meshes["Mesh"].Buffers.Attribs.InputLayoutHandle;
 
 	m_GraphicsPipeline = m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);
 }
