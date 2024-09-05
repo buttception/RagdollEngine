@@ -1,8 +1,9 @@
 #include "ragdollpch.h"
 #include "ImguiInterface.h"
 
-void ImguiInterface::Init()
+void ImguiInterface::Init(DirectXTest* dx)
 {
+	m_DirectXTest = dx;
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
@@ -12,9 +13,9 @@ void ImguiInterface::Init()
 	// Setup Dear ImGui style
 	ImGui::StyleColorsDark();
 
-	CommandList = m_DirectXTest.m_NvrhiDevice->createCommandList();
+	CommandList = m_DirectXTest->m_NvrhiDevice->createCommandList();
 	CommandList->open();
-	RD_ASSERT(m_DirectXTest.ImguiVertexShader == nullptr || m_DirectXTest.ImguiPixelShader == nullptr, "Failed to load Imgui shaders");
+	RD_ASSERT(m_DirectXTest->ImguiVertexShader == nullptr || m_DirectXTest->ImguiPixelShader == nullptr, "Failed to load Imgui shaders");
 	// create attribute layout object
 	nvrhi::VertexAttributeDesc vertexAttribLayout[] = {
 		{ "POSITION", nvrhi::Format::RG32_FLOAT,  1, 0, offsetof(ImDrawVert,pos), sizeof(ImDrawVert), false },
@@ -22,7 +23,7 @@ void ImguiInterface::Init()
 		{ "COLOR",    nvrhi::Format::RGBA8_UNORM, 1, 0, offsetof(ImDrawVert,col), sizeof(ImDrawVert), false },
 	};
 	//creating the layout for shader
-	ShaderAttribLayout = m_DirectXTest.m_NvrhiDevice->createInputLayout(vertexAttribLayout, _countof(vertexAttribLayout), m_DirectXTest.ImguiVertexShader);
+	ShaderAttribLayout = m_DirectXTest->m_NvrhiDevice->createInputLayout(vertexAttribLayout, _countof(vertexAttribLayout), m_DirectXTest->ImguiVertexShader);
 
 	io.Fonts->AddFontDefault();
 
@@ -64,26 +65,26 @@ void ImguiInterface::Init()
 		//binds slot 0 with sampler, controls how the texture is sampled
 		nvrhi::BindingLayoutItem::Sampler(0),
 	};
-	BindingLayout = m_DirectXTest.m_NvrhiDevice->createBindingLayout(layoutDesc);
+	BindingLayout = m_DirectXTest->m_NvrhiDevice->createBindingLayout(layoutDesc);
 
 	BasePSODesc.primType = nvrhi::PrimitiveType::TriangleList;
 	BasePSODesc.inputLayout = ShaderAttribLayout;
-	BasePSODesc.VS = m_DirectXTest.ImguiVertexShader;
-	BasePSODesc.PS = m_DirectXTest.ImguiPixelShader;
+	BasePSODesc.VS = m_DirectXTest->ImguiVertexShader;
+	BasePSODesc.PS = m_DirectXTest->ImguiPixelShader;
 	BasePSODesc.renderState = renderState;
 	BasePSODesc.bindingLayouts = { BindingLayout };
 	CommandList->close();
 
-	m_DirectXTest.m_NvrhiDevice->executeCommandList(CommandList);
+	m_DirectXTest->m_NvrhiDevice->executeCommandList(CommandList);
 }
 
 void ImguiInterface::BeginFrame()
 {
 	ImGuiIO& io = ImGui::GetIO();
-	io.DeltaTime = m_DirectXTest.m_PrimaryWindow->GetFrameTime();
+	io.DeltaTime = m_DirectXTest->m_PrimaryWindow->GetFrameTime();
 	io.MouseDrawCursor = false;
-	io.DisplaySize.x = m_DirectXTest.m_PrimaryWindow->GetBufferWidth();
-	io.DisplaySize.y = m_DirectXTest.m_PrimaryWindow->GetBufferHeight();
+	io.DisplaySize.x = m_DirectXTest->m_PrimaryWindow->GetBufferWidth();
+	io.DisplaySize.y = m_DirectXTest->m_PrimaryWindow->GetBufferHeight();
 	
 	ImGui::NewFrame();
 }
@@ -98,7 +99,7 @@ void ImguiInterface::Render()
 	CommandList->open();
 	CommandList->beginMarker("ImGUI");
 
-	if (!updateGeometry(CommandList))
+	if (!UpdateGeometry(CommandList))
 	{
 		return;
 	}
@@ -111,26 +112,26 @@ void ImguiInterface::Render()
 	// set up graphics state
 	nvrhi::GraphicsState drawState;
 
-	nvrhi::TextureHandle tex = m_DirectXTest.m_RhiSwapChainBuffers[m_DirectXTest.m_SwapChain->GetCurrentBackBufferIndex()];
+	nvrhi::TextureHandle tex = m_DirectXTest->m_RhiSwapChainBuffers[m_DirectXTest->m_SwapChain->GetCurrentBackBufferIndex()];
 	auto fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(tex);
-	nvrhi::FramebufferHandle pipelineFb = m_DirectXTest.m_NvrhiDevice->createFramebuffer(fbDesc);
+	nvrhi::FramebufferHandle pipelineFb = m_DirectXTest->m_NvrhiDevice->createFramebuffer(fbDesc);
 	drawState.framebuffer = pipelineFb;
 	assert(drawState.framebuffer);
 
-	drawState.pipeline = getPSO(drawState.framebuffer);
+	drawState.pipeline = GetPSO(drawState.framebuffer);
 
 	drawState.viewport.viewports.push_back(nvrhi::Viewport(io.DisplaySize.x * io.DisplayFramebufferScale.x,
 		io.DisplaySize.y * io.DisplayFramebufferScale.y));
 	drawState.viewport.scissorRects.resize(1);  // updated below
 
 	nvrhi::VertexBufferBinding vbufBinding;
-	vbufBinding.buffer = vertexBuffer;
+	vbufBinding.buffer = VertexBufferHandle;
 	vbufBinding.slot = 0;
 	vbufBinding.offset = 0;
 	drawState.vertexBuffers.push_back(vbufBinding);
 
-	drawState.indexBuffer.buffer = indexBuffer;
+	drawState.indexBuffer.buffer = IndexBufferHandle;
 	drawState.indexBuffer.format = (sizeof(ImDrawIdx) == 2 ? nvrhi::Format::R16_UINT : nvrhi::Format::R32_UINT);
 	drawState.indexBuffer.offset = 0;
 
@@ -156,7 +157,7 @@ void ImguiInterface::Render()
 					nvrhi::BindingSetItem::Sampler(0, FontSampler)
 				};
 
-				nvrhi::BindingSetHandle binding = m_DirectXTest.m_NvrhiDevice->createBindingSet(desc, BindingLayout);
+				nvrhi::BindingSetHandle binding = m_DirectXTest->m_NvrhiDevice->createBindingSet(desc, BindingLayout);
 				assert(binding);
 				drawState.bindings = { binding };
 				//drawState.bindings = { getBindingSet((nvrhi::ITexture*)pCmd->TextureId) };
@@ -185,19 +186,19 @@ void ImguiInterface::Render()
 
 	CommandList->endMarker();
 	CommandList->close();
-	m_DirectXTest.m_NvrhiDevice->executeCommandList(CommandList);
+	m_DirectXTest->m_NvrhiDevice->executeCommandList(CommandList);
 }
 
 void ImguiInterface::BackbufferResizing()
 {
-	pso = nullptr;
+	PSO = nullptr;
 }
 
 void ImguiInterface::Shutdown()
 {
 }
 
-bool ImguiInterface::reallocateBuffer(nvrhi::BufferHandle& buffer, size_t requiredSize, size_t reallocateSize, bool isIndexBuffer)
+bool ImguiInterface::ReallocateBuffer(nvrhi::BufferHandle& buffer, size_t requiredSize, size_t reallocateSize, bool isIndexBuffer)
 {
 	if (buffer == nullptr || size_t(buffer->getDesc().byteSize) < requiredSize)
 	{
@@ -213,7 +214,7 @@ bool ImguiInterface::reallocateBuffer(nvrhi::BufferHandle& buffer, size_t requir
 		desc.initialState = isIndexBuffer ? nvrhi::ResourceStates::IndexBuffer : nvrhi::ResourceStates::VertexBuffer;
 		desc.keepInitialState = true;
 
-		buffer = m_DirectXTest.m_NvrhiDevice->createBuffer(desc);
+		buffer = m_DirectXTest->m_NvrhiDevice->createBuffer(desc);
 
 		RD_ASSERT(buffer == nullptr, "Imgui buffer resize fail");
 		if (!buffer)
@@ -226,21 +227,21 @@ bool ImguiInterface::reallocateBuffer(nvrhi::BufferHandle& buffer, size_t requir
 	return true;
 }
 
-nvrhi::IGraphicsPipeline* ImguiInterface::getPSO(nvrhi::IFramebuffer* fb)
+nvrhi::IGraphicsPipeline* ImguiInterface::GetPSO(nvrhi::IFramebuffer* fb)
 {
-	if (pso)
-		return pso;
+	if (PSO)
+		return PSO;
 
-	pso = m_DirectXTest.m_NvrhiDevice->createGraphicsPipeline(BasePSODesc, fb);
-	assert(pso);
+	PSO = m_DirectXTest->m_NvrhiDevice->createGraphicsPipeline(BasePSODesc, fb);
+	assert(PSO);
 
-	return pso;
+	return PSO;
 }
 
-nvrhi::IBindingSet* ImguiInterface::getBindingSet(nvrhi::ITexture* texture)
+nvrhi::IBindingSet* ImguiInterface::GetBindingSet(nvrhi::ITexture* texture)
 {
-	auto iter = bindingsCache.find(texture);
-	if (iter != bindingsCache.end())
+	auto iter = BindingsCache.find(texture);
+	if (iter != BindingsCache.end())
 	{
 		return iter->second;
 	}
@@ -254,19 +255,19 @@ nvrhi::IBindingSet* ImguiInterface::getBindingSet(nvrhi::ITexture* texture)
 	};
 
 	nvrhi::BindingSetHandle binding;
-	binding = m_DirectXTest.m_NvrhiDevice->createBindingSet(desc, BindingLayout);
+	binding = m_DirectXTest->m_NvrhiDevice->createBindingSet(desc, BindingLayout);
 	assert(binding);
 
-	bindingsCache[texture] = binding;
+	BindingsCache[texture] = binding;
 	return binding;
 }
 
-bool ImguiInterface::updateGeometry(nvrhi::ICommandList* commandList)
+bool ImguiInterface::UpdateGeometry(nvrhi::ICommandList* commandList)
 {
 	ImDrawData* drawData = ImGui::GetDrawData();
 
 	// create/resize vertex and index buffers if needed
-	if (!reallocateBuffer(vertexBuffer,
+	if (!ReallocateBuffer(VertexBufferHandle,
 		drawData->TotalVtxCount * sizeof(ImDrawVert),
 		(drawData->TotalVtxCount + 5000) * sizeof(ImDrawVert),
 		false))
@@ -274,7 +275,7 @@ bool ImguiInterface::updateGeometry(nvrhi::ICommandList* commandList)
 		return false;
 	}
 
-	if (!reallocateBuffer(indexBuffer,
+	if (!ReallocateBuffer(IndexBufferHandle,
 		drawData->TotalIdxCount * sizeof(ImDrawIdx),
 		(drawData->TotalIdxCount + 5000) * sizeof(ImDrawIdx),
 		true))
@@ -282,12 +283,12 @@ bool ImguiInterface::updateGeometry(nvrhi::ICommandList* commandList)
 		return false;
 	}
 
-	vtxBuffer.resize(vertexBuffer->getDesc().byteSize / sizeof(ImDrawVert));
-	idxBuffer.resize(indexBuffer->getDesc().byteSize / sizeof(ImDrawIdx));
+	VertexBufferRaw.resize(VertexBufferHandle->getDesc().byteSize / sizeof(ImDrawVert));
+	IndexBufferRaw.resize(IndexBufferHandle->getDesc().byteSize / sizeof(ImDrawIdx));
 
 	// copy and convert all vertices into a single contiguous buffer
-	ImDrawVert* vtxDst = &vtxBuffer[0];
-	ImDrawIdx* idxDst = &idxBuffer[0];
+	ImDrawVert* vtxDst = &VertexBufferRaw[0];
+	ImDrawIdx* idxDst = &IndexBufferRaw[0];
 
 	for (int n = 0; n < drawData->CmdListsCount; n++)
 	{
@@ -300,8 +301,8 @@ bool ImguiInterface::updateGeometry(nvrhi::ICommandList* commandList)
 		idxDst += cmdList->IdxBuffer.Size;
 	}
 
-	commandList->writeBuffer(vertexBuffer, &vtxBuffer[0], vertexBuffer->getDesc().byteSize);
-	commandList->writeBuffer(indexBuffer, &idxBuffer[0], indexBuffer->getDesc().byteSize);
+	commandList->writeBuffer(VertexBufferHandle, &VertexBufferRaw[0], VertexBufferHandle->getDesc().byteSize);
+	commandList->writeBuffer(IndexBufferHandle, &IndexBufferRaw[0], IndexBufferHandle->getDesc().byteSize);
 
 	return true;
 }
@@ -320,7 +321,7 @@ void ImguiInterface::CreateFontTexture()
 		desc.format = nvrhi::Format::RGBA8_UNORM;
 		desc.debugName = "ImGui Font Texture";
 
-		FontTexture = m_DirectXTest.m_NvrhiDevice->createTexture(desc);
+		FontTexture = m_DirectXTest->m_NvrhiDevice->createTexture(desc);
 
 		//specify the texture data state for the gpu?
 		CommandList->beginTrackingTextureState(FontTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::Common);
@@ -340,7 +341,7 @@ void ImguiInterface::CreateFontTexture()
 		nvrhi::SamplerDesc samplerDesc = nvrhi::SamplerDesc();
 		samplerDesc.addressU = samplerDesc.addressV = samplerDesc.addressW = nvrhi::SamplerAddressMode::Wrap;
 		samplerDesc.minFilter = samplerDesc.magFilter = samplerDesc.mipFilter = true;
-		FontSampler = m_DirectXTest.m_NvrhiDevice->createSampler(samplerDesc);
+		FontSampler = m_DirectXTest->m_NvrhiDevice->createSampler(samplerDesc);
 		RD_ASSERT(FontSampler == nullptr, "Failed to create font sampler for imgui");
 
 	}

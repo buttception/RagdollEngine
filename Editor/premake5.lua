@@ -25,20 +25,17 @@ project "Editor"
 
 	links
 	{
-		"Ragdoll",
-		"imgui"
+		"Ragdoll"
 	}
 
     includedirs
     {
         "%{wks.location}/Ragdoll/src",
-		"%{IncludesDir.glm}",
+        "%{IncludesDir.nvrhi}",
+        "%{IncludesDir.imgui}",
 		"%{IncludesDir.spdlog}",
 		"%{IncludesDir.entt}",
-		"%{IncludesDir.imgui}",
 		"%{IncludesDir.glfw}",
-		"%{IncludesDir.glad}",
-		"%{IncludesDir.rapidjson}",
     }
 
 	postbuildcommands

@@ -1,6 +1,12 @@
 #include "ragdollpch.h"
 #include "DirectXTest.h"
 
+//========================temp=======================
+struct Vertex
+{
+	SimpleMath::Vector3 position;
+};
+
 DefaultMessageCallback DefaultMessageCallback::s_Instance;
 static bool MoveWindowOntoAdapter(IDXGIAdapter* targetAdapter, RECT& rect)
 {
@@ -407,20 +413,22 @@ void DirectXTest::Draw()
 	state.pipeline = m_GraphicsPipeline;
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
+	state.indexBuffer = { IndexBuffer, nvrhi::Format::R32_UINT, 0 };
+	state.vertexBuffers = { {VertexBuffer, 0, offsetof(Vertex, position)}};
 
-	auto layoutDesc = nvrhi::BindingSetDesc();
-	layoutDesc.bindings = {
-		nvrhi::BindingSetItem::PushConstants(0, sizeof(Data)),
-	};
-	auto binding = m_NvrhiDevice->createBindingSet(layoutDesc, bindingLayout);
-	state.bindings = { binding };
-	assert(state.bindings[0]);
+	//auto layoutDesc = nvrhi::BindingSetDesc();
+	//layoutDesc.bindings = {
+	//	nvrhi::BindingSetItem::PushConstants(0, sizeof(Data)),
+	//};
+	//auto binding = m_NvrhiDevice->createBindingSet(layoutDesc, BindingLayout);
+	//state.bindings = { binding };
+	//assert(state.bindings[0]);
 
 	m_CommandList->setGraphicsState(state);
-	m_CommandList->setPushConstants(&data, sizeof(Data));
+	//m_CommandList->setPushConstants(&data, sizeof(Data));
 	nvrhi::DrawArguments args;
-	args.vertexCount = 3;
-	m_CommandList->draw(args);
+	args.vertexCount = 36;
+	m_CommandList->drawIndexed(args);
 	m_CommandList->close();
 	m_NvrhiDevice->executeCommandList(m_CommandList);
 }
@@ -451,8 +459,6 @@ void DirectXTest::CreateResource()
 	nvrhi::InputLayoutHandle inputLayout;
 	nvrhi::FramebufferHandle fb;
 
-	nvrhi::BufferHandle vb;
-	nvrhi::CommandListHandle cmdList;
 	//load outputted shaders objects
 	m_FileManager->ImmediateLoad(ragdoll::FileIORequest(ragdoll::GuidGenerator::Generate(), "test.vs.cso", [&](ragdoll::Guid id, const uint8_t* data, uint32_t size) {
 		vs = m_NvrhiDevice->createShader(
@@ -482,23 +488,92 @@ void DirectXTest::CreateResource()
 	auto fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(m_RhiSwapChainBuffers[0]);
 	fb = m_NvrhiDevice->createFramebuffer(fbDesc);
+
 	//can set the requirements
-	auto layoutDesc = nvrhi::BindingLayoutDesc();
-	layoutDesc.visibility = nvrhi::ShaderType::All;
-	layoutDesc.bindings = {
-		//bind slot 0 with 2 floats
-		nvrhi::BindingLayoutItem::PushConstants(0, sizeof(float) * 5),
+	//auto layoutDesc = nvrhi::BindingLayoutDesc();
+	//layoutDesc.visibility = nvrhi::ShaderType::All;
+	//layoutDesc.bindings = {
+	//	//bind slot 0 with 2 floats
+	//	nvrhi::BindingLayoutItem::PushConstants(0, sizeof(float) * 5),
+	//};
+	//BindingLayout = m_NvrhiDevice->createBindingLayout(layoutDesc);
+
+	//create a cube first
+	Vertex vertices[8];
+	const float size = 1.f;
+	for (int i = 0; i < 8; ++i) {
+		vertices[i].position = SimpleMath::Vector3(
+			((i & 1) ? size / 2 : -size / 2),
+			((i & 2) ? size / 2 : -size / 2),
+			((i & 4) ? size / 2 : -size / 2)
+		);
+		RD_CORE_INFO("Vertex: {},{},{}", vertices[i].position.x, vertices[i].position.y, vertices[i].position.z);
+
+	}
+	uint32_t indices[36] = {
+		// Front face (vertices 0, 1, 2, 3) – counter-clockwise
+		0, 2, 1, 2, 3, 1,
+		// Back face (vertices 4, 5, 6, 7) – counter-clockwise
+		4, 5, 6, 6, 5, 7,
+		// Left face (vertices 0, 2, 4, 6) – counter-clockwise
+		0, 4, 2, 2, 4, 6,
+		// Right face (vertices 1, 3, 5, 7) – counter-clockwise
+		1, 3, 5, 5, 3, 7,
+		// Top face (vertices 2, 3, 6, 7) – counter-clockwise
+		2, 6, 3, 3, 6, 7,
+		// Bottom face (vertices 0, 1, 4, 5) – counter-clockwise
+		0, 1, 4, 4, 1, 5
 	};
-	bindingLayout = m_NvrhiDevice->createBindingLayout(layoutDesc);
+	//push the data into the buffer
+	nvrhi::VertexAttributeDesc positionAttrib;
+	positionAttrib.name = "POSITION";
+	positionAttrib.format = nvrhi::Format::RGB32_FLOAT;
+	positionAttrib.offset = 0;
+	positionAttrib.bufferIndex = 0;
+	positionAttrib.elementStride = sizeof(Vertex);
+	nvrhi::VertexAttributeDesc attribs[] = {
+		positionAttrib
+	};
+	nvrhi::InputLayoutHandle inputLayoutHandle = m_NvrhiDevice->createInputLayout(attribs, uint32_t(std::size(attribs)), vs);
+	//loading the data
+	m_CommandList->open();
+	nvrhi::BufferDesc vertexBufDesc;
+	vertexBufDesc.byteSize = sizeof(vertices);
+	vertexBufDesc.isVertexBuffer = true;
+	vertexBufDesc.debugName = "VertexBuffer";
+	vertexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;	//set as copy dest to copy over data
+	//smth smth syncrhonization need to be this state to be written
+
+	VertexBuffer = m_NvrhiDevice->createBuffer(vertexBufDesc);
+	//copy data over
+	m_CommandList->beginTrackingBufferState(VertexBuffer, nvrhi::ResourceStates::CopyDest);	//i tink this is to update nvrhi resource manager state tracker
+	m_CommandList->writeBuffer(VertexBuffer, vertices, sizeof(vertices));
+	m_CommandList->setPermanentBufferState(VertexBuffer, nvrhi::ResourceStates::VertexBuffer);	//now its a vb
+
+	nvrhi::BufferDesc indexBufDesc;
+	indexBufDesc.byteSize = sizeof(indices);
+	indexBufDesc.isIndexBuffer = true;
+	indexBufDesc.debugName = "IndexBuffer";
+	indexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;
+
+	IndexBuffer = m_NvrhiDevice->createBuffer(indexBufDesc);
+	m_CommandList->beginTrackingBufferState(IndexBuffer, nvrhi::ResourceStates::CopyDest);
+	m_CommandList->writeBuffer(IndexBuffer, indices, sizeof(indices));
+	m_CommandList->setPermanentBufferState(IndexBuffer, nvrhi::ResourceStates::IndexBuffer);
+
+	m_CommandList->close();
+	m_NvrhiDevice->executeCommandList(m_CommandList);
 
 	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
-	pipelineDesc.addBindingLayout(bindingLayout);
+	//pipelineDesc.addBindingLayout(BindingLayout);
 	pipelineDesc.setVertexShader(vs);
 	pipelineDesc.setFragmentShader(ps);
 	//why does disabling depth crash
 	pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
 	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
 	pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+	pipelineDesc.inputLayout = inputLayoutHandle;
 
 	m_GraphicsPipeline = m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);
 }

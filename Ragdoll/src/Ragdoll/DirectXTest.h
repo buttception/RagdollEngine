@@ -129,7 +129,9 @@ public:
 
 	nvrhi::ShaderHandle ImguiVertexShader;
 	nvrhi::ShaderHandle ImguiPixelShader;
-	nvrhi::BindingLayoutHandle bindingLayout;
+	nvrhi::BindingLayoutHandle BindingLayout;
+	nvrhi::BufferHandle IndexBuffer;
+	nvrhi::BufferHandle VertexBuffer;
 
 	void Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr <ragdoll::FileManager> fm);
 	void Draw();
