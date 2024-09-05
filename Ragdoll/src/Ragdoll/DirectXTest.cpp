@@ -1,10 +1,12 @@
 #include "ragdollpch.h"
 #include "DirectXTest.h"
+#include <nvrhi/utils.h>
 
 //========================temp=======================
 struct Vertex
 {
 	Vector3 position;
+	Vector3 color;
 };
 struct CBuffer {
 	Matrix world;
@@ -295,7 +297,7 @@ bool DirectXTest::CreateRenderTargets()
 		const HRESULT hr = m_SwapChain->GetBuffer(n, IID_PPV_ARGS(&m_SwapChainBuffers[n]));
 		HR_RETURN(hr)
 
-			nvrhi::TextureDesc textureDesc;
+		nvrhi::TextureDesc textureDesc;
 		textureDesc.width = m_DeviceParams.backBufferWidth;
 		textureDesc.height = m_DeviceParams.backBufferHeight;
 		textureDesc.sampleCount = m_DeviceParams.swapChainSampleCount;
@@ -399,6 +401,7 @@ void DirectXTest::Draw()
 	auto bgCol = m_PrimaryWindow->GetBackgroundColor();
 	nvrhi::Color col = nvrhi::Color(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
 	m_CommandList->clearTextureFloat(tex, subSet, col);
+	m_CommandList->clearDepthStencilTexture(DepthBuffer, subSet, true, 1.f, false, 0);
 
 	//manipulate the cube and camera
 	struct Data {
@@ -437,32 +440,36 @@ void DirectXTest::Draw()
 	cbuf.viewProj = view * proj;
 	
 	//hardcoded handling of movement now
-	if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_W))
-		data.cameraPos += cameraDir * data.cameraSpeed * m_PrimaryWindow->GetFrameTime();
-	else if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_S))
-		data.cameraPos -= cameraDir * data.cameraSpeed * m_PrimaryWindow->GetFrameTime();
-	Vector3 cameraRight = -cameraDir.Cross(Vector3(0.f, 1.f, 0.f));
-	if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_A))
-		data.cameraPos += cameraRight * data.cameraSpeed * m_PrimaryWindow->GetFrameTime();
-	else if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_D))
-		data.cameraPos -= cameraRight * data.cameraSpeed * m_PrimaryWindow->GetFrameTime();
-	if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
-	{
-		auto& io = ImGui::GetIO();
-		data.cameraEulers.x -= io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * m_PrimaryWindow->GetFrameTime();
-		data.cameraEulers.y += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * m_PrimaryWindow->GetFrameTime();
+	if (!ImGui::IsAnyItemFocused() && !ImGui::IsAnyItemActive()) {
+		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_W))
+			data.cameraPos += cameraDir * data.cameraSpeed * m_PrimaryWindow->GetFrameTime();
+		else if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_S))
+			data.cameraPos -= cameraDir * data.cameraSpeed * m_PrimaryWindow->GetFrameTime();
+		Vector3 cameraRight = -cameraDir.Cross(Vector3(0.f, 1.f, 0.f));
+		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_A))
+			data.cameraPos += cameraRight * data.cameraSpeed * m_PrimaryWindow->GetFrameTime();
+		else if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_D))
+			data.cameraPos -= cameraRight * data.cameraSpeed * m_PrimaryWindow->GetFrameTime();
+		if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
+		{
+			auto& io = ImGui::GetIO();
+			data.cameraEulers.x -= io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * m_PrimaryWindow->GetFrameTime();
+			data.cameraEulers.y += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * m_PrimaryWindow->GetFrameTime();
+		}
 	}
 
 	//draw the triangle
 	auto fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(tex);
+		.addColorAttachment(tex)
+		.setDepthAttachment(DepthBuffer);
 	nvrhi::FramebufferHandle pipelineFb = m_NvrhiDevice->createFramebuffer(fbDesc);
 	nvrhi::GraphicsState state;
 	state.pipeline = m_GraphicsPipeline;
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 	state.indexBuffer = { IndexBuffer, nvrhi::Format::R32_UINT, 0 };
-	state.vertexBuffers = { {VertexBuffer, 0, offsetof(Vertex, position)}};
+	state.vertexBuffers = { {VertexBuffer, 0, offsetof(Vertex, position)},
+	{VertexBuffer, 1, offsetof(Vertex, color)} };
 
 	auto layoutDesc = nvrhi::BindingSetDesc();
 	layoutDesc.bindings = {
@@ -533,8 +540,24 @@ void DirectXTest::CreateResource()
 		}
 	));
 	//create a depth buffer
+	nvrhi::TextureDesc depthBufferDesc;
+	depthBufferDesc.width = m_PrimaryWindow->GetBufferWidth();
+	depthBufferDesc.height = m_PrimaryWindow->GetBufferHeight();
+	depthBufferDesc.initialState = nvrhi::ResourceStates::DepthWrite;
+	depthBufferDesc.isRenderTarget = true;
+	depthBufferDesc.sampleCount = 1;
+	depthBufferDesc.dimension = nvrhi::TextureDimension::Texture2D;
+	depthBufferDesc.keepInitialState = true;
+	depthBufferDesc.mipLevels = 1;
+	depthBufferDesc.format = nvrhi::Format::D32;
+	depthBufferDesc.isTypeless = true;
+	depthBufferDesc.debugName = "Depth";
+	DepthBuffer = m_NvrhiDevice->createTexture(depthBufferDesc);
+
+	//create the fb for the graphics pipeline to draw on
 	auto fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(m_RhiSwapChainBuffers[0]);
+		.addColorAttachment(m_RhiSwapChainBuffers[0])
+		.setDepthAttachment(DepthBuffer);
 	fb = m_NvrhiDevice->createFramebuffer(fbDesc);
 
 	//can set the requirements
@@ -547,30 +570,68 @@ void DirectXTest::CreateResource()
 	BindingLayout = m_NvrhiDevice->createBindingLayout(layoutDesc);
 
 	//create a cube first
-	Vertex vertices[8];
-	const float size = 1.f;
-	for (int i = 0; i < 8; ++i) {
-		vertices[i].position = Vector3(
-			((i & 1) ? size / 2 : -size / 2),
-			((i & 2) ? size / 2 : -size / 2),
-			((i & 4) ? size / 2 : -size / 2)
-		);
-		RD_CORE_INFO("Vertex: {},{},{}", vertices[i].position.x, vertices[i].position.y, vertices[i].position.z);
+	Vertex vertices[] = {
+		// Position         // Normal        // Color
+		// Front face
+		{ {-1.0f, -1.0f,  1.0f},  {0.0f,  0.0f,  1.0f}},  // Vertex 0
+		{ { 1.0f, -1.0f,  1.0f},  {0.0f,  0.0f,  1.0f}},  // Vertex 1
+		{ { 1.0f,  1.0f,  1.0f},  {0.0f,  0.0f,  1.0f}},  // Vertex 2
+		{ {-1.0f,  1.0f,  1.0f},  {0.0f,  0.0f,  1.0f}},  // Vertex 3
 
-	}
+		// Back face
+		{ {-1.0f, -1.0f, -1.0f},  {0.0f,  1.0f, 1.0f}},  // Vertex 4
+		{ { 1.0f, -1.0f, -1.0f},  {0.0f,  1.0f, 1.0f}},  // Vertex 5
+		{ { 1.0f,  1.0f, -1.0f},  {0.0f,  1.0f, 1.0f}},  // Vertex 6
+		{ {-1.0f,  1.0f, -1.0f},  {0.0f,  1.0f, 1.0f}},  // Vertex 7
+
+		// Left face
+		{ {-1.0f, -1.0f, -1.0f},  {1.0f,  0.0f,  0.0f}},  // Vertex 8
+		{ {-1.0f, -1.0f,  1.0f},  {1.0f,  0.0f,  0.0f}},  // Vertex 9
+		{ {-1.0f,  1.0f,  1.0f},  {1.0f,  0.0f,  0.0f}},  // Vertex 10
+		{ {-1.0f,  1.0f, -1.0f},  {1.0f,  0.0f,  0.0f}},  // Vertex 11
+
+		// Right face
+		{ { 1.0f, -1.0f, -1.0f},  {1.0f,  1.0f,  0.0f}},  // Vertex 12
+		{ { 1.0f, -1.0f,  1.0f},  {1.0f,  1.0f,  0.0f}},  // Vertex 13
+		{ { 1.0f,  1.0f,  1.0f},  {1.0f,  1.0f,  0.0f}},  // Vertex 14
+		{ { 1.0f,  1.0f, -1.0f},  {1.0f,  1.0f,  0.0f}},  // Vertex 15
+
+		// Top face
+		{ {-1.0f,  1.0f, -1.0f},  {1.0f,  1.0f,  1.0f}},  // Vertex 16
+		{ { 1.0f,  1.0f, -1.0f},  {1.0f,  1.0f,  1.0f}},  // Vertex 17
+		{ { 1.0f,  1.0f,  1.0f},  {1.0f,  1.0f,  1.0f}},  // Vertex 18
+		{ {-1.0f,  1.0f,  1.0f},  {1.0f,  1.0f,  1.0f}},  // Vertex 19
+
+		// Bottom face
+		{ {-1.0f, -1.0f, -1.0f},  {0.0f, 1.0f,  0.0f}},  // Vertex 20
+		{ { 1.0f, -1.0f, -1.0f},  {0.0f, 1.0f,  0.0f}},  // Vertex 21
+		{ { 1.0f, -1.0f,  1.0f},  {0.0f, 1.0f,  0.0f}},  // Vertex 22
+		{ {-1.0f, -1.0f,  1.0f},  {0.0f, 1.0f,  0.0f}}   // Vertex 23
+	};
 	uint32_t indices[36] = {
-		// Front face (vertices 0, 1, 2, 3) – counter-clockwise
-		0, 2, 1, 2, 3, 1,
-		// Back face (vertices 4, 5, 6, 7) – counter-clockwise
-		4, 5, 6, 6, 5, 7,
-		// Left face (vertices 0, 2, 4, 6) – counter-clockwise
-		0, 4, 2, 2, 4, 6,
-		// Right face (vertices 1, 3, 5, 7) – counter-clockwise
-		1, 3, 5, 5, 3, 7,
-		// Top face (vertices 2, 3, 6, 7) – counter-clockwise
-		2, 6, 3, 3, 6, 7,
-		// Bottom face (vertices 0, 1, 4, 5) – counter-clockwise
-		0, 1, 4, 4, 1, 5
+		// Front face
+		0, 1, 2,
+		0, 2, 3,
+
+		// Back face
+		4, 5, 6,
+		4, 6, 7,
+
+		// Left face
+		8, 9, 10,
+		8, 10, 11,
+
+		// Right face
+		12, 13, 14,
+		12, 14, 15,
+
+		// Top face
+		16, 17, 18,
+		16, 18, 19,
+
+		// Bottom face
+		20, 21, 22,
+		20, 22, 23
 	};
 	//push the data into the buffer
 	nvrhi::VertexAttributeDesc positionAttrib;
@@ -579,8 +640,15 @@ void DirectXTest::CreateResource()
 	positionAttrib.offset = 0;
 	positionAttrib.bufferIndex = 0;
 	positionAttrib.elementStride = sizeof(Vertex);
+	nvrhi::VertexAttributeDesc colorAttrib;
+	colorAttrib.name = "ICOLOR";
+	colorAttrib.format = nvrhi::Format::RGB32_FLOAT;
+	colorAttrib.offset = 0;
+	colorAttrib.bufferIndex = 1;
+	colorAttrib.elementStride = sizeof(Vertex);
 	nvrhi::VertexAttributeDesc attribs[] = {
-		positionAttrib
+		positionAttrib,
+		colorAttrib
 	};
 	nvrhi::InputLayoutHandle inputLayoutHandle = m_NvrhiDevice->createInputLayout(attribs, uint32_t(std::size(attribs)), vs);
 	//loading the data
@@ -616,10 +684,10 @@ void DirectXTest::CreateResource()
 	pipelineDesc.addBindingLayout(BindingLayout);
 	pipelineDesc.setVertexShader(vs);
 	pipelineDesc.setFragmentShader(ps);
-	//why does disabling depth crash
-	pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
+
+	pipelineDesc.renderState.depthStencilState.depthTestEnable = true;
 	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
-	pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+	pipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
 	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
 	pipelineDesc.inputLayout = inputLayoutHandle;
 

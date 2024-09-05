@@ -134,6 +134,7 @@ public:
 	nvrhi::BindingLayoutHandle BindingLayout;
 	nvrhi::BufferHandle IndexBuffer;
 	nvrhi::BufferHandle VertexBuffer;
+	nvrhi::TextureHandle DepthBuffer;
 
 	void Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr <ragdoll::FileManager> fm, std::shared_ptr<ragdoll::InputHandler> hdl);
 	void Draw();
