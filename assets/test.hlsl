@@ -2,7 +2,7 @@
 
 static float3 g_color = float3(1,0,0);
 
-//cbuffer g_Const : register(b0) { float2 translationOffset; float2 scale; float radians; }
+cbuffer g_Const : register(b0) { float4x4 worldMatrix; float4x4 viewProjMatrix; }
 
 void main_vs(
 	in float3 inPos : POSITION,
@@ -10,7 +10,7 @@ void main_vs(
 	out float3 o_color : COLOR
 )
 {
-	o_pos = float4(inPos, 1);
+	o_pos = mul(mul(float4(inPos, 1), worldMatrix), viewProjMatrix);
 	o_color = g_color;
 }
 

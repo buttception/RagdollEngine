@@ -6,6 +6,10 @@ struct Vertex
 {
 	SimpleMath::Vector3 position;
 };
+struct CBuffer {
+	SimpleMath::Matrix world;
+	SimpleMath::Matrix viewProj;
+};
 
 DefaultMessageCallback DefaultMessageCallback::s_Instance;
 static bool MoveWindowOntoAdapter(IDXGIAdapter* targetAdapter, RECT& rect)
@@ -395,15 +399,15 @@ void DirectXTest::Draw()
 	nvrhi::Color col = nvrhi::Color(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
 	m_CommandList->clearTextureFloat(tex, subSet, col);
 	struct Data {
-		SimpleMath::Vector2 translationOffset = { 0.f, 0.f };
-		SimpleMath::Vector2 scale = { 1.f, 1.f };
-		float radians = 0.f;
+		SimpleMath::Vector3 position = { 0.f, 0.f, 0.f };
+		SimpleMath::Vector3 scale = { 1.f, 1.f, 0.f };
+		SimpleMath::Vector3 eulers = { 0.f, 0.f, 0.f };
 	};
 	static Data data;
 	ImGui::Begin("Triangle Manipulate");
-	ImGui::DragFloat2("Translation", &data.translationOffset.x, 0.01f);
-	ImGui::DragFloat2("Scale", &data.scale.x, 0.01f);
-	ImGui::DragFloat("Rotate", &data.radians, 0.01f);
+	ImGui::DragFloat3("Translation", &data.position.x, 0.01f);
+	ImGui::DragFloat3("Scale", &data.scale.x, 0.01f);
+	ImGui::DragFloat3("Rotate", &data.eulers.x, 0.01f);
 	ImGui::End();
 	//draw the triangle
 	auto fbDesc = nvrhi::FramebufferDesc()
@@ -416,16 +420,22 @@ void DirectXTest::Draw()
 	state.indexBuffer = { IndexBuffer, nvrhi::Format::R32_UINT, 0 };
 	state.vertexBuffers = { {VertexBuffer, 0, offsetof(Vertex, position)}};
 
-	//auto layoutDesc = nvrhi::BindingSetDesc();
-	//layoutDesc.bindings = {
-	//	nvrhi::BindingSetItem::PushConstants(0, sizeof(Data)),
-	//};
-	//auto binding = m_NvrhiDevice->createBindingSet(layoutDesc, BindingLayout);
-	//state.bindings = { binding };
-	//assert(state.bindings[0]);
+	auto layoutDesc = nvrhi::BindingSetDesc();
+	layoutDesc.bindings = {
+		nvrhi::BindingSetItem::PushConstants(0, sizeof(CBuffer)),
+	};
+	auto binding = m_NvrhiDevice->createBindingSet(layoutDesc, BindingLayout);
+	state.bindings = { binding };
+	assert(state.bindings[0]);
+
+	CBuffer test;
+	test.world = SimpleMath::Matrix::CreateTranslation(data.position);
+	test.world *= SimpleMath::Matrix::CreateScale(data.scale);
+	test.world *= SimpleMath::Matrix::CreateFromYawPitchRoll(data.eulers.x, data.eulers.y, data.eulers.z);
+	test.viewProj = SimpleMath::Matrix::Identity;
 
 	m_CommandList->setGraphicsState(state);
-	//m_CommandList->setPushConstants(&data, sizeof(Data));
+	m_CommandList->setPushConstants(&test, sizeof(CBuffer));
 	nvrhi::DrawArguments args;
 	args.vertexCount = 36;
 	m_CommandList->drawIndexed(args);
@@ -490,13 +500,13 @@ void DirectXTest::CreateResource()
 	fb = m_NvrhiDevice->createFramebuffer(fbDesc);
 
 	//can set the requirements
-	//auto layoutDesc = nvrhi::BindingLayoutDesc();
-	//layoutDesc.visibility = nvrhi::ShaderType::All;
-	//layoutDesc.bindings = {
-	//	//bind slot 0 with 2 floats
-	//	nvrhi::BindingLayoutItem::PushConstants(0, sizeof(float) * 5),
-	//};
-	//BindingLayout = m_NvrhiDevice->createBindingLayout(layoutDesc);
+	auto layoutDesc = nvrhi::BindingLayoutDesc();
+	layoutDesc.visibility = nvrhi::ShaderType::All;
+	layoutDesc.bindings = {
+		//bind slot 0 with 2 floats
+		nvrhi::BindingLayoutItem::PushConstants(0, sizeof(CBuffer)),
+	};
+	BindingLayout = m_NvrhiDevice->createBindingLayout(layoutDesc);
 
 	//create a cube first
 	Vertex vertices[8];
@@ -565,7 +575,7 @@ void DirectXTest::CreateResource()
 	m_NvrhiDevice->executeCommandList(m_CommandList);
 
 	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
-	//pipelineDesc.addBindingLayout(BindingLayout);
+	pipelineDesc.addBindingLayout(BindingLayout);
 	pipelineDesc.setVertexShader(vs);
 	pipelineDesc.setFragmentShader(ps);
 	//why does disabling depth crash
