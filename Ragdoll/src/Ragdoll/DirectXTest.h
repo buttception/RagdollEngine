@@ -16,6 +16,7 @@ using nvrhi::RefCountPtr;
 #include "Ragdoll/Graphics/GLFWContext.h"
 #include "Ragdoll/Graphics/Window/Window.h"
 #include "Ragdoll/File/FileManager.h"
+#include "Ragdoll/Input/InputHandler.h"
 #include <imgui.h>
 
 struct InstanceParameters
@@ -126,6 +127,7 @@ public:
 
 	std::shared_ptr<ragdoll::Window> m_PrimaryWindow;
 	std::shared_ptr<ragdoll::FileManager> m_FileManager;
+	std::shared_ptr<ragdoll::InputHandler> m_InputHandler;
 
 	nvrhi::ShaderHandle ImguiVertexShader;
 	nvrhi::ShaderHandle ImguiPixelShader;
@@ -133,7 +135,7 @@ public:
 	nvrhi::BufferHandle IndexBuffer;
 	nvrhi::BufferHandle VertexBuffer;
 
-	void Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr <ragdoll::FileManager> fm);
+	void Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr <ragdoll::FileManager> fm, std::shared_ptr<ragdoll::InputHandler> hdl);
 	void Draw();
 	void Present();
 	void Shutdown();

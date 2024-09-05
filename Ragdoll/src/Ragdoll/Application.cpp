@@ -79,7 +79,7 @@ namespace ragdoll
 		m_TransformLayer = std::make_shared<TransformLayer>(m_EntityManager);
 		m_LayerStack->PushLayer(m_TransformLayer);
 
-		m_DirectXTest.Init(m_PrimaryWindow, m_FileManager);
+		m_DirectXTest.Init(m_PrimaryWindow, m_FileManager, m_InputHandler);
 		m_ImguiInterface.Init(&m_DirectXTest);
 
 		//init all layers
@@ -90,8 +90,7 @@ namespace ragdoll
 	{
 		while (m_Running)
 		{
-			//input update must be called before window polls for inputs
-			m_InputHandler->Update(m_PrimaryWindow->GetDeltaTime());
+			//m_InputHandler->Update(m_PrimaryWindow->GetDeltaTime());
 			m_FileManager->Update();
 			while (m_Frametime < m_TargetFrametime) {
 				m_PrimaryWindow->Update();

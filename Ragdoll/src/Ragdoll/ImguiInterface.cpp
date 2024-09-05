@@ -1,5 +1,6 @@
 #include "ragdollpch.h"
 #include "ImguiInterface.h"
+#include "backends/imgui_impl_glfw.cpp"
 
 void ImguiInterface::Init(DirectXTest* dx)
 {
@@ -9,6 +10,7 @@ void ImguiInterface::Init(DirectXTest* dx)
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+	ImGui_ImplGlfw_InitForOther(m_DirectXTest->m_PrimaryWindow->GetGlfwWindow(), true);
 
 	// Setup Dear ImGui style
 	ImGui::StyleColorsDark();

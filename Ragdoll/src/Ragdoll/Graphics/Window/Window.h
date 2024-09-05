@@ -45,9 +45,9 @@ namespace ragdoll
 			std::string m_Title{ "ragdoll Engine" };
 			int32_t m_Width{ 1600 };
 			int32_t m_Height{ 900 };
-			SimpleMath::Vector2 m_Position{};
+			Vector2 m_Position{};
 			int32_t m_NumSamplesMSAA{ 0 };
-			SimpleMath::Color m_BackgroundColor{};
+			Color m_BackgroundColor{};
 			float m_Opacity{ 1.f };
 			bool m_Resizable{ true };
 			bool m_Visible{ true };
@@ -68,9 +68,9 @@ namespace ragdoll
 		const std::string& GetTitle() const { return m_Properties.m_Title; }
 		int32_t GetWidth() const { return m_Properties.m_Width; }
 		int32_t GetHeight() const { return m_Properties.m_Height; }
-		const SimpleMath::Vector2 GetPosition() const { return m_Properties.m_Position; }
+		const Vector2 GetPosition() const { return m_Properties.m_Position; }
 		int32_t GetNumSamplesMSAA() const { return m_Properties.m_NumSamplesMSAA; }
-		const SimpleMath::Color GetBackgroundColor() const { return m_Properties.m_BackgroundColor; }
+		const Color GetBackgroundColor() const { return m_Properties.m_BackgroundColor; }
 		float GetOpacity() const { return m_Properties.m_Opacity; }
 		bool IsResizable() const { return m_Properties.m_Resizable; }
 		bool IsVisible() const { return m_Properties.m_Visible; }

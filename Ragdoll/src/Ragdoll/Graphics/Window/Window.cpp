@@ -109,7 +109,7 @@ namespace ragdoll
 		glfwSetWindowPosCallback(m_GlfwWindow, [](GLFWwindow* window, int32_t _x, int32_t _y)
 		{
 			Window& data = *static_cast<Window*>(glfwGetWindowUserPointer(window));
-			data.m_Properties.m_Position = SimpleMath::Vector2(_x, _y);
+			data.m_Properties.m_Position = Vector2(_x, _y);
 
 			WindowMoveEvent event{_x, _y};
 			data.m_Callback(event);

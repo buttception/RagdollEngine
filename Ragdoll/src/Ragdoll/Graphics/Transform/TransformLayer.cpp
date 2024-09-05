@@ -117,11 +117,11 @@ namespace ragdoll
 		}
 	}
 
-	SimpleMath::Matrix TransformLayer::GetLocalModelMatrix(const Transform& trans)
+	Matrix TransformLayer::GetLocalModelMatrix(const Transform& trans)
 	{
-		SimpleMath::Matrix model = SimpleMath::Matrix::CreateTranslation(trans.m_LocalPosition);
-		model *= SimpleMath::Matrix::CreateFromQuaternion(trans.m_LocalRotation);
-		model *= SimpleMath::Matrix::CreateScale(trans.m_LocalScale);
+		Matrix model = Matrix::CreateTranslation(trans.m_LocalPosition);
+		model *= Matrix::CreateFromQuaternion(trans.m_LocalRotation);
+		model *= Matrix::CreateScale(trans.m_LocalScale);
 		return model;
 	}
 }

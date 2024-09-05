@@ -590,17 +590,28 @@ namespace ragdoll
 		auto& io = ImGui::GetIO();
 		io.MousePos = { m_MousePos.x, m_MousePos.y };
 		io.MouseWheel += m_ScrollDeltas.y;
+		io.MouseDelta = { m_MouseDeltas.x, m_MouseDeltas.y };
 
 		for (const auto& key : s_KeyToImGuiKeyMap) {
 			if (key.second == ImGuiKey_COUNT)
 				continue;
 			io.KeysDown[(ImGuiKey)key.second] = m_Keys[(int)key.first].m_InputState.m_Hold;
 		}
+		io.KeyCtrl = m_Keys[(int)Key::LeftControl].m_InputState.m_Hold || m_Keys[(int)Key::RightControl].m_InputState.m_Hold;
+		io.KeyShift = m_Keys[(int)Key::LeftShift].m_InputState.m_Hold || m_Keys[(int)Key::RightShift].m_InputState.m_Hold;
+		io.KeyAlt = m_Keys[(int)Key::LeftAlt].m_InputState.m_Hold || m_Keys[(int)Key::RightAlt].m_InputState.m_Hold;
+		io.KeySuper = m_Keys[(int)Key::LeftSuper].m_InputState.m_Hold || m_Keys[(int)Key::RightSuper].m_InputState.m_Hold;
 		for (const auto& key : s_ButtonToImGuiMouseButtonMap) {
 			if (key.second == ImGuiMouseButton_COUNT)
 				continue;
 			io.MouseDown[(ImGuiMouseButton_)key.second] = m_MouseButtons[(int)key.first].m_InputState.m_Hold;
 		}
+	}
+
+	void InputHandler::Reset()
+	{
+		m_MouseDeltas = { 0.f, 0.f };
+		m_ScrollDeltas = { 0.f, 0.f };
 	}
 
 	void InputHandler::Shutdown()
@@ -647,15 +658,12 @@ namespace ragdoll
 	{
 		UNREFERENCED_PARAMETER(event);
 		//handle in the future in case character pressed is a unicode character, get the unicode value for text input
-		auto& io = ImGui::GetIO();
-
-		io.AddInputCharacter(event.GetKeyCode());
 	}
 
 	void InputHandler::OnMouseMove(MouseMovedEvent& event)
 	{
 		m_MousePos = { event.GetX(), event.GetY() };
-		m_MouseDeltas = XMFLOAT2(m_MousePos.x - m_LastMousePos.x, m_MousePos.y - m_LastMousePos.y);
+		m_MouseDeltas = Vector2(m_MousePos.x - m_LastMousePos.x, m_MousePos.y - m_LastMousePos.y);
 		m_LastMousePos = m_MousePos;
 #if RD_LOG_INPUT
 		RD_CORE_TRACE("Mouse Pos: {}, Mouse Delta: {}", m_MousePos, m_MouseDeltas);

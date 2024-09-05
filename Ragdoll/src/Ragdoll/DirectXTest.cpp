@@ -4,11 +4,11 @@
 //========================temp=======================
 struct Vertex
 {
-	SimpleMath::Vector3 position;
+	Vector3 position;
 };
 struct CBuffer {
-	SimpleMath::Matrix world;
-	SimpleMath::Matrix viewProj;
+	Matrix world;
+	Matrix viewProj;
 };
 
 DefaultMessageCallback DefaultMessageCallback::s_Instance;
@@ -63,10 +63,11 @@ static bool IsNvDeviceID(UINT id)
 	return id == 0x10DE;
 }
 
-void DirectXTest::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm)
+void DirectXTest::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::InputHandler> hdl)
 {
 	m_PrimaryWindow = win;
 	m_FileManager = fm;
+	m_InputHandler = hdl;
 	CreateDevice();
 	CreateSwapChain();
 	CreateResource();
@@ -398,17 +399,60 @@ void DirectXTest::Draw()
 	auto bgCol = m_PrimaryWindow->GetBackgroundColor();
 	nvrhi::Color col = nvrhi::Color(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
 	m_CommandList->clearTextureFloat(tex, subSet, col);
+
+	//manipulate the cube and camera
 	struct Data {
-		SimpleMath::Vector3 position = { 0.f, 0.f, 0.f };
-		SimpleMath::Vector3 scale = { 1.f, 1.f, 0.f };
-		SimpleMath::Vector3 eulers = { 0.f, 0.f, 0.f };
+		Vector3 cubePosition = { 0.f, 0.f, 0.f };
+		Vector3 cubeScale = { 1.f, 1.f, 1.f };
+		Vector3 cubeEulers = { 0.f, 0.f, 0.f };
+		Vector3 cameraPos = { 0.f, 0.f, -5.f };
+		Vector2 cameraEulers = { 0.f, 0.f };
+		float cameraFov = 60.f;
+		float cameraNear = 0.01f;
+		float cameraFar = 100.f;
+		float cameraAspect = 16.f / 9.f;
+		float cameraSpeed = 1.f;
+		float cameraRotationSpeed = 5.f;
 	};
 	static Data data;
 	ImGui::Begin("Triangle Manipulate");
-	ImGui::DragFloat3("Translation", &data.position.x, 0.01f);
-	ImGui::DragFloat3("Scale", &data.scale.x, 0.01f);
-	ImGui::DragFloat3("Rotate", &data.eulers.x, 0.01f);
+	ImGui::DragFloat3("Translation", &data.cubePosition.x, 0.01f);
+	ImGui::DragFloat3("Scale", &data.cubeScale.x, 0.01f);
+	ImGui::DragFloat3("Rotate (Radians)", &data.cubeEulers.x, 0.01f);
+	ImGui::DragFloat("Camera FOV (Degrees)", &data.cameraFov, 1.f, 60.f, 120.f);
+	ImGui::DragFloat("Camera Near", &data.cameraNear, 0.01f, 0.01f, 1.f);
+	ImGui::DragFloat("Camera Far", &data.cameraFar, 10.f, 10.f, 10000.f);
+	ImGui::DragFloat("Camera Aspect Ratio", &data.cameraAspect, 0.01f, 0.01f, 5.f);
+	ImGui::DragFloat("Camera Speed", &data.cameraSpeed, 0.01f, 0.01f, 5.f);
+	ImGui::DragFloat("Camera Rotation Speed (Degrees)", &data.cameraRotationSpeed, 1.f, 10.f, 100.f);
 	ImGui::End();
+
+	CBuffer cbuf;
+	cbuf.world = Matrix::CreateTranslation(data.cubePosition);
+	cbuf.world *= Matrix::CreateScale(data.cubeScale);
+	cbuf.world *= Matrix::CreateFromYawPitchRoll(data.cubeEulers.x, data.cubeEulers.y, data.cubeEulers.z);
+	Matrix proj = Matrix::CreatePerspectiveFieldOfView(DirectX::XMConvertToRadians(data.cameraFov), data.cameraAspect, data.cameraNear, data.cameraFar);
+	Vector3 cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraEulers.x, data.cameraEulers.y, 0.f));
+	Matrix view = Matrix::CreateLookAt(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
+	cbuf.viewProj = view * proj;
+	
+	//hardcoded handling of movement now
+	if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_W))
+		data.cameraPos += cameraDir * data.cameraSpeed * m_PrimaryWindow->GetFrameTime();
+	else if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_S))
+		data.cameraPos -= cameraDir * data.cameraSpeed * m_PrimaryWindow->GetFrameTime();
+	Vector3 cameraRight = -cameraDir.Cross(Vector3(0.f, 1.f, 0.f));
+	if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_A))
+		data.cameraPos += cameraRight * data.cameraSpeed * m_PrimaryWindow->GetFrameTime();
+	else if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_D))
+		data.cameraPos -= cameraRight * data.cameraSpeed * m_PrimaryWindow->GetFrameTime();
+	if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
+	{
+		auto& io = ImGui::GetIO();
+		data.cameraEulers.x -= io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * m_PrimaryWindow->GetFrameTime();
+		data.cameraEulers.y += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * m_PrimaryWindow->GetFrameTime();
+	}
+
 	//draw the triangle
 	auto fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(tex);
@@ -428,14 +472,8 @@ void DirectXTest::Draw()
 	state.bindings = { binding };
 	assert(state.bindings[0]);
 
-	CBuffer test;
-	test.world = SimpleMath::Matrix::CreateTranslation(data.position);
-	test.world *= SimpleMath::Matrix::CreateScale(data.scale);
-	test.world *= SimpleMath::Matrix::CreateFromYawPitchRoll(data.eulers.x, data.eulers.y, data.eulers.z);
-	test.viewProj = SimpleMath::Matrix::Identity;
-
 	m_CommandList->setGraphicsState(state);
-	m_CommandList->setPushConstants(&test, sizeof(CBuffer));
+	m_CommandList->setPushConstants(&cbuf, sizeof(CBuffer));
 	nvrhi::DrawArguments args;
 	args.vertexCount = 36;
 	m_CommandList->drawIndexed(args);
@@ -512,7 +550,7 @@ void DirectXTest::CreateResource()
 	Vertex vertices[8];
 	const float size = 1.f;
 	for (int i = 0; i < 8; ++i) {
-		vertices[i].position = SimpleMath::Vector3(
+		vertices[i].position = Vector3(
 			((i & 1) ? size / 2 : -size / 2),
 			((i & 2) ? size / 2 : -size / 2),
 			((i & 4) ? size / 2 : -size / 2)
