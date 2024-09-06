@@ -47,6 +47,8 @@ ________________________________________________________________________________
 #include "Resource/ResourceManager.h"
 #include "File/FileManager.h"
 
+#include "DirectXDevice.h"
+
 namespace ragdoll
 {
 	void Application::Init(const ApplicationConfig& config)
@@ -79,8 +81,8 @@ namespace ragdoll
 		m_TransformLayer = std::make_shared<TransformLayer>(m_EntityManager);
 		m_LayerStack->PushLayer(m_TransformLayer);
 
-		m_DirectXTest.Init(m_PrimaryWindow, m_FileManager, m_InputHandler);
-		m_ImguiInterface.Init(&m_DirectXTest);
+		Renderer.Init(m_PrimaryWindow, m_FileManager);
+		m_ImguiInterface.Init(Renderer.Device.get(), Renderer.ImguiVertexShader, Renderer.ImguiPixelShader);
 
 		//init all layers
 		m_LayerStack->Init();
@@ -102,10 +104,10 @@ namespace ragdoll
 				layer->Update(static_cast<float>(m_TargetFrametime));
 			}
 			m_ImguiInterface.BeginFrame();
-			m_DirectXTest.Draw();
+			Renderer.Draw();
 
 			m_ImguiInterface.Render();
-			m_DirectXTest.Present();
+			Renderer.Device->Present();
 
 			m_PrimaryWindow->SetFrametime(m_TargetFrametime);
 			m_PrimaryWindow->IncFpsCounter();
@@ -115,8 +117,7 @@ namespace ragdoll
 
 	void Application::Shutdown()
 	{
-		m_DirectXTest.Shutdown();
-		m_DirectXTest.~DirectXTest();
+		Renderer.Shutdown();
 		m_FileManager->Shutdown();
 		m_PrimaryWindow->Shutdown();
 		GLFWContext::Shutdown();

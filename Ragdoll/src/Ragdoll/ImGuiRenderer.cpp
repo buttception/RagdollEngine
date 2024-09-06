@@ -1,8 +1,9 @@
 #include "ragdollpch.h"
-#include "ImguiInterface.h"
+#include "ImGuiRenderer.h"
+#include "DirectXDevice.h"
 #include "backends/imgui_impl_glfw.cpp"
 
-void ImguiInterface::Init(DirectXTest* dx)
+void ImguiRenderer::Init(DirectXDevice* dx, nvrhi::ShaderHandle imGuiVS, nvrhi::ShaderHandle imGuiPS)
 {
 	m_DirectXTest = dx;
 	IMGUI_CHECKVERSION();
@@ -17,7 +18,7 @@ void ImguiInterface::Init(DirectXTest* dx)
 
 	CommandList = m_DirectXTest->m_NvrhiDevice->createCommandList();
 	CommandList->open();
-	RD_ASSERT(m_DirectXTest->ImguiVertexShader == nullptr || m_DirectXTest->ImguiPixelShader == nullptr, "Failed to load Imgui shaders");
+	RD_ASSERT(imGuiVS == nullptr || imGuiPS == nullptr, "Failed to load Imgui shaders");
 	// create attribute layout object
 	nvrhi::VertexAttributeDesc vertexAttribLayout[] = {
 		{ "POSITION", nvrhi::Format::RG32_FLOAT,  1, 0, offsetof(ImDrawVert,pos), sizeof(ImDrawVert), false },
@@ -25,7 +26,7 @@ void ImguiInterface::Init(DirectXTest* dx)
 		{ "COLOR",    nvrhi::Format::RGBA8_UNORM, 1, 0, offsetof(ImDrawVert,col), sizeof(ImDrawVert), false },
 	};
 	//creating the layout for shader
-	ShaderAttribLayout = m_DirectXTest->m_NvrhiDevice->createInputLayout(vertexAttribLayout, _countof(vertexAttribLayout), m_DirectXTest->ImguiVertexShader);
+	ShaderAttribLayout = m_DirectXTest->m_NvrhiDevice->createInputLayout(vertexAttribLayout, _countof(vertexAttribLayout), imGuiVS);
 
 	io.Fonts->AddFontDefault();
 
@@ -71,8 +72,8 @@ void ImguiInterface::Init(DirectXTest* dx)
 
 	BasePSODesc.primType = nvrhi::PrimitiveType::TriangleList;
 	BasePSODesc.inputLayout = ShaderAttribLayout;
-	BasePSODesc.VS = m_DirectXTest->ImguiVertexShader;
-	BasePSODesc.PS = m_DirectXTest->ImguiPixelShader;
+	BasePSODesc.VS = imGuiVS;
+	BasePSODesc.PS = imGuiPS;
 	BasePSODesc.renderState = renderState;
 	BasePSODesc.bindingLayouts = { BindingLayout };
 	CommandList->close();
@@ -80,7 +81,7 @@ void ImguiInterface::Init(DirectXTest* dx)
 	m_DirectXTest->m_NvrhiDevice->executeCommandList(CommandList);
 }
 
-void ImguiInterface::BeginFrame()
+void ImguiRenderer::BeginFrame()
 {
 	ImGuiIO& io = ImGui::GetIO();
 	io.DeltaTime = m_DirectXTest->m_PrimaryWindow->GetFrameTime();
@@ -91,7 +92,7 @@ void ImguiInterface::BeginFrame()
 	ImGui::NewFrame();
 }
 
-void ImguiInterface::Render()
+void ImguiRenderer::Render()
 {
 	ImGui::Render();
 
@@ -191,16 +192,16 @@ void ImguiInterface::Render()
 	m_DirectXTest->m_NvrhiDevice->executeCommandList(CommandList);
 }
 
-void ImguiInterface::BackbufferResizing()
+void ImguiRenderer::BackbufferResizing()
 {
 	PSO = nullptr;
 }
 
-void ImguiInterface::Shutdown()
+void ImguiRenderer::Shutdown()
 {
 }
 
-bool ImguiInterface::ReallocateBuffer(nvrhi::BufferHandle& buffer, size_t requiredSize, size_t reallocateSize, bool isIndexBuffer)
+bool ImguiRenderer::ReallocateBuffer(nvrhi::BufferHandle& buffer, size_t requiredSize, size_t reallocateSize, bool isIndexBuffer)
 {
 	if (buffer == nullptr || size_t(buffer->getDesc().byteSize) < requiredSize)
 	{
@@ -229,7 +230,7 @@ bool ImguiInterface::ReallocateBuffer(nvrhi::BufferHandle& buffer, size_t requir
 	return true;
 }
 
-nvrhi::IGraphicsPipeline* ImguiInterface::GetPSO(nvrhi::IFramebuffer* fb)
+nvrhi::IGraphicsPipeline* ImguiRenderer::GetPSO(nvrhi::IFramebuffer* fb)
 {
 	if (PSO)
 		return PSO;
@@ -240,31 +241,7 @@ nvrhi::IGraphicsPipeline* ImguiInterface::GetPSO(nvrhi::IFramebuffer* fb)
 	return PSO;
 }
 
-nvrhi::IBindingSet* ImguiInterface::GetBindingSet(nvrhi::ITexture* texture)
-{
-	auto iter = BindingsCache.find(texture);
-	if (iter != BindingsCache.end())
-	{
-		return iter->second;
-	}
-
-	nvrhi::BindingSetDesc desc;
-
-	desc.bindings = {
-		nvrhi::BindingSetItem::PushConstants(0, sizeof(float) * 2),
-		nvrhi::BindingSetItem::Texture_SRV(0, texture),
-		nvrhi::BindingSetItem::Sampler(0, FontSampler)
-	};
-
-	nvrhi::BindingSetHandle binding;
-	binding = m_DirectXTest->m_NvrhiDevice->createBindingSet(desc, BindingLayout);
-	assert(binding);
-
-	BindingsCache[texture] = binding;
-	return binding;
-}
-
-bool ImguiInterface::UpdateGeometry(nvrhi::ICommandList* commandList)
+bool ImguiRenderer::UpdateGeometry(nvrhi::ICommandList* commandList)
 {
 	ImDrawData* drawData = ImGui::GetDrawData();
 
@@ -309,7 +286,7 @@ bool ImguiInterface::UpdateGeometry(nvrhi::ICommandList* commandList)
 	return true;
 }
 
-void ImguiInterface::CreateFontTexture()
+void ImguiRenderer::CreateFontTexture()
 {
 	ImGuiIO& io = ImGui::GetIO();
 	unsigned char* pixels;

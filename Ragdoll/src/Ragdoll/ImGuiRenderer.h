@@ -1,8 +1,9 @@
 #pragma once
-#include "DirectXTest.h"
 #include <imgui.h>
+#include <nvrhi/nvrhi.h>
+class DirectXDevice;
 
-class ImguiInterface {
+class ImguiRenderer {
 public:
 	nvrhi::CommandListHandle CommandList;
 	nvrhi::SamplerHandle FontSampler;
@@ -12,24 +13,22 @@ public:
 	nvrhi::GraphicsPipelineDesc BasePSODesc;
 
 	nvrhi::GraphicsPipelineHandle PSO;
-	std::unordered_map<nvrhi::ITexture*, nvrhi::BindingSetHandle> BindingsCache;
 
 	nvrhi::BufferHandle VertexBufferHandle;
 	nvrhi::BufferHandle IndexBufferHandle;
 	std::vector<ImDrawVert> VertexBufferRaw;
 	std::vector<ImDrawIdx> IndexBufferRaw;
 
-	void Init(DirectXTest* dx);
+	void Init(DirectXDevice* dx, nvrhi::ShaderHandle imguiVS, nvrhi::ShaderHandle imguiPS);
 	void BeginFrame();
 	void Render();
 	void BackbufferResizing();
 	void Shutdown();
 private:
-	DirectXTest* m_DirectXTest;
+	DirectXDevice* m_DirectXTest;
 
 	bool ReallocateBuffer(nvrhi::BufferHandle& buffer, size_t requiredSize, size_t reallocateSize, bool isIndexBuffer);
 	nvrhi::IGraphicsPipeline* GetPSO(nvrhi::IFramebuffer* fb);
-	nvrhi::IBindingSet* GetBindingSet(nvrhi::ITexture* texture);
 	bool UpdateGeometry(nvrhi::ICommandList* commandList);
 
 	void CreateFontTexture();
