@@ -57,7 +57,7 @@ project "Ragdoll"
 
 	prebuildcommands
 	{
-		"%{wks.location}Tools\\compileShader.bat"
+		"\"%{wks.location}Tools\\compileShader.bat\""
 	}
 
 	filter "system:windows"

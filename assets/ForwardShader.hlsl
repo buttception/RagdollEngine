@@ -9,7 +9,7 @@ cbuffer g_Const : register(b0) {
 void main_vs(
 	in float3 inPos : POSITION,
 	in float3 inNormal : NORMAL,
-	in float2 inTexcoord : TEXCOORD,
+	in float2 inTexcoord : TEXCOORD_0,
 	out float4 o_pos : SV_Position,
 	out float3 outNormal : NORMAL1,
 	out float2 outTexcoord : TEXCOORD1

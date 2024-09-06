@@ -210,7 +210,7 @@ void ForwardRenderer::CreateResource()
 	vNormalAttrib.elementStride = sizeof(Vertex);
 	vNormalAttrib.format = nvrhi::Format::RGB32_FLOAT;
 	nvrhi::VertexAttributeDesc vTexcoordAttrib;
-	vTexcoordAttrib.name = "TEXCOORD";
+	vTexcoordAttrib.name = "TEXCOORD_0";
 	vTexcoordAttrib.offset = offsetof(Vertex, texcoord);
 	vTexcoordAttrib.elementStride = sizeof(Vertex);
 	vTexcoordAttrib.format = nvrhi::Format::RG32_FLOAT;
@@ -223,7 +223,7 @@ void ForwardRenderer::CreateResource()
 
 	//load the gltf model
 	//COMMAND LIST MUST BE OPENED
-	Loader.LoadAndCreateModel("GLTF Testcases/2_BoxInterleaved/BoxInterleaved.gltf", Meshes);
+	Loader.LoadAndCreateModel("GLTF Testcases/3_BoxTextured/BoxTextured.gltf", Meshes);
 
 	CommandList->close();
 	//remember to execute the list

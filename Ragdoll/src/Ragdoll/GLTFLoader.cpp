@@ -89,7 +89,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_
 			RD_ASSERT(desc == nullptr, "Loaded mesh contains a attribute not supported by the renderer: {}", it.first);
 			for (int i = 0; i < vertexCount; ++i) {
 				uint8_t* bytePos = reinterpret_cast<uint8_t*>(&vertices[i]) + desc->offset;
-				memcpy(bytePos, data + it.second.bufferView.byteOffset + i * it.second.bufferView.byteStride, size);
+				memcpy(bytePos, data + it.second.bufferView.byteOffset + i * it.second.bufferView.byteStride + it.second.accessor.byteOffset, size);
 			}
 		}
 		//deal with index buffer
@@ -102,6 +102,9 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_
 			case TINYGLTF_COMPONENT_TYPE_SHORT:
 				indices[i] = *reinterpret_cast<int16_t*>(const_cast<uint8_t*>(data + bufferView.byteOffset + i * 2));
 				break;
+			case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+				indices[i] = *reinterpret_cast<uint16_t*>(const_cast<uint8_t*>(data + bufferView.byteOffset + i * 2));
+				break;
 			case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
 				indices[i] = *reinterpret_cast<uint32_t*>(const_cast<uint8_t*>(data + bufferView.byteOffset + i * 2));
 				break;
@@ -110,7 +113,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_
 		
 		//presume command list is open and will be closed and executed later
 		nvrhi::BufferDesc vertexBufDesc;
-		vertexBufDesc.byteSize = vertices.size();	//the offset is already the size of the vb
+		vertexBufDesc.byteSize = vertices.size() * sizeof(Vertex);	//the offset is already the size of the vb
 		vertexBufDesc.isVertexBuffer = true;
 		vertexBufDesc.debugName = itMesh.name + " Vertex Buffer";
 		vertexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;	//set as copy dest to copy over data
@@ -123,7 +126,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_
 		Renderer->CommandList->setPermanentBufferState(mesh.Buffers.VertexBuffer, nvrhi::ResourceStates::VertexBuffer);	//now its a vb
 
 		nvrhi::BufferDesc indexBufDesc;
-		indexBufDesc.byteSize = indices.size();
+		indexBufDesc.byteSize = indices.size() * sizeof(uint32_t);
 		indexBufDesc.isIndexBuffer = true;
 		indexBufDesc.debugName = itMesh.name + " Index Buffer";
 		indexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;
@@ -132,6 +135,15 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_
 		Renderer->CommandList->beginTrackingBufferState(mesh.Buffers.IndexBuffer, nvrhi::ResourceStates::CopyDest);
 		Renderer->CommandList->writeBuffer(mesh.Buffers.IndexBuffer, indices.data(), indexBufDesc.byteSize);
 		Renderer->CommandList->setPermanentBufferState(mesh.Buffers.IndexBuffer, nvrhi::ResourceStates::IndexBuffer);
+
+		for(const auto& it : vertices)
+		{
+			RD_CORE_INFO("Pos: {}, Normal: {}, Texcoord: {}", it.position, it.normal, it.texcoord);
+		}
+		for(const auto& it : indices)
+		{
+			RD_CORE_INFO("Index: {}", it);
+		}
 	}
 	//TODO: create the scene hireachy through entt
 	
