@@ -23,6 +23,7 @@ Launcher/assets/
 *.cso
 *.gltf
 *.bin
+*.png
 
 #Specific files
 imgui.ini

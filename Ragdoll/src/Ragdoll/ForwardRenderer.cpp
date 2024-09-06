@@ -105,10 +105,11 @@ void ForwardRenderer::Draw()
 	state.addBindingSet(BindingSetHandle);
 	//bind the test mesh
 	const auto& mesh = Meshes["Mesh"];
-	state.indexBuffer = { mesh.Buffers.IndexBuffer, mesh.Buffers.IndexFormat, 0 };
+	state.indexBuffer = { mesh.Buffers.IndexBuffer, nvrhi::Format::R32_UINT, 0 };
 	state.vertexBuffers = {
-		{mesh.Buffers.VertexBuffer, 0, mesh.Buffers.Attribs.AttribsDesc[0].offset},
-		{mesh.Buffers.VertexBuffer, 1, mesh.Buffers.Attribs.AttribsDesc[1].offset}
+		{mesh.Buffers.VertexBuffer, 0, offsetof(Vertex, position)},	//POSITION
+		{mesh.Buffers.VertexBuffer, 1, offsetof(Vertex, normal)},	//NORMAL
+		{mesh.Buffers.VertexBuffer, 2, offsetof(Vertex, texcoord)}	//TEXCOORD
 	};
 
 	CommandList->setGraphicsState(state);
@@ -197,6 +198,29 @@ void ForwardRenderer::CreateResource()
 	};
 	BindingSetHandle = Device->m_NvrhiDevice->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
+	//create the vertex layout and index used by the shader
+	nvrhi::VertexAttributeDesc vPositionAttrib;
+	vPositionAttrib.name = "POSITION";
+	vPositionAttrib.offset = offsetof(Vertex, position);
+	vPositionAttrib.elementStride = sizeof(Vertex);
+	vPositionAttrib.format = nvrhi::Format::RGB32_FLOAT;
+	nvrhi::VertexAttributeDesc vNormalAttrib;
+	vNormalAttrib.name = "NORMAL";
+	vNormalAttrib.offset = offsetof(Vertex, normal);
+	vNormalAttrib.elementStride = sizeof(Vertex);
+	vNormalAttrib.format = nvrhi::Format::RGB32_FLOAT;
+	nvrhi::VertexAttributeDesc vTexcoordAttrib;
+	vTexcoordAttrib.name = "TEXCOORD";
+	vTexcoordAttrib.offset = offsetof(Vertex, texcoord);
+	vTexcoordAttrib.elementStride = sizeof(Vertex);
+	vTexcoordAttrib.format = nvrhi::Format::RG32_FLOAT;
+	VertexAttributes = {
+		vPositionAttrib,
+		vNormalAttrib,
+		vTexcoordAttrib
+	};
+	InputLayoutHandle = Device->m_NvrhiDevice->createInputLayout(VertexAttributes.data(), VertexAttributes.size(), ForwardVertexShader);
+
 	//load the gltf model
 	//COMMAND LIST MUST BE OPENED
 	Loader.LoadAndCreateModel("GLTF Testcases/2_BoxInterleaved/BoxInterleaved.gltf", Meshes);
@@ -214,7 +238,7 @@ void ForwardRenderer::CreateResource()
 	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
 	pipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
 	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;	//does nothing?
-	pipelineDesc.inputLayout = Meshes["Mesh"].Buffers.Attribs.InputLayoutHandle;
+	pipelineDesc.inputLayout = InputLayoutHandle;
 
 	GraphicsPipeline = Device->m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);
 }

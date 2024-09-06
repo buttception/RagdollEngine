@@ -14,12 +14,18 @@ struct CBuffer {
 	Vector4 sceneAmbientColor = { 0.2f, 0.2f, 0.2f, 1.f };
 	Vector3 lightDirection = { 1.f, -1.f, 1.f };
 };
+struct Vertex {
+	Vector3 position = Vector3::Zero;
+	Vector3 normal = Vector3::Zero;
+	Vector2 texcoord = Vector2::Zero;
+};
 class ForwardRenderer {
 	//handled at the renderer side
 	nvrhi::BindingLayoutHandle BindingLayoutHandle;
 	nvrhi::BindingSetHandle BindingSetHandle;
-	nvrhi::BufferHandle IndexBuffer;
 	nvrhi::BufferHandle VertexBuffer;
+	nvrhi::BufferHandle IndexBuffer;
+
 	nvrhi::TextureHandle DepthBuffer;
 	nvrhi::GraphicsPipelineHandle GraphicsPipeline;
 
@@ -35,6 +41,8 @@ public:
 	nvrhi::ShaderHandle ForwardVertexShader;
 	nvrhi::ShaderHandle ForwardPixelShader;
 	nvrhi::BufferHandle ConstantBuffer;
+	std::vector<nvrhi::VertexAttributeDesc> VertexAttributes;
+	nvrhi::InputLayoutHandle InputLayoutHandle;
 	//keep all the meshes in the renderer for now
 	std::unordered_map<std::string, ragdoll::Mesh> Meshes;
 	

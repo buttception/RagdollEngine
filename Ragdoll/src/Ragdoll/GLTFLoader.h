@@ -6,33 +6,12 @@ class ForwardRenderer;
 namespace ragdoll {
 	class FileManager;
 }
-struct Vertex
-{
-	Vector3 position;
-	Vector3 color;
-};
-
 namespace ragdoll {
-	struct Attributes {
-		std::vector<nvrhi::VertexAttributeDesc> AttribsDesc;
-		uint32_t AttribsTotalByteSize{};
-		nvrhi::InputLayoutHandle InputLayoutHandle;
-
-		void CreateInputLayoutHandle(nvrhi::DeviceHandle device, nvrhi::ShaderHandle vs) {
-
-			InputLayoutHandle = device->createInputLayout(AttribsDesc.data(), uint32_t(std::size(AttribsDesc)), vs);
-		}
-	};
 	struct Buffer {
-		Attributes Attribs;
-		uint32_t TotalByteSize{};
 		uint32_t IndicesByteOffset{};
 		nvrhi::Format IndexFormat;
 		nvrhi::BufferHandle VertexBuffer;
 		nvrhi::BufferHandle IndexBuffer;
-		//can decide if we want to keep in memory next time?
-
-		void CreateBuffers(ForwardRenderer* renderer, const uint8_t* bytes, const std::string meshName);
 	};
 	struct Mesh {
 		std::string Name;

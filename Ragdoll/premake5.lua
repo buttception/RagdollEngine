@@ -55,6 +55,11 @@ project "Ragdoll"
 		"%{IncludesDir.tinygltf}",
     }
 
+	prebuildcommands
+	{
+		"%{wks.location}Tools\\compileShader.bat"
+	}
+
 	filter "system:windows"
 		systemversion "latest"
 

@@ -1,5 +1,3 @@
-#pragma pack_matrix(row_major)
-
 cbuffer g_Const : register(b0) {
 	float4x4 worldMatrix;
 	float4x4 viewProjMatrix;
@@ -10,9 +8,11 @@ cbuffer g_Const : register(b0) {
 
 void main_vs(
 	in float3 inPos : POSITION,
-	in float3 inNormal : NORMAL0,
+	in float3 inNormal : NORMAL,
+	in float2 inTexcoord : TEXCOORD,
 	out float4 o_pos : SV_Position,
-	out float3 outNormal : NORMAL1
+	out float3 outNormal : NORMAL1,
+	out float2 outTexcoord : TEXCOORD1
 )
 {
 	o_pos = mul(mul(float4(inPos, 1), worldMatrix), viewProjMatrix);
@@ -22,6 +22,7 @@ void main_vs(
 void main_ps(
 	in float4 i_pos : SV_Position,
 	in float3 inNormal : NORMAL1,
+	in float2 inTexcoord : TEXCOORD1,
 	out float4 o_color : SV_Target0
 )
 {
