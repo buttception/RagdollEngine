@@ -2,6 +2,7 @@
 
 #include "ForwardRenderer.h"
 #include "DirectXDevice.h"
+#include <nvrhi/utils.h>
 
 void ForwardRenderer::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm)
 {
@@ -28,39 +29,48 @@ void ForwardRenderer::Draw()
 
 	//manipulate the cube and camera
 	struct Data {
-		Vector3 cubePosition = { 0.f, 0.f, 0.f };
-		Vector3 cubeScale = { 1.f, 1.f, 1.f };
-		Vector3 cubeEulers = { 0.f, 0.f, 0.f };
-		Vector3 cameraPos = { 0.f, 0.f, -5.f };
-		Vector2 cameraEulers = { 0.f, 0.f };
+		Vector3 cameraPos = { 0.f, 1.f, -5.f };
+		Vector2 cameraEulers = { 0.f, 0.f};
 		float cameraFov = 60.f;
 		float cameraNear = 0.01f;
 		float cameraFar = 100.f;
 		float cameraAspect = 16.f / 9.f;
-		float cameraSpeed = 1.f;
+		float cameraSpeed = 2.5f;
 		float cameraRotationSpeed = 5.f;
+		Color dirLightColor = { 1.f,1.f,1.f,1.f };
+		Color ambientLight = { 0.2f, 0.2f, 0.2f, 1.f };
+		float ambientIntensity = 0.2f;
+		Vector2 azimuthAndElevation = { 300.f, 45.f };
 	};
 	static Data data;
 	ImGui::Begin("Triangle Manipulate");
-	ImGui::DragFloat3("Translation", &data.cubePosition.x, 0.01f);
-	ImGui::DragFloat3("Scale", &data.cubeScale.x, 0.01f);
-	ImGui::DragFloat3("Rotate (Radians)", &data.cubeEulers.x, 0.01f);
-	ImGui::DragFloat("Camera FOV (Degrees)", &data.cameraFov, 1.f, 60.f, 120.f);
-	ImGui::DragFloat("Camera Near", &data.cameraNear, 0.01f, 0.01f, 1.f);
-	ImGui::DragFloat("Camera Far", &data.cameraFar, 10.f, 10.f, 10000.f);
-	ImGui::DragFloat("Camera Aspect Ratio", &data.cameraAspect, 0.01f, 0.01f, 5.f);
-	ImGui::DragFloat("Camera Speed", &data.cameraSpeed, 0.01f, 0.01f, 5.f);
-	ImGui::DragFloat("Camera Rotation Speed (Degrees)", &data.cameraRotationSpeed, 1.f, 10.f, 100.f);
+	ImGui::SliderFloat("Camera FOV (Degrees)", &data.cameraFov, 60.f, 120.f);
+	ImGui::SliderFloat("Camera Near", &data.cameraNear, 0.01f, 1.f);
+	ImGui::SliderFloat("Camera Far", &data.cameraFar, 10.f, 10000.f);
+	ImGui::SliderFloat("Camera Aspect Ratio", &data.cameraAspect, 0.01f, 5.f);
+	ImGui::SliderFloat("Camera Speed", &data.cameraSpeed, 0.01f, 5.f);
+	ImGui::SliderFloat("Camera Rotation Speed (Degrees)", &data.cameraRotationSpeed, 5.f, 100.f);
+	ImGui::ColorEdit3("Light Diffuse", &data.dirLightColor.x);
+	ImGui::ColorEdit3("Ambient Light Diffuse", &data.ambientLight.x);
+	ImGui::SliderFloat("Azimuth (Degrees)", &data.azimuthAndElevation.x, 0.f, 360.f);
+	ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, -90.f, 90.f);
 	ImGui::End();
 
 	CBuffer cbuf;
-	cbuf.world = Matrix::CreateTranslation(data.cubePosition);
-	cbuf.world *= Matrix::CreateScale(data.cubeScale);
-	cbuf.world *= Matrix::CreateFromYawPitchRoll(data.cubeEulers.x, data.cubeEulers.y, data.cubeEulers.z);
+	cbuf.world = Matrix::Identity;
 	Matrix proj = Matrix::CreatePerspectiveFieldOfView(DirectX::XMConvertToRadians(data.cameraFov), data.cameraAspect, data.cameraNear, data.cameraFar);
 	Vector3 cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraEulers.x, data.cameraEulers.y, 0.f));
 	Matrix view = Matrix::CreateLookAt(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
 	cbuf.viewProj = view * proj;
+	cbuf.sceneAmbientColor = data.ambientLight;
+	cbuf.lightDiffuseColor = data.dirLightColor;
+	Vector2 azimuthElevationRad = {
+		DirectX::XMConvertToRadians(data.azimuthAndElevation.x),
+		DirectX::XMConvertToRadians(data.azimuthAndElevation.y) };
+	cbuf.lightDirection = Vector3(
+		sinf(azimuthElevationRad.y)*cosf(azimuthElevationRad.x),
+		cosf(azimuthElevationRad.y)*cosf(azimuthElevationRad.x),
+		sinf(azimuthElevationRad.x));
 
 	//hardcoded handling of movement now
 	if (!ImGui::IsAnyItemFocused() && !ImGui::IsAnyItemActive()) {
@@ -80,8 +90,10 @@ void ForwardRenderer::Draw()
 			data.cameraEulers.y += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindow->GetFrameTime();
 		}
 	}
+	cbuf.lightDiffuseColor = data.dirLightColor;
+	//upload the constant buffer
+	CommandList->writeBuffer(ConstantBuffer, &cbuf, sizeof(CBuffer));
 
-	//draw the triangle
 	auto fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(tex)
 		.setDepthAttachment(DepthBuffer);
@@ -90,6 +102,7 @@ void ForwardRenderer::Draw()
 	state.pipeline = GraphicsPipeline;
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
+	state.addBindingSet(BindingSetHandle);
 	//bind the test mesh
 	const auto& mesh = Meshes["Mesh"];
 	state.indexBuffer = { mesh.Buffers.IndexBuffer, mesh.Buffers.IndexFormat, 0 };
@@ -97,19 +110,9 @@ void ForwardRenderer::Draw()
 		{mesh.Buffers.VertexBuffer, 0, mesh.Buffers.Attribs.AttribsDesc[0].offset},
 		{mesh.Buffers.VertexBuffer, 1, mesh.Buffers.Attribs.AttribsDesc[1].offset}
 	};
-	//state.indexBuffer = { IndexBuffer, nvrhi::Format::R32_UINT, 0 };
-	//state.vertexBuffers = { {VertexBuffer, 0, offsetof(Vertex, position)}, {VertexBuffer, 1, offsetof(Vertex, color)} };
-
-	auto layoutDesc = nvrhi::BindingSetDesc();
-	layoutDesc.bindings = {
-		nvrhi::BindingSetItem::PushConstants(0, sizeof(CBuffer)),
-	};
-	auto binding = Device->m_NvrhiDevice->createBindingSet(layoutDesc, BindingLayout);
-	state.bindings = { binding };
-	assert(state.bindings[0]);
 
 	CommandList->setGraphicsState(state);
-	CommandList->setPushConstants(&cbuf, sizeof(CBuffer));
+
 	nvrhi::DrawArguments args;
 	args.vertexCount = 36;
 	CommandList->drawIndexed(args);
@@ -122,6 +125,9 @@ void ForwardRenderer::Shutdown()
 	//release nvrhi stuff
 	DepthBuffer = nullptr;
 	GraphicsPipeline = nullptr;
+	ConstantBuffer = nullptr;
+	BindingSetHandle = nullptr;
+	BindingLayoutHandle = nullptr;
 	Device->Shutdown();
 	Device->~DirectXDevice();
 }
@@ -135,12 +141,12 @@ void ForwardRenderer::CreateResource()
 
 	//load outputted shaders objects
 	uint32_t size{};
-	const uint8_t* data = FileManager->ImmediateLoad("test.vs.cso", size);
-	TestVertexShader = Device->m_NvrhiDevice->createShader(
+	const uint8_t* data = FileManager->ImmediateLoad("ForwardShader.vs.cso", size);
+	ForwardVertexShader = Device->m_NvrhiDevice->createShader(
 		nvrhi::ShaderDesc(nvrhi::ShaderType::Vertex),
 		data, size);
-	data = FileManager->ImmediateLoad("test.ps.cso", size);
-	TestPixelShader = Device->m_NvrhiDevice->createShader(
+	data = FileManager->ImmediateLoad("ForwardShader.ps.cso", size);
+	ForwardPixelShader = Device->m_NvrhiDevice->createShader(
 		nvrhi::ShaderDesc(nvrhi::ShaderType::Pixel),
 		data, size);
 	data = FileManager->ImmediateLoad("imgui.vs.cso", size);
@@ -168,36 +174,46 @@ void ForwardRenderer::CreateResource()
 	DepthBuffer = Device->m_NvrhiDevice->createTexture(depthBufferDesc);
 
 	//create the fb for the graphics pipeline to draw on
-	auto fbDesc = nvrhi::FramebufferDesc()
+	nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(Device->GetCurrentBackbuffer())
 		.setDepthAttachment(DepthBuffer);
 	fb = Device->m_NvrhiDevice->createFramebuffer(fbDesc);
 
 	//can set the requirements
-	auto layoutDesc = nvrhi::BindingLayoutDesc();
+	//here is creating a push constant
+	nvrhi::BindingLayoutDesc layoutDesc = nvrhi::BindingLayoutDesc();
 	layoutDesc.visibility = nvrhi::ShaderType::All;
 	layoutDesc.bindings = {
-		//bind slot 0 with 2 floats
-		nvrhi::BindingLayoutItem::PushConstants(0, sizeof(CBuffer)),
+		nvrhi::BindingLayoutItem::VolatileConstantBuffer(0)
 	};
-	BindingLayout = Device->m_NvrhiDevice->createBindingLayout(layoutDesc);
+	BindingLayoutHandle = Device->m_NvrhiDevice->createBindingLayout(layoutDesc);
+	//create a constant buffer here
+	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(CBuffer), "CBuffer", 1);
+	ConstantBuffer = Device->m_NvrhiDevice->createBuffer(cBufDesc);
+	//bind the buffer
+	nvrhi::BindingSetDesc bindingSetDesc;
+	bindingSetDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer)
+	};
+	BindingSetHandle = Device->m_NvrhiDevice->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
 	//load the gltf model
-	//for now force load the box.gltf
+	//COMMAND LIST MUST BE OPENED
 	Loader.LoadAndCreateModel("GLTF Testcases/2_BoxInterleaved/BoxInterleaved.gltf", Meshes);
 
 	CommandList->close();
+	//remember to execute the list
 	Device->m_NvrhiDevice->executeCommandList(CommandList);
 
 	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
-	pipelineDesc.addBindingLayout(BindingLayout);
-	pipelineDesc.setVertexShader(TestVertexShader);
-	pipelineDesc.setFragmentShader(TestPixelShader);
+	pipelineDesc.addBindingLayout(BindingLayoutHandle);
+	pipelineDesc.setVertexShader(ForwardVertexShader);
+	pipelineDesc.setFragmentShader(ForwardPixelShader);
 
 	pipelineDesc.renderState.depthStencilState.depthTestEnable = true;
 	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
 	pipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
-	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::Back;	//does nothing?
+	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;	//does nothing?
 	pipelineDesc.inputLayout = Meshes["Mesh"].Buffers.Attribs.InputLayoutHandle;
 
 	GraphicsPipeline = Device->m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);

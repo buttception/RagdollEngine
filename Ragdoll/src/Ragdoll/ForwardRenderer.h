@@ -10,10 +10,14 @@ class DirectXDevice;
 struct CBuffer {
 	Matrix world;
 	Matrix viewProj;
+	Vector4 lightDiffuseColor = { 1.f, 1.f, 1.f, 1.f };
+	Vector4 sceneAmbientColor = { 0.2f, 0.2f, 0.2f, 1.f };
+	Vector3 lightDirection = { 1.f, -1.f, 1.f };
 };
 class ForwardRenderer {
 	//handled at the renderer side
-	nvrhi::BindingLayoutHandle BindingLayout;
+	nvrhi::BindingLayoutHandle BindingLayoutHandle;
+	nvrhi::BindingSetHandle BindingSetHandle;
 	nvrhi::BufferHandle IndexBuffer;
 	nvrhi::BufferHandle VertexBuffer;
 	nvrhi::TextureHandle DepthBuffer;
@@ -28,8 +32,9 @@ public:
 	nvrhi::CommandListHandle CommandList;
 	nvrhi::ShaderHandle ImguiVertexShader;
 	nvrhi::ShaderHandle ImguiPixelShader;
-	nvrhi::ShaderHandle TestVertexShader;
-	nvrhi::ShaderHandle TestPixelShader;
+	nvrhi::ShaderHandle ForwardVertexShader;
+	nvrhi::ShaderHandle ForwardPixelShader;
+	nvrhi::BufferHandle ConstantBuffer;
 	//keep all the meshes in the renderer for now
 	std::unordered_map<std::string, ragdoll::Mesh> Meshes;
 	

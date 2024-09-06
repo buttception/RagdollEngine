@@ -71,7 +71,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_
 				mesh.Buffers.Attribs.AttribsDesc.emplace_back(attrib);
 			}
 			//initialize the attributes
-			mesh.Buffers.Attribs.CreateInputLayoutHandle(Renderer->Device->m_NvrhiDevice, Renderer->TestVertexShader);
+			mesh.Buffers.Attribs.CreateInputLayoutHandle(Renderer->Device->m_NvrhiDevice, Renderer->ForwardVertexShader);
 			//now load the index buffer
 			const tinygltf::Accessor& accessor = model.accessors[itPrim.indices];
 			const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
