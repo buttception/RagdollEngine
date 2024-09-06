@@ -37,16 +37,16 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_
 		int32_t bufferIndex = -1; //-1 is invalid index
 		uint32_t size = 0;
 		const uint8_t* data = nullptr;	//nullptr is invalid
-		for (const auto& itPrim : itMesh.primitives) {	//there can be more than 1 primitive???
+		for (const tinygltf::Primitive& itPrim : itMesh.primitives) {	//there can be more than 1 primitive???
 			//for every primitive in the mesh
 			for (const auto& itAttrib : itPrim.attributes) {
 				//for every attribute in the primitive, it points to the id of a assessor
-				const auto& accessor = model.accessors[itAttrib.second];
+				const tinygltf::Accessor& accessor = model.accessors[itAttrib.second];
 				//the assessor contains the id to the bufferview
-				const auto& bufferView = model.bufferViews[accessor.bufferView];
+				const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
 				//bufferView contains the id to the data
 				if (bufferIndex != bufferView.buffer) {
-					const auto& buffer = model.buffers[bufferView.buffer];
+					const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
 					//buffer is currently not loaded
 					data = FileManager->ImmediateLoad(buffer.uri, size);
 					mesh.Buffers.TotalByteSize = size;
@@ -56,6 +56,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_
 				attrib.name = itAttrib.first;	//first is the name of the attrib
 				attrib.offset = accessor.byteOffset;
 				attrib.bufferIndex = 0; //using only one vb, if got more primitives need add
+				attrib.elementStride = bufferView.byteStride;
 				//set format by gltf type
 				switch (accessor.type) {
 				case TINYGLTF_TYPE_VEC3:
@@ -68,15 +69,11 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_
 				//push the attrib into the attribs
 				mesh.Buffers.Attribs.AttribsDesc.emplace_back(attrib);
 			}
-			//once done need to update all the element strides
-			for (auto& attribDesc : mesh.Buffers.Attribs.AttribsDesc) {
-				attribDesc.elementStride = 12;
-			}
 			//initialize the attributes
 			mesh.Buffers.Attribs.CreateInputLayoutHandle(Renderer->Device->m_NvrhiDevice, Renderer->TestVertexShader);
 			//now load the index buffer
-			const auto& accessor = model.accessors[itPrim.indices];
-			const auto& bufferView = model.bufferViews[accessor.bufferView];
+			const tinygltf::Accessor& accessor = model.accessors[itPrim.indices];
+			const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
 			mesh.Buffers.IndicesByteOffset = bufferView.byteOffset;
 			switch (accessor.componentType) {
 			case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
