@@ -30,7 +30,7 @@ ________________________________________________________________________________
 #pragma once
 #include "Core/Guid.h"
 #include "ImGuiRenderer.h"
-#include "TestRenderer.h"
+#include "ForwardRenderer.h"
 
 namespace ragdoll
 {
@@ -97,7 +97,7 @@ namespace ragdoll
 		std::shared_ptr<LayerStack> m_LayerStack;
 		std::shared_ptr<TransformLayer> m_TransformLayer;
 
-		TestRenderer Renderer;
+		ForwardRenderer Renderer;
 		ImguiRenderer m_ImguiInterface;
 
 		double m_Framerate = 60.0;

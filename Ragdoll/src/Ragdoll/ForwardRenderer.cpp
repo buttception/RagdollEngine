@@ -1,9 +1,9 @@
 #include "ragdollpch.h"
 
-#include "TestRenderer.h"
+#include "ForwardRenderer.h"
 #include "DirectXDevice.h"
 
-void TestRenderer::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm)
+void ForwardRenderer::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm)
 {
 	PrimaryWindow = win;
 	FileManager = fm;
@@ -13,7 +13,7 @@ void TestRenderer::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ra
 	CreateResource();
 }
 
-void TestRenderer::Draw()
+void ForwardRenderer::Draw()
 {
 	Device->BeginFrame();
 	Device->m_NvrhiDevice->runGarbageCollection();
@@ -117,7 +117,7 @@ void TestRenderer::Draw()
 	Device->m_NvrhiDevice->executeCommandList(CommandList);
 }
 
-void TestRenderer::Shutdown()
+void ForwardRenderer::Shutdown()
 {
 	//release nvrhi stuff
 	DepthBuffer = nullptr;
@@ -126,7 +126,7 @@ void TestRenderer::Shutdown()
 	Device->~DirectXDevice();
 }
 
-void TestRenderer::CreateResource()
+void ForwardRenderer::CreateResource()
 {
 	CommandList = Device->m_NvrhiDevice->createCommandList();
 	CommandList->open();
@@ -184,7 +184,7 @@ void TestRenderer::CreateResource()
 
 	//load the gltf model
 	//for now force load the box.gltf
-	Loader.LoadAndCreateModel("Box.gltf", Meshes);
+	Loader.LoadAndCreateModel("GLTF Testcases/2_BoxInterleaved/BoxInterleaved.gltf", Meshes);
 
 	CommandList->close();
 	Device->m_NvrhiDevice->executeCommandList(CommandList);
@@ -197,7 +197,7 @@ void TestRenderer::CreateResource()
 	pipelineDesc.renderState.depthStencilState.depthTestEnable = true;
 	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
 	pipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
-	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::Back;	//does nothing?
 	pipelineDesc.inputLayout = Meshes["Mesh"].Buffers.Attribs.InputLayoutHandle;
 
 	GraphicsPipeline = Device->m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);

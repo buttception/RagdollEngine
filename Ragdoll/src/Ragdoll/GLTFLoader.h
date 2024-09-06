@@ -2,7 +2,7 @@
 #include "Ragdoll/Math/RagdollMath.h"
 #include <nvrhi/nvrhi.h>
 
-class TestRenderer;
+class ForwardRenderer;
 namespace ragdoll {
 	class FileManager;
 }
@@ -32,7 +32,7 @@ namespace ragdoll {
 		nvrhi::BufferHandle IndexBuffer;
 		//can decide if we want to keep in memory next time?
 
-		void CreateBuffers(TestRenderer* renderer, const uint8_t* bytes, const std::string meshName);
+		void CreateBuffers(ForwardRenderer* renderer, const uint8_t* bytes, const std::string meshName);
 	};
 	struct Mesh {
 		std::string Name;
@@ -47,10 +47,10 @@ namespace ragdoll {
 
 class GLTFLoader {
 	std::filesystem::path Root;
-	TestRenderer* Renderer;
+	ForwardRenderer* Renderer;
 	std::shared_ptr<ragdoll::FileManager> FileManager;
 public:
-	void Init(std::filesystem::path root, TestRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm);
+	void Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm);
 	void LoadAndCreateModel(const std::string& fileName, std::unordered_map<std::string, ragdoll::Mesh>& meshesRef);
 private:
 };

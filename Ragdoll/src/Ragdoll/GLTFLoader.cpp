@@ -1,7 +1,7 @@
 #include "ragdollpch.h"
 
 #include "GLTFLoader.h"
-#include "TestRenderer.h"
+#include "ForwardRenderer.h"
 #include "DirectXDevice.h"
 
 // Define these only in *one* .cc file.
@@ -11,7 +11,7 @@
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 #include "tiny_gltf.h"
 
-void GLTFLoader::Init(std::filesystem::path root, TestRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm)
+void GLTFLoader::Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm)
 {
 	Root = root;
 	Renderer = renderer;
@@ -24,7 +24,8 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_
 	tinygltf::TinyGLTF loader;
 	tinygltf::Model model;
 	std::string err, warn;
-	auto path = Root / fileName;
+	std::filesystem::path path = Root / fileName;
+	std::filesystem::path modelRoot = path.parent_path().lexically_relative(Root);
 	bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, path.string());
 	RD_ASSERT(ret == false, "Issue loading {}", path.string());
 
@@ -48,7 +49,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_
 				if (bufferIndex != bufferView.buffer) {
 					const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
 					//buffer is currently not loaded
-					data = FileManager->ImmediateLoad(buffer.uri, size);
+					data = FileManager->ImmediateLoad(modelRoot / buffer.uri, size);
 					mesh.Buffers.TotalByteSize = size;
 				}
 				//create the attrib
@@ -84,11 +85,11 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_
 			mesh.Buffers.CreateBuffers(Renderer, data, itMesh.name.c_str());
 		}
 	}
-	//TODO: create the scene hireachy
+	//TODO: create the scene hireachy through entt
 	
 }
 
-void ragdoll::Buffer::CreateBuffers(TestRenderer* renderer, const uint8_t* bytes, const std::string meshName)
+void ragdoll::Buffer::CreateBuffers(ForwardRenderer* renderer, const uint8_t* bytes, const std::string meshName)
 {
 	//presume command list is open and will be closed and executed later
 	nvrhi::BufferDesc vertexBufDesc;

@@ -11,7 +11,7 @@ struct CBuffer {
 	Matrix world;
 	Matrix viewProj;
 };
-class TestRenderer {
+class ForwardRenderer {
 	//handled at the renderer side
 	nvrhi::BindingLayoutHandle BindingLayout;
 	nvrhi::BufferHandle IndexBuffer;
