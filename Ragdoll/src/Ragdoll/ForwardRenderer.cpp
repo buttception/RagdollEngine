@@ -4,6 +4,8 @@
 #include "DirectXDevice.h"
 #include <nvrhi/utils.h>
 
+#include "AssetManager.h"
+
 void ForwardRenderer::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm)
 {
 	PrimaryWindow = win;
@@ -102,15 +104,24 @@ void ForwardRenderer::Draw()
 	state.pipeline = GraphicsPipeline;
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
-	state.addBindingSet(BindingSetHandle);
 	//bind the test mesh
-	const auto& mesh = Meshes["Mesh"];
-	state.indexBuffer = { mesh.Buffers.IndexBuffer, nvrhi::Format::R32_UINT, 0 };
+	const Mesh& mesh = AssetManager::GetInstance()->Meshes[0];
+	const Texture& meshTex = AssetManager::GetInstance()->Textures[0];
+	state.indexBuffer = { mesh.IndexBufferHandle, nvrhi::Format::R32_UINT, 0 };
 	state.vertexBuffers = {
-		{mesh.Buffers.VertexBuffer, 0, offsetof(Vertex, position)},	//POSITION
-		{mesh.Buffers.VertexBuffer, 1, offsetof(Vertex, normal)},	//NORMAL
-		{mesh.Buffers.VertexBuffer, 2, offsetof(Vertex, texcoord)}	//TEXCOORD
+		{mesh.VertexBufferHandle, 0, offsetof(Vertex, position)},	//POSITION
+		{mesh.VertexBufferHandle, 1, offsetof(Vertex, normal)},	//NORMAL
+		{mesh.VertexBufferHandle, 2, offsetof(Vertex, texcoord)}	//TEXCOORD
 	};
+	//bind the buffer
+	nvrhi::BindingSetDesc bindingSetDesc;
+	bindingSetDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(0, AssetManager::GetInstance()->Images[meshTex.ImageIndex].TextureHandle),
+		nvrhi::BindingSetItem::Sampler(0, meshTex.SamplerHandle)
+	};
+	BindingSetHandle = Device->m_NvrhiDevice->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+	state.addBindingSet(BindingSetHandle);
 
 	CommandList->setGraphicsState(state);
 
@@ -185,18 +196,16 @@ void ForwardRenderer::CreateResource()
 	nvrhi::BindingLayoutDesc layoutDesc = nvrhi::BindingLayoutDesc();
 	layoutDesc.visibility = nvrhi::ShaderType::All;
 	layoutDesc.bindings = {
-		nvrhi::BindingLayoutItem::VolatileConstantBuffer(0)
+		nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
+		//binds slot 0 with shader resource view, srv is used to read data from textures
+		nvrhi::BindingLayoutItem::Texture_SRV(0),
+		//binds slot 0 with sampler, controls how the texture is sampled
+		nvrhi::BindingLayoutItem::Sampler(0),
 	};
 	BindingLayoutHandle = Device->m_NvrhiDevice->createBindingLayout(layoutDesc);
 	//create a constant buffer here
 	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(CBuffer), "CBuffer", 1);
 	ConstantBuffer = Device->m_NvrhiDevice->createBuffer(cBufDesc);
-	//bind the buffer
-	nvrhi::BindingSetDesc bindingSetDesc;
-	bindingSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer)
-	};
-	BindingSetHandle = Device->m_NvrhiDevice->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
 	//create the vertex layout and index used by the shader
 	nvrhi::VertexAttributeDesc vPositionAttrib;
@@ -210,7 +219,7 @@ void ForwardRenderer::CreateResource()
 	vNormalAttrib.elementStride = sizeof(Vertex);
 	vNormalAttrib.format = nvrhi::Format::RGB32_FLOAT;
 	nvrhi::VertexAttributeDesc vTexcoordAttrib;
-	vTexcoordAttrib.name = "TEXCOORD_0";
+	vTexcoordAttrib.name = "TEXCOORD";
 	vTexcoordAttrib.offset = offsetof(Vertex, texcoord);
 	vTexcoordAttrib.elementStride = sizeof(Vertex);
 	vTexcoordAttrib.format = nvrhi::Format::RG32_FLOAT;
@@ -223,7 +232,7 @@ void ForwardRenderer::CreateResource()
 
 	//load the gltf model
 	//COMMAND LIST MUST BE OPENED
-	Loader.LoadAndCreateModel("GLTF Testcases/3_BoxTextured/BoxTextured.gltf", Meshes);
+	Loader.LoadAndCreateModel("GLTF Testcases/3_BoxTextured/BoxTextured.gltf");
 
 	CommandList->close();
 	//remember to execute the list

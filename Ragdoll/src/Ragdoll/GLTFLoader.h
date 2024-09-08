@@ -13,15 +13,6 @@ namespace ragdoll {
 		nvrhi::BufferHandle VertexBuffer;
 		nvrhi::BufferHandle IndexBuffer;
 	};
-	struct Mesh {
-		std::string Name;
-		//meshes refers to a bunch of primitives
-		//this will contain all the attributes and buffers
-		Buffer Buffers;
-		//TODO: it also refers to a material
-
-
-	};
 }
 
 class GLTFLoader {
@@ -30,6 +21,6 @@ class GLTFLoader {
 	std::shared_ptr<ragdoll::FileManager> FileManager;
 public:
 	void Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm);
-	void LoadAndCreateModel(const std::string& fileName, std::unordered_map<std::string, ragdoll::Mesh>& meshesRef);
+	void LoadAndCreateModel(const std::string& fileName);
 private:
 };

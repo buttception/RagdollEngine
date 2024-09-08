@@ -3,13 +3,16 @@
 #include "GLTFLoader.h"
 #include "ForwardRenderer.h"
 #include "DirectXDevice.h"
+#include "AssetManager.h"
 
 // Define these only in *one* .cc file.
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
-#include "tiny_gltf.h"
+#include <tiny_gltf.h>
+
+#include "../../../Editor/src/Asset/Asset.h"
 
 void GLTFLoader::Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm)
 {
@@ -18,11 +21,11 @@ void GLTFLoader::Init(std::filesystem::path root, ForwardRenderer* renderer, std
 	FileManager = fm;
 }
 
-void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_map<std::string, ragdoll::Mesh>& meshesRef)
+void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 {
 	//COMMAND LIST MUST BE OPEN FOR THIS FUNCTION TO EXECUTE
 	tinygltf::TinyGLTF loader;
-	tinygltf::Model model;
+	tinygltf::Model& model = AssetManager::GetInstance()->Model;
 	std::string err, warn;
 	std::filesystem::path path = Root / fileName;
 	std::filesystem::path modelRoot = path.parent_path().lexically_relative(Root);
@@ -40,8 +43,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_
 		};
 		std::unordered_map<std::string, TinygltfPair> attributeToAccessors;
 		//for every mesh, create a new mesh object
-		meshesRef[itMesh.name];
-		auto& mesh = meshesRef[itMesh.name];
+		Mesh mesh;
 		//keep track of what is the currently loaded buffer and data
 		int32_t bufferIndex = -1; //-1 is invalid index
 		uint32_t binSize = 0;
@@ -71,7 +73,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_
 			nvrhi::VertexAttributeDesc const* desc = nullptr;
 			uint32_t size;
 			for (const nvrhi::VertexAttributeDesc& itDesc : Renderer->VertexAttributes) {
-				if (itDesc.name == it.first)
+				if (it.first.find(itDesc.name) != std::string::npos)
 				{
 					desc = &itDesc;
 					switch (it.second.accessor.type) {
@@ -119,11 +121,11 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_
 		vertexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;	//set as copy dest to copy over data
 		//smth smth syncrhonization need to be this state to be written
 
-		mesh.Buffers.VertexBuffer = Renderer->Device->m_NvrhiDevice->createBuffer(vertexBufDesc);
+		mesh.VertexBufferHandle = Renderer->Device->m_NvrhiDevice->createBuffer(vertexBufDesc);
 		//copy data over
-		Renderer->CommandList->beginTrackingBufferState(mesh.Buffers.VertexBuffer, nvrhi::ResourceStates::CopyDest);	//i tink this is to update nvrhi resource manager state tracker
-		Renderer->CommandList->writeBuffer(mesh.Buffers.VertexBuffer, vertices.data(), vertexBufDesc.byteSize);
-		Renderer->CommandList->setPermanentBufferState(mesh.Buffers.VertexBuffer, nvrhi::ResourceStates::VertexBuffer);	//now its a vb
+		Renderer->CommandList->beginTrackingBufferState(mesh.VertexBufferHandle, nvrhi::ResourceStates::CopyDest);	//i tink this is to update nvrhi resource manager state tracker
+		Renderer->CommandList->writeBuffer(mesh.VertexBufferHandle, vertices.data(), vertexBufDesc.byteSize);
+		Renderer->CommandList->setPermanentBufferState(mesh.VertexBufferHandle, nvrhi::ResourceStates::VertexBuffer);	//now its a vb
 
 		nvrhi::BufferDesc indexBufDesc;
 		indexBufDesc.byteSize = indices.size() * sizeof(uint32_t);
@@ -131,11 +133,12 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_
 		indexBufDesc.debugName = itMesh.name + " Index Buffer";
 		indexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;
 
-		mesh.Buffers.IndexBuffer = Renderer->Device->m_NvrhiDevice->createBuffer(indexBufDesc);
-		Renderer->CommandList->beginTrackingBufferState(mesh.Buffers.IndexBuffer, nvrhi::ResourceStates::CopyDest);
-		Renderer->CommandList->writeBuffer(mesh.Buffers.IndexBuffer, indices.data(), indexBufDesc.byteSize);
-		Renderer->CommandList->setPermanentBufferState(mesh.Buffers.IndexBuffer, nvrhi::ResourceStates::IndexBuffer);
+		mesh.IndexBufferHandle = Renderer->Device->m_NvrhiDevice->createBuffer(indexBufDesc);
+		Renderer->CommandList->beginTrackingBufferState(mesh.IndexBufferHandle, nvrhi::ResourceStates::CopyDest);
+		Renderer->CommandList->writeBuffer(mesh.IndexBufferHandle, indices.data(), indexBufDesc.byteSize);
+		Renderer->CommandList->setPermanentBufferState(mesh.IndexBufferHandle, nvrhi::ResourceStates::IndexBuffer);
 
+		RD_CORE_INFO("Mesh: {}", itMesh.name);
 		for(const auto& it : vertices)
 		{
 			RD_CORE_INFO("Pos: {}, Normal: {}, Texcoord: {}", it.position, it.normal, it.texcoord);
@@ -144,7 +147,118 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName, std::unordered_
 		{
 			RD_CORE_INFO("Index: {}", it);
 		}
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
+	//load the images
+	for(const tinygltf::Image& itImg : model.images)
+	{
+		nvrhi::TextureDesc texDesc;
+		texDesc.width = itImg.width;
+		texDesc.height = itImg.height;
+		texDesc.dimension = nvrhi::TextureDimension::Texture2D;
+		switch(itImg.component)
+		{
+		case 1:
+			texDesc.format = nvrhi::Format::R8_UNORM;
+			break;
+		case 2:
+			texDesc.format = nvrhi::Format::RG8_UNORM;
+			break;
+		case 3:
+			texDesc.format = nvrhi::Format::RGBA8_UNORM;
+			break;
+		case 4:
+			texDesc.format = nvrhi::Format::RGBA8_UNORM;
+			break;
+		default:
+			RD_ASSERT(true, "Unsupported texture channel count");
+		}
+		texDesc.debugName = itImg.uri;
+		texDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+		texDesc.isRenderTarget = false;
+		texDesc.keepInitialState = true;
+
+		Image img;
+		img.TextureHandle = Renderer->Device->m_NvrhiDevice->createTexture(texDesc);
+		RD_ASSERT(img.TextureHandle == nullptr, "Issue creating texture handle: {}", itImg.uri);
+
+		//upload the texture data
+		Renderer->CommandList->writeTexture(img.TextureHandle, 0, 0, itImg.image.data(), itImg.width * itImg.component);
+
+		AssetManager::GetInstance()->Images.emplace_back(img);
+	}
+	for(const tinygltf::Texture& itTex : model.textures)
+	{
+		//textures contain a sampler and an image
+		Texture tex;
+		//create the sampler
+		const tinygltf::Sampler gltfSampler = model.samplers[itTex.sampler];
+		nvrhi::SamplerDesc samplerDesc;
+		switch(gltfSampler.minFilter)
+		{
+		case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+			samplerDesc.minFilter = true;
+			samplerDesc.mipFilter = true;
+			break;
+		case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
+			samplerDesc.minFilter = true;
+			samplerDesc.mipFilter = false;
+			break;
+		case TINYGLTF_TEXTURE_FILTER_LINEAR:
+			samplerDesc.minFilter = true;
+			break;
+		case TINYGLTF_TEXTURE_FILTER_NEAREST:
+			samplerDesc.minFilter = false;
+			break;
+		case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
+			samplerDesc.minFilter = false;
+			samplerDesc.mipFilter = true;
+			break;
+		case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
+			samplerDesc.minFilter = false;
+			samplerDesc.mipFilter = false;
+			break;
+		default:
+			RD_ASSERT(true, "Unknown min filter");
+		}
+		switch(gltfSampler.magFilter)
+		{
+		case TINYGLTF_TEXTURE_FILTER_LINEAR:
+			samplerDesc.magFilter = true;
+			break;
+		case TINYGLTF_TEXTURE_FILTER_NEAREST:
+			samplerDesc.magFilter = false;
+			break;
+		}
+		switch(gltfSampler.wrapS)
+		{
+		case TINYGLTF_TEXTURE_WRAP_REPEAT:
+			samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
+			break;
+		case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
+			samplerDesc.addressU = nvrhi::SamplerAddressMode::ClampToEdge;
+			break;
+		case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
+			samplerDesc.addressU = nvrhi::SamplerAddressMode::MirroredRepeat;
+			break;
+		}
+		switch (gltfSampler.wrapT)
+		{
+		case TINYGLTF_TEXTURE_WRAP_REPEAT:
+			samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
+			break;
+		case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
+			samplerDesc.addressV = nvrhi::SamplerAddressMode::ClampToEdge;
+			break;
+		case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
+			samplerDesc.addressV = nvrhi::SamplerAddressMode::MirroredRepeat;
+			break;
+		}
+		tex.SamplerHandle = Renderer->Device->m_NvrhiDevice->createSampler(samplerDesc);
+		tex.ImageIndex = itTex.source;
+		AssetManager::GetInstance()->Textures.emplace_back(tex);
+	}
+
 	//TODO: create the scene hireachy through entt
 	
 }

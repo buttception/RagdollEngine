@@ -43,8 +43,6 @@ public:
 	nvrhi::BufferHandle ConstantBuffer;
 	std::vector<nvrhi::VertexAttributeDesc> VertexAttributes;
 	nvrhi::InputLayoutHandle InputLayoutHandle;
-	//keep all the meshes in the renderer for now
-	std::unordered_map<std::string, ragdoll::Mesh> Meshes;
 	
 	void Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm);
 	void Draw();
