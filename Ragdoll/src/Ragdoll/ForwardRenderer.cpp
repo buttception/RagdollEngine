@@ -35,6 +35,9 @@ void ForwardRenderer::Draw()
 
 	//manipulate the cube and camera
 	struct Data {
+		Vector3 translate{ 0.f, 0.f, 0.f };
+		Vector3 scale = { 1.f, 1.f, 1.f };
+		Vector3 rotate = { 0.f, 0.f, 0.f };
 		Vector3 cameraPos = { 0.f, 1.f, -5.f };
 		Vector2 cameraEulers = { 0.f, 0.f};
 		float cameraFov = 60.f;
@@ -61,9 +64,18 @@ void ForwardRenderer::Draw()
 	ImGui::SliderFloat("Azimuth (Degrees)", &data.azimuthAndElevation.x, 0.f, 360.f);
 	ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, -90.f, 90.f);
 	ImGui::End();
+	ImGui::Begin("Object Manipulate");
+	ImGui::DragFloat3("Translation", &data.translate.x, 0.01f);
+	ImGui::DragFloat3("Scale", &data.scale.x, 0.01f);
+	ImGui::DragFloat3("Rotate", &data.rotate.x, 0.01f);
+	ImGui::End();
 
 	CBuffer cbuf;
-	cbuf.world = Matrix::Identity;
+	Matrix world = Matrix::CreateScale(data.scale);
+	world *= Matrix::CreateFromQuaternion(Quaternion::CreateFromYawPitchRoll(data.rotate));
+	world *= Matrix::CreateTranslation(data.translate);
+	cbuf.world = world;
+	cbuf.invWorldMatrix = world.Invert();
 	Matrix proj = Matrix::CreatePerspectiveFieldOfView(DirectX::XMConvertToRadians(data.cameraFov), data.cameraAspect, data.cameraNear, data.cameraFar);
 	Vector3 cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraEulers.x, data.cameraEulers.y, 0.f));
 	Matrix view = Matrix::CreateLookAt(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
@@ -77,6 +89,7 @@ void ForwardRenderer::Draw()
 		sinf(azimuthElevationRad.y)*cosf(azimuthElevationRad.x),
 		cosf(azimuthElevationRad.y)*cosf(azimuthElevationRad.x),
 		sinf(azimuthElevationRad.x));
+	cbuf.cameraPosition = data.cameraPos;
 
 	//hardcoded handling of movement now
 	if (!ImGui::IsAnyItemFocused() && !ImGui::IsAnyItemActive()) {
@@ -119,11 +132,14 @@ void ForwardRenderer::Draw()
 		const Mesh& mesh = AssetManager::GetInstance()->Meshes[renderableComp->meshIndex];
 		const Texture& meshTex = AssetManager::GetInstance()->Textures[matComp->glTFMaterialRef->pbrMetallicRoughness.baseColorTexture.index];
 		const Texture& meshNorms = AssetManager::GetInstance()->Textures[matComp->glTFMaterialRef->normalTexture.index];
+		const Texture& meshMetallicRoughness = AssetManager::GetInstance()->Textures[matComp->glTFMaterialRef->pbrMetallicRoughness.metallicRoughnessTexture.index];
 		state.indexBuffer = { mesh.IndexBufferHandle, nvrhi::Format::R32_UINT, 0 };
 		state.vertexBuffers = {
 			{mesh.VertexBufferHandle, 0, offsetof(Vertex, position)},	//POSITION
-			{mesh.VertexBufferHandle, 1, offsetof(Vertex, normal)},	//NORMAL
-			{mesh.VertexBufferHandle, 2, offsetof(Vertex, texcoord)}	//TEXCOORD
+			{mesh.VertexBufferHandle, 1, offsetof(Vertex, normal)},		//NORMAL
+			{mesh.VertexBufferHandle, 2, offsetof(Vertex, tangent)},	//TANGENT
+			{mesh.VertexBufferHandle, 3, offsetof(Vertex, binormal)},	//BINORMAL
+			{mesh.VertexBufferHandle, 4, offsetof(Vertex, texcoord)}	//TEXCOORD
 		};
 		//bind the buffer
 		nvrhi::BindingSetDesc bindingSetDesc;
@@ -132,7 +148,9 @@ void ForwardRenderer::Draw()
 			nvrhi::BindingSetItem::Texture_SRV(0, AssetManager::GetInstance()->Images[meshTex.ImageIndex].TextureHandle),
 			nvrhi::BindingSetItem::Sampler(0, meshTex.SamplerHandle),
 			nvrhi::BindingSetItem::Texture_SRV(1, AssetManager::GetInstance()->Images[meshNorms.ImageIndex].TextureHandle),
-			nvrhi::BindingSetItem::Sampler(1, meshNorms.SamplerHandle)
+			nvrhi::BindingSetItem::Sampler(1, meshNorms.SamplerHandle),
+			nvrhi::BindingSetItem::Texture_SRV(2, AssetManager::GetInstance()->Images[meshMetallicRoughness.ImageIndex].TextureHandle),
+			nvrhi::BindingSetItem::Sampler(2, meshMetallicRoughness.SamplerHandle)
 		};
 		BindingSetHandle = Device->m_NvrhiDevice->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 		state.addBindingSet(BindingSetHandle);
@@ -217,6 +235,8 @@ void ForwardRenderer::CreateResource()
 		nvrhi::BindingLayoutItem::Sampler(0),
 		nvrhi::BindingLayoutItem::Texture_SRV(1),
 		nvrhi::BindingLayoutItem::Sampler(1),
+		nvrhi::BindingLayoutItem::Texture_SRV(2),
+		nvrhi::BindingLayoutItem::Sampler(2),
 	};
 	BindingLayoutHandle = Device->m_NvrhiDevice->createBindingLayout(layoutDesc);
 	//create a constant buffer here
