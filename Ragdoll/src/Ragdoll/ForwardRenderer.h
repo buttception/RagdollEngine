@@ -31,8 +31,7 @@ class ForwardRenderer {
 
 	std::shared_ptr<ragdoll::Window> PrimaryWindow;
 	std::shared_ptr<ragdoll::FileManager> FileManager;
-	//my gltf loader
-	GLTFLoader Loader;
+	std::shared_ptr<ragdoll::EntityManager> EntityManager;
 public:
 	std::shared_ptr<DirectXDevice> Device;
 	nvrhi::CommandListHandle CommandList;
@@ -44,7 +43,7 @@ public:
 	std::vector<nvrhi::VertexAttributeDesc> VertexAttributes;
 	nvrhi::InputLayoutHandle InputLayoutHandle;
 	
-	void Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm);
+	void Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em);
 	void Draw();
 	void Shutdown();
 private:

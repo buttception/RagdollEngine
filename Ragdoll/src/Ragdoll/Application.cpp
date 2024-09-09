@@ -41,9 +41,8 @@ ________________________________________________________________________________
 #include "Event/KeyEvents.h"
 #include "Event/MouseEvent.h"
 #include "Input/InputHandler.h"
-#include "Graphics/Transform/Transform.h"
 #include "Layer/LayerStack.h"
-#include "Graphics/Transform/TransformLayer.h"
+#include "Components/TransformLayer.h"
 #include "Resource/ResourceManager.h"
 #include "File/FileManager.h"
 
@@ -81,8 +80,16 @@ namespace ragdoll
 		m_TransformLayer = std::make_shared<TransformLayer>(m_EntityManager);
 		m_LayerStack->PushLayer(m_TransformLayer);
 
-		Renderer.Init(m_PrimaryWindow, m_FileManager);
+		Renderer.Init(m_PrimaryWindow, m_FileManager, m_EntityManager);
 		m_ImguiInterface.Init(Renderer.Device.get(), Renderer.ImguiVertexShader, Renderer.ImguiPixelShader);
+
+		//my gltf loader
+		GLTFLoader loader;
+		loader.Init(m_FileManager->GetRoot(), &Renderer, m_FileManager, m_EntityManager);
+		std::string sceneName{ "Box With Spaces" };
+		std::filesystem::path fp = "gltf/2.0/";
+		fp = fp / sceneName / "glTF" / (sceneName + ".gltf");
+		loader.LoadAndCreateModel(fp.string());
 
 		//init all layers
 		m_LayerStack->Init();

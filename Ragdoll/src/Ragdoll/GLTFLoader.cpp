@@ -4,6 +4,11 @@
 #include "ForwardRenderer.h"
 #include "DirectXDevice.h"
 #include "AssetManager.h"
+#include "Ragdoll/Entity/EntityManager.h"
+
+#include "Ragdoll/Components/TransformComp.h"
+#include "Ragdoll/Components/RenderableComp.h"
+#include "Ragdoll/Components/MaterialComp.h"
 
 // Define these only in *one* .cc file.
 #define TINYGLTF_IMPLEMENTATION
@@ -14,16 +19,38 @@
 
 #include "../../../Editor/src/Asset/Asset.h"
 
-void GLTFLoader::Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm)
+void GLTFLoader::Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em)
 {
 	Root = root;
 	Renderer = renderer;
 	FileManager = fm;
+	EntityManager = em;
+}
+
+void TraverseNode(int32_t currIndex, const tinygltf::Model& model, std::shared_ptr<ragdoll::EntityManager> em)
+{
+	const tinygltf::Node& curr = model.nodes[currIndex];
+	//create the entity
+	entt::entity ent = em->CreateEntity();
+	em->AddComponent<TransformComp>(ent);
+	if (curr.mesh >= 0) {
+		RenderableComp* renderableComp = em->AddComponent<RenderableComp>(ent);
+		renderableComp->meshIndex = curr.mesh;
+		MaterialComp* matComp = em->AddComponent<MaterialComp>(ent);
+		matComp->glTFMaterialRef = &model.materials[model.meshes[curr.mesh].primitives[0].material];
+	}
+	//TODO: transforms
+
+	const tinygltf::Node& root = model.nodes[currIndex];
+	for (const int& childIndex : root.children) {
+		TraverseNode(childIndex, model, em);
+	}
 }
 
 void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 {
-	//COMMAND LIST MUST BE OPEN FOR THIS FUNCTION TO EXECUTE
+	//ownself open command list
+	Renderer->CommandList->open();
 	tinygltf::TinyGLTF loader;
 	tinygltf::Model& model = AssetManager::GetInstance()->Model;
 	std::string err, warn;
@@ -91,7 +118,8 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			RD_ASSERT(desc == nullptr, "Loaded mesh contains a attribute not supported by the renderer: {}", it.first);
 			for (int i = 0; i < vertexCount; ++i) {
 				uint8_t* bytePos = reinterpret_cast<uint8_t*>(&vertices[i]) + desc->offset;
-				memcpy(bytePos, data + it.second.bufferView.byteOffset + i * it.second.bufferView.byteStride + it.second.accessor.byteOffset, size);
+				uint32_t offset = i * (it.second.bufferView.byteStride == 0 ? size : it.second.bufferView.byteStride);
+				memcpy(bytePos, data + it.second.bufferView.byteOffset + offset + it.second.accessor.byteOffset, size);
 			}
 		}
 		//deal with index buffer
@@ -112,6 +140,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 				break;
 			}
 		}
+		mesh.VertexCount = accessor.count;
 		
 		//presume command list is open and will be closed and executed later
 		nvrhi::BufferDesc vertexBufDesc;
@@ -191,74 +220,85 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	{
 		//textures contain a sampler and an image
 		Texture tex;
-		//create the sampler
-		const tinygltf::Sampler gltfSampler = model.samplers[itTex.sampler];
 		nvrhi::SamplerDesc samplerDesc;
-		switch(gltfSampler.minFilter)
+		if (itTex.sampler < 0)
 		{
-		case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
-			samplerDesc.minFilter = true;
-			samplerDesc.mipFilter = true;
-			break;
-		case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
-			samplerDesc.minFilter = true;
-			samplerDesc.mipFilter = false;
-			break;
-		case TINYGLTF_TEXTURE_FILTER_LINEAR:
-			samplerDesc.minFilter = true;
-			break;
-		case TINYGLTF_TEXTURE_FILTER_NEAREST:
-			samplerDesc.minFilter = false;
-			break;
-		case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
-			samplerDesc.minFilter = false;
-			samplerDesc.mipFilter = true;
-			break;
-		case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
-			samplerDesc.minFilter = false;
-			samplerDesc.mipFilter = false;
-			break;
-		default:
-			RD_ASSERT(true, "Unknown min filter");
+			//no samplers so use a default one
 		}
-		switch(gltfSampler.magFilter)
+		else 
 		{
-		case TINYGLTF_TEXTURE_FILTER_LINEAR:
-			samplerDesc.magFilter = true;
-			break;
-		case TINYGLTF_TEXTURE_FILTER_NEAREST:
-			samplerDesc.magFilter = false;
-			break;
-		}
-		switch(gltfSampler.wrapS)
-		{
-		case TINYGLTF_TEXTURE_WRAP_REPEAT:
-			samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
-			break;
-		case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
-			samplerDesc.addressU = nvrhi::SamplerAddressMode::ClampToEdge;
-			break;
-		case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
-			samplerDesc.addressU = nvrhi::SamplerAddressMode::MirroredRepeat;
-			break;
-		}
-		switch (gltfSampler.wrapT)
-		{
-		case TINYGLTF_TEXTURE_WRAP_REPEAT:
-			samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
-			break;
-		case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
-			samplerDesc.addressV = nvrhi::SamplerAddressMode::ClampToEdge;
-			break;
-		case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
-			samplerDesc.addressV = nvrhi::SamplerAddressMode::MirroredRepeat;
-			break;
+			//create the sampler
+			const tinygltf::Sampler gltfSampler = model.samplers[itTex.sampler];
+			switch (gltfSampler.minFilter)
+			{
+			case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+				samplerDesc.minFilter = true;
+				samplerDesc.mipFilter = true;
+				break;
+			case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
+				samplerDesc.minFilter = true;
+				samplerDesc.mipFilter = false;
+				break;
+			case TINYGLTF_TEXTURE_FILTER_LINEAR:
+				samplerDesc.minFilter = true;
+				break;
+			case TINYGLTF_TEXTURE_FILTER_NEAREST:
+				samplerDesc.minFilter = false;
+				break;
+			case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
+				samplerDesc.minFilter = false;
+				samplerDesc.mipFilter = true;
+				break;
+			case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
+				samplerDesc.minFilter = false;
+				samplerDesc.mipFilter = false;
+				break;
+			default:
+				RD_ASSERT(true, "Unknown min filter");
+			}
+			switch (gltfSampler.magFilter)
+			{
+			case TINYGLTF_TEXTURE_FILTER_LINEAR:
+				samplerDesc.magFilter = true;
+				break;
+			case TINYGLTF_TEXTURE_FILTER_NEAREST:
+				samplerDesc.magFilter = false;
+				break;
+			}
+			switch (gltfSampler.wrapS)
+			{
+			case TINYGLTF_TEXTURE_WRAP_REPEAT:
+				samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
+				break;
+			case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
+				samplerDesc.addressU = nvrhi::SamplerAddressMode::ClampToEdge;
+				break;
+			case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
+				samplerDesc.addressU = nvrhi::SamplerAddressMode::MirroredRepeat;
+				break;
+			}
+			switch (gltfSampler.wrapT)
+			{
+			case TINYGLTF_TEXTURE_WRAP_REPEAT:
+				samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
+				break;
+			case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
+				samplerDesc.addressV = nvrhi::SamplerAddressMode::ClampToEdge;
+				break;
+			case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
+				samplerDesc.addressV = nvrhi::SamplerAddressMode::MirroredRepeat;
+				break;
+			}
 		}
 		tex.SamplerHandle = Renderer->Device->m_NvrhiDevice->createSampler(samplerDesc);
 		tex.ImageIndex = itTex.source;
 		AssetManager::GetInstance()->Textures.emplace_back(tex);
 	}
+	Renderer->CommandList->close();
+	Renderer->Device->m_NvrhiDevice->executeCommandList(Renderer->CommandList);
 
-	//TODO: create the scene hireachy through entt
-	
+	//create all the entities and their components
+	for (const int& rootIndex : model.scenes[0].nodes) {	//iterating through the root nodes
+		TraverseNode(rootIndex, model, EntityManager);
+	}
 }

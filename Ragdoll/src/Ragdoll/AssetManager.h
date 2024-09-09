@@ -7,6 +7,7 @@ struct Mesh
 {
 	nvrhi::BufferHandle VertexBufferHandle;
 	nvrhi::BufferHandle IndexBufferHandle;
+	uint32_t VertexCount;
 };
 
 struct Image

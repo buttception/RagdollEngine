@@ -5,6 +5,7 @@
 class ForwardRenderer;
 namespace ragdoll {
 	class FileManager;
+	class EntityManager;
 }
 namespace ragdoll {
 	struct Buffer {
@@ -19,8 +20,9 @@ class GLTFLoader {
 	std::filesystem::path Root;
 	ForwardRenderer* Renderer;
 	std::shared_ptr<ragdoll::FileManager> FileManager;
+	std::shared_ptr<ragdoll::EntityManager> EntityManager;
 public:
-	void Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm);
+	void Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em);
 	void LoadAndCreateModel(const std::string& fileName);
 private:
 };

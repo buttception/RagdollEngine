@@ -1,5 +1,5 @@
 ﻿/*!
-\file		TransformLayer.h
+\file		Transform.h
 \date		10/08/2024
 
 \author		Devin Tan
@@ -28,40 +28,23 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 #pragma once
-#include "Ragdoll/Layer/Layer.h"
-#include "Ragdoll/Core/Guid.h"
 #include "Ragdoll/Math/RagdollMath.h"
+#include "Ragdoll/Entity/Component.h"
+#include "Ragdoll/Core/Guid.h"
 
-namespace ragdoll
+struct TransformComp
 {
-	struct Transform;
-	class TransformLayer : public Layer
-	{
-	public:
-		TransformLayer(std::shared_ptr<EntityManager> reg);
-		~TransformLayer() override = default;
+	Vector3 m_LocalPosition{};
+	Vector3 m_LocalScale{ 1.f,1.f,1.f };
+	Quaternion m_LocalRotation{ 1.f, 0.f,0.f,0.f };
 
-		void Init() override;
-		void Update(float _dt) override;
-		void Shutdown() override;
+	//cached as shaders need this always
+	Matrix m_ModelToWorld;
 
-		void SetEntityAsRoot(Guid entityId) { m_RootEntity = entityId; }
+	//let child right sibling system
+	ragdoll::Guid m_Parent{};
+	ragdoll::Guid m_Child{};
+	ragdoll::Guid m_Sibling{};
 
-	private:
-		std::shared_ptr<EntityManager> m_EntityManager;
-
-		std::stack<Matrix> m_ModelStack;
-
-		//the root details
-		Guid m_RootEntity;
-		Guid m_RootSibling;
-		//state
-		bool m_DirtyOnwards{ false };
-
-		//some helper functions
-		void TraverseTreeAndUpdateTransforms();
-		void TraverseNode(const Guid& guid);
-
-		Matrix GetLocalModelMatrix(const Transform& trans);
-	};
-}
+	bool m_Dirty{ true };
+};

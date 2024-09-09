@@ -5,14 +5,18 @@
 #include <nvrhi/utils.h>
 
 #include "AssetManager.h"
+#include "Ragdoll/Entity/EntityManager.h"
+#include "Ragdoll/Components/TransformComp.h"
+#include "Ragdoll/Components/RenderableComp.h"
+#include "Ragdoll/Components/MaterialComp.h"
 
-void ForwardRenderer::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm)
+void ForwardRenderer::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em)
 {
 	PrimaryWindow = win;
 	FileManager = fm;
+	EntityManager = em;
 	//TODO: create device spec in the future
 	Device = DirectXDevice::Create({}, win, fm);
-	Loader.Init(FileManager->GetRoot(), this, fm);
 	CreateResource();
 }
 
@@ -100,34 +104,41 @@ void ForwardRenderer::Draw()
 		.addColorAttachment(tex)
 		.setDepthAttachment(DepthBuffer);
 	nvrhi::FramebufferHandle pipelineFb = Device->m_NvrhiDevice->createFramebuffer(fbDesc);
+
 	nvrhi::GraphicsState state;
 	state.pipeline = GraphicsPipeline;
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
-	//bind the test mesh
-	const Mesh& mesh = AssetManager::GetInstance()->Meshes[0];
-	const Texture& meshTex = AssetManager::GetInstance()->Textures[0];
-	state.indexBuffer = { mesh.IndexBufferHandle, nvrhi::Format::R32_UINT, 0 };
-	state.vertexBuffers = {
-		{mesh.VertexBufferHandle, 0, offsetof(Vertex, position)},	//POSITION
-		{mesh.VertexBufferHandle, 1, offsetof(Vertex, normal)},	//NORMAL
-		{mesh.VertexBufferHandle, 2, offsetof(Vertex, texcoord)}	//TEXCOORD
-	};
-	//bind the buffer
-	nvrhi::BindingSetDesc bindingSetDesc;
-	bindingSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
-		nvrhi::BindingSetItem::Texture_SRV(0, AssetManager::GetInstance()->Images[meshTex.ImageIndex].TextureHandle),
-		nvrhi::BindingSetItem::Sampler(0, meshTex.SamplerHandle)
-	};
-	BindingSetHandle = Device->m_NvrhiDevice->createBindingSet(bindingSetDesc, BindingLayoutHandle);
-	state.addBindingSet(BindingSetHandle);
 
-	CommandList->setGraphicsState(state);
+	entt::registry& reg = EntityManager->GetRegistry();
+	auto ecsView = reg.view<RenderableComp, MaterialComp>();
+	for (entt::entity ent : ecsView) {
+		MaterialComp* matComp = EntityManager->GetComponent<MaterialComp>(ent);
+		RenderableComp* renderableComp = EntityManager->GetComponent<RenderableComp>(ent);
+		//bind the test mesh
+		const Mesh& mesh = AssetManager::GetInstance()->Meshes[renderableComp->meshIndex];
+		const Texture& meshTex = AssetManager::GetInstance()->Textures[matComp->glTFMaterialRef->pbrMetallicRoughness.baseColorTexture.index];
+		state.indexBuffer = { mesh.IndexBufferHandle, nvrhi::Format::R32_UINT, 0 };
+		state.vertexBuffers = {
+			{mesh.VertexBufferHandle, 0, offsetof(Vertex, position)},	//POSITION
+			{mesh.VertexBufferHandle, 1, offsetof(Vertex, normal)},	//NORMAL
+			{mesh.VertexBufferHandle, 2, offsetof(Vertex, texcoord)}	//TEXCOORD
+		};
+		//bind the buffer
+		nvrhi::BindingSetDesc bindingSetDesc;
+		bindingSetDesc.bindings = {
+			nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
+			nvrhi::BindingSetItem::Texture_SRV(0, AssetManager::GetInstance()->Images[meshTex.ImageIndex].TextureHandle),
+			nvrhi::BindingSetItem::Sampler(0, meshTex.SamplerHandle)
+		};
+		BindingSetHandle = Device->m_NvrhiDevice->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+		state.addBindingSet(BindingSetHandle);
 
-	nvrhi::DrawArguments args;
-	args.vertexCount = 36;
-	CommandList->drawIndexed(args);
+		CommandList->setGraphicsState(state);
+		nvrhi::DrawArguments args;
+		args.vertexCount = mesh.VertexCount;
+		CommandList->drawIndexed(args);
+	}
 	CommandList->close();
 	Device->m_NvrhiDevice->executeCommandList(CommandList);
 }
@@ -229,11 +240,6 @@ void ForwardRenderer::CreateResource()
 		vTexcoordAttrib
 	};
 	InputLayoutHandle = Device->m_NvrhiDevice->createInputLayout(VertexAttributes.data(), VertexAttributes.size(), ForwardVertexShader);
-
-	//load the gltf model
-	//COMMAND LIST MUST BE OPENED
-	Loader.LoadAndCreateModel("GLTF Testcases/3_BoxTextured/BoxTextured.gltf");
-
 	CommandList->close();
 	//remember to execute the list
 	Device->m_NvrhiDevice->executeCommandList(CommandList);
@@ -246,7 +252,7 @@ void ForwardRenderer::CreateResource()
 	pipelineDesc.renderState.depthStencilState.depthTestEnable = true;
 	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
 	pipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
-	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;	//does nothing?
+	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::Front;	//does nothing?
 	pipelineDesc.inputLayout = InputLayoutHandle;
 
 	GraphicsPipeline = Device->m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);

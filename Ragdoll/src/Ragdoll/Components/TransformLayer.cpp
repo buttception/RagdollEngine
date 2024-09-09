@@ -32,7 +32,7 @@ ________________________________________________________________________________
 
 #include "TransformLayer.h"
 
-#include "Transform.h"
+#include "TransformComp.h"
 
 #include "Ragdoll/Layer/Layer.h"
 #include "Ragdoll/Entity/EntityManager.h"
@@ -70,7 +70,7 @@ namespace ragdoll
 
 	void TransformLayer::TraverseNode(const Guid& guid)
 	{
-		auto transform = m_EntityManager->GetComponent<Transform>(guid);
+		auto transform = m_EntityManager->GetComponent<TransformComp>(guid);
 		if(transform)
 		{
 			//check if state is dirty
@@ -117,7 +117,7 @@ namespace ragdoll
 		}
 	}
 
-	Matrix TransformLayer::GetLocalModelMatrix(const Transform& trans)
+	Matrix TransformLayer::GetLocalModelMatrix(const TransformComp& trans)
 	{
 		Matrix model = Matrix::CreateTranslation(trans.m_LocalPosition);
 		model *= Matrix::CreateFromQuaternion(trans.m_LocalRotation);
