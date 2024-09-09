@@ -15,17 +15,18 @@ struct CBuffer {
 	Vector4 sceneAmbientColor = { 0.2f, 0.2f, 0.2f, 1.f };
 	Vector4 albedoFactor = { 1.f,1.f,1.f,1.f };
 	Vector3 lightDirection = { 1.f, -1.f, 1.f };
-	Vector3 cameraPosition;
-
 	float roughness;
+	Vector3 cameraPosition;
 	float metallic;
 
 	int32_t useAlbedo{ false };
 	int32_t useNormalMap{ false };
 	int32_t useMetallicRoughnessMap{ false };
+	int32_t isLit{ false };
 };
 struct Vertex {
 	Vector3 position = Vector3::Zero;
+	Vector4 color = Vector4::One;
 	Vector3 normal = Vector3::Zero;
 	Vector3 tangent = Vector3::Zero;
 	Vector3 binormal = Vector3::Zero;

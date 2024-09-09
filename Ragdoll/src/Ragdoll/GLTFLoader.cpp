@@ -37,17 +37,23 @@ void TraverseNode(int32_t currIndex, const tinygltf::Model& model, std::shared_p
 		RenderableComp* renderableComp = em->AddComponent<RenderableComp>(ent);
 		renderableComp->meshIndex = curr.mesh;
 		MaterialComp* matComp = em->AddComponent<MaterialComp>(ent);
-		tinygltf::Material gltfMat = model.materials[model.meshes[curr.mesh].primitives[0].material];
-		matComp->Metallic = gltfMat.pbrMetallicRoughness.metallicFactor;
-		matComp->Roughness = gltfMat.pbrMetallicRoughness.roughnessFactor;
-		matComp->Color = Vector4(
-			gltfMat.pbrMetallicRoughness.baseColorFactor[0],
-			gltfMat.pbrMetallicRoughness.baseColorFactor[1], 
-			gltfMat.pbrMetallicRoughness.baseColorFactor[2], 
-			gltfMat.pbrMetallicRoughness.baseColorFactor[3]);
-		matComp->AlbedoIndex = gltfMat.pbrMetallicRoughness.baseColorTexture.index;
-		matComp->MetallicRoughnessIndex = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index;
-		matComp->NormalIndex = gltfMat.normalTexture.index;
+		if (model.meshes[curr.mesh].primitives[0].material >= 0) {
+			tinygltf::Material gltfMat = model.materials[model.meshes[curr.mesh].primitives[0].material];
+
+			matComp->Metallic = gltfMat.pbrMetallicRoughness.metallicFactor;
+			matComp->Roughness = gltfMat.pbrMetallicRoughness.roughnessFactor;
+			matComp->Color = Vector4(
+				gltfMat.pbrMetallicRoughness.baseColorFactor[0],
+				gltfMat.pbrMetallicRoughness.baseColorFactor[1],
+				gltfMat.pbrMetallicRoughness.baseColorFactor[2],
+				gltfMat.pbrMetallicRoughness.baseColorFactor[3]);
+			matComp->AlbedoIndex = gltfMat.pbrMetallicRoughness.baseColorTexture.index;
+			matComp->MetallicRoughnessIndex = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index;
+			matComp->NormalIndex = gltfMat.normalTexture.index;
+			matComp->bIsLit = true;
+		}
+		else
+			matComp->bIsLit = false;
 	}
 	//TODO: transforms
 

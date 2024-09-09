@@ -9,4 +9,6 @@ struct MaterialComp {
 	Vector4 Color;
 	float Roughness = 1.f;
 	float Metallic = 1.f;
+
+	bool bIsLit = false;
 };

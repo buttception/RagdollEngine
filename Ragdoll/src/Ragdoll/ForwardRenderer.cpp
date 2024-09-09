@@ -38,8 +38,9 @@ void ForwardRenderer::Draw()
 		Vector3 translate{ 0.f, 0.f, 0.f };
 		Vector3 scale = { 1.f, 1.f, 1.f };
 		Vector3 rotate = { 0.f, 0.f, 0.f };
-		Vector3 cameraPos = { 0.f, 1.f, -5.f };
-		Vector2 cameraEulers = { 0.f, 0.f};
+		Vector3 cameraPos = { 0.f, 1.f, 5.f };
+		float cameraYaw = DirectX::XM_PI;
+		float cameraPitch = 0.f;
 		float cameraFov = 60.f;
 		float cameraNear = 0.01f;
 		float cameraFar = 100.f;
@@ -77,7 +78,7 @@ void ForwardRenderer::Draw()
 	cbuf.world = world;
 	cbuf.invWorldMatrix = world.Invert();
 	Matrix proj = Matrix::CreatePerspectiveFieldOfView(DirectX::XMConvertToRadians(data.cameraFov), data.cameraAspect, data.cameraNear, data.cameraFar);
-	Vector3 cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraEulers.x, data.cameraEulers.y, 0.f));
+	Vector3 cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
 	Matrix view = Matrix::CreateLookAt(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
 	cbuf.viewProj = view * proj;
 	cbuf.sceneAmbientColor = data.ambientLight;
@@ -105,8 +106,8 @@ void ForwardRenderer::Draw()
 		if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
 		{
 			auto& io = ImGui::GetIO();
-			data.cameraEulers.x -= io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindow->GetFrameTime();
-			data.cameraEulers.y += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindow->GetFrameTime();
+			data.cameraYaw -= io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindow->GetFrameTime();
+			data.cameraPitch += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindow->GetFrameTime();
 		}
 	}
 	cbuf.lightDiffuseColor = data.dirLightColor;
@@ -131,14 +132,16 @@ void ForwardRenderer::Draw()
 		state.indexBuffer = { mesh.IndexBufferHandle, nvrhi::Format::R32_UINT, 0 };
 		state.vertexBuffers = {
 			{mesh.VertexBufferHandle, 0, offsetof(Vertex, position)},	//POSITION
-			{mesh.VertexBufferHandle, 1, offsetof(Vertex, normal)},		//NORMAL
-			{mesh.VertexBufferHandle, 2, offsetof(Vertex, tangent)},	//TANGENT
-			{mesh.VertexBufferHandle, 3, offsetof(Vertex, binormal)},	//BINORMAL
-			{mesh.VertexBufferHandle, 4, offsetof(Vertex, texcoord)}	//TEXCOORD
+			{mesh.VertexBufferHandle, 1, offsetof(Vertex, color)},		//COLOR
+			{mesh.VertexBufferHandle, 2, offsetof(Vertex, normal)},		//NORMAL
+			{mesh.VertexBufferHandle, 3, offsetof(Vertex, tangent)},	//TANGENT
+			{mesh.VertexBufferHandle, 4, offsetof(Vertex, binormal)},	//BINORMAL
+			{mesh.VertexBufferHandle, 5, offsetof(Vertex, texcoord)}	//TEXCOORD
 		};
 		cbuf.albedoFactor = matComp->Color;
 		cbuf.metallic = matComp->Metallic;
 		cbuf.roughness = matComp->Roughness;
+		cbuf.isLit = matComp->bIsLit;
 
 		nvrhi::ITexture* albedoTex, * normalTex, * roughnessMetallicTex;
 		nvrhi::SamplerHandle albedoSampler, normalSampler, roughnessMetallicSampler;
@@ -272,6 +275,11 @@ void ForwardRenderer::CreateResource()
 	vPositionAttrib.offset = offsetof(Vertex, position);
 	vPositionAttrib.elementStride = sizeof(Vertex);
 	vPositionAttrib.format = nvrhi::Format::RGB32_FLOAT;
+	nvrhi::VertexAttributeDesc vColorAttrib;
+	vColorAttrib.name = "COLOR";
+	vColorAttrib.offset = offsetof(Vertex, color);
+	vColorAttrib.elementStride = sizeof(Vertex);
+	vColorAttrib.format = nvrhi::Format::RGBA32_FLOAT;
 	nvrhi::VertexAttributeDesc vNormalAttrib;
 	vNormalAttrib.name = "NORMAL";
 	vNormalAttrib.offset = offsetof(Vertex, normal);
@@ -294,6 +302,7 @@ void ForwardRenderer::CreateResource()
 	vTexcoordAttrib.format = nvrhi::Format::RG32_FLOAT;
 	VertexAttributes = {
 		vPositionAttrib,
+		vColorAttrib,
 		vNormalAttrib,
 		vTangentAttrib,
 		vBinormalAttrib,
