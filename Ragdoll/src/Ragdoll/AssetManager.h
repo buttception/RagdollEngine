@@ -21,6 +21,12 @@ struct Texture
 	nvrhi::SamplerHandle SamplerHandle;
 };
 
+enum class SamplerTypes
+{
+	POINT_CLAMP,
+	LINEAR_CLAMP,
+};
+
 class AssetManager
 {
 public:

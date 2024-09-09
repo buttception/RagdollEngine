@@ -131,12 +131,7 @@ void ForwardRenderer::Draw()
 		const Mesh& mesh = AssetManager::GetInstance()->Meshes[renderableComp->meshIndex];
 		state.indexBuffer = { mesh.IndexBufferHandle, nvrhi::Format::R32_UINT, 0 };
 		state.vertexBuffers = {
-			{mesh.VertexBufferHandle, 0, offsetof(Vertex, position)},	//POSITION
-			{mesh.VertexBufferHandle, 1, offsetof(Vertex, color)},		//COLOR
-			{mesh.VertexBufferHandle, 2, offsetof(Vertex, normal)},		//NORMAL
-			{mesh.VertexBufferHandle, 3, offsetof(Vertex, tangent)},	//TANGENT
-			{mesh.VertexBufferHandle, 4, offsetof(Vertex, binormal)},	//BINORMAL
-			{mesh.VertexBufferHandle, 5, offsetof(Vertex, texcoord)}	//TEXCOORD
+			{mesh.VertexBufferHandle}
 		};
 		cbuf.albedoFactor = matComp->Color;
 		cbuf.metallic = matComp->Metallic;

@@ -86,7 +86,7 @@ namespace ragdoll
 		//my gltf loader
 		GLTFLoader loader;
 		loader.Init(m_FileManager->GetRoot(), &Renderer, m_FileManager, m_EntityManager);
-		std::string sceneName{ "Box With Spaces" };
+		std::string sceneName{ "Duck" };
 		std::filesystem::path fp = "gltf/2.0/";
 		fp = fp / sceneName / "glTF" / (sceneName + ".gltf");
 		loader.LoadAndCreateModel(fp.string());

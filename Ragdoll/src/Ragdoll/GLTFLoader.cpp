@@ -109,6 +109,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			}
 		}
 		//iterate through the map, update the new values
+		bool tangentExist = false, binormalExist = false;
 		RD_ASSERT(vertexCount == 0, "There are no vertices?");
 		std::vector<Vertex> vertices;
 		vertices.resize(vertexCount);
@@ -118,8 +119,15 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			for (const nvrhi::VertexAttributeDesc& itDesc : Renderer->VertexAttributes) {
 				if (it.first.find(itDesc.name) != std::string::npos)
 				{
+					if (it.first.find("TANGENT") != std::string::npos)
+						tangentExist = true;
+					if (it.first.find("BINORMAL") != std::string::npos)
+						binormalExist = true;
 					desc = &itDesc;
 					switch (it.second.accessor.type) {
+					case TINYGLTF_TYPE_VEC4:
+						size = 16;
+						break;
 					case TINYGLTF_TYPE_VEC3:
 						size = 12;
 						break;
@@ -159,33 +167,44 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		mesh.VertexCount = accessor.count;
 
 		//TODO: generate only if it has a normal map but no bitangent and tangent
-		//generate the tangents and binormals
-		for (size_t i = 0; i < indices.size(); i += 3) {
-			Vertex& v0 = vertices[indices[i]];
-			Vertex& v1 = vertices[indices[i + 1]];
-			Vertex& v2 = vertices[indices[i + 2]];
+		if (!tangentExist || !binormalExist)
+		{
+			//generate the tangents and binormals
+			for (size_t i = 0; i < indices.size(); i += 3) {
+				Vertex& v0 = vertices[indices[i]];
+				Vertex& v1 = vertices[indices[i + 1]];
+				Vertex& v2 = vertices[indices[i + 2]];
 
-			Vector3 edge1 = v1.position - v0.position;
-			Vector3 edge2 = v2.position - v0.position;
+				Vector3 edge1 = v1.position - v0.position;
+				Vector3 edge2 = v2.position - v0.position;
 
-			Vector2 deltaUV1 = v1.texcoord - v0.texcoord;
-			Vector2 deltaUV2 = v2.texcoord - v0.texcoord;
+				Vector2 deltaUV1 = v1.texcoord - v0.texcoord;
+				Vector2 deltaUV2 = v2.texcoord - v0.texcoord;
 
-			float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+				float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
 
-			Vector3 tangent;
-			tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
-			tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
-			tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+				Vector3 tangent;
+				if (tangentExist)
+					tangent = vertices[indices[i]].tangent;
+				else {
+					tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+					tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+					tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
 
-			// Normalize and store tangent
-			tangent.Normalize();
-			v0.tangent = v1.tangent = v2.tangent = tangent;
+					// Normalize and store tangent
+					tangent.Normalize();
+					v0.tangent = v1.tangent = v2.tangent = tangent;
+				}
 
-			// Compute bitangent
-			Vector3 binormal = v0.normal.Cross(tangent) * ((deltaUV1.x * deltaUV2.y) - (deltaUV2.x * deltaUV1.y));
-			v0.binormal = v1.binormal = v2.binormal = binormal;
+				// Compute bitangent
+				if (!binormalExist)
+				{
+					Vector3 binormal = v0.normal.Cross(tangent) * ((deltaUV1.x * deltaUV2.y) - (deltaUV2.x * deltaUV1.y));
+					v0.binormal = v1.binormal = v2.binormal = binormal;
+				}
+			}
 		}
+		
 		
 		//presume command list is open and will be closed and executed later
 		nvrhi::BufferDesc vertexBufDesc;
@@ -212,6 +231,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		Renderer->CommandList->writeBuffer(mesh.IndexBufferHandle, indices.data(), indexBufDesc.byteSize);
 		Renderer->CommandList->setPermanentBufferState(mesh.IndexBufferHandle, nvrhi::ResourceStates::IndexBuffer);
 
+#if 0
 		RD_CORE_INFO("Mesh: {}", itMesh.name);
 		for(const auto& it : vertices)
 		{
@@ -221,6 +241,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		{
 			RD_CORE_INFO("Index: {}", it);
 		}
+#endif
 		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
 	//load the images
@@ -277,6 +298,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			switch (gltfSampler.minFilter)
 			{
 			case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+			case -1:
 				samplerDesc.minFilter = true;
 				samplerDesc.mipFilter = true;
 				break;
