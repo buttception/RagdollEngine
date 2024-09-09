@@ -110,8 +110,6 @@ void ForwardRenderer::Draw()
 		}
 	}
 	cbuf.lightDiffuseColor = data.dirLightColor;
-	//upload the constant buffer
-	CommandList->writeBuffer(ConstantBuffer, &cbuf, sizeof(CBuffer));
 
 	auto fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(tex)
@@ -124,15 +122,12 @@ void ForwardRenderer::Draw()
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 
 	entt::registry& reg = EntityManager->GetRegistry();
-	auto ecsView = reg.view<RenderableComp, MaterialComp>();
+	auto ecsView = reg.view<RenderableComp, MaterialComp, TransformComp>();
 	for (entt::entity ent : ecsView) {
 		MaterialComp* matComp = EntityManager->GetComponent<MaterialComp>(ent);
 		RenderableComp* renderableComp = EntityManager->GetComponent<RenderableComp>(ent);
 		//bind the test mesh
 		const Mesh& mesh = AssetManager::GetInstance()->Meshes[renderableComp->meshIndex];
-		const Texture& meshTex = AssetManager::GetInstance()->Textures[matComp->glTFMaterialRef->pbrMetallicRoughness.baseColorTexture.index];
-		const Texture& meshNorms = AssetManager::GetInstance()->Textures[matComp->glTFMaterialRef->normalTexture.index];
-		const Texture& meshMetallicRoughness = AssetManager::GetInstance()->Textures[matComp->glTFMaterialRef->pbrMetallicRoughness.metallicRoughnessTexture.index];
 		state.indexBuffer = { mesh.IndexBufferHandle, nvrhi::Format::R32_UINT, 0 };
 		state.vertexBuffers = {
 			{mesh.VertexBufferHandle, 0, offsetof(Vertex, position)},	//POSITION
@@ -141,19 +136,47 @@ void ForwardRenderer::Draw()
 			{mesh.VertexBufferHandle, 3, offsetof(Vertex, binormal)},	//BINORMAL
 			{mesh.VertexBufferHandle, 4, offsetof(Vertex, texcoord)}	//TEXCOORD
 		};
-		//bind the buffer
+		cbuf.albedoFactor = matComp->Color;
+		cbuf.metallic = matComp->Metallic;
+		cbuf.roughness = matComp->Roughness;
+
+		nvrhi::ITexture* albedoTex, * normalTex, * roughnessMetallicTex;
+		nvrhi::SamplerHandle albedoSampler, normalSampler, roughnessMetallicSampler;
+		albedoTex = normalTex = roughnessMetallicTex = AssetManager::GetInstance()->DefaultTex;
+		albedoSampler = normalSampler = roughnessMetallicSampler = AssetManager::GetInstance()->DefaultSampler;
+		if (matComp->AlbedoIndex >= 0) {
+			const Texture& albedo = AssetManager::GetInstance()->Textures[matComp->AlbedoIndex];
+			albedoTex = AssetManager::GetInstance()->Images[albedo.ImageIndex].TextureHandle;
+			albedoSampler = albedo.SamplerHandle;
+			cbuf.useAlbedo = true;
+		}
+		if (matComp->NormalIndex >= 0) {
+			const Texture& normal = AssetManager::GetInstance()->Textures[matComp->NormalIndex];
+			normalTex = AssetManager::GetInstance()->Images[normal.ImageIndex].TextureHandle;
+			normalSampler = normal.SamplerHandle;
+			cbuf.useNormalMap = true;
+		}
+		if (matComp->MetallicRoughnessIndex >= 0) {
+			const Texture& metalRough = AssetManager::GetInstance()->Textures[matComp->MetallicRoughnessIndex];
+			roughnessMetallicTex = AssetManager::GetInstance()->Images[metalRough.ImageIndex].TextureHandle;
+			roughnessMetallicSampler = metalRough.SamplerHandle;
+			cbuf.useMetallicRoughnessMap = true;
+		}
 		nvrhi::BindingSetDesc bindingSetDesc;
 		bindingSetDesc.bindings = {
 			nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
-			nvrhi::BindingSetItem::Texture_SRV(0, AssetManager::GetInstance()->Images[meshTex.ImageIndex].TextureHandle),
-			nvrhi::BindingSetItem::Sampler(0, meshTex.SamplerHandle),
-			nvrhi::BindingSetItem::Texture_SRV(1, AssetManager::GetInstance()->Images[meshNorms.ImageIndex].TextureHandle),
-			nvrhi::BindingSetItem::Sampler(1, meshNorms.SamplerHandle),
-			nvrhi::BindingSetItem::Texture_SRV(2, AssetManager::GetInstance()->Images[meshMetallicRoughness.ImageIndex].TextureHandle),
-			nvrhi::BindingSetItem::Sampler(2, meshMetallicRoughness.SamplerHandle)
+			nvrhi::BindingSetItem::Texture_SRV(0, albedoTex),
+			nvrhi::BindingSetItem::Sampler(0, albedoSampler),
+			nvrhi::BindingSetItem::Texture_SRV(1, normalTex),
+			nvrhi::BindingSetItem::Sampler(1, normalSampler),
+			nvrhi::BindingSetItem::Texture_SRV(2, roughnessMetallicTex),
+			nvrhi::BindingSetItem::Sampler(2, roughnessMetallicSampler),
 		};
 		BindingSetHandle = Device->m_NvrhiDevice->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 		state.addBindingSet(BindingSetHandle);
+
+		//upload the constant buffer
+		CommandList->writeBuffer(ConstantBuffer, &cbuf, sizeof(CBuffer));
 
 		CommandList->setGraphicsState(state);
 		nvrhi::DrawArguments args;
@@ -277,6 +300,22 @@ void ForwardRenderer::CreateResource()
 		vTexcoordAttrib,
 	};
 	InputLayoutHandle = Device->m_NvrhiDevice->createInputLayout(VertexAttributes.data(), VertexAttributes.size(), ForwardVertexShader);
+
+	//create a default texture
+	nvrhi::TextureDesc textureDesc;
+	textureDesc.width = 1;
+	textureDesc.height = 1;
+	textureDesc.format = nvrhi::Format::RGBA8_UNORM;
+	textureDesc.isRenderTarget = false;
+	textureDesc.isTypeless = false;
+	textureDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+	textureDesc.keepInitialState = true;
+
+	AssetManager::GetInstance()->DefaultTex = Device->m_NvrhiDevice->createTexture(textureDesc);
+
+	nvrhi::SamplerDesc samplerDesc;
+	AssetManager::GetInstance()->DefaultSampler = Device->m_NvrhiDevice->createSampler(samplerDesc);
+
 	CommandList->close();
 	//remember to execute the list
 	Device->m_NvrhiDevice->executeCommandList(CommandList);

@@ -29,7 +29,9 @@ public:
 	std::vector<Mesh> Meshes;
 	std::vector<Image> Images;
 	std::vector<Texture> Textures;
-	tinygltf::Model Model;
+
+	nvrhi::TextureHandle DefaultTex;
+	nvrhi::SamplerHandle DefaultSampler;
 private:
 	inline static std::unique_ptr<AssetManager> s_Instance;
 };

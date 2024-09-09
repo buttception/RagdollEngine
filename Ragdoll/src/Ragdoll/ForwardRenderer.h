@@ -13,10 +13,16 @@ struct CBuffer {
 	Matrix viewProj;
 	Vector4 lightDiffuseColor = { 1.f, 1.f, 1.f, 1.f };
 	Vector4 sceneAmbientColor = { 0.2f, 0.2f, 0.2f, 1.f };
+	Vector4 albedoFactor = { 1.f,1.f,1.f,1.f };
 	Vector3 lightDirection = { 1.f, -1.f, 1.f };
 	Vector3 cameraPosition;
-	bool useNormalMap;
-	bool useRoughnessMetallicMap;
+
+	float roughness;
+	float metallic;
+
+	int32_t useAlbedo{ false };
+	int32_t useNormalMap{ false };
+	int32_t useMetallicRoughnessMap{ false };
 };
 struct Vertex {
 	Vector3 position = Vector3::Zero;

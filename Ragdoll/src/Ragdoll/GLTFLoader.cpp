@@ -37,7 +37,17 @@ void TraverseNode(int32_t currIndex, const tinygltf::Model& model, std::shared_p
 		RenderableComp* renderableComp = em->AddComponent<RenderableComp>(ent);
 		renderableComp->meshIndex = curr.mesh;
 		MaterialComp* matComp = em->AddComponent<MaterialComp>(ent);
-		matComp->glTFMaterialRef = &model.materials[model.meshes[curr.mesh].primitives[0].material];
+		tinygltf::Material gltfMat = model.materials[model.meshes[curr.mesh].primitives[0].material];
+		matComp->Metallic = gltfMat.pbrMetallicRoughness.metallicFactor;
+		matComp->Roughness = gltfMat.pbrMetallicRoughness.roughnessFactor;
+		matComp->Color = Vector4(
+			gltfMat.pbrMetallicRoughness.baseColorFactor[0],
+			gltfMat.pbrMetallicRoughness.baseColorFactor[1], 
+			gltfMat.pbrMetallicRoughness.baseColorFactor[2], 
+			gltfMat.pbrMetallicRoughness.baseColorFactor[3]);
+		matComp->AlbedoIndex = gltfMat.pbrMetallicRoughness.baseColorTexture.index;
+		matComp->MetallicRoughnessIndex = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index;
+		matComp->NormalIndex = gltfMat.normalTexture.index;
 	}
 	//TODO: transforms
 
@@ -52,7 +62,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	//ownself open command list
 	Renderer->CommandList->open();
 	tinygltf::TinyGLTF loader;
-	tinygltf::Model& model = AssetManager::GetInstance()->Model;
+	tinygltf::Model model;
 	std::string err, warn;
 	std::filesystem::path path = Root / fileName;
 	std::filesystem::path modelRoot = path.parent_path().lexically_relative(Root);
@@ -142,6 +152,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		}
 		mesh.VertexCount = accessor.count;
 
+		//TODO: generate only if it has a normal map but no bitangent and tangent
 		//generate the tangents and binormals
 		for (size_t i = 0; i < indices.size(); i += 3) {
 			Vertex& v0 = vertices[indices[i]];
