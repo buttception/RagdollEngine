@@ -141,6 +141,34 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			}
 		}
 		mesh.VertexCount = accessor.count;
+
+		//generate the tangents and binormals
+		for (size_t i = 0; i < indices.size(); i += 3) {
+			Vertex& v0 = vertices[indices[i]];
+			Vertex& v1 = vertices[indices[i + 1]];
+			Vertex& v2 = vertices[indices[i + 2]];
+
+			Vector3 edge1 = v1.position - v0.position;
+			Vector3 edge2 = v2.position - v0.position;
+
+			Vector2 deltaUV1 = v1.texcoord - v0.texcoord;
+			Vector2 deltaUV2 = v2.texcoord - v0.texcoord;
+
+			float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+			Vector3 tangent;
+			tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+			tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+			tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+			// Normalize and store tangent
+			tangent.Normalize();
+			v0.tangent = v1.tangent = v2.tangent = tangent;
+
+			// Compute bitangent
+			Vector3 binormal = v0.normal.Cross(tangent) * ((deltaUV1.x * deltaUV2.y) - (deltaUV2.x * deltaUV1.y));
+			v0.binormal = v1.binormal = v2.binormal = binormal;
+		}
 		
 		//presume command list is open and will be closed and executed later
 		nvrhi::BufferDesc vertexBufDesc;

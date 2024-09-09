@@ -49,7 +49,7 @@ void ForwardRenderer::Draw()
 		Vector2 azimuthAndElevation = { 300.f, 45.f };
 	};
 	static Data data;
-	ImGui::Begin("Triangle Manipulate");
+	ImGui::Begin("Camera Manipulate");
 	ImGui::SliderFloat("Camera FOV (Degrees)", &data.cameraFov, 60.f, 120.f);
 	ImGui::SliderFloat("Camera Near", &data.cameraNear, 0.01f, 1.f);
 	ImGui::SliderFloat("Camera Far", &data.cameraFar, 10.f, 10000.f);
@@ -118,6 +118,7 @@ void ForwardRenderer::Draw()
 		//bind the test mesh
 		const Mesh& mesh = AssetManager::GetInstance()->Meshes[renderableComp->meshIndex];
 		const Texture& meshTex = AssetManager::GetInstance()->Textures[matComp->glTFMaterialRef->pbrMetallicRoughness.baseColorTexture.index];
+		const Texture& meshNorms = AssetManager::GetInstance()->Textures[matComp->glTFMaterialRef->normalTexture.index];
 		state.indexBuffer = { mesh.IndexBufferHandle, nvrhi::Format::R32_UINT, 0 };
 		state.vertexBuffers = {
 			{mesh.VertexBufferHandle, 0, offsetof(Vertex, position)},	//POSITION
@@ -129,7 +130,9 @@ void ForwardRenderer::Draw()
 		bindingSetDesc.bindings = {
 			nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
 			nvrhi::BindingSetItem::Texture_SRV(0, AssetManager::GetInstance()->Images[meshTex.ImageIndex].TextureHandle),
-			nvrhi::BindingSetItem::Sampler(0, meshTex.SamplerHandle)
+			nvrhi::BindingSetItem::Sampler(0, meshTex.SamplerHandle),
+			nvrhi::BindingSetItem::Texture_SRV(1, AssetManager::GetInstance()->Images[meshNorms.ImageIndex].TextureHandle),
+			nvrhi::BindingSetItem::Sampler(1, meshNorms.SamplerHandle)
 		};
 		BindingSetHandle = Device->m_NvrhiDevice->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 		state.addBindingSet(BindingSetHandle);
@@ -212,6 +215,8 @@ void ForwardRenderer::CreateResource()
 		nvrhi::BindingLayoutItem::Texture_SRV(0),
 		//binds slot 0 with sampler, controls how the texture is sampled
 		nvrhi::BindingLayoutItem::Sampler(0),
+		nvrhi::BindingLayoutItem::Texture_SRV(1),
+		nvrhi::BindingLayoutItem::Sampler(1),
 	};
 	BindingLayoutHandle = Device->m_NvrhiDevice->createBindingLayout(layoutDesc);
 	//create a constant buffer here
@@ -229,6 +234,16 @@ void ForwardRenderer::CreateResource()
 	vNormalAttrib.offset = offsetof(Vertex, normal);
 	vNormalAttrib.elementStride = sizeof(Vertex);
 	vNormalAttrib.format = nvrhi::Format::RGB32_FLOAT;
+	nvrhi::VertexAttributeDesc vTangentAttrib;
+	vTangentAttrib.name = "TANGENT";
+	vTangentAttrib.offset = offsetof(Vertex, tangent);
+	vTangentAttrib.elementStride = sizeof(Vertex);
+	vTangentAttrib.format = nvrhi::Format::RGB32_FLOAT;
+	nvrhi::VertexAttributeDesc vBinormalAttrib;
+	vBinormalAttrib.name = "BINORMAL";
+	vBinormalAttrib.offset = offsetof(Vertex, binormal);
+	vBinormalAttrib.elementStride = sizeof(Vertex);
+	vBinormalAttrib.format = nvrhi::Format::RGB32_FLOAT;
 	nvrhi::VertexAttributeDesc vTexcoordAttrib;
 	vTexcoordAttrib.name = "TEXCOORD";
 	vTexcoordAttrib.offset = offsetof(Vertex, texcoord);
@@ -237,7 +252,9 @@ void ForwardRenderer::CreateResource()
 	VertexAttributes = {
 		vPositionAttrib,
 		vNormalAttrib,
-		vTexcoordAttrib
+		vTangentAttrib,
+		vBinormalAttrib,
+		vTexcoordAttrib,
 	};
 	InputLayoutHandle = Device->m_NvrhiDevice->createInputLayout(VertexAttributes.data(), VertexAttributes.size(), ForwardVertexShader);
 	CommandList->close();
