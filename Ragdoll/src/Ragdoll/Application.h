@@ -29,7 +29,8 @@
 __________________________________________________________________________________*/
 #pragma once
 #include "Core/Guid.h"
-#include "Ragdoll/ImguiInterface.h"
+#include "ImGuiRenderer.h"
+#include "ForwardRenderer.h"
 
 namespace ragdoll
 {
@@ -96,8 +97,8 @@ namespace ragdoll
 		std::shared_ptr<LayerStack> m_LayerStack;
 		std::shared_ptr<TransformLayer> m_TransformLayer;
 
-		DirectXTest m_DirectXTest;
-		ImguiInterface m_ImguiInterface;
+		ForwardRenderer Renderer;
+		ImguiRenderer m_ImguiInterface;
 
 		double m_Framerate = 60.0;
 		double m_TargetFrametime = 1.0 / m_Framerate;

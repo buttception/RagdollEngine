@@ -108,7 +108,7 @@ namespace ragdoll
 		//check queue status and will load async, callback will be called when done in main thread
 		void ThreadUpdate();
 		void QueueRequest(FileIORequest request);
-		void ImmediateLoad(FileIORequest request);
+		const uint8_t* ImmediateLoad(std::filesystem::path path, uint32_t& size);
 
 		void Shutdown();
 

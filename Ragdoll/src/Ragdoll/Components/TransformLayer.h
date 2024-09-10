@@ -1,5 +1,5 @@
 ﻿/*!
-\file		Transform.cpp
+\file		TransformLayer.h
 \date		10/08/2024
 
 \author		Devin Tan
@@ -27,12 +27,44 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
+#pragma once
+#include "Ragdoll/Layer/Layer.h"
+#include "Ragdoll/Core/Guid.h"
+#include "Ragdoll/Math/RagdollMath.h"
 
-#include "ragdollpch.h"
-
-#include "Transform.h"
-
+struct TransformComp;
 namespace ragdoll
 {
-	
+	class TransformLayer : public Layer
+	{
+	public:
+		TransformLayer(std::shared_ptr<EntityManager> reg);
+		~TransformLayer() override = default;
+
+		void Init() override;
+		void Update(float _dt) override;
+		void Shutdown() override;
+
+		void AddEntityAtRootLevel(Guid entityId);
+		bool HasRoot() { return m_RootEntity.m_RawId != 0; }
+		
+		void DebugPrintHierarchy();
+
+	private:
+		std::shared_ptr<EntityManager> m_EntityManager;
+
+		std::stack<Matrix> m_ModelStack;
+
+		//the root details
+		Guid m_RootEntity;
+		Guid m_RootSibling;
+		//state
+		bool m_DirtyOnwards{ false };
+
+		//some helper functions
+		void TraverseTreeAndUpdateTransforms();
+		void TraverseNode(const Guid& guid);
+
+		Matrix GetLocalModelMatrix(const TransformComp& trans);
+	};
 }

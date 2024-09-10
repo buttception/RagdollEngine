@@ -102,7 +102,8 @@ struct DeviceCreationParameters : public InstanceParameters
 	D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_1;
 };
 
-class DirectXTest {
+class DirectXDevice {
+	bool bIsShutdown = false;
 public:
 	DeviceCreationParameters					m_DeviceParams;
 	RefCountPtr<IDXGIFactory2>					m_DxgiFactory2;
@@ -122,31 +123,21 @@ public:
 	std::vector<RefCountPtr<ID3D12Resource>>	m_SwapChainBuffers;
 	std::vector<nvrhi::TextureHandle>			m_RhiSwapChainBuffers;
 	UINT64										m_FrameCount = 0;
-	nvrhi::GraphicsPipelineHandle				m_GraphicsPipeline;
-	nvrhi::CommandListHandle					m_CommandList;
 
 	std::shared_ptr<ragdoll::Window> m_PrimaryWindow;
 	std::shared_ptr<ragdoll::FileManager> m_FileManager;
-	std::shared_ptr<ragdoll::InputHandler> m_InputHandler;
 
-	nvrhi::ShaderHandle ImguiVertexShader;
-	nvrhi::ShaderHandle ImguiPixelShader;
-	nvrhi::BindingLayoutHandle BindingLayout;
-	nvrhi::BufferHandle IndexBuffer;
-	nvrhi::BufferHandle VertexBuffer;
-	nvrhi::TextureHandle DepthBuffer;
-
-	void Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr <ragdoll::FileManager> fm, std::shared_ptr<ragdoll::InputHandler> hdl);
-	void Draw();
+	static std::shared_ptr<DirectXDevice> Create(DeviceCreationParameters creationParam, std::shared_ptr<ragdoll::Window> win, std::shared_ptr <ragdoll::FileManager> fm);
+	bool BeginFrame();
 	void Present();
 	void Shutdown();
+
+	nvrhi::TextureHandle GetCurrentBackbuffer();
 private:
 	bool CreateDevice();
 	bool CreateSwapChain();
 	bool CreateRenderTargets();
 	void ResizeSwapChain();
 	void ReleaseRenderTargets();
-	bool BeginFrame();
-	void CreateResource();
 	void DestroyDeviceAndSwapChain();
 };

@@ -21,6 +21,9 @@ Launcher/assets/
 *.csproj.user
 
 *.cso
+*.gltf
+*.bin
+*.png
 
 #Specific files
 imgui.ini

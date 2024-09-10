@@ -203,21 +203,19 @@ namespace ragdoll
 		m_RequestQueue.push(request);
 	}
 
-	void FileManager::ImmediateLoad(FileIORequest request)
+	const uint8_t* FileManager::ImmediateLoad(std::filesystem::path path, uint32_t& size)
 	{
 		//high priority immediate loading blocking
 		m_FileIONextAccessMutex->lock();
 		m_FileIOMutex->lock();
 		m_FileIONextAccessMutex->unlock();
 		//main thread do not need to care about buffer status
-		if (request.m_Type == FileIORequest::Type::Read)
-		{
-			m_ImmediateBuffer.m_Request = request;
-			m_ImmediateBuffer.Load(m_Root);
-			request.m_ReadCallback(request.m_Guid, m_ImmediateBuffer.m_Data.data(), m_ImmediateBuffer.m_Data.size());
-		}
+		m_ImmediateBuffer.m_Request.m_Path = path;
+		m_ImmediateBuffer.Load(m_Root);
 		//unlock all mutex
 		m_FileIOMutex->unlock();
+		size = m_ImmediateBuffer.m_Data.size();
+		return m_ImmediateBuffer.m_Data.data();
 	}
 
 	void FileManager::Shutdown()

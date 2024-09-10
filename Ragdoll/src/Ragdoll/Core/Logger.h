@@ -90,4 +90,6 @@ template <> struct fmt::formatter<type> : ostream_formatter {}
 
 RD_LOG_OVERLOAD_USERTYPE(Vector2, vec, "(" << vec.x << ", " << vec.y << ")");
 RD_LOG_OVERLOAD_USERTYPE(Vector3, vec, "(" << vec.x << ", " << vec.y << ", " << vec.z << ")");
+RD_LOG_OVERLOAD_USERTYPE(Vector4, vec, "(" << vec.x << ", " << vec.y << ", " << vec.z << ", " << vec.w << ")");
+RD_LOG_OVERLOAD_USERTYPE(Quaternion, vec, "(" << vec.x << ", " << vec.y << ", " << vec.z << ", " << vec.w << ")");
 RD_LOG_OVERLOAD_USERTYPE(ragdoll::Guid, id, id.m_RawId);
