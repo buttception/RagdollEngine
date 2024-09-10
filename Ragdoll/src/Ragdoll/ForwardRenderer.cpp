@@ -120,7 +120,9 @@ void ForwardRenderer::Draw()
 			continue;
 		const Mesh& mesh = AssetManager::GetInstance()->Meshes[renderableComp->meshIndex];
 
-		for (const Mesh::Buffer& buffer : mesh.Buffers) {
+		for (const Mesh::Buffer& buffer : mesh.Buffers) 
+		{
+			//const Mesh::Buffer& buffer = mesh.Buffers[0];
 			nvrhi::GraphicsState state;
 			state.pipeline = GraphicsPipeline;
 			state.framebuffer = pipelineFb;

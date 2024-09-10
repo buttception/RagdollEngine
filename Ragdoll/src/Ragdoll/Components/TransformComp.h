@@ -46,5 +46,6 @@ struct TransformComp
 	ragdoll::Guid m_Child{};
 	ragdoll::Guid m_Sibling{};
 
+	int32_t glTFId{};
 	bool m_Dirty{ true };
 };

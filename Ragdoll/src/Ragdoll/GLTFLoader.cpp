@@ -50,6 +50,7 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, const tinygltf::Mod
 	}
 
 	TransformComp* transComp = em->AddComponent<TransformComp>(ent);
+	transComp->glTFId = currIndex;
 	//root level entities
 	if (level == 0)
 	{
@@ -73,11 +74,9 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, const tinygltf::Mod
 
 	transComp->m_Dirty = true;
 
-	//create the hirerachy
-
 	const tinygltf::Node& parent = model.nodes[currIndex];
 	for (const int& childIndex : parent.children) {
-		ragdoll::Guid childId = TraverseNode(childIndex, ++level, model, em, tl);
+		ragdoll::Guid childId = TraverseNode(childIndex, level + 1, model, em, tl);
 		if (transComp->m_Child.m_RawId == 0) {
 			transComp->m_Child = childId;
 		}
@@ -156,10 +155,13 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 					default:
 						RD_ASSERT(true, "Unsupport index type for {}", itMesh.name);
 					}
-					RD_ASSERT(indices[i] > accessor.maxValues[0], "");
+					if(accessor.maxValues.size() != 0)
+						RD_ASSERT(indices[i] > accessor.maxValues[0], "");
 				}
+#if 0
 				RD_CORE_TRACE("Loaded {} indices at byte offest {}", accessor.count, accessor.byteOffset);
 				RD_CORE_TRACE("Largest index is {}", *std::max_element(indices.begin(), indices.end()));
+#endif
 				buffer.TriangleCount = accessor.count;
 			}
 
@@ -216,7 +218,9 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 						uint32_t stride = bufferView.byteStride == 0 ? size : bufferView.byteStride;
 						memcpy(bytePos, data + byteOffset + i * stride, size);
 					}
+#if 0
 					RD_CORE_INFO("Loaded {} vertices of attribute: {}", vertexCount, desc->name);
+#endif
 				}
 			}
 
@@ -448,4 +452,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	for (const int& rootIndex : model.scenes[0].nodes) {	//iterating through the root nodes
 		TraverseNode(rootIndex, 0, model, EntityManager, TransformLayer);
 	}
+#if 0
+	TransformLayer->DebugPrintHierarchy();
+#endif
 }

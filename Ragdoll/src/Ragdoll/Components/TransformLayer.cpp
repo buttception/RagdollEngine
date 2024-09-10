@@ -81,16 +81,31 @@ namespace ragdoll
 
 	void PrintRecursive(Guid id, int level, std::shared_ptr<EntityManager> em) 
 	{
-		std::string node;
-		for (int i = 0; i < level; ++i) {
+		TransformComp* trans = em->GetComponent<TransformComp>(id);
 
+		std::string nodeString{};
+		for (int i = 0; i < level; ++i) {
+			nodeString += "\t";
+		}
+		RD_CORE_INFO("{}", nodeString + std::to_string((uint64_t)trans->glTFId));
+		RD_CORE_INFO("{} Position: {}", nodeString, trans->m_LocalPosition);
+		RD_CORE_INFO("{} Rotation: {}", nodeString, trans->m_LocalRotation.ToEuler() * 180.f / DirectX::XM_PI);
+		RD_CORE_INFO("{} Scale: {}", nodeString, trans->m_LocalScale);
+
+		if (trans->m_Child) {
+			PrintRecursive(trans->m_Child, level + 1, em);
+		}
+		if (trans->m_Sibling) {
+			PrintRecursive(trans->m_Sibling, level, em);
 		}
 	}
 
 	void TransformLayer::DebugPrintHierarchy()
 	{
-		int level = 0;
-
+		if(m_RootEntity.m_RawId)
+			PrintRecursive(m_RootEntity, 0, m_EntityManager);
+		if (m_RootSibling.m_RawId)
+			PrintRecursive(m_RootSibling, 0, m_EntityManager);
 	}
 
 	void TransformLayer::TraverseTreeAndUpdateTransforms()
@@ -126,7 +141,7 @@ namespace ragdoll
 				if (m_ModelStack.empty())	//first matrix will be this guy local
 					m_ModelStack.push(localModel);
 				else
-					m_ModelStack.push(m_ModelStack.top() * localModel);	//otherwise concatenate matrix in stacks
+					m_ModelStack.push(localModel * m_ModelStack.top());	//otherwise concatenate matrix in stacks
 				transform->m_ModelToWorld = m_ModelStack.top();	//set model matrix to the top of the stack
 			}
 			else
@@ -154,9 +169,10 @@ namespace ragdoll
 
 	Matrix TransformLayer::GetLocalModelMatrix(const TransformComp& trans)
 	{
-		Matrix model = Matrix::CreateTranslation(trans.m_LocalPosition);
-		model *= Matrix::CreateFromQuaternion(trans.m_LocalRotation);
+		Matrix model = Matrix::Identity;
 		model *= Matrix::CreateScale(trans.m_LocalScale);
+		model *= Matrix::CreateFromQuaternion(trans.m_LocalRotation);
+		model *= Matrix::CreateTranslation(trans.m_LocalPosition);
 		return model;
 	}
 }
