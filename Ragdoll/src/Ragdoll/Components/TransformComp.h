@@ -34,9 +34,9 @@ ________________________________________________________________________________
 
 struct TransformComp
 {
-	Vector3 m_LocalPosition{};
-	Vector3 m_LocalScale{ 1.f,1.f,1.f };
-	Quaternion m_LocalRotation{ 1.f, 0.f,0.f,0.f };
+	Vector3 m_LocalPosition = Vector3::Zero;
+	Vector3 m_LocalScale = Vector3::One;
+	Quaternion m_LocalRotation = Quaternion::Identity;
 
 	//cached as shaders need this always
 	Matrix m_ModelToWorld;

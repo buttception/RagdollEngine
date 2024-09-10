@@ -58,6 +58,41 @@ namespace ragdoll
 	{
 	}
 
+	void AddNodeToFurthestSibling(Guid sibling, Guid node, std::shared_ptr<EntityManager> em) 
+	{
+		TransformComp* trans = em->GetComponent<TransformComp>(sibling);
+		if (trans->m_Sibling.m_RawId == 0)
+			trans->m_Sibling = node;
+		else
+			AddNodeToFurthestSibling(trans->m_Sibling, node, em);
+	}
+
+	void TransformLayer::AddEntityAtRootLevel(Guid entityId)
+	{
+		if (m_RootEntity.m_RawId == 0)
+			m_RootEntity = entityId;
+		else {
+			if (m_RootSibling.m_RawId == 0)
+				m_RootSibling = entityId;
+			else
+				AddNodeToFurthestSibling(m_RootSibling, entityId, m_EntityManager);
+		}
+	}
+
+	void PrintRecursive(Guid id, int level, std::shared_ptr<EntityManager> em) 
+	{
+		std::string node;
+		for (int i = 0; i < level; ++i) {
+
+		}
+	}
+
+	void TransformLayer::DebugPrintHierarchy()
+	{
+		int level = 0;
+
+	}
+
 	void TransformLayer::TraverseTreeAndUpdateTransforms()
 	{
 		if(m_RootEntity)

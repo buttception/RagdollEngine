@@ -83,16 +83,16 @@ namespace ragdoll
 		Renderer.Init(m_PrimaryWindow, m_FileManager, m_EntityManager);
 		m_ImguiInterface.Init(Renderer.Device.get(), Renderer.ImguiVertexShader, Renderer.ImguiPixelShader);
 
+		//init all layers
+		m_LayerStack->Init();
+
 		//my gltf loader
 		GLTFLoader loader;
-		loader.Init(m_FileManager->GetRoot(), &Renderer, m_FileManager, m_EntityManager);
-		std::string sceneName{ "Duck" };
+		loader.Init(m_FileManager->GetRoot(), &Renderer, m_FileManager, m_EntityManager, m_TransformLayer);
+		std::string sceneName{ "2CylinderEngine" };
 		std::filesystem::path fp = "gltf/2.0/";
 		fp = fp / sceneName / "glTF" / (sceneName + ".gltf");
 		loader.LoadAndCreateModel(fp.string());
-
-		//init all layers
-		m_LayerStack->Init();
 	}
 
 	void Application::Run()

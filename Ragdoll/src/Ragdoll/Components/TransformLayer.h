@@ -45,7 +45,10 @@ namespace ragdoll
 		void Update(float _dt) override;
 		void Shutdown() override;
 
-		void SetEntityAsRoot(Guid entityId) { m_RootEntity = entityId; }
+		void AddEntityAtRootLevel(Guid entityId);
+		bool HasRoot() { return m_RootEntity.m_RawId != 0; }
+		
+		void DebugPrintHierarchy();
 
 	private:
 		std::shared_ptr<EntityManager> m_EntityManager;
