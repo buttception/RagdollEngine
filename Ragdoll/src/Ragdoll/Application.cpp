@@ -93,6 +93,8 @@ namespace ragdoll
 		std::filesystem::path fp = "gltf/2.0/";
 		fp = fp / sceneName / "glTF" / (sceneName + ".gltf");
 		loader.LoadAndCreateModel(fp.string());
+
+		//loader.LoadAndCreateModel("Instancing Test/FlyingWorld-BattleOfTheTrashGod.gltf");
 	}
 
 	void Application::Run()
@@ -116,9 +118,13 @@ namespace ragdoll
 			m_ImguiInterface.Render();
 			Renderer.Device->Present();
 
-			m_PrimaryWindow->SetFrametime(m_TargetFrametime);
+			m_PrimaryWindow->SetFrametime(m_Frametime);
 			m_PrimaryWindow->IncFpsCounter();
-			m_Frametime -= m_TargetFrametime;
+			if (m_Frametime > m_PrimaryWindow->GetDeltaTime())
+				m_Frametime = 0;
+			else
+				m_Frametime -= m_TargetFrametime;
+			m_Frametime = 0.f;
 		}
 	}
 

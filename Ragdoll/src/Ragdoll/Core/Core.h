@@ -72,7 +72,7 @@ ________________________________________________________________________________
 	#define RD_CRITICAL_ASSERT(x, ...) RD_ASSERT(x, __VA_ARGS__)
 #else
 	#define RD_ASSERT(x, ...) do { if(x) { RD_CORE_FATAL("Assertion failed!"); RD_CORE_ERROR(__VA_ARGS__); } } while (0)
-	#define RD_CRITICAL_ASSERT(x, ...) RD_ASSERT(x, __VA_ARGS__) if(!x) { RD_CORE_FATAL("Fatal error occured, please consult the logs") exit(EXIT_FAILURE); }
+	#define RD_CRITICAL_ASSERT(x, ...) RD_ASSERT(x, __VA_ARGS__); if(x) { RD_CORE_FATAL("Fatal error occured, please consult the logs"); exit(EXIT_FAILURE); }
 #endif
 
 // Bit macro helper

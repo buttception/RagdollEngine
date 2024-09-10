@@ -81,8 +81,8 @@ void ForwardRenderer::Draw()
 		DirectX::XMConvertToRadians(data.azimuthAndElevation.x),
 		DirectX::XMConvertToRadians(data.azimuthAndElevation.y) };
 	cbuf.lightDirection = Vector3(
-		sinf(azimuthElevationRad.y)*cosf(azimuthElevationRad.x),
-		cosf(azimuthElevationRad.y)*cosf(azimuthElevationRad.x),
+		sinf(azimuthElevationRad.y) * cosf(azimuthElevationRad.x),
+		cosf(azimuthElevationRad.y) * cosf(azimuthElevationRad.x),
 		sinf(azimuthElevationRad.x));
 	cbuf.cameraPosition = data.cameraPos;
 
@@ -110,17 +110,22 @@ void ForwardRenderer::Draw()
 		.addColorAttachment(tex)
 		.setDepthAttachment(DepthBuffer);
 	nvrhi::FramebufferHandle pipelineFb = Device->m_NvrhiDevice->createFramebuffer(fbDesc);
+	CommandList->close();
+	Device->m_NvrhiDevice->executeCommandList(CommandList);
 
 	entt::registry& reg = EntityManager->GetRegistry();
 	auto ecsView = reg.view<RenderableComp, TransformComp>();
+	int32_t calls = 0;
 	for (entt::entity ent : ecsView) {
+		if (calls == 0)
+			CommandList->open();
 		RenderableComp* renderableComp = EntityManager->GetComponent<RenderableComp>(ent);
 		TransformComp* transComp = EntityManager->GetComponent<TransformComp>(ent);
 		if (renderableComp->meshIndex < 0 || renderableComp->meshIndex >= AssetManager::GetInstance()->Meshes.size())	//no mesh inside of renderable comp
 			continue;
 		const Mesh& mesh = AssetManager::GetInstance()->Meshes[renderableComp->meshIndex];
 
-		for (const Mesh::Buffer& buffer : mesh.Buffers) 
+		for (const Mesh::Buffer& buffer : mesh.Buffers)
 		{
 			//const Mesh::Buffer& buffer = mesh.Buffers[0];
 			nvrhi::GraphicsState state;
@@ -182,10 +187,21 @@ void ForwardRenderer::Draw()
 			nvrhi::DrawArguments args;
 			args.vertexCount = buffer.TriangleCount;
 			CommandList->drawIndexed(args);
+			calls++;
 		}
+		if (calls > 1000)
+		{
+			CommandList->close();
+			Device->m_NvrhiDevice->executeCommandList(CommandList);
+			calls = 0;
+		}
+		Device->m_NvrhiDevice->runGarbageCollection();
 	}
-	CommandList->close();
-	Device->m_NvrhiDevice->executeCommandList(CommandList);
+	if (calls != 0)
+	{
+		CommandList->close();
+		Device->m_NvrhiDevice->executeCommandList(CommandList);
+	}
 }
 
 void ForwardRenderer::Shutdown()
