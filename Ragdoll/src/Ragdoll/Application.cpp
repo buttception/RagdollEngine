@@ -60,6 +60,7 @@ namespace ragdoll
 		RD_CORE_INFO("spdlog initialized for use.");
 
 		//create the profiling threads
+		MicroProfileInit();
 		MicroProfileOnThreadCreate("Main");
 		//turn on profiling
 		MicroProfileSetEnableAllGroups(true);
@@ -142,11 +143,15 @@ namespace ragdoll
 
 			m_PrimaryWindow->SetFrametime(m_Frametime);
 			m_PrimaryWindow->IncFpsCounter();
-			if (m_Frametime > m_PrimaryWindow->GetDeltaTime())
+			if (m_Frametime > m_PrimaryWindow->GetDeltaTime() || m_Frametime > 1.f)
 				m_Frametime = 0;
 			else
 				m_Frametime -= m_TargetFrametime;
 			MicroProfileFlip(nullptr);
+
+			if (ImGui::IsKeyPressed(ImGuiKey_F1)) {
+				MicroProfileDumpFileImmediately("test", "test", nullptr);
+			}
 		}
 	}
 

@@ -22,17 +22,21 @@ void ForwardRenderer::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr
 
 void ForwardRenderer::Draw()
 {
-	MICROPROFILE_SCOPEI("Render", "Draw", MP_ALICEBLUE);
+	MICROPROFILE_SCOPEI("ForwardRender", "Draw", MP_ALICEBLUE);
 	Device->BeginFrame();
 	Device->m_NvrhiDevice->runGarbageCollection();
-	nvrhi::TextureSubresourceSet subSet;
-	CommandList->open();
 	nvrhi::TextureHandle tex = Device->GetCurrentBackbuffer();
-
-	auto bgCol = PrimaryWindow->GetBackgroundColor();
-	nvrhi::Color col = nvrhi::Color(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
-	CommandList->clearTextureFloat(tex, subSet, col);
-	CommandList->clearDepthStencilTexture(DepthBuffer, subSet, true, 1.f, false, 0);
+	{
+		MICROPROFILE_SCOPEI("ForwardRender", "Clear", MP_DARKBLUE);
+		CommandList->open();
+		nvrhi::TextureSubresourceSet subSet;
+		auto bgCol = PrimaryWindow->GetBackgroundColor();
+		nvrhi::Color col = nvrhi::Color(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
+		CommandList->clearTextureFloat(tex, subSet, col);
+		CommandList->clearDepthStencilTexture(DepthBuffer, subSet, true, 1.f, false, 0);
+		CommandList->close();
+		Device->m_NvrhiDevice->executeCommandList(CommandList);
+	}
 
 	//manipulate the cube and camera
 	struct Data {
@@ -108,21 +112,18 @@ void ForwardRenderer::Draw()
 	}
 	cbuf.lightDiffuseColor = data.dirLightColor;
 
-	auto fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(tex)
-		.setDepthAttachment(DepthBuffer);
-	nvrhi::FramebufferHandle pipelineFb = Device->m_NvrhiDevice->createFramebuffer(fbDesc);
-	CommandList->close();
-	Device->m_NvrhiDevice->executeCommandList(CommandList);
-
 	{
-		MICROPROFILE_SCOPEI("Render", "Mesh Draws", MP_CADETBLUE);
+		MICROPROFILE_SCOPEI("ForwardRender", "Mesh Draws", MP_CADETBLUE);
+		//create a fb handle for the pipeline
+		auto fbDesc = nvrhi::FramebufferDesc()
+			.addColorAttachment(tex)
+			.setDepthAttachment(DepthBuffer);
+		nvrhi::FramebufferHandle pipelineFb = Device->m_NvrhiDevice->createFramebuffer(fbDesc);
+
 		entt::registry& reg = EntityManager->GetRegistry();
 		auto ecsView = reg.view<RenderableComp, TransformComp>();
-		int32_t calls = 0;
+		CommandList->open();
 		for (entt::entity ent : ecsView) {
-			if (calls == 0)
-				CommandList->open();
 			RenderableComp* renderableComp = EntityManager->GetComponent<RenderableComp>(ent);
 			TransformComp* transComp = EntityManager->GetComponent<TransformComp>(ent);
 			if (renderableComp->meshIndex < 0 || renderableComp->meshIndex >= AssetManager::GetInstance()->Meshes.size())	//no mesh inside of renderable comp
@@ -131,81 +132,78 @@ void ForwardRenderer::Draw()
 
 			for (const Mesh::Buffer& buffer : mesh.Buffers)
 			{
-				//const Mesh::Buffer& buffer = mesh.Buffers[0];
-				nvrhi::GraphicsState state;
-				state.pipeline = GraphicsPipeline;
-				state.framebuffer = pipelineFb;
-				state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
-				state.indexBuffer = { buffer.IndexBufferHandle, nvrhi::Format::R32_UINT, 0 };
-				state.vertexBuffers = {
-					{buffer.VertexBufferHandle}
-				};
+				{
+					MICROPROFILE_SCOPEI("ForwardRender", "Mesh Binding", MP_DODGERBLUE);
+					//const Mesh::Buffer& buffer = mesh.Buffers[0];
+					nvrhi::GraphicsState state;
+					state.pipeline = GraphicsPipeline;
+					state.framebuffer = pipelineFb;
+					state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
+					state.indexBuffer = { buffer.IndexBufferHandle, nvrhi::Format::R32_UINT, 0 };
+					state.vertexBuffers = {
+						{buffer.VertexBufferHandle}
+					};
 
-				const Material& mat = AssetManager::GetInstance()->Materials[buffer.MaterialIndex];
-				nvrhi::ITexture* albedoTex, * normalTex, * roughnessMetallicTex;
-				nvrhi::SamplerHandle albedoSampler, normalSampler, roughnessMetallicSampler;
-				albedoTex = normalTex = roughnessMetallicTex = AssetManager::GetInstance()->DefaultTex;
-				albedoSampler = normalSampler = roughnessMetallicSampler = AssetManager::GetInstance()->DefaultSampler;
-				if (mat.AlbedoIndex >= 0) {
-					const Texture& albedo = AssetManager::GetInstance()->Textures[mat.AlbedoIndex];
-					albedoTex = AssetManager::GetInstance()->Images[albedo.ImageIndex].TextureHandle;
-					albedoSampler = albedo.SamplerHandle;
-					cbuf.useAlbedo = true;
-				}
-				if (mat.NormalIndex >= 0) {
-					const Texture& normal = AssetManager::GetInstance()->Textures[mat.NormalIndex];
-					normalTex = AssetManager::GetInstance()->Images[normal.ImageIndex].TextureHandle;
-					normalSampler = normal.SamplerHandle;
-					cbuf.useNormalMap = true;
-				}
-				if (mat.MetallicRoughnessIndex >= 0) {
-					const Texture& metalRough = AssetManager::GetInstance()->Textures[mat.MetallicRoughnessIndex];
-					roughnessMetallicTex = AssetManager::GetInstance()->Images[metalRough.ImageIndex].TextureHandle;
-					roughnessMetallicSampler = metalRough.SamplerHandle;
-					cbuf.useMetallicRoughnessMap = true;
-				}
-				cbuf.albedoFactor = mat.Color;
-				cbuf.metallic = mat.Metallic;
-				cbuf.roughness = mat.Roughness;
-				cbuf.isLit = mat.bIsLit;
-				nvrhi::BindingSetDesc bindingSetDesc;
-				bindingSetDesc.bindings = {
-					nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
-					nvrhi::BindingSetItem::Texture_SRV(0, albedoTex),
-					nvrhi::BindingSetItem::Sampler(0, albedoSampler),
-					nvrhi::BindingSetItem::Texture_SRV(1, normalTex),
-					nvrhi::BindingSetItem::Sampler(1, normalSampler),
-					nvrhi::BindingSetItem::Texture_SRV(2, roughnessMetallicTex),
-					nvrhi::BindingSetItem::Sampler(2, roughnessMetallicSampler),
-				};
-				BindingSetHandle = Device->m_NvrhiDevice->createBindingSet(bindingSetDesc, BindingLayoutHandle);
-				state.addBindingSet(BindingSetHandle);
+					const Material& mat = AssetManager::GetInstance()->Materials[buffer.MaterialIndex];
+					nvrhi::ITexture* albedoTex, * normalTex, * roughnessMetallicTex;
+					nvrhi::SamplerHandle albedoSampler, normalSampler, roughnessMetallicSampler;
+					albedoTex = normalTex = roughnessMetallicTex = AssetManager::GetInstance()->DefaultTex;
+					albedoSampler = normalSampler = roughnessMetallicSampler = AssetManager::GetInstance()->DefaultSampler;
+					if (mat.AlbedoIndex >= 0) {
+						const Texture& albedo = AssetManager::GetInstance()->Textures[mat.AlbedoIndex];
+						albedoTex = AssetManager::GetInstance()->Images[albedo.ImageIndex].TextureHandle;
+						albedoSampler = albedo.SamplerHandle;
+						cbuf.useAlbedo = true;
+					}
+					if (mat.NormalIndex >= 0) {
+						const Texture& normal = AssetManager::GetInstance()->Textures[mat.NormalIndex];
+						normalTex = AssetManager::GetInstance()->Images[normal.ImageIndex].TextureHandle;
+						normalSampler = normal.SamplerHandle;
+						cbuf.useNormalMap = true;
+					}
+					if (mat.MetallicRoughnessIndex >= 0) {
+						const Texture& metalRough = AssetManager::GetInstance()->Textures[mat.MetallicRoughnessIndex];
+						roughnessMetallicTex = AssetManager::GetInstance()->Images[metalRough.ImageIndex].TextureHandle;
+						roughnessMetallicSampler = metalRough.SamplerHandle;
+						cbuf.useMetallicRoughnessMap = true;
+					}
+					cbuf.albedoFactor = mat.Color;
+					cbuf.metallic = mat.Metallic;
+					cbuf.roughness = mat.Roughness;
+					cbuf.isLit = mat.bIsLit;
+					nvrhi::BindingSetDesc bindingSetDesc;
+					bindingSetDesc.bindings = {
+						nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
+						nvrhi::BindingSetItem::Texture_SRV(0, albedoTex),
+						nvrhi::BindingSetItem::Sampler(0, albedoSampler),
+						nvrhi::BindingSetItem::Texture_SRV(1, normalTex),
+						nvrhi::BindingSetItem::Sampler(1, normalSampler),
+						nvrhi::BindingSetItem::Texture_SRV(2, roughnessMetallicTex),
+						nvrhi::BindingSetItem::Sampler(2, roughnessMetallicSampler),
+					};
+					BindingSetHandle = Device->m_NvrhiDevice->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+					state.addBindingSet(BindingSetHandle);
 
-				//upload the constant buffer
-				cbuf.world = transComp->m_ModelToWorld;
-				//TODO: cache inverse world matrix
-				cbuf.invWorldMatrix = transComp->m_ModelToWorld.Invert();
-				CommandList->writeBuffer(ConstantBuffer, &cbuf, sizeof(CBuffer));
+					//upload the constant buffer
+					cbuf.world = transComp->m_ModelToWorld;
+					//TODO: cache inverse world matrix
+					cbuf.invWorldMatrix = transComp->m_ModelToWorld.Invert();
+					CommandList->writeBuffer(ConstantBuffer, &cbuf, sizeof(CBuffer));
 
-				CommandList->setGraphicsState(state);
-				nvrhi::DrawArguments args;
-				args.vertexCount = buffer.TriangleCount;
-				CommandList->drawIndexed(args);
-				calls++;
-			}
-			if (calls > 500)
-			{
-				CommandList->close();
-				Device->m_NvrhiDevice->executeCommandList(CommandList);
-				Device->m_NvrhiDevice->runGarbageCollection();
-				calls = 0;
+					CommandList->setGraphicsState(state);
+				}
+
+				{
+					MICROPROFILE_SCOPEI("ForwardRender", "Mesh Draw", MP_DEEPSKYBLUE);
+					nvrhi::DrawArguments args;
+					args.vertexCount = buffer.TriangleCount;
+					CommandList->drawIndexed(args);
+				}
 			}
 		}
-		if (calls != 0)
-		{
-			CommandList->close();
-			Device->m_NvrhiDevice->executeCommandList(CommandList);
-		}
+		MICROPROFILE_SCOPEI("ForwardRender", "Mesh Execute", MP_BLUEVIOLET);
+		CommandList->close();
+		Device->m_NvrhiDevice->executeCommandList(CommandList);
 	}
 }
 

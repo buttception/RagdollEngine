@@ -100,7 +100,7 @@ namespace ragdoll
 		ForwardRenderer Renderer;
 		ImguiRenderer m_ImguiInterface;
 
-		double m_Framerate = 60.0;
+		double m_Framerate = 200.0;
 		double m_TargetFrametime = 1.0 / m_Framerate;
 		double m_Frametime = 0.0;
 	};
