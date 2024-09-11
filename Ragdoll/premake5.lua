@@ -53,6 +53,7 @@ project "Ragdoll"
 		"%{IncludesDir.entt}",
 		"%{IncludesDir.nvrhi}",
 		"%{IncludesDir.tinygltf}",
+		"%{IncludesDir.microprofile}",
     }
 
 	prebuildcommands

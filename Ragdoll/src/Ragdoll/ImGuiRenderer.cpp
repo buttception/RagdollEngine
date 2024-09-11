@@ -3,6 +3,8 @@
 #include "DirectXDevice.h"
 #include "backends/imgui_impl_glfw.cpp"
 
+#include <microprofile.h>
+
 void ImguiRenderer::Init(DirectXDevice* dx, nvrhi::ShaderHandle imGuiVS, nvrhi::ShaderHandle imGuiPS)
 {
 	m_DirectXTest = dx;
@@ -94,6 +96,7 @@ void ImguiRenderer::BeginFrame()
 
 void ImguiRenderer::Render()
 {
+	MICROPROFILE_SCOPEI("Render", "ImGui", MP_BLUE);
 	ImGui::Render();
 
 	ImDrawData* drawData = ImGui::GetDrawData();
