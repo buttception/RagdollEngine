@@ -41,8 +41,8 @@ ________________________________________________________________________________
 #include "Event/KeyEvents.h"
 #include "Event/MouseEvent.h"
 #include "Input/InputHandler.h"
-#include "Components/TransformSystem.h"
 #include "File/FileManager.h"
+#include "Scene.h"
 
 #include "DirectXDevice.h"
 #include "microprofile.h"
@@ -87,11 +87,7 @@ namespace ragdoll
 			m_FileManager = std::make_shared<FileManager>();
 			m_FileManager->Init();
 
-			//adding the transform layer
-			m_TransformSystem = std::make_shared<TransformSystem>(m_EntityManager);
-
-			Renderer.Init(m_PrimaryWindow, m_FileManager, m_EntityManager);
-			m_ImguiInterface.Init(Renderer.Device.get(), Renderer.ImguiVertexShader, Renderer.ImguiPixelShader);
+			m_Scene = std::make_shared<Scene>(this);
 		}
 		MICROPROFILE_TIMELINE_LEAVE_STATIC("Application Initialization");
 
@@ -125,46 +121,8 @@ namespace ragdoll
 					YieldProcessor();
 				}
 			}
-			m_TransformSystem->UpdateTransforms();
-			m_ImguiInterface.BeginFrame();
-			Renderer.Draw();
 
-			//spawn more shits temp
-			const static Vector3 t_range{ 10.f, 10.f, 10.f };
-			const static Vector3 t_min = { -5.f, -5.f, -5.f };
-			const static Vector3 s_range{ 0.2f, 0.2f, 0.2f };
-			const static Vector3 s_min{ 0.3f, 0.3f, 0.3f };
-			static int32_t currentGeomCount{};
-
-			ImGui::Begin("Spawn");
-			ImGui::Text("Current Geom Count: %d", currentGeomCount);
-			if (ImGui::Button("Spawn 100 geometry")) {
-				for (int i = 0; i < 100; ++i) {
-					currentGeomCount++;
-					Vector3 pos{
-						t_min.x + (std::rand() / (float)RAND_MAX) * t_range.x,
-						t_min.y + (std::rand() / (float)RAND_MAX) * t_range.y,
-						t_min.z + (std::rand() / (float)RAND_MAX) * t_range.z,
-					};
-					Vector3 scale{
-						s_min.x + (std::rand() / (float)RAND_MAX) * s_range.x,
-						s_min.y + (std::rand() / (float)RAND_MAX) * s_range.y,
-						s_min.z + (std::rand() / (float)RAND_MAX) * s_range.z,
-					};
-					entt::entity ent = m_EntityManager->CreateEntity();
-					auto tcomp = m_EntityManager->AddComponent<TransformComp>(ent);
-					tcomp->m_LocalPosition = pos;
-					tcomp->m_LocalScale = scale;
-					m_TransformSystem->AddEntityAtRootLevel(m_EntityManager->GetGuid(ent));
-					auto rcomp = m_EntityManager->AddComponent<RenderableComp>(ent);
-					rcomp->meshIndex = std::rand() / (float)RAND_MAX * AssetManager::GetInstance()->Meshes.size();
-				}
-			}
-			ImGui::End();
-
-			m_ImguiInterface.Render();
-			Renderer.Device->Present();
-
+			m_Scene->Update(m_Frametime);
 			m_PrimaryWindow->SetFrametime(m_Frametime);
 			m_PrimaryWindow->IncFpsCounter();
 			m_Frametime = 0;
@@ -178,7 +136,7 @@ namespace ragdoll
 
 	void Application::Shutdown()
 	{
-		Renderer.Shutdown();
+		m_Scene = nullptr;
 		m_FileManager->Shutdown();
 		m_PrimaryWindow->Shutdown();
 		GLFWContext::Shutdown();

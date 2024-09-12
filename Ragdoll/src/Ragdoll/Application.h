@@ -29,13 +29,11 @@
 __________________________________________________________________________________*/
 #pragma once
 #include "Core/Guid.h"
-#include "ImGuiRenderer.h"
-#include "ForwardRenderer.h"
 
 namespace ragdoll
 {
 	class EntityManager;
-	class TransformSystem;
+	class Scene;
 	class Window;
 	class FileManager;
 	class InputHandler;
@@ -55,6 +53,12 @@ namespace ragdoll
 	class Application
 	{
 	public:
+		std::shared_ptr<Window> m_PrimaryWindow;
+		std::shared_ptr<InputHandler> m_InputHandler;
+		std::shared_ptr<EntityManager> m_EntityManager;
+		std::shared_ptr<FileManager> m_FileManager;
+		std::shared_ptr<Scene> m_Scene;
+
 		struct ApplicationConfig
 		{
 			
@@ -86,15 +90,6 @@ namespace ragdoll
 		bool m_Running{ true };
 
 		GuidGenerator m_GuidGenerator{};
-		std::shared_ptr<Window> m_PrimaryWindow;
-		std::shared_ptr<InputHandler> m_InputHandler;
-		std::shared_ptr<EntityManager> m_EntityManager;
-		std::shared_ptr<FileManager> m_FileManager;
-
-		std::shared_ptr<TransformSystem> m_TransformSystem;
-
-		ForwardRenderer Renderer;
-		ImguiRenderer m_ImguiInterface;
 
 		double m_Framerate = 200.0;
 		double m_TargetFrametime = 1.0 / m_Framerate;

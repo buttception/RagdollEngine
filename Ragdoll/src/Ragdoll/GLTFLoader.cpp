@@ -7,8 +7,8 @@
 #include "Ragdoll/Entity/EntityManager.h"
 
 #include "Ragdoll/Components/TransformComp.h"
-#include "Ragdoll/Components/TransformSystem.h"
 #include "Ragdoll/Components/RenderableComp.h"
+#include "Scene.h"
 
 // Define these only in *one* .cc file.
 #define TINYGLTF_IMPLEMENTATION
@@ -17,13 +17,13 @@
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 #include <tiny_gltf.h>
 
-void GLTFLoader::Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::TransformSystem> tl)
+void GLTFLoader::Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> scene)
 {
 	Root = root;
 	Renderer = renderer;
 	FileManager = fm;
 	EntityManager = em;
-	TransformLayer = tl;
+	Scene = scene;
 }
 
 void AddToFurthestSibling(ragdoll::Guid child, ragdoll::Guid newChild, std::shared_ptr<ragdoll::EntityManager> em)
@@ -36,7 +36,7 @@ void AddToFurthestSibling(ragdoll::Guid child, ragdoll::Guid newChild, std::shar
 		trans->m_Sibling = newChild;
 }
 
-ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, const tinygltf::Model& model, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::TransformSystem> tl)
+ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, const tinygltf::Model& model, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> scene)
 {
 	const tinygltf::Node& curr = model.nodes[currIndex];
 	//create the entity
@@ -52,7 +52,7 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, const tinygltf::Mod
 	//root level entities
 	if (level == 0)
 	{
-		tl->AddEntityAtRootLevel(currId);
+		scene->AddEntityAtRootLevel(currId);
 	}
 	if (curr.matrix.size() > 0) {
 		const std::vector<double>& gltfMat = curr.matrix;
@@ -74,7 +74,7 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, const tinygltf::Mod
 
 	const tinygltf::Node& parent = model.nodes[currIndex];
 	for (const int& childIndex : parent.children) {
-		ragdoll::Guid childId = TraverseNode(childIndex, level + 1, model, em, tl);
+		ragdoll::Guid childId = TraverseNode(childIndex, level + 1, model, em, scene);
 		if (transComp->m_Child.m_RawId == 0) {
 			transComp->m_Child = childId;
 		}
@@ -448,7 +448,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 
 	//create all the entities and their components
 	for (const int& rootIndex : model.scenes[0].nodes) {	//iterating through the root nodes
-		TraverseNode(rootIndex, 0, model, EntityManager, TransformLayer);
+		TraverseNode(rootIndex, 0, model, EntityManager, Scene);
 	}
 #if 0
 	TransformLayer->DebugPrintHierarchy();
