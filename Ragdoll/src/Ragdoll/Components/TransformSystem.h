@@ -1,6 +1,6 @@
 ﻿/*!
-\file		Descriptor.cpp
-\date		17/08/2024
+\file		TransformLayer.h
+\date		10/08/2024
 
 \author		Devin Tan
 \email		devintrh@gmail.com
@@ -27,9 +27,41 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
+#pragma once
+#include "Ragdoll/Core/Guid.h"
+#include "Ragdoll/Math/RagdollMath.h"
 
-#include "Descriptor.h"
-
+struct TransformComp;
 namespace ragdoll
 {
+	class EntityManager;
+	class TransformSystem
+	{
+	public:
+		TransformSystem(std::shared_ptr<EntityManager> reg);
+
+		void UpdateTransforms();
+
+		void AddEntityAtRootLevel(Guid entityId);
+		bool HasRoot() { return m_RootEntity.m_RawId != 0; }
+		
+		void DebugPrintHierarchy();
+
+	private:
+		std::shared_ptr<EntityManager> m_EntityManager;
+
+		std::stack<Matrix> m_ModelStack;
+
+		//the root details
+		Guid m_RootEntity;
+		Guid m_RootSibling;
+		//state
+		bool m_DirtyOnwards{ false };
+
+		//some helper functions
+		void TraverseTreeAndUpdateTransforms();
+		void TraverseNode(const Guid& guid);
+
+		Matrix GetLocalModelMatrix(const TransformComp& trans);
+	};
 }

@@ -35,9 +35,11 @@ ________________________________________________________________________________
 namespace ragdoll
 {
 	class EntityManager;
-	class TransformLayer;
-	class RenderGraph;
-	class ResourceManager;
+	class TransformSystem;
+	class Window;
+	class FileManager;
+	class InputHandler;
+
 	class WindowMoveEvent;
 	class WindowResizeEvent;
 	class WindowCloseEvent;
@@ -49,10 +51,6 @@ namespace ragdoll
 	class MouseButtonReleasedEvent;
 	class MouseScrolledEvent;
 	class Event;
-	class Window;
-	class LayerStack;
-	class FileManager;
-	class InputHandler;
 
 	class Application
 	{
@@ -91,11 +89,9 @@ namespace ragdoll
 		std::shared_ptr<Window> m_PrimaryWindow;
 		std::shared_ptr<InputHandler> m_InputHandler;
 		std::shared_ptr<EntityManager> m_EntityManager;
-		std::shared_ptr<ResourceManager> m_ResourceManager;
-		std::shared_ptr<RenderGraph> m_RenderGraph;
 		std::shared_ptr<FileManager> m_FileManager;
-		std::shared_ptr<LayerStack> m_LayerStack;
-		std::shared_ptr<TransformLayer> m_TransformLayer;
+
+		std::shared_ptr<TransformSystem> m_TransformSystem;
 
 		ForwardRenderer Renderer;
 		ImguiRenderer m_ImguiInterface;

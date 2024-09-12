@@ -30,32 +30,22 @@ ________________________________________________________________________________
 
 #include "ragdollpch.h"
 
-#include "TransformLayer.h"
+#include "TransformSystem.h"
 
 #include "TransformComp.h"
 
-#include "Ragdoll/Layer/Layer.h"
 #include "Ragdoll/Entity/EntityManager.h"
 
 namespace ragdoll
 {
-	TransformLayer::TransformLayer(std::shared_ptr<EntityManager> reg) : Layer{ "TransformLayer" }, m_EntityManager { reg }
+	TransformSystem::TransformSystem(std::shared_ptr<EntityManager> reg) : m_EntityManager { reg }
 	{
 
 	}
 
-	void TransformLayer::Init()
+	void TransformSystem::UpdateTransforms()
 	{
-	}
-
-	void TransformLayer::Update(float _dt)
-	{
-		UNREFERENCED_PARAMETER(_dt);
 		TraverseTreeAndUpdateTransforms();
-	}
-
-	void TransformLayer::Shutdown()
-	{
 	}
 
 	void AddNodeToFurthestSibling(Guid sibling, Guid node, std::shared_ptr<EntityManager> em) 
@@ -67,7 +57,7 @@ namespace ragdoll
 			AddNodeToFurthestSibling(trans->m_Sibling, node, em);
 	}
 
-	void TransformLayer::AddEntityAtRootLevel(Guid entityId)
+	void TransformSystem::AddEntityAtRootLevel(Guid entityId)
 	{
 		if (m_RootEntity.m_RawId == 0)
 			m_RootEntity = entityId;
@@ -107,7 +97,7 @@ namespace ragdoll
 		}
 	}
 
-	void TransformLayer::DebugPrintHierarchy()
+	void TransformSystem::DebugPrintHierarchy()
 	{
 		if(m_RootEntity.m_RawId)
 			PrintRecursive(m_RootEntity, 0, m_EntityManager);
@@ -115,7 +105,7 @@ namespace ragdoll
 			PrintRecursive(m_RootSibling, 0, m_EntityManager);
 	}
 
-	void TransformLayer::TraverseTreeAndUpdateTransforms()
+	void TransformSystem::TraverseTreeAndUpdateTransforms()
 	{
 		if(m_RootEntity)
 		{
@@ -125,7 +115,7 @@ namespace ragdoll
 		}
 	}
 
-	void TransformLayer::TraverseNode(const Guid& guid)
+	void TransformSystem::TraverseNode(const Guid& guid)
 	{
 		auto transform = m_EntityManager->GetComponent<TransformComp>(guid);
 		if(transform)
@@ -210,7 +200,7 @@ namespace ragdoll
 		}
 	}
 
-	Matrix TransformLayer::GetLocalModelMatrix(const TransformComp& trans)
+	Matrix TransformSystem::GetLocalModelMatrix(const TransformComp& trans)
 	{
 		Matrix model = Matrix::Identity;
 		model *= Matrix::CreateScale(trans.m_LocalScale);

@@ -1,23 +1,24 @@
 #pragma once
 #include "RenderableComp.h"
-#include "Ragdoll/Layer/Layer.h"
 #include "Ragdoll/Math/RagdollMath.h"
 
 struct Proxy {
-	//for now it is like this
+	//2 4x4 float matrix i feel is quite heavy, check if this is the norms
+	Matrix ModelToWorld;
+	Matrix InvModelToWorld;	//hlsl cannot compute the inverse
+	int32_t TextureIndex{ -1 };	//in the future for instancing with textures
 
 };
 namespace ragdoll {
 	class EntityManager;
-	class RenderableLayer : public Layer {
+	class RenderableSystem 
+	{
 	public:
-		RenderableLayer(std::shared_ptr<EntityManager> reg);
-		~RenderableLayer() override = default;
+		RenderableSystem(std::shared_ptr<EntityManager> reg);
 
-		void Init() override;
-		void Update(float _dt) override;
-		void Shutdown() override;
 	private:
+		std::shared_ptr<EntityManager> m_EntityManager;
+
 		std::vector<Proxy> Proxies;
 	};
 }

@@ -41,9 +41,7 @@ ________________________________________________________________________________
 #include "Event/KeyEvents.h"
 #include "Event/MouseEvent.h"
 #include "Input/InputHandler.h"
-#include "Layer/LayerStack.h"
-#include "Components/TransformLayer.h"
-#include "Resource/ResourceManager.h"
+#include "Components/TransformSystem.h"
 #include "File/FileManager.h"
 
 #include "DirectXDevice.h"
@@ -85,24 +83,15 @@ namespace ragdoll
 			m_InputHandler->Init();
 			//create the entity manager
 			m_EntityManager = std::make_shared<EntityManager>();
-			//create the resource manager
-			m_ResourceManager = std::make_shared<ResourceManager>();
-			m_ResourceManager->Init(m_PrimaryWindow);
 			//create the file manager
 			m_FileManager = std::make_shared<FileManager>();
 			m_FileManager->Init();
 
-			//layers stuff
-			m_LayerStack = std::make_shared<LayerStack>();
 			//adding the transform layer
-			m_TransformLayer = std::make_shared<TransformLayer>(m_EntityManager);
-			m_LayerStack->PushLayer(m_TransformLayer);
+			m_TransformSystem = std::make_shared<TransformSystem>(m_EntityManager);
 
 			Renderer.Init(m_PrimaryWindow, m_FileManager, m_EntityManager);
 			m_ImguiInterface.Init(Renderer.Device.get(), Renderer.ImguiVertexShader, Renderer.ImguiPixelShader);
-
-			//init all layers
-			m_LayerStack->Init();
 		}
 		MICROPROFILE_TIMELINE_LEAVE_STATIC("Application Initialization");
 
@@ -136,10 +125,7 @@ namespace ragdoll
 					YieldProcessor();
 				}
 			}
-			for (auto& layer : *m_LayerStack)
-			{
-				layer->Update(static_cast<float>(m_Frametime));
-			}
+			m_TransformSystem->UpdateTransforms();
 			m_ImguiInterface.BeginFrame();
 			Renderer.Draw();
 
@@ -169,7 +155,7 @@ namespace ragdoll
 					auto tcomp = m_EntityManager->AddComponent<TransformComp>(ent);
 					tcomp->m_LocalPosition = pos;
 					tcomp->m_LocalScale = scale;
-					m_TransformLayer->AddEntityAtRootLevel(m_EntityManager->GetGuid(ent));
+					m_TransformSystem->AddEntityAtRootLevel(m_EntityManager->GetGuid(ent));
 					auto rcomp = m_EntityManager->AddComponent<RenderableComp>(ent);
 					rcomp->meshIndex = std::rand() / (float)RAND_MAX * AssetManager::GetInstance()->Meshes.size();
 				}
@@ -213,12 +199,6 @@ namespace ragdoll
 		RD_DISPATCH_EVENT(dispatcher, MouseButtonPressedEvent, event, Application::OnMouseButtonPressed);
 		RD_DISPATCH_EVENT(dispatcher, MouseButtonReleasedEvent, event, Application::OnMouseButtonReleased);
 		RD_DISPATCH_EVENT(dispatcher, MouseScrolledEvent, event, Application::OnMouseScrolled);
-
-		//run the event on all layers
-		for (auto& layer : *m_LayerStack)
-		{
-			layer->OnEvent(event);
-		}
 	}
 
 	bool Application::OnWindowClose(WindowCloseEvent& event)

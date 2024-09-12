@@ -7,7 +7,7 @@
 #include "Ragdoll/Entity/EntityManager.h"
 
 #include "Ragdoll/Components/TransformComp.h"
-#include "Ragdoll/Components/TransformLayer.h"
+#include "Ragdoll/Components/TransformSystem.h"
 #include "Ragdoll/Components/RenderableComp.h"
 
 // Define these only in *one* .cc file.
@@ -17,9 +17,7 @@
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 #include <tiny_gltf.h>
 
-#include "../../../Editor/src/Asset/Asset.h"
-
-void GLTFLoader::Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::TransformLayer> tl)
+void GLTFLoader::Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::TransformSystem> tl)
 {
 	Root = root;
 	Renderer = renderer;
@@ -38,7 +36,7 @@ void AddToFurthestSibling(ragdoll::Guid child, ragdoll::Guid newChild, std::shar
 		trans->m_Sibling = newChild;
 }
 
-ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, const tinygltf::Model& model, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::TransformLayer> tl)
+ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, const tinygltf::Model& model, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::TransformSystem> tl)
 {
 	const tinygltf::Node& curr = model.nodes[currIndex];
 	//create the entity
