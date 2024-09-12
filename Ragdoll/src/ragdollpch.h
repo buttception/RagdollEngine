@@ -31,6 +31,7 @@ ________________________________________________________________________________
 
 // CSTD libs
 #include <cstdlib>
+#include <ctime>
 
 // STL containers
 #include <vector>

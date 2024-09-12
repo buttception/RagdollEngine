@@ -9,6 +9,7 @@
 #include "Ragdoll/Entity/EntityManager.h"
 #include "Ragdoll/Components/TransformComp.h"
 #include "Ragdoll/Components/RenderableComp.h"
+#include "GeometryBuilder.h"
 
 void ForwardRenderer::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em)
 {
@@ -28,10 +29,10 @@ void ForwardRenderer::Draw()
 	nvrhi::TextureHandle tex = Device->GetCurrentBackbuffer();
 	{
 		MICROPROFILE_SCOPEI("ForwardRender", "Clear", MP_DARKBLUE);
-		CommandList->open();
 		nvrhi::TextureSubresourceSet subSet;
 		auto bgCol = PrimaryWindow->GetBackgroundColor();
 		nvrhi::Color col = nvrhi::Color(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
+		CommandList->open();
 		CommandList->clearTextureFloat(tex, subSet, col);
 		CommandList->clearDepthStencilTexture(DepthBuffer, subSet, true, 1.f, false, 0);
 		CommandList->close();
@@ -51,7 +52,7 @@ void ForwardRenderer::Draw()
 		float cameraFar = 1000.f;
 		float cameraAspect = 16.f / 9.f;
 		float cameraSpeed = 5.f;
-		float cameraRotationSpeed = 5.f;
+		float cameraRotationSpeed = 15.f;
 		Color dirLightColor = { 1.f,1.f,1.f,1.f };
 		Color ambientLight = { 0.2f, 0.2f, 0.2f, 1.f };
 		float ambientIntensity = 0.2f;
@@ -122,7 +123,8 @@ void ForwardRenderer::Draw()
 
 		entt::registry& reg = EntityManager->GetRegistry();
 		auto ecsView = reg.view<RenderableComp, TransformComp>();
-		CommandList->open();
+		int calls = 0;
+		const static int maxCalls = 50;
 		for (entt::entity ent : ecsView) {
 			RenderableComp* renderableComp = EntityManager->GetComponent<RenderableComp>(ent);
 			TransformComp* transComp = EntityManager->GetComponent<TransformComp>(ent);
@@ -188,6 +190,8 @@ void ForwardRenderer::Draw()
 					cbuf.world = transComp->m_ModelToWorld;
 					//TODO: cache inverse world matrix
 					cbuf.invWorldMatrix = transComp->m_ModelToWorld.Invert();
+					if(calls == 0)
+						CommandList->open();
 					CommandList->writeBuffer(ConstantBuffer, &cbuf, sizeof(CBuffer));
 
 					CommandList->setGraphicsState(state);
@@ -198,12 +202,26 @@ void ForwardRenderer::Draw()
 					nvrhi::DrawArguments args;
 					args.vertexCount = buffer.TriangleCount;
 					CommandList->drawIndexed(args);
+					calls++;
+
+					if (calls > maxCalls) {
+						MICROPROFILE_SCOPEI("ForwardRender", "Mesh Execute", MP_BLUEVIOLET);
+						CommandList->close();
+						Device->m_NvrhiDevice->executeCommandList(CommandList);
+						{
+							MICROPROFILE_SCOPEI("ForwardRender", "Garbo Collect", MP_ROYALBLUE1);
+							Device->m_NvrhiDevice->runGarbageCollection();
+						}
+						calls = 0;
+					}
 				}
 			}
 		}
-		MICROPROFILE_SCOPEI("ForwardRender", "Mesh Execute", MP_BLUEVIOLET);
-		CommandList->close();
-		Device->m_NvrhiDevice->executeCommandList(CommandList);
+		if (calls != 0) {
+			MICROPROFILE_SCOPEI("ForwardRender", "Mesh Execute", MP_BLUEVIOLET);
+			CommandList->close();
+			Device->m_NvrhiDevice->executeCommandList(CommandList);
+		}
 	}
 }
 
@@ -345,6 +363,35 @@ void ForwardRenderer::CreateResource()
 	CommandList->close();
 	//remember to execute the list
 	Device->m_NvrhiDevice->executeCommandList(CommandList);
+
+
+	Material mat;
+	mat.bIsLit = true;
+	mat.Color = { 1.f, 0.f, 0.f, 1.f };
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	mat.Color = { 1.f, 1.f, 0.f, 1.f };
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	mat.Color = { 1.f, 1.f, 1.f, 1.f };
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	mat.Color = { 1.f, 0.f, 1.f, 1.f };
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	mat.Color = { 0.f, 1.f, 0.f, 1.f };
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+
+	//build primitives
+	GeometryBuilder geomBuilder;
+	geomBuilder.Init(Device->m_NvrhiDevice);
+	//limitation of renderer where materials are tied to meshes instead of entities
+	for (int i = 0; i < 5; ++i) {
+		AssetManager::GetInstance()->Meshes.emplace_back(geomBuilder.BuildCube(1.f, i));
+		AssetManager::GetInstance()->Meshes.emplace_back(geomBuilder.BuildSphere(1.f, 16, i));
+		AssetManager::GetInstance()->Meshes.emplace_back(geomBuilder.BuildCylinder(1.f, 1.f, 16, i));
+		AssetManager::GetInstance()->Meshes.emplace_back(geomBuilder.BuildCone(1.f, 1.f, 16, i));
+		AssetManager::GetInstance()->Meshes.emplace_back(geomBuilder.BuildIcosahedron(1.f, i));
+	}
+
+	const static int32_t seed = 42;
+	std::srand(seed);
 
 	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
 	pipelineDesc.addBindingLayout(BindingLayoutHandle);

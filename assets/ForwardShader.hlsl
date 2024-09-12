@@ -93,6 +93,6 @@ void main_ps(
 	}
 	else
 	{
-		outColor = inColor;
+		outColor = albedoFactor * inColor;
 	}
 }

@@ -51,6 +51,11 @@ ________________________________________________________________________________
 
 MICROPROFILE_DEFINE(MAIN, "MAIN", "Main", MP_AUTO);
 
+//testing
+#include "Components/RenderableComp.h"
+#include "Components/TransformComp.h"
+#include "AssetManager.h"
+
 namespace ragdoll
 {
 	void Application::Init(const ApplicationConfig& config)
@@ -104,12 +109,12 @@ namespace ragdoll
 
 		MICROPROFILE_TIMELINE_ENTER_STATIC(MP_DARKGOLDENROD, "GLTF Load");
 		{
-			GLTFLoader loader;
-			loader.Init(m_FileManager->GetRoot(), &Renderer, m_FileManager, m_EntityManager, m_TransformLayer);
-			std::string sceneName{ "Sponza" };
-			std::filesystem::path fp = "gltf/2.0/";
-			fp = fp / sceneName / "glTF" / (sceneName + ".gltf");
-			loader.LoadAndCreateModel(fp.string());
+			//GLTFLoader loader;
+			//loader.Init(m_FileManager->GetRoot(), &Renderer, m_FileManager, m_EntityManager, m_TransformLayer);
+			//std::string sceneName{ "Sponza" };
+			//std::filesystem::path fp = "gltf/2.0/";
+			//fp = fp / sceneName / "glTF" / (sceneName + ".gltf");
+			//loader.LoadAndCreateModel(fp.string());
 
 			//loader.LoadAndCreateModel("Instancing Test/FlyingWorld-BattleOfTheTrashGod.gltf");
 		}
@@ -133,20 +138,50 @@ namespace ragdoll
 			}
 			for (auto& layer : *m_LayerStack)
 			{
-				layer->Update(static_cast<float>(m_TargetFrametime));
+				layer->Update(static_cast<float>(m_Frametime));
 			}
 			m_ImguiInterface.BeginFrame();
 			Renderer.Draw();
+
+			//spawn more shits temp
+			const static Vector3 t_range{ 10.f, 10.f, 10.f };
+			const static Vector3 t_min = { -5.f, -5.f, -5.f };
+			const static Vector3 s_range{ 0.2f, 0.2f, 0.2f };
+			const static Vector3 s_min{ 0.3f, 0.3f, 0.3f };
+			static int32_t currentGeomCount{};
+
+			ImGui::Begin("Spawn");
+			ImGui::Text("Current Geom Count: %d", currentGeomCount);
+			if (ImGui::Button("Spawn 100 geometry")) {
+				for (int i = 0; i < 100; ++i) {
+					currentGeomCount++;
+					Vector3 pos{
+						t_min.x + (std::rand() / (float)RAND_MAX) * t_range.x,
+						t_min.y + (std::rand() / (float)RAND_MAX) * t_range.y,
+						t_min.z + (std::rand() / (float)RAND_MAX) * t_range.z,
+					};
+					Vector3 scale{
+						s_min.x + (std::rand() / (float)RAND_MAX) * s_range.x,
+						s_min.y + (std::rand() / (float)RAND_MAX) * s_range.y,
+						s_min.z + (std::rand() / (float)RAND_MAX) * s_range.z,
+					};
+					entt::entity ent = m_EntityManager->CreateEntity();
+					auto tcomp = m_EntityManager->AddComponent<TransformComp>(ent);
+					tcomp->m_LocalPosition = pos;
+					tcomp->m_LocalScale = scale;
+					m_TransformLayer->AddEntityAtRootLevel(m_EntityManager->GetGuid(ent));
+					auto rcomp = m_EntityManager->AddComponent<RenderableComp>(ent);
+					rcomp->meshIndex = std::rand() / (float)RAND_MAX * AssetManager::GetInstance()->Meshes.size();
+				}
+			}
+			ImGui::End();
 
 			m_ImguiInterface.Render();
 			Renderer.Device->Present();
 
 			m_PrimaryWindow->SetFrametime(m_Frametime);
 			m_PrimaryWindow->IncFpsCounter();
-			if (m_Frametime > m_PrimaryWindow->GetDeltaTime() || m_Frametime > 1.f)
-				m_Frametime = 0;
-			else
-				m_Frametime -= m_TargetFrametime;
+			m_Frametime = 0;
 			MicroProfileFlip(nullptr);
 
 			if (ImGui::IsKeyPressed(ImGuiKey_F1)) {
