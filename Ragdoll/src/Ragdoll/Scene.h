@@ -4,11 +4,45 @@
 
 #include "Components/TransformComp.h"
 #include "Components/RenderableComp.h"
+#include "Entity/EntityManager.h"
 
 namespace ragdoll {
 	class EntityManager;
 	class TransformSystem;
 	class Application;
+
+	struct Proxy {
+		ENTT_ID_TYPE EnttId;	//can draw to a entity buffer next time
+		int32_t BufferIndex = -1;	//does not exist for now
+		int32_t MaterialIndex = -1;
+		//texture index and stuff next time
+	};
+
+	struct InstanceData {
+		Matrix ModelToWorld;
+		Matrix InvModelToWorld;
+
+		Vector4 Color = Vector4::One;
+		float Roughness = 0.f;
+		float Metallic = 0.f;
+
+		int UseAlbedo = 0;
+		int UseNormalMap = 0;
+		int UseRoughnessMetallicMap = 0;
+		int bIsLit = 1;
+	};
+
+	struct InstanceBuffer {
+		nvrhi::BufferHandle BufferHandle;
+		uint32_t CurrentCapacity = StartCapacity;
+		uint32_t InstanceCount = 0;
+		std::vector<InstanceData> Data;
+
+		int32_t BufferIndex;
+		std::vector<int32_t> MaterialIndices;
+		
+		static const uint32_t StartCapacity = 64;
+	};
 
 	class Scene {
 		ForwardRenderer Renderer;
@@ -23,6 +57,12 @@ namespace ragdoll {
 		//state
 		bool m_DirtyOnwards{ false };
 
+		//Rendering
+		CBuffer CBuffer;
+		std::vector<Proxy> Proxies;
+		bool bIsStaticProxiesBuilt{ false };
+		std::vector<InstanceBuffer> InstanceBuffers;
+
 	public:
 		Scene(Application*);
 
@@ -33,6 +73,10 @@ namespace ragdoll {
 		//Transforms
 		void AddEntityAtRootLevel(Guid entityId);
 
+		//Proxy
+		void BuildStaticInstances();
+		//need a update static proxies next time
+
 	private:
 		//Transforms
 		void UpdateTransforms();
@@ -41,8 +85,5 @@ namespace ragdoll {
 		void TraverseTreeAndUpdateTransforms();
 		void TraverseNode(const Guid& guid);
 		Matrix GetLocalModelMatrix(const TransformComp& trans);
-
-		//Renderable
-
 	};
 }

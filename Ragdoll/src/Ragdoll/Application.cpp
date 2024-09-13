@@ -136,7 +136,7 @@ namespace ragdoll
 
 	void Application::Shutdown()
 	{
-		m_Scene = nullptr;
+		m_Scene->Shutdown();
 		m_FileManager->Shutdown();
 		m_PrimaryWindow->Shutdown();
 		GLFWContext::Shutdown();

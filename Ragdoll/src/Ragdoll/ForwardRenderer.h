@@ -4,6 +4,7 @@
 namespace ragdoll {
 	class Window;
 	class FileManager;
+	struct InstanceBuffer;
 }
 class DirectXDevice;
 
@@ -24,6 +25,7 @@ struct CBuffer {
 	int32_t useMetallicRoughnessMap{ false };
 	int32_t isLit{ false };
 };
+
 struct Vertex {
 	Vector3 position = Vector3::Zero;
 	Vector4 color = Vector4::One;
@@ -32,6 +34,7 @@ struct Vertex {
 	Vector3 binormal = Vector3::Zero;
 	Vector2 texcoord = Vector2::Zero;
 };
+
 class ForwardRenderer {
 	//handled at the renderer side
 	nvrhi::BindingLayoutHandle BindingLayoutHandle;
@@ -39,7 +42,6 @@ class ForwardRenderer {
 	nvrhi::BufferHandle VertexBuffer;
 	nvrhi::BufferHandle IndexBuffer;
 
-	nvrhi::TextureHandle DepthBuffer;
 	nvrhi::GraphicsPipelineHandle GraphicsPipeline;
 
 	std::shared_ptr<ragdoll::Window> PrimaryWindow;
@@ -53,12 +55,16 @@ public:
 	nvrhi::ShaderHandle ForwardVertexShader;
 	nvrhi::ShaderHandle ForwardPixelShader;
 	nvrhi::BufferHandle ConstantBuffer;
+	nvrhi::TextureHandle DepthBuffer;
 	std::vector<nvrhi::VertexAttributeDesc> VertexAttributes;
 	nvrhi::InputLayoutHandle InputLayoutHandle;
 	
 	void Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em);
-	void Draw();
 	void Shutdown();
+
+	void BeginFrame(CBuffer* Cbug);
+	void Draw(CBuffer* Cbuf);
+	void DrawInstanceBuffer(ragdoll::InstanceBuffer* Buffer, CBuffer* Cbuf);
 private:
 	//handled at renderer
 	void CreateResource();

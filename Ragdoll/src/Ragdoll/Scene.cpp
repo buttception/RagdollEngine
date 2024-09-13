@@ -6,6 +6,7 @@
 #include "Entity/EntityManager.h"
 #include "AssetManager.h"
 #include "DirectXDevice.h"
+#include "nvrhi/utils.h"
 
 ragdoll::Scene::Scene(Application* app)
 {
@@ -16,9 +17,10 @@ ragdoll::Scene::Scene(Application* app)
 
 void ragdoll::Scene::Update(float _dt)
 {
-	UpdateTransforms();
 	ImguiInterface.BeginFrame();
-	Renderer.Draw();
+	Renderer.BeginFrame(&CBuffer);
+	for (auto& it : InstanceBuffers)
+		Renderer.DrawInstanceBuffer(&it, &CBuffer);
 
 	//spawn more shits temp
 	const static Vector3 t_range{ 10.f, 10.f, 10.f };
@@ -50,6 +52,8 @@ void ragdoll::Scene::Update(float _dt)
 			auto rcomp = EntityManager->AddComponent<RenderableComp>(ent);
 			rcomp->meshIndex = std::rand() / (float)RAND_MAX * AssetManager::GetInstance()->Meshes.size();
 		}
+		UpdateTransforms();
+		BuildStaticInstances();
 	}
 	ImGui::End();
 
@@ -59,7 +63,7 @@ void ragdoll::Scene::Update(float _dt)
 
 void ragdoll::Scene::Shutdown()
 {
-	//Renderer.Device->Shutdown();
+	Renderer.Shutdown();
 }
 
 void ragdoll::Scene::UpdateTransforms()
@@ -86,6 +90,88 @@ void ragdoll::Scene::AddEntityAtRootLevel(Guid entityId)
 		else
 			AddNodeToFurthestSibling(m_RootSibling, entityId, EntityManager);
 	}
+}
+
+void ragdoll::Scene::BuildStaticInstances()
+{
+	//iterate through all the transforms and renderable
+	auto EcsView = EntityManager->GetRegistry().view<RenderableComp, TransformComp>();
+	for (entt::entity ent : EcsView) {
+		RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>(ent);
+		Proxy Proxy;
+		Proxy.EnttId = (ENTT_ID_TYPE)ent;
+		//temp is mesh index now
+		Proxy.BufferIndex = rComp->meshIndex;
+		Proxy.MaterialIndex = 0;	//TEMP
+		Proxies.push_back(Proxy);
+	}
+	//sort the proxies
+	std::sort(Proxies.begin(), Proxies.end(), [](const Proxy& lhs, const Proxy& rhs) {
+		return lhs.BufferIndex > rhs.BufferIndex;
+		});
+	//TODO: update this when buffers are abstracted
+	//build the structured buffer
+	int32_t CurrBufferIndex{ -1 }, Start{ 0 };
+	if (Proxies.size() != 0)
+		CurrBufferIndex = Proxies[0].BufferIndex;
+	Renderer.CommandList->open();
+	for (int i = 0; i < Proxies.size(); ++i) {
+		//iterate till i get a different buffer id, meaning is a diff mesh
+		if (Proxies[i].BufferIndex != CurrBufferIndex)
+		{
+			InstanceBuffer Buffer;
+			//specify how big the instance data buffer size should be
+			while (i - Start > Buffer.CurrentCapacity) {
+				Buffer.CurrentCapacity *= 2;
+			}
+			Buffer.Data.resize(Buffer.CurrentCapacity);
+			Buffer.BufferIndex = Proxies[i].BufferIndex;
+			Buffer.MaterialIndices.push_back(0);	//temp
+
+			//populate the buffer data vector
+			for (int j = Start; j < i; ++j) {	//maybe should do in outer loop, then gather all the materials too
+				TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)Proxies[j].EnttId);
+				RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>((entt::entity)Proxies[j].EnttId);
+				InstanceData Data;
+
+				const Material& mat = AssetManager::GetInstance()->Materials[Proxies[i].MaterialIndex];
+				if (mat.AlbedoIndex >= 0) {
+					Data.UseAlbedo = true;
+				}
+				if (mat.NormalIndex >= 0) {
+					Data.UseNormalMap = true;
+				}
+				if (mat.MetallicRoughnessIndex >= 0) {
+					Data.UseRoughnessMetallicMap = true;
+				}
+				Data.Color = mat.Color;
+				Data.Metallic = mat.Metallic;
+				Data.Roughness = mat.Roughness;
+				Data.bIsLit = mat.bIsLit;
+				Data.ModelToWorld = tComp->m_ModelToWorld;
+				Data.InvModelToWorld = tComp->m_ModelToWorld.Invert();
+				Buffer.Data[Buffer.InstanceCount++] = Data;
+			}
+			//create the instance buffer handle
+			nvrhi::BufferDesc InstanceBufferDesc;
+			InstanceBufferDesc.byteSize = sizeof(InstanceData) * Buffer.CurrentCapacity;
+			InstanceBufferDesc.debugName = "Instance Buffer";
+			InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
+			InstanceBufferDesc.structStride = sizeof(InstanceData);
+			Buffer.BufferHandle = Renderer.Device->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
+
+			//copy data over
+			Renderer.CommandList->beginTrackingBufferState(Buffer.BufferHandle, nvrhi::ResourceStates::CopyDest);
+			Renderer.CommandList->writeBuffer(Buffer.BufferHandle, Buffer.Data.data(), sizeof(InstanceData) * Buffer.InstanceCount);
+			Renderer.CommandList->setPermanentBufferState(Buffer.BufferHandle, nvrhi::ResourceStates::ShaderResource);
+
+			InstanceBuffers.emplace_back(Buffer);
+			CurrBufferIndex = Proxies[i].BufferIndex;
+			Start = i;
+		}
+	}
+	Renderer.CommandList->close();
+	Renderer.Device->m_NvrhiDevice->executeCommandList(Renderer.CommandList);
 }
 
 void PrintRecursive(ragdoll::Guid id, int level, std::shared_ptr<ragdoll::EntityManager> em)

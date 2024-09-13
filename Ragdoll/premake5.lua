@@ -42,6 +42,11 @@ project "Ragdoll"
 		"d3d12",
 		"dxgi",
 	}
+	
+	vpaths 
+	{
+		["assets"] = { "../assets/**.*" }
+	}	
 
     includedirs
     {
