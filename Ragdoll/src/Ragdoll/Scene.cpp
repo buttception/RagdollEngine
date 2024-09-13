@@ -99,16 +99,16 @@ void ragdoll::Scene::BuildStaticInstances()
 		RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>(ent);
 		Proxy Proxy;
 		Proxy.EnttId = (ENTT_ID_TYPE)ent;
-		//temp is mesh index now
-		Proxy.BufferIndex = rComp->meshIndex;
-		Proxy.MaterialIndex = 0;	//TEMP
+		//temp only first submesh now
+		Submesh submesh = AssetManager::GetInstance()->Meshes[rComp->meshIndex].Submeshes[0];
+		Proxy.BufferIndex = submesh.VertexBufferIndex;
+		Proxy.MaterialIndex = submesh.MaterialIndex;	//TEMP
 		Proxies.push_back(Proxy);
 	}
 	//sort the proxies
 	std::sort(Proxies.begin(), Proxies.end(), [](const Proxy& lhs, const Proxy& rhs) {
 		return lhs.BufferIndex > rhs.BufferIndex;
 		});
-	//TODO: update this when buffers are abstracted
 	//build the structured buffer
 	int32_t CurrBufferIndex{ -1 }, Start{ 0 };
 	if (Proxies.size() != 0)
