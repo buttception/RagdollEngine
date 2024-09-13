@@ -19,8 +19,7 @@ void ragdoll::Scene::Update(float _dt)
 {
 	ImguiInterface.BeginFrame();
 	Renderer.BeginFrame(&CBuffer);
-	for (auto& it : InstanceBuffers)
-		Renderer.DrawInstanceBuffer(&it, &CBuffer);
+	Renderer.DrawAllInstances(&StaticInstanceBuffers, &CBuffer);
 
 	//spawn more shits temp
 	const static Vector3 t_range{ 10.f, 10.f, 10.f };
@@ -165,13 +164,28 @@ void ragdoll::Scene::BuildStaticInstances()
 			Renderer.CommandList->writeBuffer(Buffer.BufferHandle, Buffer.Data.data(), sizeof(InstanceData) * Buffer.InstanceCount);
 			Renderer.CommandList->setPermanentBufferState(Buffer.BufferHandle, nvrhi::ResourceStates::ShaderResource);
 
-			InstanceBuffers.emplace_back(Buffer);
+			StaticInstanceBuffers.emplace_back(Buffer);
 			CurrBufferIndex = Proxies[i].BufferIndex;
 			Start = i;
 		}
 	}
 	Renderer.CommandList->close();
 	Renderer.Device->m_NvrhiDevice->executeCommandList(Renderer.CommandList);
+}
+
+void ragdoll::Scene::UpdateStaticInstances()	//maybe this should be a callback function
+{
+	//iterate through all the transforms and renderable
+	auto EcsView = EntityManager->GetRegistry().view<RenderableComp, TransformComp>();
+	for (entt::entity ent : EcsView) {
+		RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>(ent);
+		Proxy Proxy;
+		Proxy.EnttId = (ENTT_ID_TYPE)ent;
+		//temp is mesh index now
+		Proxy.BufferIndex = rComp->meshIndex;
+		Proxy.MaterialIndex = 0;	//TEMP
+		Proxies.push_back(Proxy);
+	}
 }
 
 void PrintRecursive(ragdoll::Guid id, int level, std::shared_ptr<ragdoll::EntityManager> em)

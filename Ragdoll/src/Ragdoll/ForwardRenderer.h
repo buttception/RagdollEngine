@@ -9,21 +9,11 @@ namespace ragdoll {
 class DirectXDevice;
 
 struct CBuffer {
-	Matrix world;
-	Matrix invWorldMatrix;
 	Matrix viewProj;
 	Vector4 lightDiffuseColor = { 1.f, 1.f, 1.f, 1.f };
 	Vector4 sceneAmbientColor = { 0.2f, 0.2f, 0.2f, 1.f };
-	Vector4 albedoFactor = { 1.f,1.f,1.f,1.f };
 	Vector3 lightDirection = { 1.f, -1.f, 1.f };
-	float roughness;
 	Vector3 cameraPosition;
-	float metallic;
-
-	int32_t useAlbedo{ false };
-	int32_t useNormalMap{ false };
-	int32_t useMetallicRoughnessMap{ false };
-	int32_t isLit{ false };
 };
 
 struct Vertex {
@@ -63,9 +53,9 @@ public:
 	void Shutdown();
 
 	void BeginFrame(CBuffer* Cbug);
-	void Draw(CBuffer* Cbuf);
-	void DrawInstanceBuffer(ragdoll::InstanceBuffer* Buffer, CBuffer* Cbuf);
+	void DrawAllInstances(std::vector<ragdoll::InstanceBuffer>* InstanceBuffers, CBuffer* Cbuf);
 private:
 	//handled at renderer
 	void CreateResource();
+	void DrawInstanceBuffer(ragdoll::InstanceBuffer* Buffer, CBuffer* Cbuf);
 };

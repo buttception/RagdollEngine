@@ -390,8 +390,9 @@ Mesh GeometryBuilder::BuildIcosahedron(float size, int32_t matIndex)
 Mesh GeometryBuilder::BuildMesh(std::string debugName, int32_t matIndex)
 {
     Mesh mesh;
+    Submesh submesh;
     //build the vertex and index buffers
-    Mesh::Buffer buffer;
+    VertexBufferObject buffer;
     nvrhi::BufferDesc vertexBufDesc;
     vertexBufDesc.byteSize = Vertices.size() * sizeof(Vertex);	//the offset is already the size of the vb
     vertexBufDesc.isVertexBuffer = true;
@@ -420,7 +421,9 @@ Mesh GeometryBuilder::BuildMesh(std::string debugName, int32_t matIndex)
     Device->executeCommandList(CommandList);
 
     buffer.TriangleCount = Indices.size();
-    buffer.MaterialIndex = matIndex;
-    mesh.Buffers.emplace_back(buffer);
+    submesh.MaterialIndex = matIndex;
+    submesh.VertexBufferIndex = AssetManager::GetInstance()->VBOs.size();
+    AssetManager::GetInstance()->VBOs.emplace_back(buffer);
+    mesh.Submeshes.emplace_back(submesh);
     return mesh;
 }

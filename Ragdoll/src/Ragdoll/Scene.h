@@ -61,7 +61,7 @@ namespace ragdoll {
 		CBuffer CBuffer;
 		std::vector<Proxy> Proxies;
 		bool bIsStaticProxiesBuilt{ false };
-		std::vector<InstanceBuffer> InstanceBuffers;
+		std::vector<InstanceBuffer> StaticInstanceBuffers;
 
 	public:
 		Scene(Application*);
@@ -73,9 +73,9 @@ namespace ragdoll {
 		//Transforms
 		void AddEntityAtRootLevel(Guid entityId);
 
-		//Proxy
+		//Renderable
 		void BuildStaticInstances();
-		//need a update static proxies next time
+		void UpdateStaticInstances();
 
 	private:
 		//Transforms

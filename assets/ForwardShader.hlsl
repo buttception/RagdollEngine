@@ -1,19 +1,9 @@
 cbuffer g_Const : register(b0) {
-	float4x4 worldMatrix;
-	float4x4 invWorldMatrix;
 	float4x4 viewProjMatrix;
 	float4 lightDiffuseColor;
 	float4 sceneAmbientColor;
-	float4 albedoFactor;
 	float3 lightDirection;
-	float roughness;
 	float3 cameraPosition;
-	float metallic;
-
-	int useAlbedo;
-	int useNormalMap;
-	int useRoughnessMetallicMap;
-	int isLit;
 };
 
 struct InstanceData{
@@ -80,14 +70,14 @@ void main_ps(
 	out float4 outColor : SV_Target0
 )
 {
-	if(isLit)
+	if(InstanceDatas[inInstanceId].isLit)
 	{
 		// Sample textures
 		float4 albedo = InstanceDatas[inInstanceId].albedoFactor * inColor;
 		if(InstanceDatas[inInstanceId].useAlbedo){
 			albedo = albedoTexture.Sample(albedoSampler, inTexcoord) * inColor;
 		}
-		float4 RM = float4(roughness, metallic, 0, 0);
+		float4 RM = float4(InstanceDatas[inInstanceId].roughness, InstanceDatas[inInstanceId].metallic, 0, 0);
 		if(InstanceDatas[inInstanceId].useRoughnessMetallicMap){
 			RM = RMTexture.Sample(RMSampler, inTexcoord);
 		}
@@ -113,6 +103,6 @@ void main_ps(
 	}
 	else
 	{
-		outColor = albedoFactor * inColor;
+		outColor = InstanceDatas[inInstanceId].albedoFactor * inColor;
 	}
 }

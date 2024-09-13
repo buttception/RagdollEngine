@@ -15,15 +15,23 @@ struct Material {
 	bool bIsLit = false;
 };
 
+struct VertexBufferObject
+{
+	nvrhi::BufferHandle VertexBufferHandle;
+	nvrhi::BufferHandle IndexBufferHandle;
+	uint32_t TriangleCount;
+};
+
+struct Submesh 
+{
+	int32_t VertexBufferIndex;
+	int32_t MaterialIndex;
+
+};
+
 struct Mesh
 {
-	struct Buffer {
-		nvrhi::BufferHandle VertexBufferHandle;
-		nvrhi::BufferHandle IndexBufferHandle;
-		uint32_t TriangleCount;
-		int32_t MaterialIndex;
-	};
-	std::vector<Buffer> Buffers;
+	std::vector<Submesh> Submeshes;
 };
 
 struct Image
@@ -48,6 +56,7 @@ class AssetManager
 public:
 	static AssetManager* GetInstance();
 
+	std::vector<VertexBufferObject> VBOs;
 	std::vector<Mesh> Meshes;
 	std::vector<Image> Images;
 	std::vector<Texture> Textures;

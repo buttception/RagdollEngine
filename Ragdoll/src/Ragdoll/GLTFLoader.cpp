@@ -124,12 +124,13 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		//load all the submeshes
 		for (const tinygltf::Primitive& itPrim : itMesh.primitives) 
 		{
-			Mesh::Buffer buffer;
+			Submesh submesh;
+			VertexBufferObject buffer;
 			std::vector<uint32_t> indices;
 			std::vector<Vertex> vertices;
 
 			//set the material index for the primitive
-			buffer.MaterialIndex = itPrim.material;
+			submesh.MaterialIndex = itPrim.material;
 
 			//load the indices first
 			{
@@ -290,7 +291,9 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 				Renderer->CommandList->writeBuffer(buffer.IndexBufferHandle, indices.data(), indexBufDesc.byteSize);
 				Renderer->CommandList->setPermanentBufferState(buffer.IndexBufferHandle, nvrhi::ResourceStates::IndexBuffer);
 
-				mesh.Buffers.emplace_back(buffer);
+				submesh.VertexBufferIndex = AssetManager::GetInstance()->VBOs.size();
+				mesh.Submeshes.emplace_back(submesh);
+				AssetManager::GetInstance()->VBOs.emplace_back(buffer);
 			}
 		}
 #if 0
