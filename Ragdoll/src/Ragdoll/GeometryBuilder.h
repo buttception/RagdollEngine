@@ -9,11 +9,11 @@ class GeometryBuilder {
 public:
 	void Init(nvrhi::DeviceHandle nvrhiDevice);
 	
-	Mesh BuildCube(float size, int32_t matIndex);
-	Mesh BuildSphere(float diameter, uint32_t tessellation, int32_t matIndex);
-	Mesh BuildCylinder(float height, float diameter, size_t tessellation, int32_t matIndex);
-	Mesh BuildCone(float diameter, float height, size_t tessellation, int32_t matIndex);
-	Mesh BuildIcosahedron(float size, int32_t matIndex);
+	int32_t BuildCube(float size);
+	int32_t BuildSphere(float diameter, uint32_t tessellation);
+	int32_t BuildCylinder(float height, float diameter, size_t tessellation);
+	int32_t BuildCone(float diameter, float height, size_t tessellation);
+	int32_t BuildIcosahedron(float size);
 private:
 	nvrhi::DeviceHandle Device;
 	std::vector<Vertex> Vertices;
@@ -21,5 +21,5 @@ private:
 
 	nvrhi::CommandListHandle CommandList;
 
-	Mesh BuildMesh(std::string debugName, int32_t matIndex);
+	int32_t BuildVBO(std::string debugName);
 };

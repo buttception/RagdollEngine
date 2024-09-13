@@ -38,7 +38,7 @@ namespace ragdoll {
 		uint32_t InstanceCount = 0;
 		std::vector<InstanceData> Data;
 
-		int32_t BufferIndex;
+		int32_t VertexBufferIndex;
 		std::vector<int32_t> MaterialIndices;
 		
 		static const uint32_t StartCapacity = 64;
@@ -75,7 +75,6 @@ namespace ragdoll {
 
 		//Renderable
 		void BuildStaticInstances();
-		void UpdateStaticInstances();
 
 	private:
 		//Transforms

@@ -139,10 +139,8 @@ void ForwardRenderer::DrawInstanceBuffer(ragdoll::InstanceBuffer* InstanceBuffer
 		.setDepthAttachment(DepthBuffer);
 	nvrhi::FramebufferHandle pipelineFb = Device->m_NvrhiDevice->createFramebuffer(fbDesc);
 
-	const Mesh& mesh = AssetManager::GetInstance()->Meshes[InstanceBuffer->BufferIndex];
+	const VertexBufferObject& buffer = AssetManager::GetInstance()->VBOs[InstanceBuffer->VertexBufferIndex];
 
-	const Submesh& submesh = mesh.Submeshes[0];//temp, only 1st submesh
-	const VertexBufferObject& buffer = AssetManager::GetInstance()->VBOs[submesh.VertexBufferIndex];
 	nvrhi::GraphicsState state;
 	state.pipeline = GraphicsPipeline;
 	state.framebuffer = pipelineFb;
@@ -153,7 +151,7 @@ void ForwardRenderer::DrawInstanceBuffer(ragdoll::InstanceBuffer* InstanceBuffer
 	};
 
 	//temp
-	const Material& mat = AssetManager::GetInstance()->Materials[submesh.MaterialIndex];
+	const Material& mat = AssetManager::GetInstance()->Materials[InstanceBuffer->MaterialIndices[0]];
 	nvrhi::ITexture* albedoTex, * normalTex, * roughnessMetallicTex;
 	nvrhi::SamplerHandle albedoSampler, normalSampler, roughnessMetallicSampler;
 	albedoTex = normalTex = roughnessMetallicTex = AssetManager::GetInstance()->DefaultTex;
@@ -339,13 +337,35 @@ void ForwardRenderer::CreateResource()
 	//build primitives
 	GeometryBuilder geomBuilder;
 	geomBuilder.Init(Device->m_NvrhiDevice);
-	//limitation of renderer where materials are tied to meshes instead of entities
+	int32_t id = geomBuilder.BuildCube(1.f);
 	for (int i = 0; i < 5; ++i) {
-		AssetManager::GetInstance()->Meshes.emplace_back(geomBuilder.BuildCube(1.f, i));
-		AssetManager::GetInstance()->Meshes.emplace_back(geomBuilder.BuildSphere(1.f, 16, i));
-		AssetManager::GetInstance()->Meshes.emplace_back(geomBuilder.BuildCylinder(1.f, 1.f, 16, i));
-		AssetManager::GetInstance()->Meshes.emplace_back(geomBuilder.BuildCone(1.f, 1.f, 16, i));
-		AssetManager::GetInstance()->Meshes.emplace_back(geomBuilder.BuildIcosahedron(1.f, i));
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildSphere(1.f, 16);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildCylinder(1.f, 1.f, 16);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildCone(1.f, 1.f, 16);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildIcosahedron(1.f);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
 
 	const static int32_t seed = 42;

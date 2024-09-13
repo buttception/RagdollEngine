@@ -23,7 +23,7 @@ void ReverseWinding(std::vector<uint32_t>& indices, std::vector<Vertex>& vertice
     }
 }
 
-Mesh GeometryBuilder::BuildCube(float size, int32_t matIndex)
+int32_t GeometryBuilder::BuildCube(float size)
 {
     Vertices.clear();
     Vertices.clear();
@@ -79,10 +79,10 @@ Mesh GeometryBuilder::BuildCube(float size, int32_t matIndex)
         Vertices.push_back({ (normal + side1 - side2) * halfExtents, {1.f, 1.f, 1.f, 1.f}, normal, Vector3::Zero, Vector3::Zero, texcoords[3] });
     }
     ReverseWinding(Indices, Vertices);
-    return BuildMesh("Cube", matIndex);
+    return BuildVBO("Cube");
 }
 
-Mesh GeometryBuilder::BuildSphere(float diameter, uint32_t tessellation, int32_t matIndex)
+int32_t GeometryBuilder::BuildSphere(float diameter, uint32_t tessellation)
 {
 	Vertices.clear();
 	Indices.clear();
@@ -144,7 +144,7 @@ Mesh GeometryBuilder::BuildSphere(float diameter, uint32_t tessellation, int32_t
         }
     }
     ReverseWinding(Indices, Vertices);
-    return BuildMesh("Sphere", matIndex);
+    return BuildVBO("Sphere");
 }
 
 Vector3 GetCircleVector(size_t i, size_t tessellation) 
@@ -214,7 +214,7 @@ void CreateCylinderCap(std::vector<Vertex>& vertices, std::vector<uint32_t>& ind
     }
 }
 
-Mesh GeometryBuilder::BuildCylinder(float height, float diameter, size_t tessellation, int32_t matIndex)
+int32_t GeometryBuilder::BuildCylinder(float height, float diameter, size_t tessellation)
 {
     Vertices.clear();
     Indices.clear();
@@ -257,10 +257,10 @@ Mesh GeometryBuilder::BuildCylinder(float height, float diameter, size_t tessell
     CreateCylinderCap(Vertices, Indices, tessellation, height, radius, false);
 
     ReverseWinding(Indices, Vertices);
-    return BuildMesh("Cylinder", matIndex);
+    return BuildVBO("Cylinder");
 }
 
-Mesh GeometryBuilder::BuildCone(float diameter, float height, size_t tessellation, int32_t matIndex)
+int32_t GeometryBuilder::BuildCone(float diameter, float height, size_t tessellation)
 {
     Vertices.clear();
     Indices.clear();
@@ -306,10 +306,10 @@ Mesh GeometryBuilder::BuildCone(float diameter, float height, size_t tessellatio
     CreateCylinderCap(Vertices, Indices, tessellation, height, radius, false);
 
     ReverseWinding(Indices, Vertices);
-    return BuildMesh("Cone", matIndex);
+    return BuildVBO("Cone");
 }
 
-Mesh GeometryBuilder::BuildIcosahedron(float size, int32_t matIndex)
+int32_t GeometryBuilder::BuildIcosahedron(float size)
 {
     Vertices.clear();
     Indices.clear();
@@ -384,10 +384,10 @@ Mesh GeometryBuilder::BuildIcosahedron(float size, int32_t matIndex)
         Vertices.push_back({ position, Vector4::One, normal, Vector3::Zero, Vector3::Zero, {0.f, 1.f} });
     }
 
-    return BuildMesh("Icosahedron", matIndex);
+    return BuildVBO("Icosahedron");
 }
 
-Mesh GeometryBuilder::BuildMesh(std::string debugName, int32_t matIndex)
+int32_t GeometryBuilder::BuildVBO(std::string debugName)
 {
     Mesh mesh;
     Submesh submesh;
@@ -421,9 +421,6 @@ Mesh GeometryBuilder::BuildMesh(std::string debugName, int32_t matIndex)
     Device->executeCommandList(CommandList);
 
     buffer.TriangleCount = Indices.size();
-    submesh.MaterialIndex = matIndex;
-    submesh.VertexBufferIndex = AssetManager::GetInstance()->VBOs.size();
     AssetManager::GetInstance()->VBOs.emplace_back(buffer);
-    mesh.Submeshes.emplace_back(submesh);
-    return mesh;
+    return AssetManager::GetInstance()->VBOs.size() - 1;
 }

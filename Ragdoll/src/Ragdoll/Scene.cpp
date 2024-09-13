@@ -50,6 +50,7 @@ void ragdoll::Scene::Update(float _dt)
 			AddEntityAtRootLevel(EntityManager->GetGuid(ent));
 			auto rcomp = EntityManager->AddComponent<RenderableComp>(ent);
 			rcomp->meshIndex = std::rand() / (float)RAND_MAX * AssetManager::GetInstance()->Meshes.size();
+			RD_CORE_INFO("{}", rcomp->meshIndex);
 		}
 		UpdateTransforms();
 		BuildStaticInstances();
@@ -107,7 +108,7 @@ void ragdoll::Scene::BuildStaticInstances()
 	}
 	//sort the proxies
 	std::sort(Proxies.begin(), Proxies.end(), [](const Proxy& lhs, const Proxy& rhs) {
-		return lhs.BufferIndex > rhs.BufferIndex;
+		return lhs.BufferIndex < rhs.BufferIndex;
 		});
 	//build the structured buffer
 	int32_t CurrBufferIndex{ -1 }, Start{ 0 };
@@ -116,7 +117,7 @@ void ragdoll::Scene::BuildStaticInstances()
 	Renderer.CommandList->open();
 	for (int i = 0; i < Proxies.size(); ++i) {
 		//iterate till i get a different buffer id, meaning is a diff mesh
-		if (Proxies[i].BufferIndex != CurrBufferIndex)
+		if (Proxies[i].BufferIndex != CurrBufferIndex || i == Proxies.size() - 1)
 		{
 			InstanceBuffer Buffer;
 			//specify how big the instance data buffer size should be
@@ -124,8 +125,8 @@ void ragdoll::Scene::BuildStaticInstances()
 				Buffer.CurrentCapacity *= 2;
 			}
 			Buffer.Data.resize(Buffer.CurrentCapacity);
-			Buffer.BufferIndex = Proxies[i].BufferIndex;
-			Buffer.MaterialIndices.push_back(0);	//temp
+			Buffer.VertexBufferIndex = CurrBufferIndex;
+			Buffer.MaterialIndices.push_back(Proxies[i].MaterialIndex);	//temp
 
 			//populate the buffer data vector
 			for (int j = Start; j < i; ++j) {	//maybe should do in outer loop, then gather all the materials too
@@ -133,7 +134,7 @@ void ragdoll::Scene::BuildStaticInstances()
 				RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>((entt::entity)Proxies[j].EnttId);
 				InstanceData Data;
 
-				const Material& mat = AssetManager::GetInstance()->Materials[Proxies[i].MaterialIndex];
+				const Material& mat = AssetManager::GetInstance()->Materials[Proxies[j].MaterialIndex];
 				if (mat.AlbedoIndex >= 0) {
 					Data.UseAlbedo = true;
 				}
@@ -171,21 +172,6 @@ void ragdoll::Scene::BuildStaticInstances()
 	}
 	Renderer.CommandList->close();
 	Renderer.Device->m_NvrhiDevice->executeCommandList(Renderer.CommandList);
-}
-
-void ragdoll::Scene::UpdateStaticInstances()	//maybe this should be a callback function
-{
-	//iterate through all the transforms and renderable
-	auto EcsView = EntityManager->GetRegistry().view<RenderableComp, TransformComp>();
-	for (entt::entity ent : EcsView) {
-		RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>(ent);
-		Proxy Proxy;
-		Proxy.EnttId = (ENTT_ID_TYPE)ent;
-		//temp is mesh index now
-		Proxy.BufferIndex = rComp->meshIndex;
-		Proxy.MaterialIndex = 0;	//TEMP
-		Proxies.push_back(Proxy);
-	}
 }
 
 void PrintRecursive(ragdoll::Guid id, int level, std::shared_ptr<ragdoll::EntityManager> em)
