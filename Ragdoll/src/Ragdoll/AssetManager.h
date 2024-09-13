@@ -42,13 +42,21 @@ struct Image
 struct Texture
 {
 	int32_t ImageIndex;
-	nvrhi::SamplerHandle SamplerHandle;
+	int32_t SamplerIndex;
 };
 
 enum class SamplerTypes
 {
-	POINT_CLAMP,
-	LINEAR_CLAMP,
+	Point_Clamp,
+	Point_Wrap,
+	Point_Repeat,
+	Linear_Clamp,
+	Linear_Wrap,
+	Linear_Repeat,
+	Trilinear_Clamp,
+	Trilinear_Wrap,
+	Trilinear_Repeat,
+	COUNT
 };
 
 class AssetManager
@@ -64,6 +72,7 @@ public:
 
 	nvrhi::TextureHandle DefaultTex;
 	nvrhi::SamplerHandle DefaultSampler;
+	std::vector<nvrhi::SamplerHandle> Samplers;
 private:
 	inline static std::unique_ptr<AssetManager> s_Instance;
 };

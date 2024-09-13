@@ -51,11 +51,11 @@ void main_vs(
 	outInstanceId = inInstanceId;
 }
 
-sampler albedoSampler : register(s1);
+sampler albedoSampler : register(s0);
 Texture2D albedoTexture : register(t1);
-sampler normalSampler : register(s2);
+sampler normalSampler : register(s1);
 Texture2D normalTexture : register(t2);
-sampler RMSampler : register(s3);
+sampler RMSampler : register(s2);
 Texture2D RMTexture : register(t3);
 
 void main_ps(

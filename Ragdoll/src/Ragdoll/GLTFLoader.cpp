@@ -351,7 +351,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	{
 		//textures contain a sampler and an image
 		Texture tex;
-		nvrhi::SamplerDesc samplerDesc;
+		SamplerTypes type;
 		if (itTex.sampler < 0)
 		{
 			//no samplers so use a default one
@@ -360,69 +360,83 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		{
 			//create the sampler
 			const tinygltf::Sampler gltfSampler = model.samplers[itTex.sampler];
-			switch (gltfSampler.minFilter)
-			{
-			case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
-			case -1:
-				samplerDesc.minFilter = true;
-				samplerDesc.mipFilter = true;
-				break;
-			case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
-				samplerDesc.minFilter = true;
-				samplerDesc.mipFilter = false;
-				break;
-			case TINYGLTF_TEXTURE_FILTER_LINEAR:
-				samplerDesc.minFilter = true;
-				break;
-			case TINYGLTF_TEXTURE_FILTER_NEAREST:
-				samplerDesc.minFilter = false;
-				break;
-			case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
-				samplerDesc.minFilter = false;
-				samplerDesc.mipFilter = true;
-				break;
-			case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
-				samplerDesc.minFilter = false;
-				samplerDesc.mipFilter = false;
-				break;
-			default:
-				RD_ASSERT(true, "Unknown min filter");
-			}
-			switch (gltfSampler.magFilter)
-			{
-			case TINYGLTF_TEXTURE_FILTER_LINEAR:
-				samplerDesc.magFilter = true;
-				break;
-			case TINYGLTF_TEXTURE_FILTER_NEAREST:
-				samplerDesc.magFilter = false;
-				break;
-			}
 			switch (gltfSampler.wrapS)
 			{
 			case TINYGLTF_TEXTURE_WRAP_REPEAT:
-				samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
+				switch (gltfSampler.minFilter)
+				{
+				case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+				case TINYGLTF_TEXTURE_FILTER_LINEAR:
+					if (gltfSampler.magFilter == 1)
+						type = SamplerTypes::Trilinear_Repeat;
+					else
+						type = SamplerTypes::Linear_Repeat;
+					break;
+				case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
+				case TINYGLTF_TEXTURE_FILTER_NEAREST:
+					type = SamplerTypes::Point_Repeat;
+					break;
+				case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
+				case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
+				case -1:
+					RD_CORE_WARN("Sampler do not exist, giving trilinear");
+					type = SamplerTypes::Trilinear_Repeat;
+					break;
+				default:
+					RD_ASSERT(true, "Unknown min filter");
+				}
 				break;
 			case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
-				samplerDesc.addressU = nvrhi::SamplerAddressMode::ClampToEdge;
+				switch (gltfSampler.minFilter)
+				{
+				case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+				case TINYGLTF_TEXTURE_FILTER_LINEAR:
+					if (gltfSampler.magFilter == 1)
+						type = SamplerTypes::Trilinear_Clamp;
+					else
+						type = SamplerTypes::Linear_Clamp;
+					break;
+				case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
+				case TINYGLTF_TEXTURE_FILTER_NEAREST:
+					type = SamplerTypes::Point_Clamp;
+					break;
+				case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
+				case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
+				case -1:
+					RD_CORE_WARN("Sampler do not exist, giving trilinear");
+					type = SamplerTypes::Trilinear_Clamp;
+					break;
+				default:
+					RD_ASSERT(true, "Unknown min filter");
+				}
 				break;
 			case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
-				samplerDesc.addressU = nvrhi::SamplerAddressMode::MirroredRepeat;
-				break;
-			}
-			switch (gltfSampler.wrapT)
-			{
-			case TINYGLTF_TEXTURE_WRAP_REPEAT:
-				samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
-				break;
-			case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
-				samplerDesc.addressV = nvrhi::SamplerAddressMode::ClampToEdge;
-				break;
-			case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
-				samplerDesc.addressV = nvrhi::SamplerAddressMode::MirroredRepeat;
+				switch (gltfSampler.minFilter)
+				{
+				case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+				case TINYGLTF_TEXTURE_FILTER_LINEAR:
+					if (gltfSampler.magFilter == 1)
+						type = SamplerTypes::Trilinear_Repeat;
+					else
+						type = SamplerTypes::Linear_Repeat;
+					break;
+				case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
+				case TINYGLTF_TEXTURE_FILTER_NEAREST:
+					type = SamplerTypes::Point_Repeat;
+					break;
+				case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
+				case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
+				case -1:
+					RD_CORE_WARN("Sampler do not exist, giving trilinear");
+					type = SamplerTypes::Trilinear_Repeat;
+					break;
+				default:
+					RD_ASSERT(true, "Unknown min filter");
+				}
 				break;
 			}
 		}
-		tex.SamplerHandle = Renderer->Device->m_NvrhiDevice->createSampler(samplerDesc);
+		tex.SamplerIndex = (int)type;
 		tex.ImageIndex = itTex.source;
 		AssetManager::GetInstance()->Textures.emplace_back(tex);
 

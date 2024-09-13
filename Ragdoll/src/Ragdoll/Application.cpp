@@ -95,8 +95,8 @@ namespace ragdoll
 		MICROPROFILE_TIMELINE_ENTER_STATIC(MP_DARKGOLDENROD, "GLTF Load");
 		{
 			//GLTFLoader loader;
-			//loader.Init(m_FileManager->GetRoot(), &Renderer, m_FileManager, m_EntityManager, m_TransformLayer);
-			//std::string sceneName{ "Sponza" };
+			//loader.Init(m_FileManager->GetRoot(), &m_Scene->Renderer, m_FileManager, m_EntityManager, m_Scene);
+			//std::string sceneName{ "BoxTextured" };
 			//std::filesystem::path fp = "gltf/2.0/";
 			//fp = fp / sceneName / "glTF" / (sceneName + ".gltf");
 			//loader.LoadAndCreateModel(fp.string());
@@ -104,6 +104,9 @@ namespace ragdoll
 			//loader.LoadAndCreateModel("Instancing Test/FlyingWorld-BattleOfTheTrashGod.gltf");
 		}
 		MICROPROFILE_TIMELINE_LEAVE_STATIC("GLTF Load");
+
+		m_Scene->UpdateTransforms();
+		m_Scene->BuildStaticInstances();
 	}
 
 	void Application::Run()

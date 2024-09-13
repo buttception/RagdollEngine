@@ -50,7 +50,6 @@ void ragdoll::Scene::Update(float _dt)
 			AddEntityAtRootLevel(EntityManager->GetGuid(ent));
 			auto rcomp = EntityManager->AddComponent<RenderableComp>(ent);
 			rcomp->meshIndex = std::rand() / (float)RAND_MAX * AssetManager::GetInstance()->Meshes.size();
-			RD_CORE_INFO("{}", rcomp->meshIndex);
 		}
 		UpdateTransforms();
 		BuildStaticInstances();
@@ -74,10 +73,11 @@ void ragdoll::Scene::UpdateTransforms()
 void AddNodeToFurthestSibling(ragdoll::Guid sibling, ragdoll::Guid node, std::shared_ptr<ragdoll::EntityManager> em)
 {
 	TransformComp* trans = em->GetComponent<TransformComp>(sibling);
-	if (trans->m_Sibling.m_RawId == 0)
-		trans->m_Sibling = node;
-	else
-		AddNodeToFurthestSibling(trans->m_Sibling, node, em);
+	while (trans->m_Sibling.m_RawId != 0)
+	{
+		trans = em->GetComponent<TransformComp>(trans->m_Sibling);
+	}
+	trans->m_Sibling = node;
 }
 
 void ragdoll::Scene::AddEntityAtRootLevel(Guid entityId)
@@ -119,15 +119,30 @@ void ragdoll::Scene::BuildStaticInstances()
 		//iterate till i get a different buffer id, meaning is a diff mesh
 		if (Proxies[i].BufferIndex != CurrBufferIndex || i == Proxies.size() - 1)
 		{
+			//search to see if the instance buffer already exist
+			int32_t InstanceBufferId = -1;
+			for (int j = 0; j < StaticInstanceBuffers.size(); ++j) {
+				if (StaticInstanceBuffers[j].VertexBufferIndex == CurrBufferIndex) {
+					InstanceBufferId = j;
+					break;
+				}
+			}
 			InstanceBuffer Buffer;
+			if (InstanceBufferId != -1)
+				Buffer = StaticInstanceBuffers[InstanceBufferId];
+			else
+				Buffer.VertexBufferIndex = CurrBufferIndex;
+
 			//specify how big the instance data buffer size should be
 			while (i - Start > Buffer.CurrentCapacity) {
 				Buffer.CurrentCapacity *= 2;
 			}
 			Buffer.Data.resize(Buffer.CurrentCapacity);
-			Buffer.VertexBufferIndex = CurrBufferIndex;
 			Buffer.MaterialIndices.push_back(Proxies[i].MaterialIndex);	//temp
+			Buffer.InstanceCount = 0;
 
+			if (i == 0)
+				i = 1;
 			//populate the buffer data vector
 			for (int j = Start; j < i; ++j) {	//maybe should do in outer loop, then gather all the materials too
 				TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)Proxies[j].EnttId);
@@ -166,7 +181,8 @@ void ragdoll::Scene::BuildStaticInstances()
 			Renderer.CommandList->setPermanentBufferState(Buffer.BufferHandle, nvrhi::ResourceStates::ShaderResource);
 
 			StaticInstanceBuffers.emplace_back(Buffer);
-			CurrBufferIndex = Proxies[i].BufferIndex;
+			if(i < Proxies.size())
+				CurrBufferIndex = Proxies[i].BufferIndex;
 			Start = i;
 		}
 	}

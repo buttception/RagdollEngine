@@ -159,17 +159,17 @@ void ForwardRenderer::DrawInstanceBuffer(ragdoll::InstanceBuffer* InstanceBuffer
 	if (mat.AlbedoIndex >= 0) {
 		const Texture& albedo = AssetManager::GetInstance()->Textures[mat.AlbedoIndex];
 		albedoTex = AssetManager::GetInstance()->Images[albedo.ImageIndex].TextureHandle;
-		albedoSampler = albedo.SamplerHandle;
+		albedoSampler = AssetManager::GetInstance()->Samplers[albedo.SamplerIndex];
 	}
 	if (mat.NormalIndex >= 0) {
 		const Texture& normal = AssetManager::GetInstance()->Textures[mat.NormalIndex];
 		normalTex = AssetManager::GetInstance()->Images[normal.ImageIndex].TextureHandle;
-		normalSampler = normal.SamplerHandle;
+		normalSampler = AssetManager::GetInstance()->Samplers[normal.SamplerIndex];
 	}
 	if (mat.MetallicRoughnessIndex >= 0) {
 		const Texture& metalRough = AssetManager::GetInstance()->Textures[mat.MetallicRoughnessIndex];
 		roughnessMetallicTex = AssetManager::GetInstance()->Images[metalRough.ImageIndex].TextureHandle;
-		roughnessMetallicSampler = metalRough.SamplerHandle;
+		roughnessMetallicSampler = AssetManager::GetInstance()->Samplers[metalRough.SamplerIndex];
 	}
 	CommandList->writeBuffer(ConstantBuffer, Cbuf, sizeof(CBuffer));
 
@@ -178,11 +178,11 @@ void ForwardRenderer::DrawInstanceBuffer(ragdoll::InstanceBuffer* InstanceBuffer
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, InstanceBuffer->BufferHandle),
 		nvrhi::BindingSetItem::Texture_SRV(1, albedoTex),
-		nvrhi::BindingSetItem::Sampler(1, albedoSampler),
+		nvrhi::BindingSetItem::Sampler(0, albedoSampler),
 		nvrhi::BindingSetItem::Texture_SRV(2, normalTex),
-		nvrhi::BindingSetItem::Sampler(2, normalSampler),
+		nvrhi::BindingSetItem::Sampler(1, normalSampler),
 		nvrhi::BindingSetItem::Texture_SRV(3, roughnessMetallicTex),
-		nvrhi::BindingSetItem::Sampler(3, roughnessMetallicSampler),
+		nvrhi::BindingSetItem::Sampler(2, roughnessMetallicSampler),
 	};
 	BindingSetHandle = Device->m_NvrhiDevice->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 	state.addBindingSet(BindingSetHandle);
@@ -249,11 +249,11 @@ void ForwardRenderer::CreateResource()
 		nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
 		nvrhi::BindingLayoutItem::StructuredBuffer_SRV(0),
 		nvrhi::BindingLayoutItem::Texture_SRV(1),
-		nvrhi::BindingLayoutItem::Sampler(1),
+		nvrhi::BindingLayoutItem::Sampler(0),
 		nvrhi::BindingLayoutItem::Texture_SRV(2),
-		nvrhi::BindingLayoutItem::Sampler(2),
+		nvrhi::BindingLayoutItem::Sampler(1),
 		nvrhi::BindingLayoutItem::Texture_SRV(3),
-		nvrhi::BindingLayoutItem::Sampler(3),
+		nvrhi::BindingLayoutItem::Sampler(2),
 	};
 	BindingLayoutHandle = Device->m_NvrhiDevice->createBindingLayout(layoutDesc);
 	//create a constant buffer here
@@ -316,56 +316,130 @@ void ForwardRenderer::CreateResource()
 	nvrhi::SamplerDesc samplerDesc;
 	AssetManager::GetInstance()->DefaultSampler = Device->m_NvrhiDevice->createSampler(samplerDesc);
 
+	AssetManager::GetInstance()->Samplers.resize((int)SamplerTypes::COUNT);
+	//create all the samplers used
+	samplerDesc.minFilter = 0;
+	samplerDesc.magFilter = 0;
+	samplerDesc.mipFilter = 0;
+	samplerDesc.addressU = nvrhi::SamplerAddressMode::Clamp;
+	samplerDesc.addressV = nvrhi::SamplerAddressMode::Clamp;
+	samplerDesc.addressW = nvrhi::SamplerAddressMode::Clamp;
+	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp] = Device->m_NvrhiDevice->createSampler(samplerDesc);
+	samplerDesc.minFilter = 0;
+	samplerDesc.magFilter = 0;
+	samplerDesc.mipFilter = 0;
+	samplerDesc.addressU = nvrhi::SamplerAddressMode::Wrap;
+	samplerDesc.addressV = nvrhi::SamplerAddressMode::Wrap;
+	samplerDesc.addressW = nvrhi::SamplerAddressMode::Wrap;
+	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Wrap] = Device->m_NvrhiDevice->createSampler(samplerDesc);
+	samplerDesc.minFilter = 0;
+	samplerDesc.magFilter = 0;
+	samplerDesc.mipFilter = 0;
+	samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
+	samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
+	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
+	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Repeat] = Device->m_NvrhiDevice->createSampler(samplerDesc);
+
+	samplerDesc.minFilter = 1;
+	samplerDesc.magFilter = 1;
+	samplerDesc.mipFilter = 0;
+	samplerDesc.addressU = nvrhi::SamplerAddressMode::Clamp;
+	samplerDesc.addressV = nvrhi::SamplerAddressMode::Clamp;
+	samplerDesc.addressW = nvrhi::SamplerAddressMode::Clamp;
+	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp] = Device->m_NvrhiDevice->createSampler(samplerDesc);
+	samplerDesc.minFilter = 1;
+	samplerDesc.magFilter = 1;
+	samplerDesc.mipFilter = 0;
+	samplerDesc.addressU = nvrhi::SamplerAddressMode::Wrap;
+	samplerDesc.addressV = nvrhi::SamplerAddressMode::Wrap;
+	samplerDesc.addressW = nvrhi::SamplerAddressMode::Wrap;
+	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Wrap] = Device->m_NvrhiDevice->createSampler(samplerDesc);
+	samplerDesc.minFilter = 1;
+	samplerDesc.magFilter = 1;
+	samplerDesc.mipFilter = 0;
+	samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
+	samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
+	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
+	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Repeat] = Device->m_NvrhiDevice->createSampler(samplerDesc);
+
+	samplerDesc.minFilter = 1;
+	samplerDesc.magFilter = 1;
+	samplerDesc.mipFilter = 1;
+	samplerDesc.addressU = nvrhi::SamplerAddressMode::Clamp;
+	samplerDesc.addressV = nvrhi::SamplerAddressMode::Clamp;
+	samplerDesc.addressW = nvrhi::SamplerAddressMode::Clamp;
+	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Trilinear_Clamp] = Device->m_NvrhiDevice->createSampler(samplerDesc);
+	samplerDesc.minFilter = 1;
+	samplerDesc.magFilter = 1;
+	samplerDesc.mipFilter = 1;
+	samplerDesc.addressU = nvrhi::SamplerAddressMode::Wrap;
+	samplerDesc.addressV = nvrhi::SamplerAddressMode::Wrap;
+	samplerDesc.addressW = nvrhi::SamplerAddressMode::Wrap;
+	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Trilinear_Wrap] = Device->m_NvrhiDevice->createSampler(samplerDesc);
+	samplerDesc.minFilter = 1;
+	samplerDesc.magFilter = 1;
+	samplerDesc.mipFilter = 1;
+	samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
+	samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
+	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
+	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Trilinear_Repeat] = Device->m_NvrhiDevice->createSampler(samplerDesc);
+
 	CommandList->close();
 	//remember to execute the list
 	Device->m_NvrhiDevice->executeCommandList(CommandList);
 
+	static bool testWithCustom{ true };
+	if (testWithCustom) {
+		//create 5 random textures
+		//Image img;
+		//nvrhi::TextureHandle tex = Device->m_NvrhiDevice->createTexture(textureDesc);
+		//Vector4 color = { 1.f,1.f,1.f,1.f };
+		//CommandList->writeTexture(tex, 0, 0, &color, 4);
+		//img.TextureHandle = tex;
+		//AssetManager::GetInstance()->Images.emplace_back(img);
 
-	Material mat;
-	mat.bIsLit = true;
-	mat.Color = { 1.f, 0.f, 0.f, 1.f };
-	AssetManager::GetInstance()->Materials.emplace_back(mat);
-	mat.Color = { 1.f, 1.f, 0.f, 1.f };
-	AssetManager::GetInstance()->Materials.emplace_back(mat);
-	mat.Color = { 1.f, 1.f, 1.f, 1.f };
-	AssetManager::GetInstance()->Materials.emplace_back(mat);
-	mat.Color = { 1.f, 0.f, 1.f, 1.f };
-	AssetManager::GetInstance()->Materials.emplace_back(mat);
-	mat.Color = { 0.f, 1.f, 0.f, 1.f };
-	AssetManager::GetInstance()->Materials.emplace_back(mat);
+		Material mat;
+		mat.bIsLit = true;
+		mat.Color = Vector4::One;
+		AssetManager::GetInstance()->Materials.emplace_back(mat);
+		AssetManager::GetInstance()->Materials.emplace_back(mat);
+		AssetManager::GetInstance()->Materials.emplace_back(mat);
+		AssetManager::GetInstance()->Materials.emplace_back(mat);
+		AssetManager::GetInstance()->Materials.emplace_back(mat);
 
-	//build primitives
-	GeometryBuilder geomBuilder;
-	geomBuilder.Init(Device->m_NvrhiDevice);
-	int32_t id = geomBuilder.BuildCube(1.f);
-	for (int i = 0; i < 5; ++i) {
-		Mesh mesh;
-		mesh.Submeshes.push_back({ id, i });
-		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
-	}
-	id = geomBuilder.BuildSphere(1.f, 16);
-	for (int i = 0; i < 5; ++i) {
-		Mesh mesh;
-		mesh.Submeshes.push_back({ id, i });
-		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
-	}
-	id = geomBuilder.BuildCylinder(1.f, 1.f, 16);
-	for (int i = 0; i < 5; ++i) {
-		Mesh mesh;
-		mesh.Submeshes.push_back({ id, i });
-		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
-	}
-	id = geomBuilder.BuildCone(1.f, 1.f, 16);
-	for (int i = 0; i < 5; ++i) {
-		Mesh mesh;
-		mesh.Submeshes.push_back({ id, i });
-		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
-	}
-	id = geomBuilder.BuildIcosahedron(1.f);
-	for (int i = 0; i < 5; ++i) {
-		Mesh mesh;
-		mesh.Submeshes.push_back({ id, i });
-		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+		//build primitives
+		GeometryBuilder geomBuilder;
+		geomBuilder.Init(Device->m_NvrhiDevice);
+		int32_t id = geomBuilder.BuildCube(1.f);
+		for (int i = 0; i < 5; ++i) {
+			Mesh mesh;
+			mesh.Submeshes.push_back({ id, i });
+			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+		}
+		id = geomBuilder.BuildSphere(1.f, 16);
+		for (int i = 0; i < 5; ++i) {
+			Mesh mesh;
+			mesh.Submeshes.push_back({ id, i });
+			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+		}
+		id = geomBuilder.BuildCylinder(1.f, 1.f, 16);
+		for (int i = 0; i < 5; ++i) {
+			Mesh mesh;
+			mesh.Submeshes.push_back({ id, i });
+			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+		}
+		id = geomBuilder.BuildCone(1.f, 1.f, 16);
+		for (int i = 0; i < 5; ++i) {
+			Mesh mesh;
+			mesh.Submeshes.push_back({ id, i });
+			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+		}
+		id = geomBuilder.BuildIcosahedron(1.f);
+		for (int i = 0; i < 5; ++i) {
+			Mesh mesh;
+			mesh.Submeshes.push_back({ id, i });
+			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+		}
 	}
 
 	const static int32_t seed = 42;

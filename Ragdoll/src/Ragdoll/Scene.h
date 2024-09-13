@@ -45,7 +45,6 @@ namespace ragdoll {
 	};
 
 	class Scene {
-		ForwardRenderer Renderer;
 		ImguiRenderer ImguiInterface;
 
 		//Transforms
@@ -64,6 +63,8 @@ namespace ragdoll {
 		std::vector<InstanceBuffer> StaticInstanceBuffers;
 
 	public:
+		ForwardRenderer Renderer;
+
 		Scene(Application*);
 
 		void Init();
@@ -71,6 +72,7 @@ namespace ragdoll {
 		void Shutdown();
 
 		//Transforms
+		void UpdateTransforms();
 		void AddEntityAtRootLevel(Guid entityId);
 
 		//Renderable
@@ -78,7 +80,6 @@ namespace ragdoll {
 
 	private:
 		//Transforms
-		void UpdateTransforms();
 		bool HasRoot() { return m_RootEntity.m_RawId != 0; }
 		void DebugPrintHierarchy();
 		void TraverseTreeAndUpdateTransforms();
