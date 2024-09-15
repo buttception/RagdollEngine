@@ -21,6 +21,7 @@ struct InstanceData{
 };
 
 StructuredBuffer<InstanceData> InstanceDatas : register(t0);
+Texture2D Textures[] : register(t0, space1);
 
 void main_vs(
 	in float3 inPos : POSITION,
@@ -75,7 +76,7 @@ void main_ps(
 		// Sample textures
 		float4 albedo = InstanceDatas[inInstanceId].albedoFactor * inColor;
 		if(InstanceDatas[inInstanceId].useAlbedo){
-			albedo = albedoTexture.Sample(albedoSampler, inTexcoord) * inColor;
+			albedo = Textures[0].Sample(albedoSampler, inTexcoord) * inColor;
 		}
 		float4 RM = float4(InstanceDatas[inInstanceId].roughness, InstanceDatas[inInstanceId].metallic, 0, 0);
 		if(InstanceDatas[inInstanceId].useRoughnessMetallicMap){

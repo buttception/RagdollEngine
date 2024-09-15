@@ -170,7 +170,7 @@ void ragdoll::Scene::BuildStaticInstances()
 			//create the instance buffer handle
 			nvrhi::BufferDesc InstanceBufferDesc;
 			InstanceBufferDesc.byteSize = sizeof(InstanceData) * Buffer.CurrentCapacity;
-			InstanceBufferDesc.debugName = "Instance Buffer";
+			InstanceBufferDesc.debugName = "Instance Buffer " + std::to_string(CurrBufferIndex);
 			InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
 			InstanceBufferDesc.structStride = sizeof(InstanceData);
 			Buffer.BufferHandle = Renderer.Device->m_NvrhiDevice->createBuffer(InstanceBufferDesc);

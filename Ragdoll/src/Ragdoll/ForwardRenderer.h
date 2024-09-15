@@ -48,6 +48,8 @@ public:
 	nvrhi::TextureHandle DepthBuffer;
 	std::vector<nvrhi::VertexAttributeDesc> VertexAttributes;
 	nvrhi::InputLayoutHandle InputLayoutHandle;
+	nvrhi::DescriptorTableHandle DescriptorTable;
+	nvrhi::BindingLayoutHandle BindlessLayoutHandle;
 	
 	void Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em);
 	void Shutdown();

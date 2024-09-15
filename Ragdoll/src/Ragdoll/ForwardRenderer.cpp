@@ -11,6 +11,7 @@
 #include "Ragdoll/Components/RenderableComp.h"
 #include "Scene.h"
 #include "GeometryBuilder.h"
+#include "nvrhi/d3d12-backend.h"
 
 void ForwardRenderer::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em)
 {
@@ -185,7 +186,9 @@ void ForwardRenderer::DrawInstanceBuffer(ragdoll::InstanceBuffer* InstanceBuffer
 		nvrhi::BindingSetItem::Sampler(2, roughnessMetallicSampler),
 	};
 	BindingSetHandle = Device->m_NvrhiDevice->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+
 	state.addBindingSet(BindingSetHandle);
+	state.addBindingSet(DescriptorTable);
 	CommandList->setGraphicsState(state);
 
 	nvrhi::DrawArguments args;
@@ -306,12 +309,16 @@ void ForwardRenderer::CreateResource()
 	textureDesc.width = 1;
 	textureDesc.height = 1;
 	textureDesc.format = nvrhi::Format::RGBA8_UNORM;
+	textureDesc.dimension = nvrhi::TextureDimension::Texture2D;
 	textureDesc.isRenderTarget = false;
 	textureDesc.isTypeless = false;
 	textureDesc.initialState = nvrhi::ResourceStates::ShaderResource;
 	textureDesc.keepInitialState = true;
 
+	textureDesc.debugName = "DefaultTex";
 	AssetManager::GetInstance()->DefaultTex = Device->m_NvrhiDevice->createTexture(textureDesc);
+	uint8_t defaultColor[4] = { 255, 255, 255, 255 };
+	CommandList->writeTexture(AssetManager::GetInstance()->DefaultTex, 0, 0, &defaultColor, 4);
 
 	nvrhi::SamplerDesc samplerDesc;
 	AssetManager::GetInstance()->DefaultSampler = Device->m_NvrhiDevice->createSampler(samplerDesc);
@@ -388,65 +395,88 @@ void ForwardRenderer::CreateResource()
 	//remember to execute the list
 	Device->m_NvrhiDevice->executeCommandList(CommandList);
 
-	static bool testWithCustom{ true };
-	if (testWithCustom) {
-		//create 5 random textures
-		//Image img;
-		//nvrhi::TextureHandle tex = Device->m_NvrhiDevice->createTexture(textureDesc);
-		//Vector4 color = { 1.f,1.f,1.f,1.f };
-		//CommandList->writeTexture(tex, 0, 0, &color, 4);
-		//img.TextureHandle = tex;
-		//AssetManager::GetInstance()->Images.emplace_back(img);
+	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
 
-		Material mat;
-		mat.bIsLit = true;
-		mat.Color = Vector4::One;
-		AssetManager::GetInstance()->Materials.emplace_back(mat);
-		AssetManager::GetInstance()->Materials.emplace_back(mat);
-		AssetManager::GetInstance()->Materials.emplace_back(mat);
-		AssetManager::GetInstance()->Materials.emplace_back(mat);
-		AssetManager::GetInstance()->Materials.emplace_back(mat);
+	//create 5 random textures
+	Image img;
+	textureDesc.debugName = "test red";
+	nvrhi::TextureHandle texHandle = Device->m_NvrhiDevice->createTexture(textureDesc);
+	uint8_t color[4] = {255, 0, 0, 255};
+	CommandList->open();
+	CommandList->writeTexture(texHandle, 0, 0, &color, 4);
+	CommandList->close();
+	Device->m_NvrhiDevice->executeCommandList(CommandList);
+	img.TextureHandle = texHandle;
+	AssetManager::GetInstance()->Images.emplace_back(img);
+	Texture texture;
+	texture.ImageIndex = 0;
+	texture.SamplerIndex = 0;
+	AssetManager::GetInstance()->Textures.emplace_back(texture);
 
-		//build primitives
-		GeometryBuilder geomBuilder;
-		geomBuilder.Init(Device->m_NvrhiDevice);
-		int32_t id = geomBuilder.BuildCube(1.f);
-		for (int i = 0; i < 5; ++i) {
-			Mesh mesh;
-			mesh.Submeshes.push_back({ id, i });
-			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
-		}
-		id = geomBuilder.BuildSphere(1.f, 16);
-		for (int i = 0; i < 5; ++i) {
-			Mesh mesh;
-			mesh.Submeshes.push_back({ id, i });
-			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
-		}
-		id = geomBuilder.BuildCylinder(1.f, 1.f, 16);
-		for (int i = 0; i < 5; ++i) {
-			Mesh mesh;
-			mesh.Submeshes.push_back({ id, i });
-			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
-		}
-		id = geomBuilder.BuildCone(1.f, 1.f, 16);
-		for (int i = 0; i < 5; ++i) {
-			Mesh mesh;
-			mesh.Submeshes.push_back({ id, i });
-			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
-		}
-		id = geomBuilder.BuildIcosahedron(1.f);
-		for (int i = 0; i < 5; ++i) {
-			Mesh mesh;
-			mesh.Submeshes.push_back({ id, i });
-			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
-		}
+	nvrhi::BindlessLayoutDesc bindlessDesc;
+	
+	bindlessDesc.visibility = nvrhi::ShaderType::Pixel;
+	bindlessDesc.maxCapacity = 512;
+	bindlessDesc.firstSlot = 0;
+	bindlessDesc.registerSpaces = {
+		nvrhi::BindingLayoutItem::Texture_SRV(1)
+	};
+	
+	BindlessLayoutHandle = Device->m_NvrhiDevice->createBindlessLayout(bindlessDesc);
+	DescriptorTable = Device->m_NvrhiDevice->createDescriptorTable(BindlessLayoutHandle);
+	Device->m_NvrhiDevice->resizeDescriptorTable(DescriptorTable, 512, true);
+	auto ret = Device->m_NvrhiDevice->writeDescriptorTable(DescriptorTable, nvrhi::BindingSetItem::Texture_SRV(0, texHandle));
+	RD_ASSERT(!ret, "Failed to write descriptor table");
+
+	Material mat;
+	mat.bIsLit = true;
+	mat.Color = Vector4::One;
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	mat.AlbedoIndex = 0;
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+
+	//build primitives
+	GeometryBuilder geomBuilder;
+	geomBuilder.Init(Device->m_NvrhiDevice);
+	int32_t id = geomBuilder.BuildCube(1.f);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildSphere(1.f, 16);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildCylinder(1.f, 1.f, 16);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildCone(1.f, 1.f, 16);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildIcosahedron(1.f);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
 
 	const static int32_t seed = 42;
 	std::srand(seed);
 
-	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
 	pipelineDesc.addBindingLayout(BindingLayoutHandle);
+	pipelineDesc.addBindingLayout(BindlessLayoutHandle);
 	pipelineDesc.setVertexShader(ForwardVertexShader);
 	pipelineDesc.setFragmentShader(ForwardPixelShader);
 
