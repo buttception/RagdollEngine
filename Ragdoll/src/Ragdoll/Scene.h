@@ -26,9 +26,9 @@ namespace ragdoll {
 		float Roughness = 0.f;
 		float Metallic = 0.f;
 
-		int UseAlbedo = 0;
-		int UseNormalMap = 0;
-		int UseRoughnessMetallicMap = 0;
+		int AlbedoIndex = -1;
+		int NormalIndex = -1;
+		int RoughnessMetallicIndex = -1;
 		int bIsLit = 1;
 	};
 

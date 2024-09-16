@@ -344,6 +344,8 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 
 		//upload the texture data
 		Renderer->CommandList->writeTexture(img.TextureHandle, 0, 0, itImg.image.data(), itImg.width * itImg.component);
+		//write to descriptor table
+		Renderer->AddTextureToTable(img.TextureHandle);
 
 		AssetManager::GetInstance()->Images.emplace_back(img);
 	}

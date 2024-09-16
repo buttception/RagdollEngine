@@ -103,7 +103,7 @@ void ragdoll::Scene::BuildStaticInstances()
 		//temp only first submesh now
 		Submesh submesh = AssetManager::GetInstance()->Meshes[rComp->meshIndex].Submeshes[0];
 		Proxy.BufferIndex = submesh.VertexBufferIndex;
-		Proxy.MaterialIndex = submesh.MaterialIndex;	//TEMP
+		Proxy.MaterialIndex = submesh.MaterialIndex;
 		Proxies.push_back(Proxy);
 	}
 	//sort the proxies
@@ -150,15 +150,9 @@ void ragdoll::Scene::BuildStaticInstances()
 				InstanceData Data;
 
 				const Material& mat = AssetManager::GetInstance()->Materials[Proxies[j].MaterialIndex];
-				if (mat.AlbedoIndex >= 0) {
-					Data.UseAlbedo = true;
-				}
-				if (mat.NormalIndex >= 0) {
-					Data.UseNormalMap = true;
-				}
-				if (mat.MetallicRoughnessIndex >= 0) {
-					Data.UseRoughnessMetallicMap = true;
-				}
+				Data.AlbedoIndex = mat.AlbedoIndex;
+				Data.NormalIndex = mat.NormalIndex;
+				Data.RoughnessMetallicIndex = mat.MetallicRoughnessIndex;
 				Data.Color = mat.Color;
 				Data.Metallic = mat.Metallic;
 				Data.Roughness = mat.Roughness;

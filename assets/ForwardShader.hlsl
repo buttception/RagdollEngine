@@ -14,9 +14,9 @@ struct InstanceData{
 	float roughness;
 	float metallic;
 
-	int useAlbedo;
-	int useNormalMap;
-	int useRoughnessMetallicMap;
+	int albedoIndex;
+	int normalIndex;
+	int roughnessMetallicIndex;
 	int isLit;
 };
 
@@ -53,11 +53,8 @@ void main_vs(
 }
 
 sampler albedoSampler : register(s0);
-Texture2D albedoTexture : register(t1);
 sampler normalSampler : register(s1);
-Texture2D normalTexture : register(t2);
 sampler RMSampler : register(s2);
-Texture2D RMTexture : register(t3);
 
 void main_ps(
 	in float4 inPos : SV_Position,
@@ -75,20 +72,20 @@ void main_ps(
 	{
 		// Sample textures
 		float4 albedo = InstanceDatas[inInstanceId].albedoFactor * inColor;
-		if(InstanceDatas[inInstanceId].useAlbedo){
-			albedo = Textures[0].Sample(albedoSampler, inTexcoord) * inColor;
+		if(InstanceDatas[inInstanceId].albedoIndex != -1){
+			albedo = Textures[InstanceDatas[inInstanceId].albedoIndex].Sample(albedoSampler, inTexcoord) * inColor;
 		}
 		float4 RM = float4(InstanceDatas[inInstanceId].roughness, InstanceDatas[inInstanceId].metallic, 0, 0);
-		if(InstanceDatas[inInstanceId].useRoughnessMetallicMap){
-			RM = RMTexture.Sample(RMSampler, inTexcoord);
+		if(InstanceDatas[inInstanceId].roughnessMetallicIndex != -1){
+			RM = Textures[InstanceDatas[inInstanceId].roughnessMetallicIndex].Sample(RMSampler, inTexcoord);
 		}
 		float roughness = RM.r;
 		float metallic = RM.g;
 
 		// Sample normal map and transform to world space
 		float3 N = inNormal;
-		if(InstanceDatas[inInstanceId].useNormalMap){
-			float3 normalMapValue = normalize(normalTexture.Sample(normalSampler, inTexcoord).xyz * 2.0f - 1.0f);
+		if(InstanceDatas[inInstanceId].normalIndex != -1){
+			float3 normalMapValue = normalize(Textures[InstanceDatas[inInstanceId].normalIndex].Sample(normalSampler, inTexcoord).xyz * 2.0f - 1.0f);
 			float3x3 TBN = float3x3(inTangent, inBinormal, inNormal);
 			N = normalize(mul(normalMapValue, TBN));
 		}

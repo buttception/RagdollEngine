@@ -37,6 +37,7 @@ class ForwardRenderer {
 	std::shared_ptr<ragdoll::Window> PrimaryWindow;
 	std::shared_ptr<ragdoll::FileManager> FileManager;
 	std::shared_ptr<ragdoll::EntityManager> EntityManager;
+	int32_t TextureCount{};
 public:
 	std::shared_ptr<DirectXDevice> Device;
 	nvrhi::CommandListHandle CommandList;
@@ -53,6 +54,8 @@ public:
 	
 	void Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em);
 	void Shutdown();
+
+	void AddTextureToTable(nvrhi::TextureHandle tex);
 
 	void BeginFrame(CBuffer* Cbug);
 	void DrawAllInstances(std::vector<ragdoll::InstanceBuffer>* InstanceBuffers, CBuffer* Cbuf);
