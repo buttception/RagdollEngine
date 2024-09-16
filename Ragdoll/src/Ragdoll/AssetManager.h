@@ -4,9 +4,9 @@
 #include <tiny_gltf.h>
 
 struct Material {
-	int32_t AlbedoIndex = -1;
-	int32_t NormalIndex = -1;
-	int32_t MetallicRoughnessIndex = -1;
+	int32_t AlbedoTextureIndex = -1;
+	int32_t NormalTextureIndex = -1;
+	int32_t RoughnessMetallicTextureIndex = -1;
 
 	Vector4 Color;
 	float Roughness = 1.f;

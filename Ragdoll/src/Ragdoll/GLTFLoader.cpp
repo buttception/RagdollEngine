@@ -36,7 +36,7 @@ void AddToFurthestSibling(ragdoll::Guid child, ragdoll::Guid newChild, std::shar
 		trans->m_Sibling = newChild;
 }
 
-ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, const tinygltf::Model& model, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> scene)
+ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndicesOffset, const tinygltf::Model& model, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> scene)
 {
 	const tinygltf::Node& curr = model.nodes[currIndex];
 	//create the entity
@@ -44,7 +44,7 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, const tinygltf::Mod
 	ragdoll::Guid currId = em->GetGuid(ent);
 	if (curr.mesh >= 0) {
 		RenderableComp* renderableComp = em->AddComponent<RenderableComp>(ent);
-		renderableComp->meshIndex = curr.mesh;
+		renderableComp->meshIndex = curr.mesh + meshIndicesOffset;
 	}
 
 	TransformComp* transComp = em->AddComponent<TransformComp>(ent);
@@ -74,7 +74,7 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, const tinygltf::Mod
 
 	const tinygltf::Node& parent = model.nodes[currIndex];
 	for (const int& childIndex : parent.children) {
-		ragdoll::Guid childId = TraverseNode(childIndex, level + 1, model, em, scene);
+		ragdoll::Guid childId = TraverseNode(childIndex, level + 1, meshIndicesOffset, model, em, scene);
 		if (transComp->m_Child.m_RawId == 0) {
 			transComp->m_Child = childId;
 		}
@@ -110,6 +110,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, path.string());
 	RD_ASSERT(ret == false, "Issue loading {}", path.string());
 
+	uint32_t meshIndicesOffset = AssetManager::GetInstance()->Meshes.size();
 	//go downwards from meshes
 	for (const auto& itMesh : model.meshes) {
 		//should not create a new input layout handle, use the one provided by the renderer
@@ -122,6 +123,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		uint32_t vertexCount{};
 
 		//load all the submeshes
+		uint32_t materialIndicesOffset = AssetManager::GetInstance()->Materials.size();
 		for (const tinygltf::Primitive& itPrim : itMesh.primitives) 
 		{
 			Submesh submesh;
@@ -130,7 +132,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			std::vector<Vertex> vertices;
 
 			//set the material index for the primitive
-			submesh.MaterialIndex = itPrim.material;
+			submesh.MaterialIndex = itPrim.material + materialIndicesOffset;
 
 			//load the indices first
 			{
@@ -310,8 +312,10 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
 	//load the images
-	for(const tinygltf::Image& itImg : model.images)
+	std::unordered_map<int32_t, int32_t> gltfSourceToImageIndex{};
+	for(int i = 0; i < model.images.size(); ++i)
 	{
+		const tinygltf::Image& itImg = model.images[i];
 		nvrhi::TextureDesc texDesc;
 		texDesc.width = itImg.width;
 		texDesc.height = itImg.height;
@@ -345,10 +349,12 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		//upload the texture data
 		Renderer->CommandList->writeTexture(img.TextureHandle, 0, 0, itImg.image.data(), itImg.width * itImg.component);
 		//write to descriptor table
-		Renderer->AddTextureToTable(img.TextureHandle);
+		int32_t index = Renderer->AddTextureToTable(img.TextureHandle);
+		gltfSourceToImageIndex[i] = index;
 
 		AssetManager::GetInstance()->Images.emplace_back(img);
 	}
+	uint32_t textureIndicesOffset = AssetManager::GetInstance()->Textures.size();
 	for(const tinygltf::Texture& itTex : model.textures)
 	{
 		//textures contain a sampler and an image
@@ -439,7 +445,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			}
 		}
 		tex.SamplerIndex = (int)type;
-		tex.ImageIndex = itTex.source;
+		tex.ImageIndex = gltfSourceToImageIndex.at(itTex.source);
 		AssetManager::GetInstance()->Textures.emplace_back(tex);
 
 		TINYGLTF_MODE_POINTS;
@@ -458,16 +464,17 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			gltfMat.pbrMetallicRoughness.baseColorFactor[1],
 			gltfMat.pbrMetallicRoughness.baseColorFactor[2],
 			gltfMat.pbrMetallicRoughness.baseColorFactor[3]);
-		mat.AlbedoIndex = gltfMat.pbrMetallicRoughness.baseColorTexture.index;
-		mat.MetallicRoughnessIndex = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index;
-		mat.NormalIndex = gltfMat.normalTexture.index;
+		//get the textures
+		mat.AlbedoTextureIndex = gltfMat.pbrMetallicRoughness.baseColorTexture.index + textureIndicesOffset;
+		mat.RoughnessMetallicTextureIndex = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index + textureIndicesOffset;
+		mat.NormalTextureIndex = gltfMat.normalTexture.index + textureIndicesOffset;
 		mat.bIsLit = true;
 		AssetManager::GetInstance()->Materials.emplace_back(mat);
 	}
 
 	//create all the entities and their components
 	for (const int& rootIndex : model.scenes[0].nodes) {	//iterating through the root nodes
-		TraverseNode(rootIndex, 0, model, EntityManager, Scene);
+		TraverseNode(rootIndex, 0, meshIndicesOffset, model, EntityManager, Scene);
 	}
 #if 0
 	TransformLayer->DebugPrintHierarchy();

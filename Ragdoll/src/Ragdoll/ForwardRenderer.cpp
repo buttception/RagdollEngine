@@ -35,13 +35,15 @@ void ForwardRenderer::Shutdown()
 	Device->~DirectXDevice();
 }
 
-void ForwardRenderer::AddTextureToTable(nvrhi::TextureHandle tex)
+int32_t ForwardRenderer::AddTextureToTable(nvrhi::TextureHandle tex)
 {
 	Device->m_NvrhiDevice->writeDescriptorTable(DescriptorTable, nvrhi::BindingSetItem::Texture_SRV(TextureCount++, tex));
+	return TextureCount - 1;
 }
 
 void ForwardRenderer::BeginFrame(CBuffer* Cbuf)
 {
+	MICROPROFILE_SCOPEI("Render", "Begin Frame", MP_BLUE);
 	Device->BeginFrame();
 	Device->m_NvrhiDevice->runGarbageCollection();
 	nvrhi::TextureHandle tex = Device->GetCurrentBackbuffer();
@@ -130,6 +132,7 @@ void ForwardRenderer::BeginFrame(CBuffer* Cbuf)
 
 void ForwardRenderer::DrawAllInstances(std::vector<ragdoll::InstanceBuffer>* InstanceBuffers, CBuffer* Cbuf)
 {
+	MICROPROFILE_SCOPEI("Render", "Draw All Instances", MP_BLUEVIOLET);
 	CommandList->open();
 	for (auto& it : *InstanceBuffers)
 		DrawInstanceBuffer(&it, Cbuf);
@@ -140,6 +143,7 @@ void ForwardRenderer::DrawAllInstances(std::vector<ragdoll::InstanceBuffer>* Ins
 
 void ForwardRenderer::DrawInstanceBuffer(ragdoll::InstanceBuffer* InstanceBuffer, CBuffer* Cbuf)
 {
+	MICROPROFILE_SCOPEI("Render", "Instance draw", MP_ALICEBLUE);
 	auto fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(Device->GetCurrentBackbuffer())
 		.setDepthAttachment(DepthBuffer);
@@ -156,27 +160,9 @@ void ForwardRenderer::DrawInstanceBuffer(ragdoll::InstanceBuffer* InstanceBuffer
 		{buffer.VertexBufferHandle}
 	};
 
-	//temp
-	const Material& mat = AssetManager::GetInstance()->Materials[InstanceBuffer->MaterialIndices[0]];
-	nvrhi::ITexture* albedoTex, * normalTex, * roughnessMetallicTex;
+	//TODO: bindless samplers
 	nvrhi::SamplerHandle albedoSampler, normalSampler, roughnessMetallicSampler;
-	albedoTex = normalTex = roughnessMetallicTex = AssetManager::GetInstance()->DefaultTex;
-	albedoSampler = normalSampler = roughnessMetallicSampler = AssetManager::GetInstance()->DefaultSampler;
-	if (mat.AlbedoIndex >= 0) {
-		const Texture& albedo = AssetManager::GetInstance()->Textures[mat.AlbedoIndex];
-		albedoTex = AssetManager::GetInstance()->Images[albedo.ImageIndex].TextureHandle;
-		albedoSampler = AssetManager::GetInstance()->Samplers[albedo.SamplerIndex];
-	}
-	if (mat.NormalIndex >= 0) {
-		const Texture& normal = AssetManager::GetInstance()->Textures[mat.NormalIndex];
-		normalTex = AssetManager::GetInstance()->Images[normal.ImageIndex].TextureHandle;
-		normalSampler = AssetManager::GetInstance()->Samplers[normal.SamplerIndex];
-	}
-	if (mat.MetallicRoughnessIndex >= 0) {
-		const Texture& metalRough = AssetManager::GetInstance()->Textures[mat.MetallicRoughnessIndex];
-		roughnessMetallicTex = AssetManager::GetInstance()->Images[metalRough.ImageIndex].TextureHandle;
-		roughnessMetallicSampler = AssetManager::GetInstance()->Samplers[metalRough.SamplerIndex];
-	}
+	albedoSampler = normalSampler = roughnessMetallicSampler = AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Trilinear_Repeat];
 	CommandList->writeBuffer(ConstantBuffer, Cbuf, sizeof(CBuffer));
 
 	nvrhi::BindingSetDesc bindingSetDesc;
@@ -406,12 +392,12 @@ void ForwardRenderer::CreateResource()
 
 	BindlessLayoutHandle = Device->m_NvrhiDevice->createBindlessLayout(bindlessDesc);
 	DescriptorTable = Device->m_NvrhiDevice->createDescriptorTable(BindlessLayoutHandle);
-	//not sure why i am forced to resize
+	//TODO: not sure why i am forced to resize
 	Device->m_NvrhiDevice->resizeDescriptorTable(DescriptorTable, bindlessDesc.maxCapacity, true);
 
 	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
 
-	bool testCustom{ false };
+	bool testCustom{ true };
 	if (testCustom) {
 		//create 5 random textures
 		uint8_t colors[5][4] = {
@@ -438,12 +424,11 @@ void ForwardRenderer::CreateResource()
 			img.TextureHandle = texHandle;
 			AssetManager::GetInstance()->Images.emplace_back(img);
 			Texture texture;
-			texture.ImageIndex = 0;
+			texture.ImageIndex = i;
 			texture.SamplerIndex = 0;
 			AssetManager::GetInstance()->Textures.emplace_back(texture);
 
-			auto ret = Device->m_NvrhiDevice->writeDescriptorTable(DescriptorTable, nvrhi::BindingSetItem::Texture_SRV(i, texHandle));
-			RD_ASSERT(!ret, "Failed to write descriptor table");
+			AddTextureToTable(texHandle);
 		}
 		CommandList->close();
 		Device->m_NvrhiDevice->executeCommandList(CommandList);
@@ -451,15 +436,15 @@ void ForwardRenderer::CreateResource()
 		Material mat;
 		mat.bIsLit = true;
 		mat.Color = Vector4::One;
-		mat.AlbedoIndex = 0;
+		mat.AlbedoTextureIndex = 0;
 		AssetManager::GetInstance()->Materials.emplace_back(mat);
-		mat.AlbedoIndex = 1;
+		mat.AlbedoTextureIndex = 1;
 		AssetManager::GetInstance()->Materials.emplace_back(mat);
-		mat.AlbedoIndex = 2;
+		mat.AlbedoTextureIndex = 2;
 		AssetManager::GetInstance()->Materials.emplace_back(mat);
-		mat.AlbedoIndex = 3;
+		mat.AlbedoTextureIndex = 3;
 		AssetManager::GetInstance()->Materials.emplace_back(mat);
-		mat.AlbedoIndex = 4;
+		mat.AlbedoTextureIndex = 4;
 		AssetManager::GetInstance()->Materials.emplace_back(mat);
 
 		//build primitives

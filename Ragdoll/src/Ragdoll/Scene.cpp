@@ -49,7 +49,7 @@ void ragdoll::Scene::Update(float _dt)
 			tcomp->m_LocalScale = scale;
 			AddEntityAtRootLevel(EntityManager->GetGuid(ent));
 			auto rcomp = EntityManager->AddComponent<RenderableComp>(ent);
-			rcomp->meshIndex = std::rand() / (float)RAND_MAX * AssetManager::GetInstance()->Meshes.size();
+			rcomp->meshIndex = std::rand() / (float)RAND_MAX * 25;
 		}
 		UpdateTransforms();
 		BuildStaticInstances();
@@ -96,15 +96,18 @@ void ragdoll::Scene::BuildStaticInstances()
 {
 	//iterate through all the transforms and renderable
 	auto EcsView = EntityManager->GetRegistry().view<RenderableComp, TransformComp>();
-	for (entt::entity ent : EcsView) {
+	for (const entt::entity& ent : EcsView) {
 		RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>(ent);
-		Proxy Proxy;
-		Proxy.EnttId = (ENTT_ID_TYPE)ent;
-		//temp only first submesh now
-		Submesh submesh = AssetManager::GetInstance()->Meshes[rComp->meshIndex].Submeshes[0];
-		Proxy.BufferIndex = submesh.VertexBufferIndex;
-		Proxy.MaterialIndex = submesh.MaterialIndex;
-		Proxies.push_back(Proxy);
+		Mesh mesh = AssetManager::GetInstance()->Meshes[rComp->meshIndex];
+		for (const Submesh& submesh : mesh.Submeshes)
+		{
+			Proxy Proxy;
+			Proxy.EnttId = (ENTT_ID_TYPE)ent;
+			//temp only first submesh now
+			Proxy.BufferIndex = submesh.VertexBufferIndex;
+			Proxy.MaterialIndex = submesh.MaterialIndex;
+			Proxies.push_back(Proxy);
+		}
 	}
 	//sort the proxies
 	std::sort(Proxies.begin(), Proxies.end(), [](const Proxy& lhs, const Proxy& rhs) {
@@ -127,19 +130,23 @@ void ragdoll::Scene::BuildStaticInstances()
 					break;
 				}
 			}
+			InstanceBuffer* BufferPtr;
 			InstanceBuffer Buffer;
 			if (InstanceBufferId != -1)
-				Buffer = StaticInstanceBuffers[InstanceBufferId];
+				BufferPtr = &StaticInstanceBuffers[InstanceBufferId];
 			else
-				Buffer.VertexBufferIndex = CurrBufferIndex;
+			{
+				BufferPtr = &Buffer;
+				BufferPtr->VertexBufferIndex = CurrBufferIndex;
+			}
 
 			//specify how big the instance data buffer size should be
-			while (i - Start > Buffer.CurrentCapacity) {
-				Buffer.CurrentCapacity *= 2;
+			while (i - Start > BufferPtr->CurrentCapacity) {
+				BufferPtr->CurrentCapacity *= 2;
 			}
-			Buffer.Data.resize(Buffer.CurrentCapacity);
-			Buffer.MaterialIndices.push_back(Proxies[i].MaterialIndex);	//temp
-			Buffer.InstanceCount = 0;
+			BufferPtr->Data.resize(BufferPtr->CurrentCapacity);
+			BufferPtr->MaterialIndices.push_back(Proxies[i].MaterialIndex);	//temp
+			BufferPtr->InstanceCount = 0;
 
 			if (i == 0)
 				i = 1;
@@ -150,31 +157,36 @@ void ragdoll::Scene::BuildStaticInstances()
 				InstanceData Data;
 
 				const Material& mat = AssetManager::GetInstance()->Materials[Proxies[j].MaterialIndex];
-				Data.AlbedoIndex = mat.AlbedoIndex;
-				Data.NormalIndex = mat.NormalIndex;
-				Data.RoughnessMetallicIndex = mat.MetallicRoughnessIndex;
+				if(mat.AlbedoTextureIndex != -1)
+					Data.AlbedoIndex = AssetManager::GetInstance()->Textures[mat.AlbedoTextureIndex].ImageIndex;
+				if(mat.NormalTextureIndex != -1)
+					Data.NormalIndex = AssetManager::GetInstance()->Textures[mat.NormalTextureIndex].ImageIndex;
+				if(mat.RoughnessMetallicTextureIndex != -1)
+					Data.RoughnessMetallicIndex = AssetManager::GetInstance()->Textures[mat.RoughnessMetallicTextureIndex].ImageIndex;
 				Data.Color = mat.Color;
 				Data.Metallic = mat.Metallic;
 				Data.Roughness = mat.Roughness;
 				Data.bIsLit = mat.bIsLit;
 				Data.ModelToWorld = tComp->m_ModelToWorld;
 				Data.InvModelToWorld = tComp->m_ModelToWorld.Invert();
-				Buffer.Data[Buffer.InstanceCount++] = Data;
+				BufferPtr->Data[BufferPtr->InstanceCount++] = Data;
 			}
-			//create the instance buffer handle
+			//create the instance buffer handle, need to resize if got new stuff anyways
 			nvrhi::BufferDesc InstanceBufferDesc;
-			InstanceBufferDesc.byteSize = sizeof(InstanceData) * Buffer.CurrentCapacity;
+			InstanceBufferDesc.byteSize = sizeof(InstanceData) * BufferPtr->CurrentCapacity;
 			InstanceBufferDesc.debugName = "Instance Buffer " + std::to_string(CurrBufferIndex);
 			InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
 			InstanceBufferDesc.structStride = sizeof(InstanceData);
-			Buffer.BufferHandle = Renderer.Device->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
+			BufferPtr->BufferHandle = Renderer.Device->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
+			if (InstanceBufferId == -1)
+				StaticInstanceBuffers.emplace_back(*BufferPtr);
+			//emplace if is a new buffer, otherwise do nothing
 
 			//copy data over
-			Renderer.CommandList->beginTrackingBufferState(Buffer.BufferHandle, nvrhi::ResourceStates::CopyDest);
-			Renderer.CommandList->writeBuffer(Buffer.BufferHandle, Buffer.Data.data(), sizeof(InstanceData) * Buffer.InstanceCount);
-			Renderer.CommandList->setPermanentBufferState(Buffer.BufferHandle, nvrhi::ResourceStates::ShaderResource);
+			Renderer.CommandList->beginTrackingBufferState(BufferPtr->BufferHandle, nvrhi::ResourceStates::CopyDest);
+			Renderer.CommandList->writeBuffer(BufferPtr->BufferHandle, BufferPtr->Data.data(), sizeof(InstanceData) * BufferPtr->InstanceCount);
+			Renderer.CommandList->setPermanentBufferState(BufferPtr->BufferHandle, nvrhi::ResourceStates::ShaderResource);
 
-			StaticInstanceBuffers.emplace_back(Buffer);
 			if(i < Proxies.size())
 				CurrBufferIndex = Proxies[i].BufferIndex;
 			Start = i;
