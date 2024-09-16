@@ -4,34 +4,18 @@
 namespace ragdoll {
 	class Window;
 	class FileManager;
+	struct InstanceBuffer;
 }
 class DirectXDevice;
 
 struct CBuffer {
-	Matrix world;
-	Matrix invWorldMatrix;
 	Matrix viewProj;
 	Vector4 lightDiffuseColor = { 1.f, 1.f, 1.f, 1.f };
 	Vector4 sceneAmbientColor = { 0.2f, 0.2f, 0.2f, 1.f };
-	Vector4 albedoFactor = { 1.f,1.f,1.f,1.f };
 	Vector3 lightDirection = { 1.f, -1.f, 1.f };
-	float roughness;
 	Vector3 cameraPosition;
-	float metallic;
+};
 
-	int32_t useAlbedo{ false };
-	int32_t useNormalMap{ false };
-	int32_t useMetallicRoughnessMap{ false };
-	int32_t isLit{ false };
-};
-struct Vertex {
-	Vector3 position = Vector3::Zero;
-	Vector4 color = Vector4::One;
-	Vector3 normal = Vector3::Zero;
-	Vector3 tangent = Vector3::Zero;
-	Vector3 binormal = Vector3::Zero;
-	Vector2 texcoord = Vector2::Zero;
-};
 class ForwardRenderer {
 	//handled at the renderer side
 	nvrhi::BindingLayoutHandle BindingLayoutHandle;
@@ -39,12 +23,12 @@ class ForwardRenderer {
 	nvrhi::BufferHandle VertexBuffer;
 	nvrhi::BufferHandle IndexBuffer;
 
-	nvrhi::TextureHandle DepthBuffer;
 	nvrhi::GraphicsPipelineHandle GraphicsPipeline;
 
 	std::shared_ptr<ragdoll::Window> PrimaryWindow;
 	std::shared_ptr<ragdoll::FileManager> FileManager;
 	std::shared_ptr<ragdoll::EntityManager> EntityManager;
+	int32_t TextureCount{};
 public:
 	std::shared_ptr<DirectXDevice> Device;
 	nvrhi::CommandListHandle CommandList;
@@ -53,13 +37,21 @@ public:
 	nvrhi::ShaderHandle ForwardVertexShader;
 	nvrhi::ShaderHandle ForwardPixelShader;
 	nvrhi::BufferHandle ConstantBuffer;
+	nvrhi::TextureHandle DepthBuffer;
 	std::vector<nvrhi::VertexAttributeDesc> VertexAttributes;
 	nvrhi::InputLayoutHandle InputLayoutHandle;
+	nvrhi::DescriptorTableHandle DescriptorTable;
+	nvrhi::BindingLayoutHandle BindlessLayoutHandle;
 	
 	void Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em);
-	void Draw();
 	void Shutdown();
+
+	int32_t AddTextureToTable(nvrhi::TextureHandle tex);
+
+	void BeginFrame(CBuffer* Cbug);
+	void DrawAllInstances(std::vector<ragdoll::InstanceBuffer>* InstanceBuffers, CBuffer* Cbuf);
 private:
 	//handled at renderer
 	void CreateResource();
+	void DrawInstanceBuffer(ragdoll::InstanceBuffer* Buffer, CBuffer* Cbuf);
 };

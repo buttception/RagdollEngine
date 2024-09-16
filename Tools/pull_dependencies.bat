@@ -7,6 +7,7 @@ call :pull_dependency "spdlog" "https://github.com/buttception/spdlog.git"
 call :pull_dependency "glfw" "https://github.com/buttception/glfw.git"
 call :pull_dependency "entt" "https://github.com/buttception/entt.git"
 call :pull_dependency "tinygltf" "https://github.com/syoyo/tinygltf.git"
+call :pull_dependency "microprofile" "https://github.com/jonasmr/microprofile.git"
 
 set "dependencies_path=%~dp0\..\Editor\dependencies"
 call :pull_dependency "imgui" "--branch docking https://github.com/buttception/imgui.git"
@@ -22,9 +23,15 @@ if exist "%dependencies_path%\%~1" (
 ) else (
     git clone %~2 "%dependencies_path%\%~1" 
     if errorlevel 1 (
-       echo [91mError pulling %~1 from %~2[0m
+        echo [91mError pulling %~1 from %~2[0m
     ) else (
-       echo [92m%~1 cloned succesfully.[0m
+        echo [92m%~1 cloned succesfully.[0m
+    )
+    git -C "%dependencies_path%\%~1" submodule update --init --recursive
+    if errorlevel 1 (
+        echo [91mError updating submodules %~1 from %~2[0m
+    ) else (
+        echo [92m%~1 submodules updated succesfully.[0m
     )
 )
 goto:eof

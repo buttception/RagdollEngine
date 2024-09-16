@@ -29,15 +29,15 @@
 __________________________________________________________________________________*/
 #pragma once
 #include "Core/Guid.h"
-#include "ImGuiRenderer.h"
-#include "ForwardRenderer.h"
 
 namespace ragdoll
 {
 	class EntityManager;
-	class TransformLayer;
-	class RenderGraph;
-	class ResourceManager;
+	class Scene;
+	class Window;
+	class FileManager;
+	class InputHandler;
+
 	class WindowMoveEvent;
 	class WindowResizeEvent;
 	class WindowCloseEvent;
@@ -49,14 +49,16 @@ namespace ragdoll
 	class MouseButtonReleasedEvent;
 	class MouseScrolledEvent;
 	class Event;
-	class Window;
-	class LayerStack;
-	class FileManager;
-	class InputHandler;
 
 	class Application
 	{
 	public:
+		std::shared_ptr<Window> m_PrimaryWindow;
+		std::shared_ptr<InputHandler> m_InputHandler;
+		std::shared_ptr<EntityManager> m_EntityManager;
+		std::shared_ptr<FileManager> m_FileManager;
+		std::shared_ptr<Scene> m_Scene;
+
 		struct ApplicationConfig
 		{
 			
@@ -88,19 +90,8 @@ namespace ragdoll
 		bool m_Running{ true };
 
 		GuidGenerator m_GuidGenerator{};
-		std::shared_ptr<Window> m_PrimaryWindow;
-		std::shared_ptr<InputHandler> m_InputHandler;
-		std::shared_ptr<EntityManager> m_EntityManager;
-		std::shared_ptr<ResourceManager> m_ResourceManager;
-		std::shared_ptr<RenderGraph> m_RenderGraph;
-		std::shared_ptr<FileManager> m_FileManager;
-		std::shared_ptr<LayerStack> m_LayerStack;
-		std::shared_ptr<TransformLayer> m_TransformLayer;
 
-		ForwardRenderer Renderer;
-		ImguiRenderer m_ImguiInterface;
-
-		double m_Framerate = 60.0;
+		double m_Framerate = 200.0;
 		double m_TargetFrametime = 1.0 / m_Framerate;
 		double m_Frametime = 0.0;
 	};

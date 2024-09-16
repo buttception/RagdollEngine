@@ -28,13 +28,8 @@
 			SOFTWARE.
 __________________________________________________________________________________*/
 
-//#include <backends/imgui_impl_glfw.h>
-//#include <backends/imgui_impl_opengl3.h>
-
 #include "ragdollpch.h"
 #include "Ragdoll.h"
-#include "Asset/AssetManager.h"
-#include "Ragdoll/Layer/LayerStack.h"
 
 namespace ragdoll
 {
@@ -47,17 +42,9 @@ namespace ragdoll
 		void Init(const ApplicationConfig& config) override
 		{
 			Application::Init(config);
-			// Do editor specific initialization here
-			m_AssetManager = std::make_shared<AssetManager>();
-			m_AssetManager->Init(m_FileManager);
-			//add the imgui layer
-			//auto imGuiLayer = std::make_shared<GuiLayer>(m_PrimaryWindow, m_EntityManager);
-			//imGuiLayer->Init();
-			//m_LayerStack->PushLayer(imGuiLayer);
 		}
 
 	private:
-		std::shared_ptr<AssetManager> m_AssetManager;
 	};
 }
 

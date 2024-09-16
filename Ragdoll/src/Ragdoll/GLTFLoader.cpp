@@ -7,8 +7,8 @@
 #include "Ragdoll/Entity/EntityManager.h"
 
 #include "Ragdoll/Components/TransformComp.h"
-#include "Ragdoll/Components/TransformLayer.h"
 #include "Ragdoll/Components/RenderableComp.h"
+#include "Scene.h"
 
 // Define these only in *one* .cc file.
 #define TINYGLTF_IMPLEMENTATION
@@ -17,15 +17,13 @@
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 #include <tiny_gltf.h>
 
-#include "../../../Editor/src/Asset/Asset.h"
-
-void GLTFLoader::Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::TransformLayer> tl)
+void GLTFLoader::Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> scene)
 {
 	Root = root;
 	Renderer = renderer;
 	FileManager = fm;
 	EntityManager = em;
-	TransformLayer = tl;
+	Scene = scene;
 }
 
 void AddToFurthestSibling(ragdoll::Guid child, ragdoll::Guid newChild, std::shared_ptr<ragdoll::EntityManager> em)
@@ -38,7 +36,7 @@ void AddToFurthestSibling(ragdoll::Guid child, ragdoll::Guid newChild, std::shar
 		trans->m_Sibling = newChild;
 }
 
-ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, const tinygltf::Model& model, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::TransformLayer> tl)
+ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndicesOffset, const tinygltf::Model& model, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> scene)
 {
 	const tinygltf::Node& curr = model.nodes[currIndex];
 	//create the entity
@@ -46,7 +44,7 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, const tinygltf::Mod
 	ragdoll::Guid currId = em->GetGuid(ent);
 	if (curr.mesh >= 0) {
 		RenderableComp* renderableComp = em->AddComponent<RenderableComp>(ent);
-		renderableComp->meshIndex = curr.mesh;
+		renderableComp->meshIndex = curr.mesh + meshIndicesOffset;
 	}
 
 	TransformComp* transComp = em->AddComponent<TransformComp>(ent);
@@ -54,7 +52,7 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, const tinygltf::Mod
 	//root level entities
 	if (level == 0)
 	{
-		tl->AddEntityAtRootLevel(currId);
+		scene->AddEntityAtRootLevel(currId);
 	}
 	if (curr.matrix.size() > 0) {
 		const std::vector<double>& gltfMat = curr.matrix;
@@ -76,7 +74,7 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, const tinygltf::Mod
 
 	const tinygltf::Node& parent = model.nodes[currIndex];
 	for (const int& childIndex : parent.children) {
-		ragdoll::Guid childId = TraverseNode(childIndex, level + 1, model, em, tl);
+		ragdoll::Guid childId = TraverseNode(childIndex, level + 1, meshIndicesOffset, model, em, scene);
 		if (transComp->m_Child.m_RawId == 0) {
 			transComp->m_Child = childId;
 		}
@@ -112,6 +110,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, path.string());
 	RD_ASSERT(ret == false, "Issue loading {}", path.string());
 
+	uint32_t meshIndicesOffset = AssetManager::GetInstance()->Meshes.size();
 	//go downwards from meshes
 	for (const auto& itMesh : model.meshes) {
 		//should not create a new input layout handle, use the one provided by the renderer
@@ -124,14 +123,16 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		uint32_t vertexCount{};
 
 		//load all the submeshes
+		uint32_t materialIndicesOffset = AssetManager::GetInstance()->Materials.size();
 		for (const tinygltf::Primitive& itPrim : itMesh.primitives) 
 		{
-			Mesh::Buffer buffer;
+			Submesh submesh;
+			VertexBufferInfo buffer;
 			std::vector<uint32_t> indices;
 			std::vector<Vertex> vertices;
 
 			//set the material index for the primitive
-			buffer.MaterialIndex = itPrim.material;
+			submesh.MaterialIndex = itPrim.material + materialIndicesOffset;
 
 			//load the indices first
 			{
@@ -162,7 +163,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 				RD_CORE_TRACE("Loaded {} indices at byte offest {}", accessor.count, accessor.byteOffset);
 				RD_CORE_TRACE("Largest index is {}", *std::max_element(indices.begin(), indices.end()));
 #endif
-				buffer.TriangleCount = accessor.count;
+				buffer.IndicesCount = accessor.count;
 			}
 
 			//add the relevant data into the map to use
@@ -265,34 +266,10 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 				}
 			}
 
-			//create all the vertex and index buffers
-			//presume command list is open and will be closed and executed later
+			//add to the asset manager vertices
 			{
-				nvrhi::BufferDesc vertexBufDesc;
-				vertexBufDesc.byteSize = vertices.size() * sizeof(Vertex);	//the offset is already the size of the vb
-				vertexBufDesc.isVertexBuffer = true;
-				vertexBufDesc.debugName = itMesh.name + " Vertex Buffer";
-				vertexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;	//set as copy dest to copy over data
-				//smth smth syncrhonization need to be this state to be written
-
-				buffer.VertexBufferHandle = Renderer->Device->m_NvrhiDevice->createBuffer(vertexBufDesc);
-				//copy data over
-				Renderer->CommandList->beginTrackingBufferState(buffer.VertexBufferHandle, nvrhi::ResourceStates::CopyDest);	//i tink this is to update nvrhi resource manager state tracker
-				Renderer->CommandList->writeBuffer(buffer.VertexBufferHandle, vertices.data(), vertexBufDesc.byteSize);
-				Renderer->CommandList->setPermanentBufferState(buffer.VertexBufferHandle, nvrhi::ResourceStates::VertexBuffer);	//now its a vb
-
-				nvrhi::BufferDesc indexBufDesc;
-				indexBufDesc.byteSize = indices.size() * sizeof(uint32_t);
-				indexBufDesc.isIndexBuffer = true;
-				indexBufDesc.debugName = itMesh.name + " Index Buffer";
-				indexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;
-
-				buffer.IndexBufferHandle = Renderer->Device->m_NvrhiDevice->createBuffer(indexBufDesc);
-				Renderer->CommandList->beginTrackingBufferState(buffer.IndexBufferHandle, nvrhi::ResourceStates::CopyDest);
-				Renderer->CommandList->writeBuffer(buffer.IndexBufferHandle, indices.data(), indexBufDesc.byteSize);
-				Renderer->CommandList->setPermanentBufferState(buffer.IndexBufferHandle, nvrhi::ResourceStates::IndexBuffer);
-
-				mesh.Buffers.emplace_back(buffer);
+				submesh.VertexBufferIndex = AssetManager::GetInstance()->AddVertices(vertices, indices);
+				mesh.Submeshes.emplace_back(submesh);
 			}
 		}
 #if 0
@@ -308,9 +285,13 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 #endif
 		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
+	//create the buffers
+	AssetManager::GetInstance()->UpdateVBOIBO(Renderer);
 	//load the images
-	for(const tinygltf::Image& itImg : model.images)
+	std::unordered_map<int32_t, int32_t> gltfSourceToImageIndex{};
+	for(int i = 0; i < model.images.size(); ++i)
 	{
+		const tinygltf::Image& itImg = model.images[i];
 		nvrhi::TextureDesc texDesc;
 		texDesc.width = itImg.width;
 		texDesc.height = itImg.height;
@@ -343,14 +324,18 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 
 		//upload the texture data
 		Renderer->CommandList->writeTexture(img.TextureHandle, 0, 0, itImg.image.data(), itImg.width * itImg.component);
+		//write to descriptor table
+		int32_t index = Renderer->AddTextureToTable(img.TextureHandle);
+		gltfSourceToImageIndex[i] = index;
 
 		AssetManager::GetInstance()->Images.emplace_back(img);
 	}
+	uint32_t textureIndicesOffset = AssetManager::GetInstance()->Textures.size();
 	for(const tinygltf::Texture& itTex : model.textures)
 	{
 		//textures contain a sampler and an image
 		Texture tex;
-		nvrhi::SamplerDesc samplerDesc;
+		SamplerTypes type;
 		if (itTex.sampler < 0)
 		{
 			//no samplers so use a default one
@@ -359,70 +344,84 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		{
 			//create the sampler
 			const tinygltf::Sampler gltfSampler = model.samplers[itTex.sampler];
-			switch (gltfSampler.minFilter)
-			{
-			case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
-			case -1:
-				samplerDesc.minFilter = true;
-				samplerDesc.mipFilter = true;
-				break;
-			case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
-				samplerDesc.minFilter = true;
-				samplerDesc.mipFilter = false;
-				break;
-			case TINYGLTF_TEXTURE_FILTER_LINEAR:
-				samplerDesc.minFilter = true;
-				break;
-			case TINYGLTF_TEXTURE_FILTER_NEAREST:
-				samplerDesc.minFilter = false;
-				break;
-			case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
-				samplerDesc.minFilter = false;
-				samplerDesc.mipFilter = true;
-				break;
-			case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
-				samplerDesc.minFilter = false;
-				samplerDesc.mipFilter = false;
-				break;
-			default:
-				RD_ASSERT(true, "Unknown min filter");
-			}
-			switch (gltfSampler.magFilter)
-			{
-			case TINYGLTF_TEXTURE_FILTER_LINEAR:
-				samplerDesc.magFilter = true;
-				break;
-			case TINYGLTF_TEXTURE_FILTER_NEAREST:
-				samplerDesc.magFilter = false;
-				break;
-			}
 			switch (gltfSampler.wrapS)
 			{
 			case TINYGLTF_TEXTURE_WRAP_REPEAT:
-				samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
+				switch (gltfSampler.minFilter)
+				{
+				case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+				case TINYGLTF_TEXTURE_FILTER_LINEAR:
+					if (gltfSampler.magFilter == 1)
+						type = SamplerTypes::Trilinear_Repeat;
+					else
+						type = SamplerTypes::Linear_Repeat;
+					break;
+				case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
+				case TINYGLTF_TEXTURE_FILTER_NEAREST:
+					type = SamplerTypes::Point_Repeat;
+					break;
+				case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
+				case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
+				case -1:
+					RD_CORE_WARN("Sampler do not exist, giving trilinear");
+					type = SamplerTypes::Trilinear_Repeat;
+					break;
+				default:
+					RD_ASSERT(true, "Unknown min filter");
+				}
 				break;
 			case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
-				samplerDesc.addressU = nvrhi::SamplerAddressMode::ClampToEdge;
+				switch (gltfSampler.minFilter)
+				{
+				case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+				case TINYGLTF_TEXTURE_FILTER_LINEAR:
+					if (gltfSampler.magFilter == 1)
+						type = SamplerTypes::Trilinear_Clamp;
+					else
+						type = SamplerTypes::Linear_Clamp;
+					break;
+				case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
+				case TINYGLTF_TEXTURE_FILTER_NEAREST:
+					type = SamplerTypes::Point_Clamp;
+					break;
+				case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
+				case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
+				case -1:
+					RD_CORE_WARN("Sampler do not exist, giving trilinear");
+					type = SamplerTypes::Trilinear_Clamp;
+					break;
+				default:
+					RD_ASSERT(true, "Unknown min filter");
+				}
 				break;
 			case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
-				samplerDesc.addressU = nvrhi::SamplerAddressMode::MirroredRepeat;
-				break;
-			}
-			switch (gltfSampler.wrapT)
-			{
-			case TINYGLTF_TEXTURE_WRAP_REPEAT:
-				samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
-				break;
-			case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
-				samplerDesc.addressV = nvrhi::SamplerAddressMode::ClampToEdge;
-				break;
-			case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
-				samplerDesc.addressV = nvrhi::SamplerAddressMode::MirroredRepeat;
+				switch (gltfSampler.minFilter)
+				{
+				case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+				case TINYGLTF_TEXTURE_FILTER_LINEAR:
+					if (gltfSampler.magFilter == 1)
+						type = SamplerTypes::Trilinear_Repeat;
+					else
+						type = SamplerTypes::Linear_Repeat;
+					break;
+				case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
+				case TINYGLTF_TEXTURE_FILTER_NEAREST:
+					type = SamplerTypes::Point_Repeat;
+					break;
+				case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
+				case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
+				case -1:
+					RD_CORE_WARN("Sampler do not exist, giving trilinear");
+					type = SamplerTypes::Trilinear_Repeat;
+					break;
+				default:
+					RD_ASSERT(true, "Unknown min filter");
+				}
 				break;
 			}
 		}
-		tex.SamplerHandle = Renderer->Device->m_NvrhiDevice->createSampler(samplerDesc);
-		tex.ImageIndex = itTex.source;
+		tex.SamplerIndex = (int)type;
+		tex.ImageIndex = gltfSourceToImageIndex.at(itTex.source);
 		AssetManager::GetInstance()->Textures.emplace_back(tex);
 
 		TINYGLTF_MODE_POINTS;
@@ -441,16 +440,17 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			gltfMat.pbrMetallicRoughness.baseColorFactor[1],
 			gltfMat.pbrMetallicRoughness.baseColorFactor[2],
 			gltfMat.pbrMetallicRoughness.baseColorFactor[3]);
-		mat.AlbedoIndex = gltfMat.pbrMetallicRoughness.baseColorTexture.index;
-		mat.MetallicRoughnessIndex = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index;
-		mat.NormalIndex = gltfMat.normalTexture.index;
+		//get the textures
+		mat.AlbedoTextureIndex = gltfMat.pbrMetallicRoughness.baseColorTexture.index + textureIndicesOffset;
+		mat.RoughnessMetallicTextureIndex = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index + textureIndicesOffset;
+		mat.NormalTextureIndex = gltfMat.normalTexture.index + textureIndicesOffset;
 		mat.bIsLit = true;
 		AssetManager::GetInstance()->Materials.emplace_back(mat);
 	}
 
 	//create all the entities and their components
 	for (const int& rootIndex : model.scenes[0].nodes) {	//iterating through the root nodes
-		TraverseNode(rootIndex, 0, model, EntityManager, TransformLayer);
+		TraverseNode(rootIndex, 0, meshIndicesOffset, model, EntityManager, Scene);
 	}
 #if 0
 	TransformLayer->DebugPrintHierarchy();

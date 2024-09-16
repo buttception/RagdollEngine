@@ -42,6 +42,11 @@ project "Ragdoll"
 		"d3d12",
 		"dxgi",
 	}
+	
+	vpaths 
+	{
+		["assets"] = { "../assets/**.*" }
+	}	
 
     includedirs
     {
@@ -53,6 +58,7 @@ project "Ragdoll"
 		"%{IncludesDir.entt}",
 		"%{IncludesDir.nvrhi}",
 		"%{IncludesDir.tinygltf}",
+		"%{IncludesDir.microprofile}",
     }
 
 	prebuildcommands

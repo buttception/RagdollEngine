@@ -47,7 +47,7 @@ namespace ragdoll
 			int32_t m_Height{ 900 };
 			Vector2 m_Position{};
 			int32_t m_NumSamplesMSAA{ 0 };
-			Color m_BackgroundColor{};
+			Color m_BackgroundColor{ 0.2f, 0.2f, 0.2f, 1.f};
 			float m_Opacity{ 1.f };
 			bool m_Resizable{ true };
 			bool m_Visible{ true };

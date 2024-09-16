@@ -41,12 +41,18 @@ ________________________________________________________________________________
 #include "Event/KeyEvents.h"
 #include "Event/MouseEvent.h"
 #include "Input/InputHandler.h"
-#include "Layer/LayerStack.h"
-#include "Components/TransformLayer.h"
-#include "Resource/ResourceManager.h"
 #include "File/FileManager.h"
+#include "Scene.h"
 
 #include "DirectXDevice.h"
+#include "microprofile.h"
+
+MICROPROFILE_DEFINE(MAIN, "MAIN", "Main", MP_AUTO);
+
+//testing
+#include "Components/RenderableComp.h"
+#include "Components/TransformComp.h"
+#include "AssetManager.h"
 
 namespace ragdoll
 {
@@ -56,84 +62,91 @@ namespace ragdoll
 		Logger::Init();
 		RD_CORE_INFO("spdlog initialized for use.");
 
-		GLFWContext::Init();
+		//create the profiling threads
+		MicroProfileInit();
+		MicroProfileOnThreadCreate("Main");
+		//turn on profiling
+		MicroProfileSetEnableAllGroups(true);
+		MicroProfileSetForceMetaCounters(true);
+		RD_CORE_INFO("Open localhost:{} in chrome to capture profile data", MicroProfileWebServerPort());
 
-		m_PrimaryWindow = std::make_shared<Window>();
-		m_PrimaryWindow->Init();
-		//bind the application callback to the window
-		m_PrimaryWindow->SetEventCallback(RD_BIND_EVENT_FN(Application::OnEvent));
-		//setup input handler
-		m_InputHandler = std::make_shared<InputHandler>();
-		m_InputHandler->Init();
-		//create the entity manager
-		m_EntityManager = std::make_shared<EntityManager>();
-		//create the resource manager
-		m_ResourceManager = std::make_shared<ResourceManager>();
-		m_ResourceManager->Init(m_PrimaryWindow);
-		//create the file manager
-		m_FileManager = std::make_shared<FileManager>();
-		m_FileManager->Init();
+		MICROPROFILE_TIMELINE_ENTER_STATIC(MP_DARKGOLDENROD, "Application Initialization");
+		{
+			GLFWContext::Init();
 
-		//layers stuff
-		m_LayerStack = std::make_shared<LayerStack>();
-		//adding the transform layer
-		m_TransformLayer = std::make_shared<TransformLayer>(m_EntityManager);
-		m_LayerStack->PushLayer(m_TransformLayer);
+			m_PrimaryWindow = std::make_shared<Window>();
+			m_PrimaryWindow->Init();
+			//bind the application callback to the window
+			m_PrimaryWindow->SetEventCallback(RD_BIND_EVENT_FN(Application::OnEvent));
+			//setup input handler
+			m_InputHandler = std::make_shared<InputHandler>();
+			m_InputHandler->Init();
+			//create the entity manager
+			m_EntityManager = std::make_shared<EntityManager>();
+			//create the file manager
+			m_FileManager = std::make_shared<FileManager>();
+			m_FileManager->Init();
 
-		Renderer.Init(m_PrimaryWindow, m_FileManager, m_EntityManager);
-		m_ImguiInterface.Init(Renderer.Device.get(), Renderer.ImguiVertexShader, Renderer.ImguiPixelShader);
+			m_Scene = std::make_shared<Scene>(this);
+		}
+		MICROPROFILE_TIMELINE_LEAVE_STATIC("Application Initialization");
 
-		//init all layers
-		m_LayerStack->Init();
 
-		//my gltf loader
-		GLTFLoader loader;
-		loader.Init(m_FileManager->GetRoot(), &Renderer, m_FileManager, m_EntityManager, m_TransformLayer);
-		std::string sceneName{ "Sponza" };
-		std::filesystem::path fp = "gltf/2.0/";
-		fp = fp / sceneName / "glTF" / (sceneName + ".gltf");
-		loader.LoadAndCreateModel(fp.string());
+		MICROPROFILE_TIMELINE_ENTER_STATIC(MP_DARKGOLDENROD, "GLTF Load");
+		{
+			if (false)
+			{
+				GLTFLoader loader;
+				loader.Init(m_FileManager->GetRoot(), &m_Scene->Renderer, m_FileManager, m_EntityManager, m_Scene);
+				std::string sceneName{ "Sponza" };
+				std::filesystem::path fp = "gltf/2.0/";
+				fp = fp / sceneName / "glTF" / (sceneName + ".gltf");
+				loader.LoadAndCreateModel(fp.string());
 
-		//loader.LoadAndCreateModel("Instancing Test/FlyingWorld-BattleOfTheTrashGod.gltf");
+				//loader.LoadAndCreateModel("Instancing Test/FlyingWorld-BattleOfTheTrashGod.gltf");
+			}
+		}
+		MICROPROFILE_TIMELINE_LEAVE_STATIC("GLTF Load");
+
+		m_Scene->UpdateTransforms();
+		m_Scene->BuildStaticInstances();
 	}
 
 	void Application::Run()
 	{
 		while (m_Running)
 		{
+			MICROPROFILE_SCOPE(MAIN);
 			//m_InputHandler->Update(m_PrimaryWindow->GetDeltaTime());
 			m_FileManager->Update();
-			while (m_Frametime < m_TargetFrametime) {
-				m_PrimaryWindow->Update();
-				m_Frametime += m_PrimaryWindow->GetDeltaTime();
-				YieldProcessor();
-			}
-			for (auto& layer : *m_LayerStack)
 			{
-				layer->Update(static_cast<float>(m_TargetFrametime));
+				MICROPROFILE_SCOPEI("Update", "Wait", MP_YELLOW);
+				while (m_Frametime < m_TargetFrametime) {
+					m_PrimaryWindow->Update();
+					m_Frametime += m_PrimaryWindow->GetDeltaTime();
+					YieldProcessor();
+				}
 			}
-			m_ImguiInterface.BeginFrame();
-			Renderer.Draw();
 
-			m_ImguiInterface.Render();
-			Renderer.Device->Present();
-
+			m_Scene->Update(m_Frametime);
 			m_PrimaryWindow->SetFrametime(m_Frametime);
 			m_PrimaryWindow->IncFpsCounter();
-			if (m_Frametime > m_PrimaryWindow->GetDeltaTime())
-				m_Frametime = 0;
-			else
-				m_Frametime -= m_TargetFrametime;
-			m_Frametime = 0.f;
+			m_Frametime = 0;
+			MicroProfileFlip(nullptr);
+
+			if (ImGui::IsKeyPressed(ImGuiKey_F1)) {
+				MicroProfileDumpFileImmediately("test", "test", nullptr);
+			}
 		}
 	}
 
 	void Application::Shutdown()
 	{
-		Renderer.Shutdown();
+		m_Scene->Shutdown();
 		m_FileManager->Shutdown();
 		m_PrimaryWindow->Shutdown();
 		GLFWContext::Shutdown();
+		MicroProfileShutdown();
 		RD_CORE_INFO("ragdoll Engine application shut down successfull");
 	}
 
@@ -150,12 +163,6 @@ namespace ragdoll
 		RD_DISPATCH_EVENT(dispatcher, MouseButtonPressedEvent, event, Application::OnMouseButtonPressed);
 		RD_DISPATCH_EVENT(dispatcher, MouseButtonReleasedEvent, event, Application::OnMouseButtonReleased);
 		RD_DISPATCH_EVENT(dispatcher, MouseScrolledEvent, event, Application::OnMouseScrolled);
-
-		//run the event on all layers
-		for (auto& layer : *m_LayerStack)
-		{
-			layer->OnEvent(event);
-		}
 	}
 
 	bool Application::OnWindowClose(WindowCloseEvent& event)

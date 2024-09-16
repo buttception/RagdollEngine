@@ -70,6 +70,8 @@ void DirectXDevice::Shutdown()
 {
 	if (bIsShutdown)
 		return;
+	m_NvrhiDevice->waitForIdle();
+	m_NvrhiDevice->runGarbageCollection();
 	DestroyDeviceAndSwapChain();
 
 	m_DxgiAdapter = nullptr;

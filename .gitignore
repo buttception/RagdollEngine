@@ -24,6 +24,7 @@ Launcher/assets/
 *.gltf
 *.bin
 *.png
+*.html
 
 #Specific files
 imgui.ini
