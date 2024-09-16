@@ -160,19 +160,17 @@ void ForwardRenderer::DrawInstanceBuffer(ragdoll::InstanceBuffer* InstanceBuffer
 		{buffer.VertexBufferHandle}
 	};
 
-	//TODO: bindless samplers
-	nvrhi::SamplerHandle albedoSampler, normalSampler, roughnessMetallicSampler;
-	albedoSampler = normalSampler = roughnessMetallicSampler = AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Trilinear_Repeat];
 	CommandList->writeBuffer(ConstantBuffer, Cbuf, sizeof(CBuffer));
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, InstanceBuffer->BufferHandle),
-		nvrhi::BindingSetItem::Sampler(0, albedoSampler),
-		nvrhi::BindingSetItem::Sampler(1, normalSampler),
-		nvrhi::BindingSetItem::Sampler(2, roughnessMetallicSampler),
 	};
+	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
+	{
+		bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler(i, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Trilinear_Repeat]));
+	}
 	BindingSetHandle = Device->m_NvrhiDevice->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
 	state.addBindingSet(BindingSetHandle);
@@ -242,6 +240,12 @@ void ForwardRenderer::CreateResource()
 		nvrhi::BindingLayoutItem::Sampler(0),
 		nvrhi::BindingLayoutItem::Sampler(1),
 		nvrhi::BindingLayoutItem::Sampler(2),
+		nvrhi::BindingLayoutItem::Sampler(3),
+		nvrhi::BindingLayoutItem::Sampler(4),
+		nvrhi::BindingLayoutItem::Sampler(5),
+		nvrhi::BindingLayoutItem::Sampler(6),
+		nvrhi::BindingLayoutItem::Sampler(7),
+		nvrhi::BindingLayoutItem::Sampler(8),
 	};
 	BindingLayoutHandle = Device->m_NvrhiDevice->createBindingLayout(layoutDesc);
 	//create a constant buffer here

@@ -27,8 +27,11 @@ namespace ragdoll {
 		float Metallic = 0.f;
 
 		int AlbedoIndex = -1;
+		int AlbedoSamplerIndex = 0;
 		int NormalIndex = -1;
+		int NormalSamplerIndex = 0;
 		int RoughnessMetallicIndex = -1;
+		int RoughnessMetallicSamplerIndex = 0;
 		int bIsLit = 1;
 	};
 

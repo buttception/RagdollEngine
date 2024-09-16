@@ -175,11 +175,23 @@ void ragdoll::Scene::BuildStaticInstances()
 
 				const Material& mat = AssetManager::GetInstance()->Materials[Proxies[j].MaterialIndex];
 				if(mat.AlbedoTextureIndex != -1)
-					Data.AlbedoIndex = AssetManager::GetInstance()->Textures[mat.AlbedoTextureIndex].ImageIndex;
+				{
+					const Texture& tex = AssetManager::GetInstance()->Textures[mat.AlbedoTextureIndex];
+					Data.AlbedoIndex = tex.ImageIndex;
+					Data.AlbedoSamplerIndex = tex.SamplerIndex;
+				}
 				if(mat.NormalTextureIndex != -1)
-					Data.NormalIndex = AssetManager::GetInstance()->Textures[mat.NormalTextureIndex].ImageIndex;
+				{
+					const Texture& tex = AssetManager::GetInstance()->Textures[mat.NormalTextureIndex];
+					Data.NormalIndex = tex.ImageIndex;
+					Data.NormalSamplerIndex = tex.SamplerIndex;
+				}
 				if(mat.RoughnessMetallicTextureIndex != -1)
-					Data.RoughnessMetallicIndex = AssetManager::GetInstance()->Textures[mat.RoughnessMetallicTextureIndex].ImageIndex;
+				{
+					const Texture& tex = AssetManager::GetInstance()->Textures[mat.RoughnessMetallicTextureIndex];
+					Data.RoughnessMetallicIndex = tex.ImageIndex;
+					Data.RoughnessMetallicSamplerIndex = tex.SamplerIndex;
+				}
 				Data.Color = mat.Color;
 				Data.Metallic = mat.Metallic;
 				Data.Roughness = mat.Roughness;

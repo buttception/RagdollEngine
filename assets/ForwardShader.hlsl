@@ -15,8 +15,11 @@ struct InstanceData{
 	float metallic;
 
 	int albedoIndex;
+	int albedoSamplerIndex;
 	int normalIndex;
+	int normalSamplerIndex;
 	int roughnessMetallicIndex;
+	int roughnessMetallicSamplerIndex;
 	int isLit;
 };
 
@@ -52,9 +55,7 @@ void main_vs(
 	outInstanceId = inInstanceId;
 }
 
-sampler albedoSampler : register(s0);
-sampler normalSampler : register(s1);
-sampler RMSampler : register(s2);
+sampler Samplers[9] : register(s0);
 
 void main_ps(
 	in float4 inPos : SV_Position,
@@ -68,24 +69,25 @@ void main_ps(
 	out float4 outColor : SV_Target0
 )
 {
-	if(InstanceDatas[inInstanceId].isLit)
+	InstanceData data = InstanceDatas[inInstanceId];
+	if(data.isLit)
 	{
 		// Sample textures
-		float4 albedo = InstanceDatas[inInstanceId].albedoFactor * inColor;
-		if(InstanceDatas[inInstanceId].albedoIndex != -1){
-			albedo = Textures[InstanceDatas[inInstanceId].albedoIndex].Sample(albedoSampler, inTexcoord) * inColor;
+		float4 albedo = data.albedoFactor * inColor;
+		if(data.albedoIndex != -1){
+			albedo = Textures[data.albedoIndex].Sample(Samplers[data.albedoSamplerIndex], inTexcoord) * inColor;
 		}
-		float4 RM = float4(InstanceDatas[inInstanceId].roughness, InstanceDatas[inInstanceId].metallic, 0, 0);
-		if(InstanceDatas[inInstanceId].roughnessMetallicIndex != -1){
-			RM = Textures[InstanceDatas[inInstanceId].roughnessMetallicIndex].Sample(RMSampler, inTexcoord);
+		float4 RM = float4(data.roughness, data.metallic, 0, 0);
+		if(data.roughnessMetallicIndex != -1){
+			RM = Textures[data.roughnessMetallicIndex].Sample(Samplers[data.roughnessMetallicSamplerIndex], inTexcoord);
 		}
 		float roughness = RM.r;
 		float metallic = RM.g;
 
 		// Sample normal map and transform to world space
 		float3 N = inNormal;
-		if(InstanceDatas[inInstanceId].normalIndex != -1){
-			float3 normalMapValue = normalize(Textures[InstanceDatas[inInstanceId].normalIndex].Sample(normalSampler, inTexcoord).xyz * 2.0f - 1.0f);
+		if(data.normalIndex != -1){
+			float3 normalMapValue = normalize(Textures[data.normalIndex].Sample(Samplers[data.normalSamplerIndex], inTexcoord).xyz * 2.0f - 1.0f);
 			float3x3 TBN = float3x3(inTangent, inBinormal, inNormal);
 			N = normalize(mul(normalMapValue, TBN));
 		}
@@ -101,6 +103,6 @@ void main_ps(
 	}
 	else
 	{
-		outColor = InstanceDatas[inInstanceId].albedoFactor * inColor;
+		outColor = data.albedoFactor * inColor;
 	}
 }
