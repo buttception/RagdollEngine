@@ -16,15 +16,6 @@ struct CBuffer {
 	Vector3 cameraPosition;
 };
 
-struct Vertex {
-	Vector3 position = Vector3::Zero;
-	Vector4 color = Vector4::One;
-	Vector3 normal = Vector3::Zero;
-	Vector3 tangent = Vector3::Zero;
-	Vector3 binormal = Vector3::Zero;
-	Vector2 texcoord = Vector2::Zero;
-};
-
 class ForwardRenderer {
 	//handled at the renderer side
 	nvrhi::BindingLayoutHandle BindingLayoutHandle;

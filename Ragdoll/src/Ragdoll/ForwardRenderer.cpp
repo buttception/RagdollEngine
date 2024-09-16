@@ -149,15 +149,15 @@ void ForwardRenderer::DrawInstanceBuffer(ragdoll::InstanceBuffer* InstanceBuffer
 		.setDepthAttachment(DepthBuffer);
 	nvrhi::FramebufferHandle pipelineFb = Device->m_NvrhiDevice->createFramebuffer(fbDesc);
 
-	const VertexBufferObject& buffer = AssetManager::GetInstance()->VBOs[InstanceBuffer->VertexBufferIndex];
+	const VertexBufferInfo& buffer = AssetManager::GetInstance()->VertexBufferInfos[InstanceBuffer->VertexBufferIndex];
 
 	nvrhi::GraphicsState state;
 	state.pipeline = GraphicsPipeline;
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
-	state.indexBuffer = { buffer.IndexBufferHandle, nvrhi::Format::R32_UINT, 0 };
+	state.indexBuffer = { AssetManager::GetInstance()->IBO, nvrhi::Format::R32_UINT, 0};
 	state.vertexBuffers = {
-		{buffer.VertexBufferHandle}
+		{ AssetManager::GetInstance()->VBO }
 	};
 
 	CommandList->writeBuffer(ConstantBuffer, Cbuf, sizeof(CBuffer));
@@ -169,7 +169,7 @@ void ForwardRenderer::DrawInstanceBuffer(ragdoll::InstanceBuffer* InstanceBuffer
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
 	{
-		bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler(i, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Trilinear_Repeat]));
+		bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler(i, AssetManager::GetInstance()->Samplers[i]));
 	}
 	BindingSetHandle = Device->m_NvrhiDevice->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
@@ -178,7 +178,9 @@ void ForwardRenderer::DrawInstanceBuffer(ragdoll::InstanceBuffer* InstanceBuffer
 	CommandList->setGraphicsState(state);
 
 	nvrhi::DrawArguments args;
-	args.vertexCount = buffer.TriangleCount;
+	args.vertexCount = buffer.IndicesCount;
+	args.startVertexLocation = buffer.VBOffset;
+	args.startIndexLocation = buffer.IBOffset;
 	args.instanceCount = InstanceBuffer->InstanceCount;
 	CommandList->drawIndexed(args);
 }
@@ -429,7 +431,7 @@ void ForwardRenderer::CreateResource()
 			AssetManager::GetInstance()->Images.emplace_back(img);
 			Texture texture;
 			texture.ImageIndex = i;
-			texture.SamplerIndex = 0;
+			texture.SamplerIndex = i;
 			AssetManager::GetInstance()->Textures.emplace_back(texture);
 
 			AddTextureToTable(texHandle);
@@ -484,6 +486,10 @@ void ForwardRenderer::CreateResource()
 			mesh.Submeshes.push_back({ id, i });
 			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 		}
+		CommandList->open();
+		AssetManager::GetInstance()->UpdateVBOIBO(this);
+		CommandList->close();
+		Device->m_NvrhiDevice->executeCommandList(CommandList);
 	}
 
 	const static int32_t seed = 42;

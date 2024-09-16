@@ -20,6 +20,4 @@ private:
 	std::vector<uint32_t> Indices;
 
 	nvrhi::CommandListHandle CommandList;
-
-	int32_t BuildVBO(std::string debugName);
 };

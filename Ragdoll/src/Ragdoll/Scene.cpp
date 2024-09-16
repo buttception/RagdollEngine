@@ -32,9 +32,9 @@ void ragdoll::Scene::Update(float _dt)
 	ImGui::Begin("Spawn");
 	ImGui::Text("Current Geom Count: %d", currentGeomCount);
 	bool test = false;
-	if (ImGui::Button("Spawn 10000 geometry")) {
+	if (ImGui::Button("Spawn 500 geometry")) {
 		test = true;
-		for (int i = 0; i < 10000; ++i) {
+		for (int i = 0; i < 500; ++i) {
 			MICROPROFILE_SCOPEI("Creation", "Entity Create", MP_GREEN);
 			currentGeomCount++;
 			Vector3 pos{

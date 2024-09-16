@@ -79,7 +79,9 @@ int32_t GeometryBuilder::BuildCube(float size)
         Vertices.push_back({ (normal + side1 - side2) * halfExtents, {1.f, 1.f, 1.f, 1.f}, normal, Vector3::Zero, Vector3::Zero, texcoords[3] });
     }
     ReverseWinding(Indices, Vertices);
-    return BuildVBO("Cube");
+
+    uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    return index;
 }
 
 int32_t GeometryBuilder::BuildSphere(float diameter, uint32_t tessellation)
@@ -144,7 +146,9 @@ int32_t GeometryBuilder::BuildSphere(float diameter, uint32_t tessellation)
         }
     }
     ReverseWinding(Indices, Vertices);
-    return BuildVBO("Sphere");
+
+    uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    return index;
 }
 
 Vector3 GetCircleVector(size_t i, size_t tessellation) 
@@ -257,7 +261,9 @@ int32_t GeometryBuilder::BuildCylinder(float height, float diameter, size_t tess
     CreateCylinderCap(Vertices, Indices, tessellation, height, radius, false);
 
     ReverseWinding(Indices, Vertices);
-    return BuildVBO("Cylinder");
+
+    uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    return index;
 }
 
 int32_t GeometryBuilder::BuildCone(float diameter, float height, size_t tessellation)
@@ -306,7 +312,9 @@ int32_t GeometryBuilder::BuildCone(float diameter, float height, size_t tessella
     CreateCylinderCap(Vertices, Indices, tessellation, height, radius, false);
 
     ReverseWinding(Indices, Vertices);
-    return BuildVBO("Cone");
+
+    uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    return index;
 }
 
 int32_t GeometryBuilder::BuildIcosahedron(float size)
@@ -384,43 +392,6 @@ int32_t GeometryBuilder::BuildIcosahedron(float size)
         Vertices.push_back({ position, Vector4::One, normal, Vector3::Zero, Vector3::Zero, {0.f, 1.f} });
     }
 
-    return BuildVBO("Icosahedron");
-}
-
-int32_t GeometryBuilder::BuildVBO(std::string debugName)
-{
-    Mesh mesh;
-    Submesh submesh;
-    //build the vertex and index buffers
-    VertexBufferObject buffer;
-    nvrhi::BufferDesc vertexBufDesc;
-    vertexBufDesc.byteSize = Vertices.size() * sizeof(Vertex);	//the offset is already the size of the vb
-    vertexBufDesc.isVertexBuffer = true;
-    vertexBufDesc.debugName = debugName + " VBO";
-    vertexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;	//set as copy dest to copy over data
-    buffer.VertexBufferHandle = Device->createBuffer(vertexBufDesc);
-    //smth smth syncrhonization need to be this state to be written
-
-    nvrhi::BufferDesc indexBufDesc;
-    indexBufDesc.byteSize = Indices.size() * sizeof(uint32_t);
-    indexBufDesc.isIndexBuffer = true;
-    indexBufDesc.debugName = debugName + " IBO";
-    indexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;
-    buffer.IndexBufferHandle = Device->createBuffer(indexBufDesc);
-
-    CommandList->open();
-    //copy data over
-    CommandList->beginTrackingBufferState(buffer.VertexBufferHandle, nvrhi::ResourceStates::CopyDest);	//i tink this is to update nvrhi resource manager state tracker
-    CommandList->writeBuffer(buffer.VertexBufferHandle, Vertices.data(), vertexBufDesc.byteSize);
-    CommandList->setPermanentBufferState(buffer.VertexBufferHandle, nvrhi::ResourceStates::VertexBuffer);	//now its a vb
-
-    CommandList->beginTrackingBufferState(buffer.IndexBufferHandle, nvrhi::ResourceStates::CopyDest);
-    CommandList->writeBuffer(buffer.IndexBufferHandle, Indices.data(), indexBufDesc.byteSize);
-    CommandList->setPermanentBufferState(buffer.IndexBufferHandle, nvrhi::ResourceStates::IndexBuffer);
-    CommandList->close();
-    Device->executeCommandList(CommandList);
-
-    buffer.TriangleCount = Indices.size();
-    AssetManager::GetInstance()->VBOs.emplace_back(buffer);
-    return AssetManager::GetInstance()->VBOs.size() - 1;
+    uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    return index;
 }

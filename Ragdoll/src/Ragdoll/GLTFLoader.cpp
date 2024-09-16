@@ -127,7 +127,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		for (const tinygltf::Primitive& itPrim : itMesh.primitives) 
 		{
 			Submesh submesh;
-			VertexBufferObject buffer;
+			VertexBufferInfo buffer;
 			std::vector<uint32_t> indices;
 			std::vector<Vertex> vertices;
 
@@ -163,7 +163,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 				RD_CORE_TRACE("Loaded {} indices at byte offest {}", accessor.count, accessor.byteOffset);
 				RD_CORE_TRACE("Largest index is {}", *std::max_element(indices.begin(), indices.end()));
 #endif
-				buffer.TriangleCount = accessor.count;
+				buffer.IndicesCount = accessor.count;
 			}
 
 			//add the relevant data into the map to use
@@ -266,36 +266,10 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 				}
 			}
 
-			//create all the vertex and index buffers
-			//presume command list is open and will be closed and executed later
+			//add to the asset manager vertices
 			{
-				nvrhi::BufferDesc vertexBufDesc;
-				vertexBufDesc.byteSize = vertices.size() * sizeof(Vertex);	//the offset is already the size of the vb
-				vertexBufDesc.isVertexBuffer = true;
-				vertexBufDesc.debugName = itMesh.name + " Vertex Buffer";
-				vertexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;	//set as copy dest to copy over data
-				//smth smth syncrhonization need to be this state to be written
-
-				buffer.VertexBufferHandle = Renderer->Device->m_NvrhiDevice->createBuffer(vertexBufDesc);
-				//copy data over
-				Renderer->CommandList->beginTrackingBufferState(buffer.VertexBufferHandle, nvrhi::ResourceStates::CopyDest);	//i tink this is to update nvrhi resource manager state tracker
-				Renderer->CommandList->writeBuffer(buffer.VertexBufferHandle, vertices.data(), vertexBufDesc.byteSize);
-				Renderer->CommandList->setPermanentBufferState(buffer.VertexBufferHandle, nvrhi::ResourceStates::VertexBuffer);	//now its a vb
-
-				nvrhi::BufferDesc indexBufDesc;
-				indexBufDesc.byteSize = indices.size() * sizeof(uint32_t);
-				indexBufDesc.isIndexBuffer = true;
-				indexBufDesc.debugName = itMesh.name + " Index Buffer";
-				indexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;
-
-				buffer.IndexBufferHandle = Renderer->Device->m_NvrhiDevice->createBuffer(indexBufDesc);
-				Renderer->CommandList->beginTrackingBufferState(buffer.IndexBufferHandle, nvrhi::ResourceStates::CopyDest);
-				Renderer->CommandList->writeBuffer(buffer.IndexBufferHandle, indices.data(), indexBufDesc.byteSize);
-				Renderer->CommandList->setPermanentBufferState(buffer.IndexBufferHandle, nvrhi::ResourceStates::IndexBuffer);
-
-				submesh.VertexBufferIndex = AssetManager::GetInstance()->VBOs.size();
+				submesh.VertexBufferIndex = AssetManager::GetInstance()->AddVertices(vertices, indices);
 				mesh.Submeshes.emplace_back(submesh);
-				AssetManager::GetInstance()->VBOs.emplace_back(buffer);
 			}
 		}
 #if 0
@@ -311,6 +285,8 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 #endif
 		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
+	//create the buffers
+	AssetManager::GetInstance()->UpdateVBOIBO(Renderer);
 	//load the images
 	std::unordered_map<int32_t, int32_t> gltfSourceToImageIndex{};
 	for(int i = 0; i < model.images.size(); ++i)
