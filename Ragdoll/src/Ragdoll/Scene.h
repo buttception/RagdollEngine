@@ -53,6 +53,7 @@ namespace ragdoll {
 		//the root details
 		Guid m_RootEntity;
 		Guid m_RootSibling;
+		Guid m_FurthestSibling;	//cache for better performance
 		//state
 		bool m_DirtyOnwards{ false };
 

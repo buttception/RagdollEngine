@@ -7,6 +7,7 @@
 #include "AssetManager.h"
 #include "DirectXDevice.h"
 #include "nvrhi/utils.h"
+#include "microprofile.h"
 
 ragdoll::Scene::Scene(Application* app)
 {
@@ -30,8 +31,11 @@ void ragdoll::Scene::Update(float _dt)
 
 	ImGui::Begin("Spawn");
 	ImGui::Text("Current Geom Count: %d", currentGeomCount);
-	if (ImGui::Button("Spawn 100 geometry")) {
-		for (int i = 0; i < 100; ++i) {
+	bool test = false;
+	if (ImGui::Button("Spawn 10000 geometry")) {
+		test = true;
+		for (int i = 0; i < 10000; ++i) {
+			MICROPROFILE_SCOPEI("Creation", "Entity Create", MP_GREEN);
 			currentGeomCount++;
 			Vector3 pos{
 				t_min.x + (std::rand() / (float)RAND_MAX) * t_range.x,
@@ -43,17 +47,33 @@ void ragdoll::Scene::Update(float _dt)
 				s_min.y + (std::rand() / (float)RAND_MAX) * s_range.y,
 				s_min.z + (std::rand() / (float)RAND_MAX) * s_range.z,
 			};
-			entt::entity ent = EntityManager->CreateEntity();
-			auto tcomp = EntityManager->AddComponent<TransformComp>(ent);
-			tcomp->m_LocalPosition = pos;
-			tcomp->m_LocalScale = scale;
-			AddEntityAtRootLevel(EntityManager->GetGuid(ent));
-			auto rcomp = EntityManager->AddComponent<RenderableComp>(ent);
-			rcomp->meshIndex = std::rand() / (float)RAND_MAX * 25;
+			entt::entity ent;
+			{
+				MICROPROFILE_SCOPEI("Creation", "Creating Entity", MP_DARKGREEN);
+				ent = EntityManager->CreateEntity();
+			}
+			{
+				MICROPROFILE_SCOPEI("Creation", "Setting Transform", MP_GREENYELLOW);
+				auto tcomp = EntityManager->AddComponent<TransformComp>(ent);
+				tcomp->m_LocalPosition = pos;
+				tcomp->m_LocalScale = scale;
+				{
+					MICROPROFILE_SCOPEI("Creation", "Adding at Root", MP_DARKOLIVEGREEN);
+					AddEntityAtRootLevel(EntityManager->GetGuid(ent));
+				}
+			}
+			{
+				MICROPROFILE_SCOPEI("Creation", "Setting Renderable", MP_FORESTGREEN);
+				auto rcomp = EntityManager->AddComponent<RenderableComp>(ent);
+				rcomp->meshIndex = std::rand() / (float)RAND_MAX * 25;
+			}
 		}
+		MICROPROFILE_SCOPEI("Creation", "Entity Update", MP_DARKSEAGREEN);
 		UpdateTransforms();
 		BuildStaticInstances();
 	}
+	if(test)
+		MicroProfileDumpFileImmediately("test.html", nullptr, nullptr);
 	ImGui::End();
 
 	ImguiInterface.Render();
@@ -70,25 +90,22 @@ void ragdoll::Scene::UpdateTransforms()
 	TraverseTreeAndUpdateTransforms();
 }
 
-void AddNodeToFurthestSibling(ragdoll::Guid sibling, ragdoll::Guid node, std::shared_ptr<ragdoll::EntityManager> em)
-{
-	TransformComp* trans = em->GetComponent<TransformComp>(sibling);
-	while (trans->m_Sibling.m_RawId != 0)
-	{
-		trans = em->GetComponent<TransformComp>(trans->m_Sibling);
-	}
-	trans->m_Sibling = node;
-}
-
 void ragdoll::Scene::AddEntityAtRootLevel(Guid entityId)
 {
 	if (m_RootEntity.m_RawId == 0)
 		m_RootEntity = entityId;
 	else {
 		if (m_RootSibling.m_RawId == 0)
+		{
 			m_RootSibling = entityId;
+			m_FurthestSibling = entityId;
+		}
 		else
-			AddNodeToFurthestSibling(m_RootSibling, entityId, EntityManager);
+		{
+			TransformComp* furthestTrans = EntityManager->GetComponent<TransformComp>(m_FurthestSibling);
+			furthestTrans->m_Sibling = entityId;
+			m_FurthestSibling = entityId;
+		}
 	}
 }
 
