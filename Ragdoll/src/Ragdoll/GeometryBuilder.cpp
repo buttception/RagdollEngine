@@ -80,6 +80,30 @@ int32_t GeometryBuilder::BuildCube(float size)
     }
     ReverseWinding(Indices, Vertices);
 
+    //generate the tangents and binormals
+    for (size_t i = 0; i < Indices.size(); i += 3) {
+        Vertex& v0 = Vertices[Indices[i]];
+        Vertex& v1 = Vertices[Indices[i + 1]];
+        Vertex& v2 = Vertices[Indices[i + 2]];
+
+        Vector3 edge1 = v1.position - v0.position;
+        Vector3 edge2 = v2.position - v0.position;
+
+        Vector2 deltaUV1 = v1.texcoord - v0.texcoord;
+        Vector2 deltaUV2 = v2.texcoord - v0.texcoord;
+
+        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        Vector3 tangent;
+        tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+        // Normalize and store tangent
+        tangent.Normalize();
+        v0.tangent = v1.tangent = v2.tangent = tangent;
+    }
+
     uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
     return index;
 }
@@ -146,6 +170,30 @@ int32_t GeometryBuilder::BuildSphere(float diameter, uint32_t tessellation)
         }
     }
     ReverseWinding(Indices, Vertices);
+
+    //generate the tangents and binormals
+    for (size_t i = 0; i < Indices.size(); i += 3) {
+        Vertex& v0 = Vertices[Indices[i]];
+        Vertex& v1 = Vertices[Indices[i + 1]];
+        Vertex& v2 = Vertices[Indices[i + 2]];
+
+        Vector3 edge1 = v1.position - v0.position;
+        Vector3 edge2 = v2.position - v0.position;
+
+        Vector2 deltaUV1 = v1.texcoord - v0.texcoord;
+        Vector2 deltaUV2 = v2.texcoord - v0.texcoord;
+
+        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        Vector3 tangent;
+        tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+        // Normalize and store tangent
+        tangent.Normalize();
+        v0.tangent = v1.tangent = v2.tangent = tangent;
+    }
 
     uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
     return index;
@@ -262,6 +310,30 @@ int32_t GeometryBuilder::BuildCylinder(float height, float diameter, size_t tess
 
     ReverseWinding(Indices, Vertices);
 
+    //generate the tangents and binormals
+    for (size_t i = 0; i < Indices.size(); i += 3) {
+        Vertex& v0 = Vertices[Indices[i]];
+        Vertex& v1 = Vertices[Indices[i + 1]];
+        Vertex& v2 = Vertices[Indices[i + 2]];
+
+        Vector3 edge1 = v1.position - v0.position;
+        Vector3 edge2 = v2.position - v0.position;
+
+        Vector2 deltaUV1 = v1.texcoord - v0.texcoord;
+        Vector2 deltaUV2 = v2.texcoord - v0.texcoord;
+
+        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        Vector3 tangent;
+        tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+        // Normalize and store tangent
+        tangent.Normalize();
+        v0.tangent = v1.tangent = v2.tangent = tangent;
+    }
+
     uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
     return index;
 }
@@ -312,6 +384,30 @@ int32_t GeometryBuilder::BuildCone(float diameter, float height, size_t tessella
     CreateCylinderCap(Vertices, Indices, tessellation, height, radius, false);
 
     ReverseWinding(Indices, Vertices);
+
+    //generate the tangents and binormals
+    for (size_t i = 0; i < Indices.size(); i += 3) {
+        Vertex& v0 = Vertices[Indices[i]];
+        Vertex& v1 = Vertices[Indices[i + 1]];
+        Vertex& v2 = Vertices[Indices[i + 2]];
+
+        Vector3 edge1 = v1.position - v0.position;
+        Vector3 edge2 = v2.position - v0.position;
+
+        Vector2 deltaUV1 = v1.texcoord - v0.texcoord;
+        Vector2 deltaUV2 = v2.texcoord - v0.texcoord;
+
+        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        Vector3 tangent;
+        tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+        // Normalize and store tangent
+        tangent.Normalize();
+        v0.tangent = v1.tangent = v2.tangent = tangent;
+    }
 
     uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
     return index;
@@ -390,6 +486,30 @@ int32_t GeometryBuilder::BuildIcosahedron(float size)
 
         position = XMVectorScale(verts[v2], size);
         Vertices.push_back({ position, normal, Vector3::Zero, {0.f, 1.f} });
+    }
+
+    //generate the tangents and binormals
+    for (size_t i = 0; i < Indices.size(); i += 3) {
+        Vertex& v0 = Vertices[Indices[i]];
+        Vertex& v1 = Vertices[Indices[i + 1]];
+        Vertex& v2 = Vertices[Indices[i + 2]];
+
+        Vector3 edge1 = v1.position - v0.position;
+        Vector3 edge2 = v2.position - v0.position;
+
+        Vector2 deltaUV1 = v1.texcoord - v0.texcoord;
+        Vector2 deltaUV2 = v2.texcoord - v0.texcoord;
+
+        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        Vector3 tangent;
+        tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+        // Normalize and store tangent
+        tangent.Normalize();
+        v0.tangent = v1.tangent = v2.tangent = tangent;
     }
 
     uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);

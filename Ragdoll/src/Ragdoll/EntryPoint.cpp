@@ -48,10 +48,12 @@ int main(int argc, char* argv[])
 	cxxopts::Options options("Ragdoll Renderer", "Custom renderer using nvrhi for D3D12");
 	options.add_options()
 		("c,custom", "Create custom meshes") // a bool parameter
+		("s,scene", "glTF scene to load", cxxopts::value<std::string>())
 		;
 	auto result = options.parse(argc, argv);
 	ragdoll::Application::ApplicationConfig config;
-	config.bCreateCustomMeshes = result["custom"].as<bool>();
+	config.bCreateCustomMeshes = result["custom"].as_optional<bool>().value_or(false);
+	config.glTFSceneToLoad = result["scene"].as_optional<std::string>().value_or("");
 
 	app->Init(config);
 	app->Run();

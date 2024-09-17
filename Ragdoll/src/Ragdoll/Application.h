@@ -55,6 +55,7 @@ namespace ragdoll
 	public:
 		struct ApplicationConfig
 		{
+			std::string glTFSceneToLoad;
 			bool bCreateCustomMeshes{ false };
 		};
 

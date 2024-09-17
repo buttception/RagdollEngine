@@ -24,8 +24,8 @@ ragdoll::Scene::Scene(Application* app)
 void ragdoll::Scene::Update(float _dt)
 {
 	ImguiInterface.BeginFrame();
-	Renderer.BeginFrame(&CBuffer);
-	Renderer.DrawAllInstances(&StaticInstanceBuffers, &CBuffer);
+	Renderer.BeginFrame(CBuffer);
+	Renderer.DrawAllInstances(StaticInstanceBufferHandle, StaticInstanceGroupInfos, CBuffer);
 
 	//spawn more shits temp
 	const static Vector3 t_range{ 10.f, 10.f, 10.f };
@@ -52,6 +52,11 @@ void ragdoll::Scene::Update(float _dt)
 					s_min.y + (std::rand() / (float)RAND_MAX) * s_range.y,
 					s_min.z + (std::rand() / (float)RAND_MAX) * s_range.z,
 				};
+				Vector3 eulerRotate{
+					std::rand() / (float)RAND_MAX * DirectX::XM_2PI,
+					std::rand() / (float)RAND_MAX * DirectX::XM_2PI,
+					std::rand() / (float)RAND_MAX * DirectX::XM_2PI
+				};
 				entt::entity ent;
 				{
 					MICROPROFILE_SCOPEI("Creation", "Creating Entity", MP_DARKGREEN);
@@ -62,6 +67,7 @@ void ragdoll::Scene::Update(float _dt)
 					auto tcomp = EntityManager->AddComponent<TransformComp>(ent);
 					tcomp->m_LocalPosition = pos;
 					tcomp->m_LocalScale = scale;
+					tcomp->m_LocalRotation = Quaternion::CreateFromYawPitchRoll(eulerRotate.y, eulerRotate.x, eulerRotate.z);
 					{
 						MICROPROFILE_SCOPEI("Creation", "Adding at Root", MP_DARKOLIVEGREEN);
 						AddEntityAtRootLevel(EntityManager->GetGuid(ent));
@@ -134,6 +140,8 @@ void ragdoll::Scene::BuildStaticInstances()
 			Proxies.push_back(Proxy);
 		}
 	}
+	if(Proxies.empty())
+		return;
 	//sort the proxies
 	std::sort(Proxies.begin(), Proxies.end(), [](const Proxy& lhs, const Proxy& rhs) {
 		return lhs.BufferIndex < rhs.BufferIndex;
@@ -142,39 +150,22 @@ void ragdoll::Scene::BuildStaticInstances()
 	int32_t CurrBufferIndex{ -1 }, Start{ 0 };
 	if (Proxies.size() != 0)
 		CurrBufferIndex = Proxies[0].BufferIndex;
-	Renderer.CommandList->open();
+	//clear the old information
+	StaticInstanceGroupInfos.clear();
+	StaticInstanceDatas.clear();
+
 	for (int i = 0; i < Proxies.size(); ++i) {
 		//iterate till i get a different buffer id, meaning is a diff mesh
 		if (Proxies[i].BufferIndex != CurrBufferIndex || i == Proxies.size() - 1)
 		{
-			//search to see if the instance buffer already exist
-			int32_t InstanceBufferId = -1;
-			for (int j = 0; j < StaticInstanceBuffers.size(); ++j) {
-				if (StaticInstanceBuffers[j].VertexBufferIndex == CurrBufferIndex) {
-					InstanceBufferId = j;
-					break;
-				}
-			}
-			InstanceBuffer* BufferPtr;
-			InstanceBuffer Buffer;
-			if (InstanceBufferId != -1)
-				BufferPtr = &StaticInstanceBuffers[InstanceBufferId];
-			else
-			{
-				BufferPtr = &Buffer;
-				BufferPtr->VertexBufferIndex = CurrBufferIndex;
-			}
-
-			//specify how big the instance data buffer size should be
-			while (i - Start > BufferPtr->CurrentCapacity) {
-				BufferPtr->CurrentCapacity *= 2;
-			}
-			BufferPtr->Data.resize(BufferPtr->CurrentCapacity);
-			BufferPtr->MaterialIndices.push_back(Proxies[i].MaterialIndex);	//temp
-			BufferPtr->InstanceCount = 0;
-
 			if (i == 0)
 				i = 1;
+			//add this as instance group
+			InstanceGroupInfo info;
+			info.InstanceCount = i - Start;
+			info.InstanceOffset = StaticInstanceDatas.size();
+			info.VertexBufferIndex = CurrBufferIndex;
+			StaticInstanceGroupInfos.emplace_back(info);
 			//populate the buffer data vector
 			for (int j = Start; j < i; ++j) {	//maybe should do in outer loop, then gather all the materials too
 				TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)Proxies[j].EnttId);
@@ -206,31 +197,30 @@ void ragdoll::Scene::BuildStaticInstances()
 				Data.bIsLit = mat.bIsLit;
 				Data.ModelToWorld = tComp->m_ModelToWorld;
 				Data.InvModelToWorld = tComp->m_ModelToWorld.Invert();
-				BufferPtr->Data[BufferPtr->InstanceCount++] = Data;
+				StaticInstanceDatas.emplace_back(Data);
 			}
-			//create the instance buffer handle, need to resize if got new stuff anyways
-			nvrhi::BufferDesc InstanceBufferDesc;
-			InstanceBufferDesc.byteSize = sizeof(InstanceData) * BufferPtr->CurrentCapacity;
-			InstanceBufferDesc.debugName = "Instance Buffer " + std::to_string(CurrBufferIndex);
-			InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
-			InstanceBufferDesc.structStride = sizeof(InstanceData);
-			BufferPtr->BufferHandle = Renderer.Device->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
-			if (InstanceBufferId == -1)
-				StaticInstanceBuffers.emplace_back(*BufferPtr);
-			//emplace if is a new buffer, otherwise do nothing
-
-			//copy data over
-			Renderer.CommandList->beginTrackingBufferState(BufferPtr->BufferHandle, nvrhi::ResourceStates::CopyDest);
-			Renderer.CommandList->writeBuffer(BufferPtr->BufferHandle, BufferPtr->Data.data(), sizeof(InstanceData) * BufferPtr->InstanceCount);
-			Renderer.CommandList->setPermanentBufferState(BufferPtr->BufferHandle, nvrhi::ResourceStates::ShaderResource);
-
 			if(i < Proxies.size())
 				CurrBufferIndex = Proxies[i].BufferIndex;
 			Start = i;
 		}
 	}
-	Renderer.CommandList->close();
-	Renderer.Device->m_NvrhiDevice->executeCommandList(Renderer.CommandList);
+	{
+		//create the instance buffer handle
+		nvrhi::BufferDesc InstanceBufferDesc;
+		InstanceBufferDesc.byteSize = sizeof(InstanceData) * StaticInstanceDatas.size();
+		InstanceBufferDesc.debugName = "Global instance buffer";
+		InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
+		InstanceBufferDesc.structStride = sizeof(InstanceData);
+		StaticInstanceBufferHandle = Renderer.Device->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
+
+		//copy data over
+		Renderer.CommandList->open();
+		Renderer.CommandList->beginTrackingBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::CopyDest);
+		Renderer.CommandList->writeBuffer(StaticInstanceBufferHandle, StaticInstanceDatas.data(), sizeof(InstanceData) * StaticInstanceDatas.size());
+		Renderer.CommandList->setPermanentBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::ShaderResource);
+		Renderer.CommandList->close();
+		Renderer.Device->m_NvrhiDevice->executeCommandList(Renderer.CommandList);
+	}
 }
 
 void PrintRecursive(ragdoll::Guid id, int level, std::shared_ptr<ragdoll::EntityManager> em)

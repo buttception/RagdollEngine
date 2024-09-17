@@ -35,16 +35,10 @@ namespace ragdoll {
 		int bIsLit = 1;
 	};
 
-	struct InstanceBuffer {
-		nvrhi::BufferHandle BufferHandle;
-		uint32_t CurrentCapacity = StartCapacity;
+	struct InstanceGroupInfo {
+		uint32_t InstanceOffset = 0;
 		uint32_t InstanceCount = 0;
-		std::vector<InstanceData> Data;
-
 		int32_t VertexBufferIndex;
-		std::vector<int32_t> MaterialIndices;
-		
-		static const uint32_t StartCapacity = 64;
 	};
 
 	struct SceneConfig {
@@ -67,8 +61,9 @@ namespace ragdoll {
 		//Rendering
 		CBuffer CBuffer;
 		std::vector<Proxy> Proxies;
-		bool bIsStaticProxiesBuilt{ false };
-		std::vector<InstanceBuffer> StaticInstanceBuffers;
+		std::vector<InstanceData> StaticInstanceDatas;
+		std::vector<InstanceGroupInfo> StaticInstanceGroupInfos;
+		nvrhi::BufferHandle StaticInstanceBufferHandle;
 
 	public:
 		ForwardRenderer Renderer;

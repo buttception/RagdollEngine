@@ -139,7 +139,7 @@ int32_t ForwardRenderer::AddTextureToTable(nvrhi::TextureHandle tex)
 	return TextureCount - 1;
 }
 
-void ForwardRenderer::BeginFrame(CBuffer* Cbuf)
+void ForwardRenderer::BeginFrame(CBuffer& Cbuf)
 {
 	MICROPROFILE_SCOPEI("Render", "Begin Frame", MP_BLUE);
 	Device->BeginFrame();
@@ -150,8 +150,10 @@ void ForwardRenderer::BeginFrame(CBuffer* Cbuf)
 		auto bgCol = PrimaryWindow->GetBackgroundColor();
 		nvrhi::Color col = nvrhi::Color(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
 		CommandList->open();
+		CommandList->beginMarker("ClearBackBuffer");
 		CommandList->clearTextureFloat(tex, subSet, col);
 		CommandList->clearDepthStencilTexture(DepthBuffer, subSet, true, 1.f, false, 0);
+		CommandList->endMarker();
 		CommandList->close();
 		Device->m_NvrhiDevice->executeCommandList(CommandList);
 	}
@@ -195,17 +197,17 @@ void ForwardRenderer::BeginFrame(CBuffer* Cbuf)
 	Matrix proj = Matrix::CreatePerspectiveFieldOfView(DirectX::XMConvertToRadians(data.cameraFov), data.cameraAspect, data.cameraNear, data.cameraFar);
 	Vector3 cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
 	Matrix view = Matrix::CreateLookAt(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
-	Cbuf->viewProj = view * proj;
-	Cbuf->sceneAmbientColor = data.ambientLight;
-	Cbuf->lightDiffuseColor = data.dirLightColor;
+	Cbuf.viewProj = view * proj;
+	Cbuf.sceneAmbientColor = data.ambientLight;
+	Cbuf.lightDiffuseColor = data.dirLightColor;
 	Vector2 azimuthElevationRad = {
 		DirectX::XMConvertToRadians(data.azimuthAndElevation.x),
 		DirectX::XMConvertToRadians(data.azimuthAndElevation.y) };
-	Cbuf->lightDirection = Vector3(
+	Cbuf.lightDirection = Vector3(
 		sinf(azimuthElevationRad.y) * cosf(azimuthElevationRad.x),
 		cosf(azimuthElevationRad.y) * cosf(azimuthElevationRad.x),
 		sinf(azimuthElevationRad.x));
-	Cbuf->cameraPosition = data.cameraPos;
+	Cbuf.cameraPosition = data.cameraPos;
 
 	//hardcoded handling of movement now
 	if (!ImGui::IsAnyItemFocused() && !ImGui::IsAnyItemActive()) {
@@ -225,45 +227,24 @@ void ForwardRenderer::BeginFrame(CBuffer* Cbuf)
 			data.cameraPitch += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindow->GetFrameTime();
 		}
 	}
-	Cbuf->lightDiffuseColor = data.dirLightColor;
+	Cbuf.lightDiffuseColor = data.dirLightColor;
 }
 
-void ForwardRenderer::DrawAllInstances(std::vector<ragdoll::InstanceBuffer>* InstanceBuffers, CBuffer* Cbuf)
+void ForwardRenderer::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, CBuffer& Cbuf)
 {
+	if (infos.empty())
+		return;
 	MICROPROFILE_SCOPEI("Render", "Draw All Instances", MP_BLUEVIOLET);
-	CommandList->open();
-	for (auto& it : *InstanceBuffers)
-		DrawInstanceBuffer(&it, Cbuf);
-
-	CommandList->close();
-	Device->m_NvrhiDevice->executeCommandList(CommandList);
-}
-
-void ForwardRenderer::DrawInstanceBuffer(ragdoll::InstanceBuffer* InstanceBuffer, CBuffer* Cbuf)
-{
-	MICROPROFILE_SCOPEI("Render", "Instance draw", MP_ALICEBLUE);
+	//create and set the state
 	auto fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(Device->GetCurrentBackbuffer())
 		.setDepthAttachment(DepthBuffer);
 	nvrhi::FramebufferHandle pipelineFb = Device->m_NvrhiDevice->createFramebuffer(fbDesc);
 
-	const VertexBufferInfo& buffer = AssetManager::GetInstance()->VertexBufferInfos[InstanceBuffer->VertexBufferIndex];
-
-	nvrhi::GraphicsState state;
-	state.pipeline = GraphicsPipeline;
-	state.framebuffer = pipelineFb;
-	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
-	state.indexBuffer = { AssetManager::GetInstance()->IBO, nvrhi::Format::R32_UINT, 0};
-	state.vertexBuffers = {
-		{ AssetManager::GetInstance()->VBO }
-	};
-
-	CommandList->writeBuffer(ConstantBuffer, Cbuf, sizeof(CBuffer));
-
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, InstanceBuffer->BufferHandle),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, instanceBuffer),
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
 	{
@@ -271,16 +252,38 @@ void ForwardRenderer::DrawInstanceBuffer(ragdoll::InstanceBuffer* InstanceBuffer
 	}
 	BindingSetHandle = Device->m_NvrhiDevice->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
+	nvrhi::GraphicsState state;
+	state.pipeline = GraphicsPipeline;
+	state.framebuffer = pipelineFb;
+	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
+	state.indexBuffer = { AssetManager::GetInstance()->IBO, nvrhi::Format::R32_UINT, 0 };
+	state.vertexBuffers = {
+		{ AssetManager::GetInstance()->VBO }
+	};
 	state.addBindingSet(BindingSetHandle);
 	state.addBindingSet(DescriptorTable);
+
+	CommandList->open();
+	CommandList->beginMarker("Instance Draws");
+	CommandList->writeBuffer(ConstantBuffer, &Cbuf, sizeof(CBuffer));
 	CommandList->setGraphicsState(state);
 
-	nvrhi::DrawArguments args;
-	args.vertexCount = buffer.IndicesCount;
-	args.startVertexLocation = buffer.VBOffset;
-	args.startIndexLocation = buffer.IBOffset;
-	args.instanceCount = InstanceBuffer->InstanceCount;
-	CommandList->drawIndexed(args);
+	for (const ragdoll::InstanceGroupInfo& info : infos)
+	{
+		const VertexBufferInfo& buffer = AssetManager::GetInstance()->VertexBufferInfos[info.VertexBufferIndex];
+		nvrhi::DrawArguments args;
+		args.vertexCount = buffer.IndicesCount;
+		args.startVertexLocation = buffer.VBOffset;
+		args.startIndexLocation = buffer.IBOffset;
+		args.instanceCount = info.InstanceCount;
+		Cbuf.instanceOffset = info.InstanceOffset;
+		CommandList->writeBuffer(ConstantBuffer, &Cbuf, sizeof(CBuffer));
+		CommandList->drawIndexed(args);
+	}
+
+	CommandList->endMarker();
+	CommandList->close();
+	Device->m_NvrhiDevice->executeCommandList(CommandList);
 }
 
 void ForwardRenderer::CreateResource()

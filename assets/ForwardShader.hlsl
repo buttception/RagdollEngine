@@ -3,6 +3,7 @@ cbuffer g_Const : register(b0) {
 	float4 lightDiffuseColor;
 	float4 sceneAmbientColor;
 	float3 lightDirection;
+	int instanceOffset;
 	float3 cameraPosition;
 };
 
@@ -41,11 +42,12 @@ void main_vs(
 	out nointerpolation uint outInstanceId : TEXCOORD6
 )
 {
-	outFragPos = mul(float4(inPos, 1), InstanceDatas[inInstanceId].worldMatrix); 
+	InstanceData data = InstanceDatas[inInstanceId + instanceOffset];
+	outFragPos = mul(float4(inPos, 1), data.worldMatrix); 
 	outPos = mul(outFragPos, viewProjMatrix);
 
-	outNormal = normalize(mul(inNormal, transpose((float3x3)InstanceDatas[inInstanceId].invWorldMatrix)));
-	outTangent = normalize(mul(inTangent, transpose((float3x3)InstanceDatas[inInstanceId].invWorldMatrix)));
+	outNormal = normalize(mul(inNormal, transpose((float3x3)data.invWorldMatrix)));
+	outTangent = normalize(mul(inTangent, transpose((float3x3)data.invWorldMatrix)));
 	outBinormal = normalize(cross(outTangent, outNormal));
 	outTexcoord = inTexcoord;
 	outInstanceId = inInstanceId;
@@ -64,7 +66,7 @@ void main_ps(
 	out float4 outColor : SV_Target0
 )
 {
-	InstanceData data = InstanceDatas[inInstanceId];
+	InstanceData data = InstanceDatas[inInstanceId + instanceOffset];
 	if(data.isLit)
 	{
 		// Sample textures

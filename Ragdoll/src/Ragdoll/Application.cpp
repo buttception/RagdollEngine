@@ -94,11 +94,11 @@ namespace ragdoll
 
 		MICROPROFILE_TIMELINE_ENTER_STATIC(MP_DARKGOLDENROD, "GLTF Load");
 		{
-			if (true)
+			if (!Config.glTFSceneToLoad.empty())
 			{
 				GLTFLoader loader;
 				loader.Init(m_FileManager->GetRoot(), &m_Scene->Renderer, m_FileManager, m_EntityManager, m_Scene);
-				std::string sceneName{ "Sponza" };
+				std::string sceneName = Config.glTFSceneToLoad;
 				std::filesystem::path fp = "gltf/2.0/";
 				fp = fp / sceneName / "glTF" / (sceneName + ".gltf");
 				loader.LoadAndCreateModel(fp.string());
