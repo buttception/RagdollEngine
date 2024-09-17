@@ -81,8 +81,11 @@ void ragdoll::Scene::Update(float _dt)
 			}
 			{
 				MICROPROFILE_SCOPEI("Creation", "Entity Update", MP_DARKSEAGREEN);
-				UpdateTransforms();
-				BuildStaticInstances();
+				PopulateStaticProxies();	//create all the proxies to iterate
+				UpdateTransforms();	//update all the dirty transforms
+				UpdateStaticProxies();	//update all the bounding box in the proxies
+				ResetTransformDirtyFlags();	//reset the dirty flags
+				BuildStaticInstances();	//build the instance buffer
 			}
 			MicroProfileDumpFileImmediately("test.html", nullptr, nullptr);
 		}
@@ -104,6 +107,15 @@ void ragdoll::Scene::UpdateTransforms()
 	TraverseTreeAndUpdateTransforms();
 }
 
+void ragdoll::Scene::ResetTransformDirtyFlags()
+{
+	auto EcsView = EntityManager->GetRegistry().view<TransformComp>();
+	for (const entt::entity& ent : EcsView) {
+		TransformComp* comp = EntityManager->GetComponent<TransformComp>(ent);
+		comp->m_Dirty = false;
+	}
+}
+
 void ragdoll::Scene::AddEntityAtRootLevel(Guid entityId)
 {
 	if (m_RootEntity.m_RawId == 0)
@@ -123,7 +135,7 @@ void ragdoll::Scene::AddEntityAtRootLevel(Guid entityId)
 	}
 }
 
-void ragdoll::Scene::BuildStaticInstances()
+void ragdoll::Scene::PopulateStaticProxies()
 {
 	//iterate through all the transforms and renderable
 	auto EcsView = EntityManager->GetRegistry().view<RenderableComp, TransformComp>();
@@ -137,42 +149,73 @@ void ragdoll::Scene::BuildStaticInstances()
 			//temp only first submesh now
 			Proxy.BufferIndex = submesh.VertexBufferIndex;
 			Proxy.MaterialIndex = submesh.MaterialIndex;
-			Proxies.push_back(Proxy);
+			//bounding box will be empty for now
+			StaticProxies.push_back(Proxy);
 		}
 	}
-	if(Proxies.empty())
+}
+
+void ragdoll::Scene::UpdateStaticProxies()
+{
+	for (Proxy& proxy : StaticProxies)
+	{
+		//update all the bounding boxes of the static proxies
+		TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)proxy.EnttId);
+		proxy.BoundingBox = AssetManager::GetInstance()->VertexBufferInfos[proxy.BufferIndex].BestFitBox;
+		proxy.BoundingBox.Center.x += tComp->m_ModelToWorld.m[0][3];
+		proxy.BoundingBox.Center.y += tComp->m_ModelToWorld.m[1][3];
+		proxy.BoundingBox.Center.z += tComp->m_ModelToWorld.m[2][3];
+
+		//transforming the axis aligned vector instead
+		Vector3 E = proxy.BoundingBox.Extents;
+		proxy.BoundingBox.Extents.x =
+			E.x * abs(tComp->m_ModelToWorld.m[0][0]) *
+			E.y * abs(tComp->m_ModelToWorld.m[0][1]) *
+			E.z * abs(tComp->m_ModelToWorld.m[0][2]);
+		proxy.BoundingBox.Extents.y =
+			E.x * abs(tComp->m_ModelToWorld.m[1][0]) *
+			E.y * abs(tComp->m_ModelToWorld.m[1][1]) *
+			E.z * abs(tComp->m_ModelToWorld.m[1][2]);
+		proxy.BoundingBox.Extents.z =
+			E.x * abs(tComp->m_ModelToWorld.m[2][0]) *
+			E.y * abs(tComp->m_ModelToWorld.m[2][1]) *
+			E.z * abs(tComp->m_ModelToWorld.m[2][2]);
+	}
+}
+
+void ragdoll::Scene::BuildStaticInstances()
+{
+	if(StaticProxies.empty())
 		return;
 	//sort the proxies
-	std::sort(Proxies.begin(), Proxies.end(), [](const Proxy& lhs, const Proxy& rhs) {
+	std::sort(StaticProxies.begin(), StaticProxies.end(), [](const Proxy& lhs, const Proxy& rhs) {
 		return lhs.BufferIndex < rhs.BufferIndex;
 		});
 	//build the structured buffer
 	int32_t CurrBufferIndex{ -1 }, Start{ 0 };
-	if (Proxies.size() != 0)
-		CurrBufferIndex = Proxies[0].BufferIndex;
+	if (StaticProxies.size() != 0)
+		CurrBufferIndex = StaticProxies[0].BufferIndex;
 	//clear the old information
 	StaticInstanceGroupInfos.clear();
 	StaticInstanceDatas.clear();
 
-	for (int i = 0; i < Proxies.size(); ++i) {
+	for (int i = 0; i < StaticProxies.size(); ++i) {
 		//iterate till i get a different buffer id, meaning is a diff mesh
-		if (Proxies[i].BufferIndex != CurrBufferIndex || i == Proxies.size() - 1)
+		if (StaticProxies[i].BufferIndex != CurrBufferIndex || i == StaticProxies.size() - 1)
 		{
 			if (i == 0)
 				i = 1;
 			//add this as instance group
 			InstanceGroupInfo info;
-			info.InstanceCount = i - Start;
 			info.InstanceOffset = StaticInstanceDatas.size();
 			info.VertexBufferIndex = CurrBufferIndex;
-			StaticInstanceGroupInfos.emplace_back(info);
 			//populate the buffer data vector
 			for (int j = Start; j < i; ++j) {	//maybe should do in outer loop, then gather all the materials too
-				TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)Proxies[j].EnttId);
-				RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>((entt::entity)Proxies[j].EnttId);
+				TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)StaticProxies[j].EnttId);
+				RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>((entt::entity)StaticProxies[j].EnttId);
 				InstanceData Data;
 
-				const Material& mat = AssetManager::GetInstance()->Materials[Proxies[j].MaterialIndex];
+				const Material& mat = AssetManager::GetInstance()->Materials[StaticProxies[j].MaterialIndex];
 				if(mat.AlbedoTextureIndex != -1)
 				{
 					const Texture& tex = AssetManager::GetInstance()->Textures[mat.AlbedoTextureIndex];
@@ -198,9 +241,11 @@ void ragdoll::Scene::BuildStaticInstances()
 				Data.ModelToWorld = tComp->m_ModelToWorld;
 				Data.InvModelToWorld = tComp->m_ModelToWorld.Invert();
 				StaticInstanceDatas.emplace_back(Data);
+				info.InstanceCount++;
 			}
-			if(i < Proxies.size())
-				CurrBufferIndex = Proxies[i].BufferIndex;
+			StaticInstanceGroupInfos.emplace_back(info);
+			if(i < StaticProxies.size())
+				CurrBufferIndex = StaticProxies[i].BufferIndex;
 			Start = i;
 		}
 	}
@@ -271,81 +316,15 @@ void ragdoll::Scene::TraverseTreeAndUpdateTransforms()
 
 void ragdoll::Scene::TraverseNode(const Guid& guid)
 {
-	auto transform = EntityManager->GetComponent<TransformComp>(guid);
+	TransformComp* transform = EntityManager->GetComponent<TransformComp>(guid);
 	if (transform)
 	{
-		{
-			//check if state is dirty
-			bool dirtyFromHere = false;
-			if (!m_DirtyOnwards)
-			{
-				if (transform->m_Dirty)
-				{
-					m_DirtyOnwards = true;
-					dirtyFromHere = true;
-				}
-			}
-			if (m_DirtyOnwards)
-			{
-				//get local matrix
-				auto localModel = GetLocalModelMatrix(*transform);
-				//add to model stack
-				if (m_ModelStack.empty())	//first matrix will be this guy local
-					m_ModelStack.push(localModel);
-				else
-					m_ModelStack.push(localModel * m_ModelStack.top());	//otherwise concatenate matrix in stacks
-				transform->m_ModelToWorld = m_ModelStack.top();	//set model matrix to the top of the stack
-			}
-			else
-				m_ModelStack.push(transform->m_ModelToWorld);	//if not dirty, just push the current model matrix
-			//traverse children
-			if (transform->m_Child)
-				TraverseNode(transform->m_Child);
-
-			//once done, pop the stack
-			m_ModelStack.pop();
-			//resets the dirty flags
-			if (dirtyFromHere)
-				m_DirtyOnwards = false;
-			transform->m_Dirty = false;
-		}
+		UpdateTransform(*transform, guid);
 
 		//traverse siblings with a for loop
 		while (transform->m_Sibling.m_RawId != 0) {
 			transform = EntityManager->GetComponent<TransformComp>(transform->m_Sibling);
-			//check if state is dirty
-			bool dirtyFromHere = false;
-			if (!m_DirtyOnwards)
-			{
-				if (transform->m_Dirty)
-				{
-					m_DirtyOnwards = true;
-					dirtyFromHere = true;
-				}
-			}
-			if (m_DirtyOnwards)
-			{
-				//get local matrix
-				auto localModel = GetLocalModelMatrix(*transform);
-				//add to model stack
-				if (m_ModelStack.empty())	//first matrix will be this guy local
-					m_ModelStack.push(localModel);
-				else
-					m_ModelStack.push(localModel * m_ModelStack.top());	//otherwise concatenate matrix in stacks
-				transform->m_ModelToWorld = m_ModelStack.top();	//set model matrix to the top of the stack
-			}
-			else
-				m_ModelStack.push(transform->m_ModelToWorld);	//if not dirty, just push the current model matrix
-			//traverse children
-			if (transform->m_Child)
-				TraverseNode(transform->m_Child);
-
-			//once done, pop the stack
-			m_ModelStack.pop();
-			//resets the dirty flags
-			if (dirtyFromHere)
-				m_DirtyOnwards = false;
-			transform->m_Dirty = false;
+			UpdateTransform(*transform, guid);
 		}
 	}
 	else
@@ -361,4 +340,41 @@ Matrix ragdoll::Scene::GetLocalModelMatrix(const TransformComp& trans)
 	model *= Matrix::CreateFromQuaternion(trans.m_LocalRotation);
 	model *= Matrix::CreateTranslation(trans.m_LocalPosition);
 	return model;
+}
+
+void ragdoll::Scene::UpdateTransform(TransformComp& comp, const Guid& guid)
+{
+	//check if state is dirty
+	bool dirtyFromHere = false;
+	if (!m_DirtyOnwards)
+	{
+		if (comp.m_Dirty)
+		{
+			m_DirtyOnwards = true;
+			dirtyFromHere = true;
+		}
+	}
+	if (m_DirtyOnwards)
+	{
+		comp.m_Dirty = true;
+		//get local matrix
+		auto localModel = GetLocalModelMatrix(comp);
+		//add to model stack
+		if (m_ModelStack.empty())	//first matrix will be this guy local
+			m_ModelStack.push(localModel);
+		else
+			m_ModelStack.push(localModel * m_ModelStack.top());	//otherwise concatenate matrix in stacks
+		comp.m_ModelToWorld = m_ModelStack.top();	//set model matrix to the top of the stack
+	}
+	else
+		m_ModelStack.push(comp.m_ModelToWorld);	//if not dirty, just push the current model matrix
+	//traverse children
+	if (comp.m_Child)
+		TraverseNode(comp.m_Child);
+
+	//once done, pop the stack
+	m_ModelStack.pop();
+	//resets the dirty flags
+	if (dirtyFromHere)
+		m_DirtyOnwards = false;
 }

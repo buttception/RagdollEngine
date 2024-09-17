@@ -12,10 +12,10 @@ namespace ragdoll {
 	class Application;
 
 	struct Proxy {
-		ENTT_ID_TYPE EnttId;	//can draw to a entity buffer next time
-		int32_t BufferIndex = -1;	//does not exist for now
+		ENTT_ID_TYPE EnttId;
+		int32_t BufferIndex = -1;
 		int32_t MaterialIndex = -1;
-		//texture index and stuff next time
+		DirectX::BoundingBox BoundingBox;
 	};
 
 	struct InstanceData {
@@ -60,7 +60,8 @@ namespace ragdoll {
 
 		//Rendering
 		CBuffer CBuffer;
-		std::vector<Proxy> Proxies;
+		std::vector<Proxy> StaticProxies;
+		std::vector<DirectX::BoundingBox> ProxyBoundingBoxes;
 		std::vector<InstanceData> StaticInstanceDatas;
 		std::vector<InstanceGroupInfo> StaticInstanceGroupInfos;
 		nvrhi::BufferHandle StaticInstanceBufferHandle;
@@ -77,9 +78,12 @@ namespace ragdoll {
 
 		//Transforms
 		void UpdateTransforms();
+		void ResetTransformDirtyFlags();
 		void AddEntityAtRootLevel(Guid entityId);
 
 		//Renderable
+		void PopulateStaticProxies();
+		void UpdateStaticProxies();
 		void BuildStaticInstances();
 
 	private:
@@ -89,5 +93,6 @@ namespace ragdoll {
 		void TraverseTreeAndUpdateTransforms();
 		void TraverseNode(const Guid& guid);
 		Matrix GetLocalModelMatrix(const TransformComp& trans);
+		void UpdateTransform(TransformComp& comp, const Guid& id);
 	};
 }

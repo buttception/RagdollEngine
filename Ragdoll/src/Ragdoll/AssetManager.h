@@ -2,6 +2,7 @@
 
 #include <nvrhi/nvrhi.h>
 #include <tiny_gltf.h>
+#include "Ragdoll/Math/RagdollMath.h"
 
 struct Material {
 	int32_t AlbedoTextureIndex = -1;
@@ -28,6 +29,9 @@ struct VertexBufferInfo
 	uint32_t IBOffset;
 	uint32_t IndicesCount;
 	uint32_t VerticesCount;
+
+	//Best fit box for culling
+	DirectX::BoundingBox BestFitBox;
 };
 
 struct Submesh 

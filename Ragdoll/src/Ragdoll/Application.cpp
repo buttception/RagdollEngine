@@ -108,7 +108,10 @@ namespace ragdoll
 		}
 		MICROPROFILE_TIMELINE_LEAVE_STATIC("GLTF Load");
 
+		m_Scene->PopulateStaticProxies();
 		m_Scene->UpdateTransforms();
+		m_Scene->UpdateStaticProxies();
+		m_Scene->ResetTransformDirtyFlags();
 		m_Scene->BuildStaticInstances();
 	}
 

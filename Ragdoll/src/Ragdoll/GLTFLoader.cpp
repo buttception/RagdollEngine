@@ -128,8 +128,8 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		{
 			Submesh submesh;
 			VertexBufferInfo buffer;
-			std::vector<uint32_t> indices;
-			std::vector<Vertex> vertices;
+			IndexStagingBuffer.clear();
+			VertexStagingBuffer.clear();
 
 			//set the material index for the primitive
 			submesh.MaterialIndex = itPrim.material + materialIndicesOffset;
@@ -138,26 +138,26 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			{
 				const tinygltf::Accessor& accessor = model.accessors[itPrim.indices];
 				const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
-				indices.resize(accessor.count);
+				IndexStagingBuffer.resize(accessor.count);
 				uint8_t* data = model.buffers[bufferView.buffer].data.data();
 				uint32_t byteOffset = bufferView.byteOffset + accessor.byteOffset;
 				//manually assign to reconcil things like short to uint
 				for (int i = 0; i < accessor.count; ++i) {
 					switch (accessor.componentType) {
 					case TINYGLTF_COMPONENT_TYPE_SHORT:
-						indices[i] = *reinterpret_cast<int16_t*>(data + byteOffset + i * tinygltf::GetComponentSizeInBytes(accessor.componentType));
+						IndexStagingBuffer[i] = *reinterpret_cast<int16_t*>(data + byteOffset + i * tinygltf::GetComponentSizeInBytes(accessor.componentType));
 						break;
 					case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
-						indices[i] = *reinterpret_cast<uint16_t*>(data + byteOffset + i * tinygltf::GetComponentSizeInBytes(accessor.componentType));
+						IndexStagingBuffer[i] = *reinterpret_cast<uint16_t*>(data + byteOffset + i * tinygltf::GetComponentSizeInBytes(accessor.componentType));
 						break;
 					case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
-						indices[i] = *reinterpret_cast<uint32_t*>(data + byteOffset + i * tinygltf::GetComponentSizeInBytes(accessor.componentType));
+						IndexStagingBuffer[i] = *reinterpret_cast<uint32_t*>(data + byteOffset + i * tinygltf::GetComponentSizeInBytes(accessor.componentType));
 						break;
 					default:
 						RD_ASSERT(true, "Unsupport index type for {}", itMesh.name);
 					}
 					if(accessor.maxValues.size() != 0)
-						RD_ASSERT(indices[i] > accessor.maxValues[0], "");
+						RD_ASSERT(IndexStagingBuffer[i] > accessor.maxValues[0], "");
 				}
 #if 0
 				RD_CORE_TRACE("Loaded {} indices at byte offest {}", accessor.count, accessor.byteOffset);
@@ -180,7 +180,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			//for every attribute, check if there is one that corresponds with renderer attributes
 			bool tangentExist = false, binormalExist = false;
 			{
-				vertices.resize(vertexCount);
+				VertexStagingBuffer.resize(vertexCount);
 				for (const auto& it : attributeToAccessors) {
 					nvrhi::VertexAttributeDesc const* desc = nullptr;
 					const tinygltf::Accessor& accessor = it.second;
@@ -213,7 +213,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 					//memcpy the data from the buffer over into the vertices
 					uint8_t* data = model.buffers[bufferView.buffer].data.data();
 					for (int i = 0; i < vertexCount; ++i) {
-						Vertex& v = vertices[i];
+						Vertex& v = VertexStagingBuffer[i];
 						uint8_t* bytePos = reinterpret_cast<uint8_t*>(&v) + desc->offset;
 						uint32_t byteOffset = accessor.byteOffset + bufferView.byteOffset;
 						uint32_t stride = bufferView.byteStride == 0 ? size : bufferView.byteStride;
@@ -230,10 +230,10 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 				if (!tangentExist || !binormalExist)
 				{
 					//generate the tangents and binormals
-					for (size_t i = 0; i < indices.size(); i += 3) {
-						Vertex& v0 = vertices[indices[i]];
-						Vertex& v1 = vertices[indices[i + 1]];
-						Vertex& v2 = vertices[indices[i + 2]];
+					for (size_t i = 0; i < IndexStagingBuffer.size(); i += 3) {
+						Vertex& v0 = VertexStagingBuffer[IndexStagingBuffer[i]];
+						Vertex& v1 = VertexStagingBuffer[IndexStagingBuffer[i + 1]];
+						Vertex& v2 = VertexStagingBuffer[IndexStagingBuffer[i + 2]];
 
 						Vector3 edge1 = v1.position - v0.position;
 						Vector3 edge2 = v2.position - v0.position;
@@ -245,7 +245,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 
 						Vector3 tangent;
 						if (tangentExist)
-							tangent = vertices[indices[i]].tangent;
+							tangent = VertexStagingBuffer[IndexStagingBuffer[i]].tangent;
 						else {
 							tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
 							tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
@@ -261,8 +261,25 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 
 			//add to the asset manager vertices
 			{
-				submesh.VertexBufferIndex = AssetManager::GetInstance()->AddVertices(vertices, indices);
+				submesh.VertexBufferIndex = AssetManager::GetInstance()->AddVertices(VertexStagingBuffer, IndexStagingBuffer);
 				mesh.Submeshes.emplace_back(submesh);
+			}
+
+			//create the best fit box by going through the vertices
+			{
+				Vector3 min, max;
+				min = max = VertexStagingBuffer[0].position;
+				for (const Vertex& v : VertexStagingBuffer) {
+					min.x = std::min(v.position.x, min.x); max.x = std::max(v.position.x, max.x);
+					min.y = std::min(v.position.y, min.y); max.y = std::max(v.position.y, max.y);
+					min.z = std::min(v.position.z, min.z); max.z = std::max(v.position.z, max.z);
+				}
+				DirectX::XMFLOAT3 extents = max - min;
+				DirectX::XMFLOAT3 center = min + extents / 2.f;
+				AssetManager::GetInstance()->VertexBufferInfos[submesh.VertexBufferIndex].BestFitBox = {
+					center,
+					extents
+				};
 			}
 		}
 #if 0

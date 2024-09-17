@@ -47,11 +47,27 @@ namespace ragdoll
 		{
 			auto entity = GetEntity(guid);
 			if(entity == entt::null)
+			{
+				RD_CORE_ERROR("Entity in T* GetComponent(const Guid& guid) is entt::null");
 				return nullptr;
+			}
 			if(m_Registry.all_of<T>(entity))
 				return &m_Registry.get<T>(entity);
 			RD_CORE_ERROR("Entity does not have component {}", typeid(T).name());
 			return nullptr;
+		}
+
+		template<typename T>
+		T* GetComponentOr(const Guid& guid, T* other = nullptr) {
+			auto entity = GetEntity(guid);
+			if (entity == entt::null)
+			{
+				RD_CORE_ERROR("Entity in T* GetComponentOr(const Guid& guid, T* other = nullptr) is entt::null");
+				return other;
+			}
+			if (m_Registry.all_of<T>(entity))
+				return &m_Registry.get<T>(entity);
+			return other;
 		}
 
 		template<typename T>
@@ -66,6 +82,18 @@ namespace ragdoll
 				return &m_Registry.get<T>(entity);
 			RD_CORE_ERROR("Entity does not have component {}", typeid(T).name());
 			return nullptr;
+		}
+
+		template<typename T>
+		T* GetComponentOr(const entt::entity& entity, T* other = nullptr) {
+			if (entity == entt::null)
+			{
+				RD_CORE_ERROR("Entity in T* GetComponent(const entt::entity& entity, T* other = nullptr) is entt::null");
+				return other;
+			}
+			if (m_Registry.all_of<T>(entity))
+				return &m_Registry.get<T>(entity);
+			return other;
 		}
 
 		template<typename T>
