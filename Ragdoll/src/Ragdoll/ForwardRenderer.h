@@ -46,6 +46,7 @@ public:
 	void Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em);
 	void Shutdown();
 
+	void CreateCustomMeshes();
 	int32_t AddTextureToTable(nvrhi::TextureHandle tex);
 
 	void BeginFrame(CBuffer* Cbug);

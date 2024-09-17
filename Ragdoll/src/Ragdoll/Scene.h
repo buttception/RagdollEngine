@@ -47,6 +47,10 @@ namespace ragdoll {
 		static const uint32_t StartCapacity = 64;
 	};
 
+	struct SceneConfig {
+		bool bIsThereCustomMeshes{ false };
+	};
+
 	class Scene {
 		ImguiRenderer ImguiInterface;
 
@@ -68,6 +72,7 @@ namespace ragdoll {
 
 	public:
 		ForwardRenderer Renderer;
+		SceneConfig Config;
 
 		Scene(Application*);
 

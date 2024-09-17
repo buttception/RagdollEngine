@@ -53,16 +53,17 @@ namespace ragdoll
 	class Application
 	{
 	public:
+		struct ApplicationConfig
+		{
+			bool bCreateCustomMeshes{ false };
+		};
+
 		std::shared_ptr<Window> m_PrimaryWindow;
 		std::shared_ptr<InputHandler> m_InputHandler;
 		std::shared_ptr<EntityManager> m_EntityManager;
 		std::shared_ptr<FileManager> m_FileManager;
 		std::shared_ptr<Scene> m_Scene;
-
-		struct ApplicationConfig
-		{
-			
-		};
+		ApplicationConfig Config;
 
 		Application() = default;
 		virtual ~Application() = default;

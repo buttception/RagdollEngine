@@ -58,7 +58,7 @@ namespace ragdoll
 {
 	void Application::Init(const ApplicationConfig& config)
 	{
-		UNREFERENCED_PARAMETER(config);
+		Config = config;
 		Logger::Init();
 		RD_CORE_INFO("spdlog initialized for use.");
 
@@ -94,7 +94,7 @@ namespace ragdoll
 
 		MICROPROFILE_TIMELINE_ENTER_STATIC(MP_DARKGOLDENROD, "GLTF Load");
 		{
-			if (false)
+			if (true)
 			{
 				GLTFLoader loader;
 				loader.Init(m_FileManager->GetRoot(), &m_Scene->Renderer, m_FileManager, m_EntityManager, m_Scene);

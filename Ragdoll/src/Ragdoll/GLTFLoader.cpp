@@ -255,13 +255,6 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 							tangent.Normalize();
 							v0.tangent = v1.tangent = v2.tangent = tangent;
 						}
-
-						// Compute bitangent
-						if (!binormalExist)
-						{
-							Vector3 binormal = v0.normal.Cross(tangent) * ((deltaUV1.x * deltaUV2.y) - (deltaUV2.x * deltaUV1.y));
-							v0.binormal = v1.binormal = v2.binormal = binormal;
-						}
 					}
 				}
 			}

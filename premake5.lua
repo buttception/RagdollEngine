@@ -2,7 +2,7 @@ include "Tools/dependencies.lua"
 
 workspace "Ragdoll"
 	architecture "x64"
-	startproject "Editor"
+	startproject "Ragdoll"
 
 	configurations
 	{
@@ -17,9 +17,4 @@ group ""
 
 group "Dependencies"
 	include "Ragdoll/dependencies/glfw"
-
-group "Application"
-	include "Editor"
-	include "Launcher"
-group "Application/Dependencies"
-	include "Editor/dependencies/imgui"
+	include "Ragdoll/dependencies/imgui"

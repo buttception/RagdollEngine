@@ -35,6 +35,104 @@ void ForwardRenderer::Shutdown()
 	Device->~DirectXDevice();
 }
 
+void ForwardRenderer::CreateCustomMeshes()
+{
+	//create 5 random textures
+	uint8_t colors[5][4] = {
+		{255, 0, 0, 255},
+		{255, 255, 0, 255},
+		{0, 255, 255, 255},
+		{0, 0, 255, 255},
+		{0, 255, 0, 255},
+	};
+	std::string debugNames[5] = {
+		"Custom Red",
+		"Custom Yellow",
+		"Custom Cyan",
+		"Custom Blue",
+		"Custom Green",
+	};
+	CommandList->open();
+	for (int i = 0; i < 5; ++i)
+	{
+		Image img;
+		nvrhi::TextureDesc textureDesc;
+		textureDesc.width = 1;
+		textureDesc.height = 1;
+		textureDesc.format = nvrhi::Format::RGBA8_UNORM;
+		textureDesc.dimension = nvrhi::TextureDimension::Texture2D;
+		textureDesc.isRenderTarget = false;
+		textureDesc.isTypeless = false;
+		textureDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+		textureDesc.keepInitialState = true;
+		textureDesc.debugName = debugNames[i];
+		nvrhi::TextureHandle texHandle = Device->m_NvrhiDevice->createTexture(textureDesc);
+		CommandList->writeTexture(texHandle, 0, 0, &colors[i], 4);
+		img.TextureHandle = texHandle;
+		AssetManager::GetInstance()->Images.emplace_back(img);
+		Texture texture;
+		texture.ImageIndex = i;
+		texture.SamplerIndex = i;
+		AssetManager::GetInstance()->Textures.emplace_back(texture);
+
+		AddTextureToTable(texHandle);
+	}
+	CommandList->close();
+	Device->m_NvrhiDevice->executeCommandList(CommandList);
+
+	Material mat;
+	mat.bIsLit = true;
+	mat.Color = Vector4::One;
+	mat.AlbedoTextureIndex = 0;
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	mat.AlbedoTextureIndex = 1;
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	mat.AlbedoTextureIndex = 2;
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	mat.AlbedoTextureIndex = 3;
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	mat.AlbedoTextureIndex = 4;
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+
+	//build primitives
+	GeometryBuilder geomBuilder;
+	geomBuilder.Init(Device->m_NvrhiDevice);
+	int32_t id = geomBuilder.BuildCube(1.f);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildSphere(1.f, 16);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildCylinder(1.f, 1.f, 16);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildCone(1.f, 1.f, 16);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildIcosahedron(1.f);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	CommandList->open();
+	AssetManager::GetInstance()->UpdateVBOIBO(this);
+	CommandList->close();
+	Device->m_NvrhiDevice->executeCommandList(CommandList);
+}
+
 int32_t ForwardRenderer::AddTextureToTable(nvrhi::TextureHandle tex)
 {
 	Device->m_NvrhiDevice->writeDescriptorTable(DescriptorTable, nvrhi::BindingSetItem::Texture_SRV(TextureCount++, tex));
@@ -260,11 +358,6 @@ void ForwardRenderer::CreateResource()
 	vPositionAttrib.offset = offsetof(Vertex, position);
 	vPositionAttrib.elementStride = sizeof(Vertex);
 	vPositionAttrib.format = nvrhi::Format::RGB32_FLOAT;
-	nvrhi::VertexAttributeDesc vColorAttrib;
-	vColorAttrib.name = "COLOR";
-	vColorAttrib.offset = offsetof(Vertex, color);
-	vColorAttrib.elementStride = sizeof(Vertex);
-	vColorAttrib.format = nvrhi::Format::RGBA32_FLOAT;
 	nvrhi::VertexAttributeDesc vNormalAttrib;
 	vNormalAttrib.name = "NORMAL";
 	vNormalAttrib.offset = offsetof(Vertex, normal);
@@ -275,11 +368,6 @@ void ForwardRenderer::CreateResource()
 	vTangentAttrib.offset = offsetof(Vertex, tangent);
 	vTangentAttrib.elementStride = sizeof(Vertex);
 	vTangentAttrib.format = nvrhi::Format::RGB32_FLOAT;
-	nvrhi::VertexAttributeDesc vBinormalAttrib;
-	vBinormalAttrib.name = "BINORMAL";
-	vBinormalAttrib.offset = offsetof(Vertex, binormal);
-	vBinormalAttrib.elementStride = sizeof(Vertex);
-	vBinormalAttrib.format = nvrhi::Format::RGB32_FLOAT;
 	nvrhi::VertexAttributeDesc vTexcoordAttrib;
 	vTexcoordAttrib.name = "TEXCOORD";
 	vTexcoordAttrib.offset = offsetof(Vertex, texcoord);
@@ -287,10 +375,8 @@ void ForwardRenderer::CreateResource()
 	vTexcoordAttrib.format = nvrhi::Format::RG32_FLOAT;
 	VertexAttributes = {
 		vPositionAttrib,
-		vColorAttrib,
 		vNormalAttrib,
 		vTangentAttrib,
-		vBinormalAttrib,
 		vTexcoordAttrib,
 	};
 	InputLayoutHandle = Device->m_NvrhiDevice->createInputLayout(VertexAttributes.data(), VertexAttributes.size(), ForwardVertexShader);
@@ -402,95 +488,6 @@ void ForwardRenderer::CreateResource()
 	Device->m_NvrhiDevice->resizeDescriptorTable(DescriptorTable, bindlessDesc.maxCapacity, true);
 
 	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
-
-	bool testCustom{ true };
-	if (testCustom) {
-		//create 5 random textures
-		uint8_t colors[5][4] = {
-			{255, 0, 0, 255},
-			{255, 255, 0, 255},
-			{0, 255, 255, 255},
-			{0, 0, 255, 255},
-			{0, 255, 0, 255},
-		};
-		std::string debugNames[5] = {
-			"Custom Red",
-			"Custom Yellow",
-			"Custom Cyan",
-			"Custom Blue",
-			"Custom Green",
-		};
-		CommandList->open();
-		for (int i = 0; i < 5; ++i)
-		{
-			Image img;
-			textureDesc.debugName = debugNames[i];
-			nvrhi::TextureHandle texHandle = Device->m_NvrhiDevice->createTexture(textureDesc);
-			CommandList->writeTexture(texHandle, 0, 0, &colors[i], 4);
-			img.TextureHandle = texHandle;
-			AssetManager::GetInstance()->Images.emplace_back(img);
-			Texture texture;
-			texture.ImageIndex = i;
-			texture.SamplerIndex = i;
-			AssetManager::GetInstance()->Textures.emplace_back(texture);
-
-			AddTextureToTable(texHandle);
-		}
-		CommandList->close();
-		Device->m_NvrhiDevice->executeCommandList(CommandList);
-
-		Material mat;
-		mat.bIsLit = true;
-		mat.Color = Vector4::One;
-		mat.AlbedoTextureIndex = 0;
-		AssetManager::GetInstance()->Materials.emplace_back(mat);
-		mat.AlbedoTextureIndex = 1;
-		AssetManager::GetInstance()->Materials.emplace_back(mat);
-		mat.AlbedoTextureIndex = 2;
-		AssetManager::GetInstance()->Materials.emplace_back(mat);
-		mat.AlbedoTextureIndex = 3;
-		AssetManager::GetInstance()->Materials.emplace_back(mat);
-		mat.AlbedoTextureIndex = 4;
-		AssetManager::GetInstance()->Materials.emplace_back(mat);
-
-		//build primitives
-		GeometryBuilder geomBuilder;
-		geomBuilder.Init(Device->m_NvrhiDevice);
-		int32_t id = geomBuilder.BuildCube(1.f);
-		for (int i = 0; i < 5; ++i) {
-			Mesh mesh;
-			mesh.Submeshes.push_back({ id, i });
-			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
-		}
-		id = geomBuilder.BuildSphere(1.f, 16);
-		for (int i = 0; i < 5; ++i) {
-			Mesh mesh;
-			mesh.Submeshes.push_back({ id, i });
-			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
-		}
-		id = geomBuilder.BuildCylinder(1.f, 1.f, 16);
-		for (int i = 0; i < 5; ++i) {
-			Mesh mesh;
-			mesh.Submeshes.push_back({ id, i });
-			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
-		}
-		id = geomBuilder.BuildCone(1.f, 1.f, 16);
-		for (int i = 0; i < 5; ++i) {
-			Mesh mesh;
-			mesh.Submeshes.push_back({ id, i });
-			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
-		}
-		id = geomBuilder.BuildIcosahedron(1.f);
-		for (int i = 0; i < 5; ++i) {
-			Mesh mesh;
-			mesh.Submeshes.push_back({ id, i });
-			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
-		}
-		CommandList->open();
-		AssetManager::GetInstance()->UpdateVBOIBO(this);
-		CommandList->close();
-		Device->m_NvrhiDevice->executeCommandList(CommandList);
-	}
 
 	const static int32_t seed = 42;
 	std::srand(seed);

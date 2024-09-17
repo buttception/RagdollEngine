@@ -13,6 +13,11 @@ ragdoll::Scene::Scene(Application* app)
 {
 	EntityManager = app->m_EntityManager;
 	Renderer.Init(app->m_PrimaryWindow, app->m_FileManager, app->m_EntityManager);
+	if (app->Config.bCreateCustomMeshes)
+	{
+		Config.bIsThereCustomMeshes = true;
+		Renderer.CreateCustomMeshes();
+	}
 	ImguiInterface.Init(Renderer.Device.get(), Renderer.ImguiVertexShader, Renderer.ImguiPixelShader);
 }
 
@@ -29,52 +34,55 @@ void ragdoll::Scene::Update(float _dt)
 	const static Vector3 s_min{ 0.3f, 0.3f, 0.3f };
 	static int32_t currentGeomCount{};
 
-	ImGui::Begin("Spawn");
-	ImGui::Text("Current Geom Count: %d", currentGeomCount);
-	bool test = false;
-	if (ImGui::Button("Spawn 500 geometry")) {
-		test = true;
-		for (int i = 0; i < 500; ++i) {
-			MICROPROFILE_SCOPEI("Creation", "Entity Create", MP_GREEN);
-			currentGeomCount++;
-			Vector3 pos{
-				t_min.x + (std::rand() / (float)RAND_MAX) * t_range.x,
-				t_min.y + (std::rand() / (float)RAND_MAX) * t_range.y,
-				t_min.z + (std::rand() / (float)RAND_MAX) * t_range.z,
-			};
-			Vector3 scale{
-				s_min.x + (std::rand() / (float)RAND_MAX) * s_range.x,
-				s_min.y + (std::rand() / (float)RAND_MAX) * s_range.y,
-				s_min.z + (std::rand() / (float)RAND_MAX) * s_range.z,
-			};
-			entt::entity ent;
-			{
-				MICROPROFILE_SCOPEI("Creation", "Creating Entity", MP_DARKGREEN);
-				ent = EntityManager->CreateEntity();
-			}
-			{
-				MICROPROFILE_SCOPEI("Creation", "Setting Transform", MP_GREENYELLOW);
-				auto tcomp = EntityManager->AddComponent<TransformComp>(ent);
-				tcomp->m_LocalPosition = pos;
-				tcomp->m_LocalScale = scale;
+	if (Config.bIsThereCustomMeshes)
+	{
+		ImGui::Begin("Spawn");
+		ImGui::Text("Current Geom Count: %d", currentGeomCount);
+		if (ImGui::Button("Spawn 500 geometry")) {
+			for (int i = 0; i < 500; ++i) {
+				MICROPROFILE_SCOPEI("Creation", "Entity Create", MP_GREEN);
+				currentGeomCount++;
+				Vector3 pos{
+					t_min.x + (std::rand() / (float)RAND_MAX) * t_range.x,
+					t_min.y + (std::rand() / (float)RAND_MAX) * t_range.y,
+					t_min.z + (std::rand() / (float)RAND_MAX) * t_range.z,
+				};
+				Vector3 scale{
+					s_min.x + (std::rand() / (float)RAND_MAX) * s_range.x,
+					s_min.y + (std::rand() / (float)RAND_MAX) * s_range.y,
+					s_min.z + (std::rand() / (float)RAND_MAX) * s_range.z,
+				};
+				entt::entity ent;
 				{
-					MICROPROFILE_SCOPEI("Creation", "Adding at Root", MP_DARKOLIVEGREEN);
-					AddEntityAtRootLevel(EntityManager->GetGuid(ent));
+					MICROPROFILE_SCOPEI("Creation", "Creating Entity", MP_DARKGREEN);
+					ent = EntityManager->CreateEntity();
+				}
+				{
+					MICROPROFILE_SCOPEI("Creation", "Setting Transform", MP_GREENYELLOW);
+					auto tcomp = EntityManager->AddComponent<TransformComp>(ent);
+					tcomp->m_LocalPosition = pos;
+					tcomp->m_LocalScale = scale;
+					{
+						MICROPROFILE_SCOPEI("Creation", "Adding at Root", MP_DARKOLIVEGREEN);
+						AddEntityAtRootLevel(EntityManager->GetGuid(ent));
+					}
+				}
+				{
+					MICROPROFILE_SCOPEI("Creation", "Setting Renderable", MP_FORESTGREEN);
+					auto rcomp = EntityManager->AddComponent<RenderableComp>(ent);
+					rcomp->meshIndex = std::rand() / (float)RAND_MAX * 25;
 				}
 			}
 			{
-				MICROPROFILE_SCOPEI("Creation", "Setting Renderable", MP_FORESTGREEN);
-				auto rcomp = EntityManager->AddComponent<RenderableComp>(ent);
-				rcomp->meshIndex = std::rand() / (float)RAND_MAX * 25;
+				MICROPROFILE_SCOPEI("Creation", "Entity Update", MP_DARKSEAGREEN);
+				UpdateTransforms();
+				BuildStaticInstances();
 			}
+			MicroProfileDumpFileImmediately("test.html", nullptr, nullptr);
 		}
-		MICROPROFILE_SCOPEI("Creation", "Entity Update", MP_DARKSEAGREEN);
-		UpdateTransforms();
-		BuildStaticInstances();
+		ImGui::End();
 	}
-	if(test)
-		MicroProfileDumpFileImmediately("test.html", nullptr, nullptr);
-	ImGui::End();
+	
 
 	ImguiInterface.Render();
 	Renderer.Device->Present();
