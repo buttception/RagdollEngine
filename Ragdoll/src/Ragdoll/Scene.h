@@ -79,6 +79,7 @@ namespace ragdoll {
 		SceneConfig Config;
 		DebugInfo DebugInfo;
 		Matrix CameraViewProjection;
+		Matrix CameraProjection;
 		Matrix CameraView;
 
 		Scene(Application*);
@@ -97,7 +98,7 @@ namespace ragdoll {
 		//Renderable
 		void PopulateStaticProxies();
 		void UpdateStaticProxies();
-		void BuildStaticInstances(const Matrix& cameraViewProjection, const Matrix& cameraView);
+		void BuildStaticInstances(const Matrix& cameraProjection, const Matrix& cameraView);
 
 	private:
 		//Transforms

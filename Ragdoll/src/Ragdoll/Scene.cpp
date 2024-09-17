@@ -94,7 +94,7 @@ void ragdoll::Scene::Update(float _dt)
 	}
 
 	if (bIsCameraDirty)
-		BuildStaticInstances(CameraViewProjection, CameraView);
+		BuildStaticInstances(CameraProjection, CameraView);
 	Renderer.DrawAllInstances(StaticInstanceBufferHandle, StaticInstanceGroupInfos, CBuffer);
 	Renderer.DrawBoundingBoxes(StaticInstanceDebugBufferHandle, StaticDebugInstanceDatas.size(), CBuffer);
 
@@ -146,7 +146,7 @@ void ragdoll::Scene::UpdateControls(float _dt)
 	ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, -90.f, 90.f);
 	ImGui::End();
 
-	Matrix proj = Matrix::CreatePerspectiveFieldOfView(DirectX::XMConvertToRadians(data.cameraFov), data.cameraAspect, data.cameraNear, data.cameraFar);
+	CameraProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraAspect, data.cameraNear, data.cameraFar);
 	Vector3 cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
 
 	//hardcoded handling of movement now
@@ -161,7 +161,7 @@ void ragdoll::Scene::UpdateControls(float _dt)
 			bIsCameraDirty = true;
 			data.cameraPos -= cameraDir * data.cameraSpeed * PrimaryWindow->GetFrameTime();
 		}
-		Vector3 cameraRight = -cameraDir.Cross(Vector3(0.f, 1.f, 0.f));
+		Vector3 cameraRight = cameraDir.Cross(Vector3(0.f, 1.f, 0.f));
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_A))
 		{
 			bIsCameraDirty = true;
@@ -176,15 +176,14 @@ void ragdoll::Scene::UpdateControls(float _dt)
 		{
 			bIsCameraDirty = true;
 			auto& io = ImGui::GetIO();
-			data.cameraYaw -= io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindow->GetFrameTime();
+			data.cameraYaw += io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindow->GetFrameTime();
 			data.cameraPitch += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindow->GetFrameTime();
 		}
 	}
 	cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
 
-	CameraView = Matrix::CreateLookAt(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
-	CBuffer.viewProj = CameraView * proj;
-	CameraViewProjection = CBuffer.viewProj;
+	CameraView = DirectX::XMMatrixLookAtLH(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
+	CameraViewProjection = CBuffer.viewProj = CameraView * CameraProjection;
 	CBuffer.sceneAmbientColor = data.ambientLight;
 	CBuffer.lightDiffuseColor = data.dirLightColor;
 	Vector2 azimuthElevationRad = {
@@ -280,7 +279,7 @@ void ragdoll::Scene::UpdateStaticProxies()
 	}
 }
 
-void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraViewProjection, const Matrix& cameraView)
+void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const Matrix& cameraView)
 {
 	if(StaticProxies.empty())
 		return;
@@ -298,8 +297,9 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraViewProjection, co
 	StaticDebugInstanceDatas.clear();
 
 	DirectX::BoundingFrustum frustum;
-	DirectX::BoundingFrustum::CreateFromMatrix(frustum, cameraViewProjection, true);
+	DirectX::BoundingFrustum::CreateFromMatrix(frustum, cameraProjection);
 	frustum.Transform(frustum, cameraView.Invert());
+
 	for (int i = 0; i < StaticProxies.size(); ++i) {
 		//iterate till i get a different buffer id, meaning is a diff mesh
 		if (StaticProxies[i].BufferIndex != CurrBufferIndex || i == StaticProxies.size() - 1)
