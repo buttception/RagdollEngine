@@ -12,6 +12,7 @@
 ragdoll::Scene::Scene(Application* app)
 {
 	EntityManager = app->m_EntityManager;
+	PrimaryWindow = app->m_PrimaryWindow;
 	Renderer.Init(app->m_PrimaryWindow, app->m_FileManager, app->m_EntityManager);
 	if (app->Config.bCreateCustomMeshes)
 	{
@@ -24,12 +25,12 @@ ragdoll::Scene::Scene(Application* app)
 void ragdoll::Scene::Update(float _dt)
 {
 	ImguiInterface.BeginFrame();
-	Renderer.BeginFrame(CBuffer);
-	Renderer.DrawAllInstances(StaticInstanceBufferHandle, StaticInstanceGroupInfos, CBuffer);
+	Renderer.BeginFrame();
+	UpdateControls(_dt);
 
 	//spawn more shits temp
-	const static Vector3 t_range{ 10.f, 10.f, 10.f };
-	const static Vector3 t_min = { -5.f, -5.f, -5.f };
+	const static Vector3 t_range{ 50.f, 50.f, 50.f };
+	const static Vector3 t_min = { -25.f, -25.f, -25.f };
 	const static Vector3 s_range{ 0.2f, 0.2f, 0.2f };
 	const static Vector3 s_min{ 0.3f, 0.3f, 0.3f };
 	static int32_t currentGeomCount{};
@@ -85,21 +86,116 @@ void ragdoll::Scene::Update(float _dt)
 				UpdateTransforms();	//update all the dirty transforms
 				UpdateStaticProxies();	//update all the bounding box in the proxies
 				ResetTransformDirtyFlags();	//reset the dirty flags
-				BuildStaticInstances();	//build the instance buffer
+				bIsCameraDirty = true;
 			}
 			MicroProfileDumpFileImmediately("test.html", nullptr, nullptr);
 		}
 		ImGui::End();
 	}
-	
+
+	if (bIsCameraDirty)
+		BuildStaticInstances(CameraViewProjection, CameraView);
+	Renderer.DrawAllInstances(StaticInstanceBufferHandle, StaticInstanceGroupInfos, CBuffer);
+	Renderer.DrawBoundingBoxes(StaticInstanceDebugBufferHandle, StaticDebugInstanceDatas.size(), CBuffer);
+
+	ImGui::Begin("Debug");
+	ImGui::Text("%d culled", DebugInfo.CulledObjectCount);
+	ImGui::End();
 
 	ImguiInterface.Render();
 	Renderer.Device->Present();
+
+	DebugInfo.CulledObjectCount = 0;
+	bIsCameraDirty = false;
 }
 
 void ragdoll::Scene::Shutdown()
 {
 	Renderer.Shutdown();
+}
+
+void ragdoll::Scene::UpdateControls(float _dt)
+{
+	//manipulate the cube and camera
+	struct Data {
+		Vector3 cameraPos = { 0.f, 1.f, 5.f };
+		float cameraYaw = DirectX::XM_PI;
+		float cameraPitch = 0.f;
+		float cameraFov = 60.f;
+		float cameraNear = 0.01f;
+		float cameraFar = 1000.f;
+		float cameraAspect = 16.f / 9.f;
+		float cameraSpeed = 5.f;
+		float cameraRotationSpeed = 15.f;
+		Color dirLightColor = { 1.f,1.f,1.f,1.f };
+		Color ambientLight = { 0.2f, 0.2f, 0.2f, 1.f };
+		float ambientIntensity = 0.2f;
+		Vector2 azimuthAndElevation = { 0.f, 45.f };
+	};
+	static Data data;
+	ImGui::Begin("Camera Manipulate");
+	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera FOV (Degrees)", &data.cameraFov, 60.f, 120.f) : true;
+	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera Near", &data.cameraNear, 0.01f, 1.f) : true;
+	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera Far", &data.cameraFar, 10.f, 10000.f) : true;
+	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera Aspect Ratio", &data.cameraAspect, 0.01f, 5.f) : true;
+	ImGui::SliderFloat("Camera Speed", &data.cameraSpeed, 0.01f, 30.f);
+	ImGui::SliderFloat("Camera Rotation Speed (Degrees)", &data.cameraRotationSpeed, 5.f, 100.f);
+	ImGui::ColorEdit3("Light Diffuse", &data.dirLightColor.x);
+	ImGui::ColorEdit3("Ambient Light Diffuse", &data.ambientLight.x);
+	ImGui::SliderFloat("Azimuth (Degrees)", &data.azimuthAndElevation.x, 0.f, 360.f);
+	ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, -90.f, 90.f);
+	ImGui::End();
+
+	Matrix proj = Matrix::CreatePerspectiveFieldOfView(DirectX::XMConvertToRadians(data.cameraFov), data.cameraAspect, data.cameraNear, data.cameraFar);
+	Vector3 cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
+
+	//hardcoded handling of movement now
+	if (!ImGui::IsAnyItemFocused() && !ImGui::IsAnyItemActive()) {
+		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_W))
+		{
+			bIsCameraDirty = true;
+			data.cameraPos += cameraDir * data.cameraSpeed * PrimaryWindow->GetFrameTime();
+		}
+		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_S))
+		{
+			bIsCameraDirty = true;
+			data.cameraPos -= cameraDir * data.cameraSpeed * PrimaryWindow->GetFrameTime();
+		}
+		Vector3 cameraRight = -cameraDir.Cross(Vector3(0.f, 1.f, 0.f));
+		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_A))
+		{
+			bIsCameraDirty = true;
+			data.cameraPos += cameraRight * data.cameraSpeed * PrimaryWindow->GetFrameTime();
+		}
+		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_D))
+		{
+			bIsCameraDirty = true;
+			data.cameraPos -= cameraRight * data.cameraSpeed * PrimaryWindow->GetFrameTime();
+		}
+		if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
+		{
+			bIsCameraDirty = true;
+			auto& io = ImGui::GetIO();
+			data.cameraYaw -= io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindow->GetFrameTime();
+			data.cameraPitch += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindow->GetFrameTime();
+		}
+	}
+	cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
+
+	CameraView = Matrix::CreateLookAt(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
+	CBuffer.viewProj = CameraView * proj;
+	CameraViewProjection = CBuffer.viewProj;
+	CBuffer.sceneAmbientColor = data.ambientLight;
+	CBuffer.lightDiffuseColor = data.dirLightColor;
+	Vector2 azimuthElevationRad = {
+		DirectX::XMConvertToRadians(data.azimuthAndElevation.x),
+		DirectX::XMConvertToRadians(data.azimuthAndElevation.y) };
+	CBuffer.lightDirection = Vector3(
+		sinf(azimuthElevationRad.y) * cosf(azimuthElevationRad.x),
+		cosf(azimuthElevationRad.y) * cosf(azimuthElevationRad.x),
+		sinf(azimuthElevationRad.x));
+	CBuffer.cameraPosition = data.cameraPos;
+	CBuffer.lightDiffuseColor = data.dirLightColor;
 }
 
 void ragdoll::Scene::UpdateTransforms()
@@ -137,6 +233,7 @@ void ragdoll::Scene::AddEntityAtRootLevel(Guid entityId)
 
 void ragdoll::Scene::PopulateStaticProxies()
 {
+	StaticProxies.clear();
 	//iterate through all the transforms and renderable
 	auto EcsView = EntityManager->GetRegistry().view<RenderableComp, TransformComp>();
 	for (const entt::entity& ent : EcsView) {
@@ -162,28 +259,28 @@ void ragdoll::Scene::UpdateStaticProxies()
 		//update all the bounding boxes of the static proxies
 		TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)proxy.EnttId);
 		proxy.BoundingBox = AssetManager::GetInstance()->VertexBufferInfos[proxy.BufferIndex].BestFitBox;
-		proxy.BoundingBox.Center.x += tComp->m_ModelToWorld.m[0][3];
-		proxy.BoundingBox.Center.y += tComp->m_ModelToWorld.m[1][3];
-		proxy.BoundingBox.Center.z += tComp->m_ModelToWorld.m[2][3];
+		proxy.BoundingBox.Center.x += tComp->m_ModelToWorld._41;
+		proxy.BoundingBox.Center.y += tComp->m_ModelToWorld._42;
+		proxy.BoundingBox.Center.z += tComp->m_ModelToWorld._43;
 
 		//transforming the axis aligned vector instead
 		Vector3 E = proxy.BoundingBox.Extents;
 		proxy.BoundingBox.Extents.x =
-			E.x * abs(tComp->m_ModelToWorld.m[0][0]) *
-			E.y * abs(tComp->m_ModelToWorld.m[0][1]) *
-			E.z * abs(tComp->m_ModelToWorld.m[0][2]);
+			E.x * abs(tComp->m_ModelToWorld._11) +
+			E.y * abs(tComp->m_ModelToWorld._21) +
+			E.z * abs(tComp->m_ModelToWorld._31);
 		proxy.BoundingBox.Extents.y =
-			E.x * abs(tComp->m_ModelToWorld.m[1][0]) *
-			E.y * abs(tComp->m_ModelToWorld.m[1][1]) *
-			E.z * abs(tComp->m_ModelToWorld.m[1][2]);
+			E.x * abs(tComp->m_ModelToWorld._12) +
+			E.y * abs(tComp->m_ModelToWorld._22) +
+			E.z * abs(tComp->m_ModelToWorld._32);
 		proxy.BoundingBox.Extents.z =
-			E.x * abs(tComp->m_ModelToWorld.m[2][0]) *
-			E.y * abs(tComp->m_ModelToWorld.m[2][1]) *
-			E.z * abs(tComp->m_ModelToWorld.m[2][2]);
+			E.x * abs(tComp->m_ModelToWorld._13) +
+			E.y * abs(tComp->m_ModelToWorld._23) +
+			E.z * abs(tComp->m_ModelToWorld._33);
 	}
 }
 
-void ragdoll::Scene::BuildStaticInstances()
+void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraViewProjection, const Matrix& cameraView)
 {
 	if(StaticProxies.empty())
 		return;
@@ -198,7 +295,11 @@ void ragdoll::Scene::BuildStaticInstances()
 	//clear the old information
 	StaticInstanceGroupInfos.clear();
 	StaticInstanceDatas.clear();
+	StaticDebugInstanceDatas.clear();
 
+	DirectX::BoundingFrustum frustum;
+	DirectX::BoundingFrustum::CreateFromMatrix(frustum, cameraViewProjection, true);
+	frustum.Transform(frustum, cameraView.Invert());
 	for (int i = 0; i < StaticProxies.size(); ++i) {
 		//iterate till i get a different buffer id, meaning is a diff mesh
 		if (StaticProxies[i].BufferIndex != CurrBufferIndex || i == StaticProxies.size() - 1)
@@ -210,7 +311,24 @@ void ragdoll::Scene::BuildStaticInstances()
 			info.InstanceOffset = StaticInstanceDatas.size();
 			info.VertexBufferIndex = CurrBufferIndex;
 			//populate the buffer data vector
-			for (int j = Start; j < i; ++j) {	//maybe should do in outer loop, then gather all the materials too
+			for (int j = Start; j < i; ++j) {
+				//debug instances
+				InstanceData debugData;
+				Vector3 translate = StaticProxies[j].BoundingBox.Center;
+				Vector3 scale = StaticProxies[j].BoundingBox.Extents;
+				Matrix matrix = Matrix::CreateScale(scale);
+				matrix *= Matrix::CreateTranslation(translate);
+				debugData.ModelToWorld = matrix;
+				debugData.bIsLit = false;
+				debugData.Color = { 0.f, 1.f, 0.f, 1.f };
+				StaticDebugInstanceDatas.emplace_back(debugData);
+				//check if within the camera frustum
+				DirectX::ContainmentType result = frustum.Contains(StaticProxies[j].BoundingBox);
+				if (result == DirectX::ContainmentType::DISJOINT)
+				{
+					DebugInfo.CulledObjectCount++;
+					continue;
+				}
 				TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)StaticProxies[j].EnttId);
 				RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>((entt::entity)StaticProxies[j].EnttId);
 				InstanceData Data;
@@ -249,7 +367,14 @@ void ragdoll::Scene::BuildStaticInstances()
 			Start = i;
 		}
 	}
+
+	if (StaticInstanceDatas.empty())
 	{
+		StaticInstanceGroupInfos.clear();
+	}
+	else
+	{
+		Renderer.CommandList->open();
 		//create the instance buffer handle
 		nvrhi::BufferDesc InstanceBufferDesc;
 		InstanceBufferDesc.byteSize = sizeof(InstanceData) * StaticInstanceDatas.size();
@@ -259,13 +384,27 @@ void ragdoll::Scene::BuildStaticInstances()
 		StaticInstanceBufferHandle = Renderer.Device->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
 
 		//copy data over
-		Renderer.CommandList->open();
 		Renderer.CommandList->beginTrackingBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::CopyDest);
 		Renderer.CommandList->writeBuffer(StaticInstanceBufferHandle, StaticInstanceDatas.data(), sizeof(InstanceData) * StaticInstanceDatas.size());
 		Renderer.CommandList->setPermanentBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::ShaderResource);
 		Renderer.CommandList->close();
 		Renderer.Device->m_NvrhiDevice->executeCommandList(Renderer.CommandList);
 	}
+	//create the debug instance buffer
+	nvrhi::BufferDesc InstanceBufferDesc;
+	InstanceBufferDesc.byteSize = sizeof(InstanceData) * StaticDebugInstanceDatas.size();
+	InstanceBufferDesc.debugName = "Debug instance buffer";
+	InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
+	InstanceBufferDesc.structStride = sizeof(InstanceData);
+	StaticInstanceDebugBufferHandle = Renderer.Device->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
+
+	//copy data over
+	Renderer.CommandList->open();
+	Renderer.CommandList->beginTrackingBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::CopyDest);
+	Renderer.CommandList->writeBuffer(StaticInstanceDebugBufferHandle, StaticDebugInstanceDatas.data(), sizeof(InstanceData)* StaticDebugInstanceDatas.size());
+	Renderer.CommandList->setPermanentBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::ShaderResource);
+	Renderer.CommandList->close();
+	Renderer.Device->m_NvrhiDevice->executeCommandList(Renderer.CommandList);
 }
 
 void PrintRecursive(ragdoll::Guid id, int level, std::shared_ptr<ragdoll::EntityManager> em)

@@ -274,12 +274,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 					min.y = std::min(v.position.y, min.y); max.y = std::max(v.position.y, max.y);
 					min.z = std::min(v.position.z, min.z); max.z = std::max(v.position.z, max.z);
 				}
-				DirectX::XMFLOAT3 extents = max - min;
-				DirectX::XMFLOAT3 center = min + extents / 2.f;
-				AssetManager::GetInstance()->VertexBufferInfos[submesh.VertexBufferIndex].BestFitBox = {
-					center,
-					extents
-				};
+				DirectX::BoundingBox::CreateFromPoints(AssetManager::GetInstance()->VertexBufferInfos[submesh.VertexBufferIndex].BestFitBox, min, max);
 			}
 		}
 #if 0

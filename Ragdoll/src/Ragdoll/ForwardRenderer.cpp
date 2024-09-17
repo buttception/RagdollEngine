@@ -139,7 +139,7 @@ int32_t ForwardRenderer::AddTextureToTable(nvrhi::TextureHandle tex)
 	return TextureCount - 1;
 }
 
-void ForwardRenderer::BeginFrame(CBuffer& Cbuf)
+void ForwardRenderer::BeginFrame()
 {
 	MICROPROFILE_SCOPEI("Render", "Begin Frame", MP_BLUE);
 	Device->BeginFrame();
@@ -157,77 +157,6 @@ void ForwardRenderer::BeginFrame(CBuffer& Cbuf)
 		CommandList->close();
 		Device->m_NvrhiDevice->executeCommandList(CommandList);
 	}
-
-	//manipulate the cube and camera
-	struct Data {
-		Vector3 translate{ 0.f, 0.f, 0.f };
-		Vector3 scale = { 1.f, 1.f, 1.f };
-		Vector3 rotate = { 0.f, 0.f, 0.f };
-		Vector3 cameraPos = { 0.f, 1.f, 5.f };
-		float cameraYaw = DirectX::XM_PI;
-		float cameraPitch = 0.f;
-		float cameraFov = 60.f;
-		float cameraNear = 0.01f;
-		float cameraFar = 1000.f;
-		float cameraAspect = 16.f / 9.f;
-		float cameraSpeed = 5.f;
-		float cameraRotationSpeed = 15.f;
-		Color dirLightColor = { 1.f,1.f,1.f,1.f };
-		Color ambientLight = { 0.2f, 0.2f, 0.2f, 1.f };
-		float ambientIntensity = 0.2f;
-		Vector2 azimuthAndElevation = { 0.f, 45.f };
-	};
-	static Data data;
-	ImGui::Begin("Camera Manipulate");
-	ImGui::SliderFloat("Camera FOV (Degrees)", &data.cameraFov, 60.f, 120.f);
-	ImGui::SliderFloat("Camera Near", &data.cameraNear, 0.01f, 1.f);
-	ImGui::SliderFloat("Camera Far", &data.cameraFar, 10.f, 10000.f);
-	ImGui::SliderFloat("Camera Aspect Ratio", &data.cameraAspect, 0.01f, 5.f);
-	ImGui::SliderFloat("Camera Speed", &data.cameraSpeed, 0.01f, 30.f);
-	ImGui::SliderFloat("Camera Rotation Speed (Degrees)", &data.cameraRotationSpeed, 5.f, 100.f);
-	ImGui::ColorEdit3("Light Diffuse", &data.dirLightColor.x);
-	ImGui::ColorEdit3("Ambient Light Diffuse", &data.ambientLight.x);
-	ImGui::SliderFloat("Azimuth (Degrees)", &data.azimuthAndElevation.x, 0.f, 360.f);
-	ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, -90.f, 90.f);
-	ImGui::End();
-
-	Matrix world = Matrix::CreateScale(data.scale);
-	world *= Matrix::CreateFromQuaternion(Quaternion::CreateFromYawPitchRoll(data.rotate));
-	world *= Matrix::CreateTranslation(data.translate);
-	Matrix proj = Matrix::CreatePerspectiveFieldOfView(DirectX::XMConvertToRadians(data.cameraFov), data.cameraAspect, data.cameraNear, data.cameraFar);
-	Vector3 cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
-	Matrix view = Matrix::CreateLookAt(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
-	Cbuf.viewProj = view * proj;
-	Cbuf.sceneAmbientColor = data.ambientLight;
-	Cbuf.lightDiffuseColor = data.dirLightColor;
-	Vector2 azimuthElevationRad = {
-		DirectX::XMConvertToRadians(data.azimuthAndElevation.x),
-		DirectX::XMConvertToRadians(data.azimuthAndElevation.y) };
-	Cbuf.lightDirection = Vector3(
-		sinf(azimuthElevationRad.y) * cosf(azimuthElevationRad.x),
-		cosf(azimuthElevationRad.y) * cosf(azimuthElevationRad.x),
-		sinf(azimuthElevationRad.x));
-	Cbuf.cameraPosition = data.cameraPos;
-
-	//hardcoded handling of movement now
-	if (!ImGui::IsAnyItemFocused() && !ImGui::IsAnyItemActive()) {
-		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_W))
-			data.cameraPos += cameraDir * data.cameraSpeed * PrimaryWindow->GetFrameTime();
-		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_S))
-			data.cameraPos -= cameraDir * data.cameraSpeed * PrimaryWindow->GetFrameTime();
-		Vector3 cameraRight = -cameraDir.Cross(Vector3(0.f, 1.f, 0.f));
-		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_A))
-			data.cameraPos += cameraRight * data.cameraSpeed * PrimaryWindow->GetFrameTime();
-		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_D))
-			data.cameraPos -= cameraRight * data.cameraSpeed * PrimaryWindow->GetFrameTime();
-		if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
-		{
-			auto& io = ImGui::GetIO();
-			data.cameraYaw -= io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindow->GetFrameTime();
-			data.cameraPitch += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindow->GetFrameTime();
-		}
-	}
-	Cbuf.lightDiffuseColor = data.dirLightColor;
 }
 
 void ForwardRenderer::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, CBuffer& Cbuf)
@@ -508,4 +437,59 @@ void ForwardRenderer::CreateResource()
 	pipelineDesc.inputLayout = InputLayoutHandle;
 
 	GraphicsPipeline = Device->m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);
+
+	pipelineDesc.renderState.rasterState.fillMode = nvrhi::RasterFillMode::Wireframe;
+
+	WireframePipeline = Device->m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);
+}
+
+void ForwardRenderer::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t instanceCount, CBuffer& Cbuf)
+{
+	if (instanceCount == 0)
+		return;
+	//make it instanced next time
+	auto fbDesc = nvrhi::FramebufferDesc()
+		.addColorAttachment(Device->GetCurrentBackbuffer())
+		.setDepthAttachment(DepthBuffer);
+	nvrhi::FramebufferHandle pipelineFb = Device->m_NvrhiDevice->createFramebuffer(fbDesc);
+
+	nvrhi::BindingSetDesc bindingSetDesc;
+	bindingSetDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, instanceBuffer),
+	};
+	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
+	{
+		bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler(i, AssetManager::GetInstance()->Samplers[i]));
+	}
+	BindingSetHandle = Device->m_NvrhiDevice->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+
+	nvrhi::GraphicsState state;
+	state.pipeline = WireframePipeline;
+	state.framebuffer = pipelineFb;
+	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
+	state.indexBuffer = { AssetManager::GetInstance()->IBO, nvrhi::Format::R32_UINT, 0 };
+	state.vertexBuffers = {
+		{ AssetManager::GetInstance()->VBO }
+	};
+	state.addBindingSet(BindingSetHandle);
+	state.addBindingSet(DescriptorTable);
+
+	CommandList->open();
+	CommandList->beginMarker("Debug Draws");
+	CommandList->writeBuffer(ConstantBuffer, &Cbuf, sizeof(CBuffer));
+	CommandList->setGraphicsState(state);
+
+	nvrhi::DrawArguments args;
+	args.vertexCount = 36;
+	args.startVertexLocation = 0;
+	args.startIndexLocation = 0;
+	args.instanceCount = instanceCount;
+	Cbuf.instanceOffset = 0;
+	CommandList->writeBuffer(ConstantBuffer, &Cbuf, sizeof(CBuffer));
+	CommandList->drawIndexed(args);
+
+	CommandList->endMarker();
+	CommandList->close();
+	Device->m_NvrhiDevice->executeCommandList(CommandList);
 }

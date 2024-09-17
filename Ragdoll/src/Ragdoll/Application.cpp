@@ -112,7 +112,6 @@ namespace ragdoll
 		m_Scene->UpdateTransforms();
 		m_Scene->UpdateStaticProxies();
 		m_Scene->ResetTransformDirtyFlags();
-		m_Scene->BuildStaticInstances();
 	}
 
 	void Application::Run()
@@ -145,6 +144,7 @@ namespace ragdoll
 
 	void Application::Shutdown()
 	{
+		AssetManager::GetInstance()->Release();
 		m_Scene->Shutdown();
 		m_FileManager->Shutdown();
 		m_PrimaryWindow->Shutdown();

@@ -418,6 +418,7 @@ int32_t GeometryBuilder::BuildIcosahedron(float size)
     Vertices.clear();
     Indices.clear();
 
+    size /= 2.f;
     constexpr float  t = 1.618033988749894848205f; // (1 + sqrt(5)) / 2
     constexpr float t2 = 1.519544995837552493271f; // sqrt( 1 + sqr( (1 + sqrt(5)) / 2 ) )
 

@@ -25,6 +25,7 @@ class ForwardRenderer {
 	nvrhi::BufferHandle IndexBuffer;
 
 	nvrhi::GraphicsPipelineHandle GraphicsPipeline;
+	nvrhi::GraphicsPipelineHandle WireframePipeline;
 
 	std::shared_ptr<ragdoll::Window> PrimaryWindow;
 	std::shared_ptr<ragdoll::FileManager> FileManager;
@@ -50,8 +51,9 @@ public:
 	void CreateCustomMeshes();
 	int32_t AddTextureToTable(nvrhi::TextureHandle tex);
 
-	void BeginFrame(CBuffer& Cbug);
+	void BeginFrame();
 	void DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, CBuffer& Cbuf);
+	void DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t instanceCount, CBuffer& Cbuf);
 private:
 	//handled at renderer
 	void CreateResource();

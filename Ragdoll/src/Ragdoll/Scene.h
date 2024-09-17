@@ -41,12 +41,17 @@ namespace ragdoll {
 		int32_t VertexBufferIndex;
 	};
 
+	struct DebugInfo {
+		uint32_t CulledObjectCount{};
+	};
+
 	struct SceneConfig {
 		bool bIsThereCustomMeshes{ false };
 	};
 
 	class Scene {
 		ImguiRenderer ImguiInterface;
+		std::shared_ptr<Window> PrimaryWindow;
 
 		//Transforms
 		std::shared_ptr<EntityManager> EntityManager;
@@ -59,22 +64,30 @@ namespace ragdoll {
 		bool m_DirtyOnwards{ false };
 
 		//Rendering
+		bool bIsCameraDirty{ true };
 		CBuffer CBuffer;
 		std::vector<Proxy> StaticProxies;
 		std::vector<DirectX::BoundingBox> ProxyBoundingBoxes;
 		std::vector<InstanceData> StaticInstanceDatas;
 		std::vector<InstanceGroupInfo> StaticInstanceGroupInfos;
 		nvrhi::BufferHandle StaticInstanceBufferHandle;
+		std::vector<InstanceData> StaticDebugInstanceDatas;
+		nvrhi::BufferHandle StaticInstanceDebugBufferHandle;	//contains all the aabb boxes to draw
 
 	public:
 		ForwardRenderer Renderer;
 		SceneConfig Config;
+		DebugInfo DebugInfo;
+		Matrix CameraViewProjection;
+		Matrix CameraView;
 
 		Scene(Application*);
 
 		void Init();
 		void Update(float _dt);
 		void Shutdown();
+
+		void UpdateControls(float _dt);
 
 		//Transforms
 		void UpdateTransforms();
@@ -84,7 +97,7 @@ namespace ragdoll {
 		//Renderable
 		void PopulateStaticProxies();
 		void UpdateStaticProxies();
-		void BuildStaticInstances();
+		void BuildStaticInstances(const Matrix& cameraViewProjection, const Matrix& cameraView);
 
 	private:
 		//Transforms

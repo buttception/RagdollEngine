@@ -75,6 +75,7 @@ class AssetManager
 {
 public:
 	static AssetManager* GetInstance();
+	static void Release() { s_Instance = nullptr; }
 
 	std::vector<VertexBufferInfo> VertexBufferInfos;
 	std::vector<Mesh> Meshes;
