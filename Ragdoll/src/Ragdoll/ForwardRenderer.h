@@ -4,7 +4,7 @@
 namespace ragdoll {
 	class Window;
 	class FileManager;
-	struct InstanceBuffer;
+	struct InstanceGroupInfo;
 }
 class DirectXDevice;
 
@@ -13,6 +13,7 @@ struct CBuffer {
 	Vector4 lightDiffuseColor = { 1.f, 1.f, 1.f, 1.f };
 	Vector4 sceneAmbientColor = { 0.2f, 0.2f, 0.2f, 1.f };
 	Vector3 lightDirection = { 1.f, -1.f, 1.f };
+	int instanceOffset{ 0 };
 	Vector3 cameraPosition;
 };
 
@@ -24,6 +25,7 @@ class ForwardRenderer {
 	nvrhi::BufferHandle IndexBuffer;
 
 	nvrhi::GraphicsPipelineHandle GraphicsPipeline;
+	nvrhi::GraphicsPipelineHandle WireframePipeline;
 
 	std::shared_ptr<ragdoll::Window> PrimaryWindow;
 	std::shared_ptr<ragdoll::FileManager> FileManager;
@@ -46,12 +48,13 @@ public:
 	void Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em);
 	void Shutdown();
 
+	void CreateCustomMeshes();
 	int32_t AddTextureToTable(nvrhi::TextureHandle tex);
 
-	void BeginFrame(CBuffer* Cbug);
-	void DrawAllInstances(std::vector<ragdoll::InstanceBuffer>* InstanceBuffers, CBuffer* Cbuf);
+	void BeginFrame();
+	void DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, CBuffer& Cbuf);
+	void DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t instanceCount, CBuffer& Cbuf);
 private:
 	//handled at renderer
 	void CreateResource();
-	void DrawInstanceBuffer(ragdoll::InstanceBuffer* Buffer, CBuffer* Cbuf);
 };

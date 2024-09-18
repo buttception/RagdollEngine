@@ -91,6 +91,7 @@ bool DirectXDevice::CreateDevice()
 	m_DeviceParams.swapChainBufferCount = 2;
 	m_DeviceParams.backBufferWidth = m_PrimaryWindow->GetBufferWidth();
 	m_DeviceParams.backBufferHeight = m_PrimaryWindow->GetBufferHeight();
+	//m_DeviceParams.vsyncEnabled = true;
 #define HR_RETURN(hr) if(FAILED(hr)) return false;
 	if (m_DeviceParams.enableDebugRuntime)
 	{

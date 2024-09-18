@@ -5,18 +5,12 @@
 #include "Components/TransformComp.h"
 #include "Components/RenderableComp.h"
 #include "Entity/EntityManager.h"
+#include "Octree.h"
 
 namespace ragdoll {
 	class EntityManager;
 	class TransformSystem;
 	class Application;
-
-	struct Proxy {
-		ENTT_ID_TYPE EnttId;	//can draw to a entity buffer next time
-		int32_t BufferIndex = -1;	//does not exist for now
-		int32_t MaterialIndex = -1;
-		//texture index and stuff next time
-	};
 
 	struct InstanceData {
 		Matrix ModelToWorld;
@@ -35,20 +29,24 @@ namespace ragdoll {
 		int bIsLit = 1;
 	};
 
-	struct InstanceBuffer {
-		nvrhi::BufferHandle BufferHandle;
-		uint32_t CurrentCapacity = StartCapacity;
+	struct InstanceGroupInfo {
 		uint32_t InstanceCount = 0;
-		std::vector<InstanceData> Data;
-
 		int32_t VertexBufferIndex;
-		std::vector<int32_t> MaterialIndices;
-		
-		static const uint32_t StartCapacity = 64;
+	};
+
+	struct DebugInfo {
+		uint32_t CulledObjectCount{};
+	};
+
+	struct SceneConfig {
+		bool bIsThereCustomMeshes{ false };
+		bool bDrawOctree{ false };
+		bool bDrawBoxes{ false };
 	};
 
 	class Scene {
-		ImguiRenderer ImguiInterface;
+		std::shared_ptr<ImguiRenderer> ImguiInterface;
+		std::shared_ptr<Window> PrimaryWindow;
 
 		//Transforms
 		std::shared_ptr<EntityManager> EntityManager;
@@ -61,13 +59,25 @@ namespace ragdoll {
 		bool m_DirtyOnwards{ false };
 
 		//Rendering
+		bool bIsCameraDirty{ true };
+		bool bFreezeFrustumCulling{ false };
 		CBuffer CBuffer;
-		std::vector<Proxy> Proxies;
-		bool bIsStaticProxiesBuilt{ false };
-		std::vector<InstanceBuffer> StaticInstanceBuffers;
+		Octree StaticOctree;
+		std::vector<Proxy> StaticProxiesToDraw;
+		std::vector<InstanceData> StaticInstanceDatas;
+		std::vector<InstanceGroupInfo> StaticInstanceGroupInfos;
+		nvrhi::BufferHandle StaticInstanceBufferHandle;
+
+		std::vector<InstanceData> StaticDebugInstanceDatas;
+		nvrhi::BufferHandle StaticInstanceDebugBufferHandle;	//contains all the aabb boxes to draw
 
 	public:
-		ForwardRenderer Renderer;
+		std::shared_ptr<ForwardRenderer> Renderer;
+		SceneConfig Config;
+		DebugInfo DebugInfo;
+		Matrix CameraViewProjection;
+		Matrix CameraProjection;
+		Matrix CameraView;
 
 		Scene(Application*);
 
@@ -75,12 +85,17 @@ namespace ragdoll {
 		void Update(float _dt);
 		void Shutdown();
 
+		void UpdateControls(float _dt);
+
 		//Transforms
 		void UpdateTransforms();
+		void ResetTransformDirtyFlags();
 		void AddEntityAtRootLevel(Guid entityId);
 
 		//Renderable
-		void BuildStaticInstances();
+		void PopulateStaticProxies();
+		void BuildStaticInstances(const Matrix& cameraProjection, const Matrix& cameraView);
+		void CullOctant(const Octant& octant, const DirectX::BoundingFrustum& frustum);
 
 	private:
 		//Transforms
@@ -89,5 +104,9 @@ namespace ragdoll {
 		void TraverseTreeAndUpdateTransforms();
 		void TraverseNode(const Guid& guid);
 		Matrix GetLocalModelMatrix(const TransformComp& trans);
+		void UpdateTransform(TransformComp& comp, const Guid& id);
+
+		//Debug
+		void AddOctantDebug(Octant octant, uint32_t level);
 	};
 }

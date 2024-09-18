@@ -1,5 +1,6 @@
 #pragma once
 #include "Ragdoll/Math/RagdollMath.h"
+#include "Ragdoll/AssetManager.h"
 #include <nvrhi/nvrhi.h>
 
 class ForwardRenderer;
@@ -15,6 +16,9 @@ class GLTFLoader {
 	std::shared_ptr<ragdoll::FileManager> FileManager;
 	std::shared_ptr<ragdoll::EntityManager> EntityManager;
 	std::shared_ptr<ragdoll::Scene> Scene;
+
+	std::vector<uint32_t> IndexStagingBuffer;
+	std::vector<Vertex> VertexStagingBuffer;
 public:
 	void Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> tl);
 	void LoadAndCreateModel(const std::string& fileName);

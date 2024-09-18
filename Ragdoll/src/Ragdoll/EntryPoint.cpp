@@ -1,5 +1,5 @@
 ﻿/*!
-\file		Launcher.cpp
+\file		EntryPoint.h
 \date		05/08/2024
 
 \author		Devin Tan
@@ -27,27 +27,43 @@
 			OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 			SOFTWARE.
 __________________________________________________________________________________*/
-
+#pragma once
 #include "ragdollpch.h"
-#include "Ragdoll.h"
+#include "Application.h"
+#include <cxxopts.hpp>
 
-class Launcher : public ragdoll::Application
-{
-public:
-	Launcher() = default;
-	~Launcher() override = default;
-
-	void Init(const ApplicationConfig& config) override
-	{
-		Application::Init(config);
-
-	}
-};
-/**
- * \brief Creates the editor application
- * \return The editor application
- */
 ragdoll::Application* ragdoll::CreateApplication()
 {
-	return new Launcher();
+	return new Application();
+}
+
+int main(int argc, char* argv[])
+{
+#ifdef RAGDOLL_DEBUG
+	// Flag _CrtDumpMemoryLeak to be called AFTER program ends.
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+#endif
+	auto app = ragdoll::CreateApplication();
+
+	cxxopts::Options options("Ragdoll Renderer", "Custom renderer using nvrhi for D3D12");
+	options.add_options()
+		("custom", "Create custom meshes") // a bool parameter
+		("sample", "glTF sample scene to load", cxxopts::value<std::string>())
+		("scene", "glTF scene to load", cxxopts::value<std::string>())
+		("dbgOctree", "Draw Octree debug")
+		("dbgBoxes", "Draw Bounding Box")
+		;
+	auto result = options.parse(argc, argv);
+	ragdoll::Application::ApplicationConfig config;
+	config.bCreateCustomMeshes = result["custom"].as_optional<bool>().value_or(false);
+	config.bDrawDebugOctree = result["dbgOctree"].as_optional<bool>().value_or(false);
+	config.bDrawDebugBoundingBoxes = result["dbgBoxes"].as_optional<bool>().value_or(false);
+	config.glTfSampleSceneToLoad = result["sample"].as_optional<std::string>().value_or("");
+	config.glTfSceneToLoad = result["scene"].as_optional<std::string>().value_or("");
+
+	app->Init(config);
+	app->Run();
+	app->Shutdown();
+
+	delete app;
 }

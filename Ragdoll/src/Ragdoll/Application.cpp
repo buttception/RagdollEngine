@@ -58,7 +58,7 @@ namespace ragdoll
 {
 	void Application::Init(const ApplicationConfig& config)
 	{
-		UNREFERENCED_PARAMETER(config);
+		Config = config;
 		Logger::Init();
 		RD_CORE_INFO("spdlog initialized for use.");
 
@@ -94,22 +94,25 @@ namespace ragdoll
 
 		MICROPROFILE_TIMELINE_ENTER_STATIC(MP_DARKGOLDENROD, "GLTF Load");
 		{
-			if (false)
+			GLTFLoader loader;
+			loader.Init(m_FileManager->GetRoot(), m_Scene->Renderer.get(), m_FileManager, m_EntityManager, m_Scene);
+			if (!Config.glTfSampleSceneToLoad.empty())
 			{
-				GLTFLoader loader;
-				loader.Init(m_FileManager->GetRoot(), &m_Scene->Renderer, m_FileManager, m_EntityManager, m_Scene);
-				std::string sceneName{ "Sponza" };
+				std::string sceneName = Config.glTfSampleSceneToLoad;
 				std::filesystem::path fp = "gltf/2.0/";
 				fp = fp / sceneName / "glTF" / (sceneName + ".gltf");
 				loader.LoadAndCreateModel(fp.string());
-
-				//loader.LoadAndCreateModel("Instancing Test/FlyingWorld-BattleOfTheTrashGod.gltf");
+			}
+			else if (!Config.glTfSceneToLoad.empty())
+			{
+				loader.LoadAndCreateModel(Config.glTfSceneToLoad);
 			}
 		}
 		MICROPROFILE_TIMELINE_LEAVE_STATIC("GLTF Load");
 
 		m_Scene->UpdateTransforms();
-		m_Scene->BuildStaticInstances();
+		m_Scene->PopulateStaticProxies();
+		m_Scene->ResetTransformDirtyFlags();
 	}
 
 	void Application::Run()
@@ -142,12 +145,18 @@ namespace ragdoll
 
 	void Application::Shutdown()
 	{
+		AssetManager::GetInstance()->Release();
 		m_Scene->Shutdown();
 		m_FileManager->Shutdown();
 		m_PrimaryWindow->Shutdown();
+#ifdef _DEBUG
+		// to prevent the tzdb allocations from being reported as memory leaks
+		std::chrono::get_tzdb_list().~tzdb_list();
+#endif
 		GLFWContext::Shutdown();
 		MicroProfileShutdown();
 		RD_CORE_INFO("ragdoll Engine application shut down successfull");
+		Logger::Shutdown();
 	}
 
 	void Application::OnEvent(Event& event)

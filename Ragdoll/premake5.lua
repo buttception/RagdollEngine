@@ -1,12 +1,9 @@
 include "../dependencies.lua"
 
 project "Ragdoll"
-	kind "StaticLib"
 	language "C++"
 	cppdialect "C++20"
-	staticruntime "on"
-	warnings "Extra"
-	externalwarnings "Off"
+	staticruntime "On"
 
 	targetdir ("%{wks.location}/build/" .. outputdir .. "/%{prj.name}")
 	objdir ("%{wks.location}/build-int/" .. outputdir .. "/%{prj.name}")
@@ -59,6 +56,7 @@ project "Ragdoll"
 		"%{IncludesDir.nvrhi}",
 		"%{IncludesDir.tinygltf}",
 		"%{IncludesDir.microprofile}",
+		"%{IncludesDir.cxxopts}",
     }
 
 	prebuildcommands
@@ -74,9 +72,13 @@ project "Ragdoll"
 		runtime "Debug"
 		optimize "off"
 		symbols "on"
+		kind "ConsoleApp"
 
 	filter "configurations:Release"
 		defines "RAGDOLL_RELEASE"
 		runtime "Release"
 		optimize "on"
 		symbols "off"
+		kind "WindowedApp"
+		entrypoint "mainCRTStartup"
+	

@@ -126,10 +126,11 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		uint32_t materialIndicesOffset = AssetManager::GetInstance()->Materials.size();
 		for (const tinygltf::Primitive& itPrim : itMesh.primitives) 
 		{
-			Submesh submesh;
+			Submesh submesh{};
+			DirectX::BoundingBox box;
 			VertexBufferInfo buffer;
-			std::vector<uint32_t> indices;
-			std::vector<Vertex> vertices;
+			IndexStagingBuffer.clear();
+			VertexStagingBuffer.clear();
 
 			//set the material index for the primitive
 			submesh.MaterialIndex = itPrim.material + materialIndicesOffset;
@@ -138,26 +139,26 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			{
 				const tinygltf::Accessor& accessor = model.accessors[itPrim.indices];
 				const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
-				indices.resize(accessor.count);
+				IndexStagingBuffer.resize(accessor.count);
 				uint8_t* data = model.buffers[bufferView.buffer].data.data();
 				uint32_t byteOffset = bufferView.byteOffset + accessor.byteOffset;
 				//manually assign to reconcil things like short to uint
 				for (int i = 0; i < accessor.count; ++i) {
 					switch (accessor.componentType) {
 					case TINYGLTF_COMPONENT_TYPE_SHORT:
-						indices[i] = *reinterpret_cast<int16_t*>(data + byteOffset + i * tinygltf::GetComponentSizeInBytes(accessor.componentType));
+						IndexStagingBuffer[i] = *reinterpret_cast<int16_t*>(data + byteOffset + i * tinygltf::GetComponentSizeInBytes(accessor.componentType));
 						break;
 					case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
-						indices[i] = *reinterpret_cast<uint16_t*>(data + byteOffset + i * tinygltf::GetComponentSizeInBytes(accessor.componentType));
+						IndexStagingBuffer[i] = *reinterpret_cast<uint16_t*>(data + byteOffset + i * tinygltf::GetComponentSizeInBytes(accessor.componentType));
 						break;
 					case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
-						indices[i] = *reinterpret_cast<uint32_t*>(data + byteOffset + i * tinygltf::GetComponentSizeInBytes(accessor.componentType));
+						IndexStagingBuffer[i] = *reinterpret_cast<uint32_t*>(data + byteOffset + i * tinygltf::GetComponentSizeInBytes(accessor.componentType));
 						break;
 					default:
 						RD_ASSERT(true, "Unsupport index type for {}", itMesh.name);
 					}
 					if(accessor.maxValues.size() != 0)
-						RD_ASSERT(indices[i] > accessor.maxValues[0], "");
+						RD_ASSERT(IndexStagingBuffer[i] > accessor.maxValues[0], "");
 				}
 #if 0
 				RD_CORE_TRACE("Loaded {} indices at byte offest {}", accessor.count, accessor.byteOffset);
@@ -180,7 +181,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			//for every attribute, check if there is one that corresponds with renderer attributes
 			bool tangentExist = false, binormalExist = false;
 			{
-				vertices.resize(vertexCount);
+				VertexStagingBuffer.resize(vertexCount);
 				for (const auto& it : attributeToAccessors) {
 					nvrhi::VertexAttributeDesc const* desc = nullptr;
 					const tinygltf::Accessor& accessor = it.second;
@@ -192,7 +193,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 							if (itDesc.name == "POSITION")
 								type = AttributeType::Position;
 							else if (itDesc.name == "COLOR")
-								type = AttributeType::Color;
+								continue;	//skip vertex color
 							else if (itDesc.name == "NORMAL")
 								type = AttributeType::Normal;
 							else if (itDesc.name == "TANGENT") {
@@ -213,11 +214,32 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 					//memcpy the data from the buffer over into the vertices
 					uint8_t* data = model.buffers[bufferView.buffer].data.data();
 					for (int i = 0; i < vertexCount; ++i) {
-						Vertex& v = vertices[i];
+						Vertex& v = VertexStagingBuffer[i];
 						uint8_t* bytePos = reinterpret_cast<uint8_t*>(&v) + desc->offset;
 						uint32_t byteOffset = accessor.byteOffset + bufferView.byteOffset;
 						uint32_t stride = bufferView.byteStride == 0 ? size : bufferView.byteStride;
 						memcpy(bytePos, data + byteOffset + i * stride, size);
+					}
+
+					if (type == AttributeType::Position)
+					{
+						if (accessor.maxValues.size() == 3 && accessor.minValues.size() == 3)
+						{
+							Vector3 max{ (float)accessor.maxValues[0], (float)accessor.maxValues[1], (float)accessor.maxValues[2] };
+							Vector3 min{ (float)accessor.minValues[0], (float)accessor.minValues[1], (float)accessor.minValues[2] };
+							DirectX::BoundingBox::CreateFromPoints(box, min, max);
+						}
+						else
+						{
+							Vector3 min, max;
+							min = max = VertexStagingBuffer[0].position;
+							for (const Vertex& v : VertexStagingBuffer) {
+								min.x = std::min(v.position.x, min.x); max.x = std::max(v.position.x, max.x);
+								min.y = std::min(v.position.y, min.y); max.y = std::max(v.position.y, max.y);
+								min.z = std::min(v.position.z, min.z); max.z = std::max(v.position.z, max.z);
+							}
+							DirectX::BoundingBox::CreateFromPoints(box, min, max);
+						}
 					}
 #if 0
 					RD_CORE_INFO("Loaded {} vertices of attribute: {}", vertexCount, desc->name);
@@ -230,10 +252,10 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 				if (!tangentExist || !binormalExist)
 				{
 					//generate the tangents and binormals
-					for (size_t i = 0; i < indices.size(); i += 3) {
-						Vertex& v0 = vertices[indices[i]];
-						Vertex& v1 = vertices[indices[i + 1]];
-						Vertex& v2 = vertices[indices[i + 2]];
+					for (size_t i = 0; i < IndexStagingBuffer.size(); i += 3) {
+						Vertex& v0 = VertexStagingBuffer[IndexStagingBuffer[i]];
+						Vertex& v1 = VertexStagingBuffer[IndexStagingBuffer[i + 1]];
+						Vertex& v2 = VertexStagingBuffer[IndexStagingBuffer[i + 2]];
 
 						Vector3 edge1 = v1.position - v0.position;
 						Vector3 edge2 = v2.position - v0.position;
@@ -245,7 +267,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 
 						Vector3 tangent;
 						if (tangentExist)
-							tangent = vertices[indices[i]].tangent;
+							tangent = VertexStagingBuffer[IndexStagingBuffer[i]].tangent;
 						else {
 							tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
 							tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
@@ -255,20 +277,14 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 							tangent.Normalize();
 							v0.tangent = v1.tangent = v2.tangent = tangent;
 						}
-
-						// Compute bitangent
-						if (!binormalExist)
-						{
-							Vector3 binormal = v0.normal.Cross(tangent) * ((deltaUV1.x * deltaUV2.y) - (deltaUV2.x * deltaUV1.y));
-							v0.binormal = v1.binormal = v2.binormal = binormal;
-						}
 					}
 				}
 			}
 
 			//add to the asset manager vertices
 			{
-				submesh.VertexBufferIndex = AssetManager::GetInstance()->AddVertices(vertices, indices);
+				submesh.VertexBufferIndex = AssetManager::GetInstance()->AddVertices(VertexStagingBuffer, IndexStagingBuffer);
+				AssetManager::GetInstance()->VertexBufferInfos[submesh.VertexBufferIndex].BestFitBox = box;
 				mesh.Submeshes.emplace_back(submesh);
 			}
 		}
@@ -441,9 +457,12 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			gltfMat.pbrMetallicRoughness.baseColorFactor[2],
 			gltfMat.pbrMetallicRoughness.baseColorFactor[3]);
 		//get the textures
-		mat.AlbedoTextureIndex = gltfMat.pbrMetallicRoughness.baseColorTexture.index + textureIndicesOffset;
-		mat.RoughnessMetallicTextureIndex = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index + textureIndicesOffset;
-		mat.NormalTextureIndex = gltfMat.normalTexture.index + textureIndicesOffset;
+		if(gltfMat.pbrMetallicRoughness.baseColorTexture.index >= 0)
+			mat.AlbedoTextureIndex = gltfMat.pbrMetallicRoughness.baseColorTexture.index + textureIndicesOffset;
+		if(gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index >= 0)
+			mat.RoughnessMetallicTextureIndex = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index + textureIndicesOffset;
+		if(gltfMat.normalTexture.index >= 0)
+			mat.NormalTextureIndex = gltfMat.normalTexture.index + textureIndicesOffset;
 		mat.bIsLit = true;
 		AssetManager::GetInstance()->Materials.emplace_back(mat);
 	}

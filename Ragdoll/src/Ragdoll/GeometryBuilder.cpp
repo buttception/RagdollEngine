@@ -67,20 +67,52 @@ int32_t GeometryBuilder::BuildCube(float size)
         // Four vertices per face.
         // position // color // normal // tangent // binormal // t0
         // (normal - side1 - side2) * tsize
-        Vertices.push_back({ (normal - side1 - side2) * halfExtents, {1.f, 1.f, 1.f, 1.f}, normal, Vector3::Zero, Vector3::Zero, texcoords[0] });
+        Vertices.push_back({ (normal - side1 - side2) * halfExtents, normal, Vector3::Zero, texcoords[0] });
 
         // (normal - side1 + side2) * tsize
-        Vertices.push_back({ (normal - side1 + side2) * halfExtents, {1.f, 1.f, 1.f, 1.f}, normal, Vector3::Zero, Vector3::Zero, texcoords[1] });
+        Vertices.push_back({ (normal - side1 + side2) * halfExtents, normal, Vector3::Zero, texcoords[1] });
 
         // (normal + side1 + side2) * tsize
-        Vertices.push_back({ (normal + side1 + side2) * halfExtents, {1.f, 1.f, 1.f, 1.f}, normal, Vector3::Zero, Vector3::Zero, texcoords[2] });
+        Vertices.push_back({ (normal + side1 + side2) * halfExtents, normal, Vector3::Zero, texcoords[2] });
 
         // (normal + side1 - side2) * tsize
-        Vertices.push_back({ (normal + side1 - side2) * halfExtents, {1.f, 1.f, 1.f, 1.f}, normal, Vector3::Zero, Vector3::Zero, texcoords[3] });
+        Vertices.push_back({ (normal + side1 - side2) * halfExtents, normal, Vector3::Zero, texcoords[3] });
     }
     ReverseWinding(Indices, Vertices);
 
+    //generate the tangents and binormals
+    for (size_t i = 0; i < Indices.size(); i += 3) {
+        Vertex& v0 = Vertices[Indices[i]];
+        Vertex& v1 = Vertices[Indices[i + 1]];
+        Vertex& v2 = Vertices[Indices[i + 2]];
+
+        Vector3 edge1 = v1.position - v0.position;
+        Vector3 edge2 = v2.position - v0.position;
+
+        Vector2 deltaUV1 = v1.texcoord - v0.texcoord;
+        Vector2 deltaUV2 = v2.texcoord - v0.texcoord;
+
+        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        Vector3 tangent;
+        tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+        // Normalize and store tangent
+        tangent.Normalize();
+        v0.tangent = v1.tangent = v2.tangent = tangent;
+    }
+
     uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    Vector3 min, max;
+    min = max = Vertices[0].position;
+    for (const Vertex& v : Vertices) {
+        min.x = std::min(v.position.x, min.x); max.x = std::max(v.position.x, max.x);
+        min.y = std::min(v.position.y, min.y); max.y = std::max(v.position.y, max.y);
+        min.z = std::min(v.position.z, min.z); max.z = std::max(v.position.z, max.z);
+    }
+    DirectX::BoundingBox::CreateFromPoints(AssetManager::GetInstance()->VertexBufferInfos[index].BestFitBox, min, max);
     return index;
 }
 
@@ -122,7 +154,7 @@ int32_t GeometryBuilder::BuildSphere(float diameter, uint32_t tessellation)
             const Vector3 normal{ dx, dy, dz };
             const Vector2 texCoord{ u, v };
             const DirectX::XMVECTOR pos = DirectX::XMVectorScale(normal, radius);
-            Vertices.push_back({ normal * radius, { 1.f,1.f,1.f,1.f }, normal, Vector3::Zero, Vector3::Zero, texCoord});
+            Vertices.push_back({ normal * radius, normal, Vector3::Zero, texCoord});
         }
     }
 
@@ -147,7 +179,39 @@ int32_t GeometryBuilder::BuildSphere(float diameter, uint32_t tessellation)
     }
     ReverseWinding(Indices, Vertices);
 
+    //generate the tangents and binormals
+    for (size_t i = 0; i < Indices.size(); i += 3) {
+        Vertex& v0 = Vertices[Indices[i]];
+        Vertex& v1 = Vertices[Indices[i + 1]];
+        Vertex& v2 = Vertices[Indices[i + 2]];
+
+        Vector3 edge1 = v1.position - v0.position;
+        Vector3 edge2 = v2.position - v0.position;
+
+        Vector2 deltaUV1 = v1.texcoord - v0.texcoord;
+        Vector2 deltaUV2 = v2.texcoord - v0.texcoord;
+
+        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        Vector3 tangent;
+        tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+        // Normalize and store tangent
+        tangent.Normalize();
+        v0.tangent = v1.tangent = v2.tangent = tangent;
+    }
+
     uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    Vector3 min, max;
+    min = max = Vertices[0].position;
+    for (const Vertex& v : Vertices) {
+        min.x = std::min(v.position.x, min.x); max.x = std::max(v.position.x, max.x);
+        min.y = std::min(v.position.y, min.y); max.y = std::max(v.position.y, max.y);
+        min.z = std::min(v.position.z, min.z); max.z = std::max(v.position.z, max.z);
+    }
+    DirectX::BoundingBox::CreateFromPoints(AssetManager::GetInstance()->VertexBufferInfos[index].BestFitBox, min, max);
     return index;
 }
 
@@ -214,7 +278,7 @@ void CreateCylinderCap(std::vector<Vertex>& vertices, std::vector<uint32_t>& ind
         Vector3 pos = position;
         Vector2 texCoord = textureCoordinate;
         Vector3 norm = normal;
-        vertices.push_back({ pos, {1.f,1.f,1.f,1.f}, normal, Vector3::Zero, Vector3::Zero, texCoord});
+        vertices.push_back({ pos, normal, Vector3::Zero, texCoord});
     }
 }
 
@@ -244,8 +308,8 @@ int32_t GeometryBuilder::BuildCylinder(float height, float diameter, size_t tess
 
         Vector2 TexCoord{ u, 0.f };
 
-        Vertices.push_back({ sideOffset + topOffset, { 1.f,1.f,1.f,1.f }, normal, Vector3::Zero, Vector3::Zero, TexCoord });
-        Vertices.push_back({ sideOffset - topOffset, { 1.f,1.f,1.f,1.f }, normal, Vector3::Zero, Vector3::Zero, TexCoord });
+        Vertices.push_back({ sideOffset + topOffset, normal, Vector3::Zero, TexCoord });
+        Vertices.push_back({ sideOffset - topOffset, normal, Vector3::Zero, TexCoord });
 
         Indices.push_back(i * 2);
         Indices.push_back((i * 2 + 2) % (stride * 2));
@@ -262,7 +326,39 @@ int32_t GeometryBuilder::BuildCylinder(float height, float diameter, size_t tess
 
     ReverseWinding(Indices, Vertices);
 
+    //generate the tangents and binormals
+    for (size_t i = 0; i < Indices.size(); i += 3) {
+        Vertex& v0 = Vertices[Indices[i]];
+        Vertex& v1 = Vertices[Indices[i + 1]];
+        Vertex& v2 = Vertices[Indices[i + 2]];
+
+        Vector3 edge1 = v1.position - v0.position;
+        Vector3 edge2 = v2.position - v0.position;
+
+        Vector2 deltaUV1 = v1.texcoord - v0.texcoord;
+        Vector2 deltaUV2 = v2.texcoord - v0.texcoord;
+
+        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        Vector3 tangent;
+        tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+        // Normalize and store tangent
+        tangent.Normalize();
+        v0.tangent = v1.tangent = v2.tangent = tangent;
+    }
+
     uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    Vector3 min, max;
+    min = max = Vertices[0].position;
+    for (const Vertex& v : Vertices) {
+        min.x = std::min(v.position.x, min.x); max.x = std::max(v.position.x, max.x);
+        min.y = std::min(v.position.y, min.y); max.y = std::max(v.position.y, max.y);
+        min.z = std::min(v.position.z, min.z); max.z = std::max(v.position.z, max.z);
+    }
+    DirectX::BoundingBox::CreateFromPoints(AssetManager::GetInstance()->VertexBufferInfos[index].BestFitBox, min, max);
     return index;
 }
 
@@ -300,8 +396,8 @@ int32_t GeometryBuilder::BuildCone(float diameter, float height, size_t tessella
         normal = DirectX::XMVector3Normalize(normal);
 
         // Duplicate the top vertex for distinct normals
-        Vertices.push_back({ topOffset, Vector4::One, normal, Vector3::Zero, Vector3::Zero, Vector2::Zero });
-        Vertices.push_back({ pt, Vector4::One, normal, Vector3::Zero, Vector3::Zero, DirectX::XMVectorAdd(textureCoordinate, DirectX::g_XMIdentityR1) });
+        Vertices.push_back({ topOffset, normal, Vector3::Zero, Vector2::Zero });
+        Vertices.push_back({ pt, normal, Vector3::Zero, DirectX::XMVectorAdd(textureCoordinate, DirectX::g_XMIdentityR1) });
 
         Indices.push_back(i * 2);
         Indices.push_back((i * 2 + 3) % (stride * 2));
@@ -313,7 +409,39 @@ int32_t GeometryBuilder::BuildCone(float diameter, float height, size_t tessella
 
     ReverseWinding(Indices, Vertices);
 
+    //generate the tangents and binormals
+    for (size_t i = 0; i < Indices.size(); i += 3) {
+        Vertex& v0 = Vertices[Indices[i]];
+        Vertex& v1 = Vertices[Indices[i + 1]];
+        Vertex& v2 = Vertices[Indices[i + 2]];
+
+        Vector3 edge1 = v1.position - v0.position;
+        Vector3 edge2 = v2.position - v0.position;
+
+        Vector2 deltaUV1 = v1.texcoord - v0.texcoord;
+        Vector2 deltaUV2 = v2.texcoord - v0.texcoord;
+
+        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        Vector3 tangent;
+        tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+        // Normalize and store tangent
+        tangent.Normalize();
+        v0.tangent = v1.tangent = v2.tangent = tangent;
+    }
+
     uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    Vector3 min, max;
+    min = max = Vertices[0].position;
+    for (const Vertex& v : Vertices) {
+        min.x = std::min(v.position.x, min.x); max.x = std::max(v.position.x, max.x);
+        min.y = std::min(v.position.y, min.y); max.y = std::max(v.position.y, max.y);
+        min.z = std::min(v.position.z, min.z); max.z = std::max(v.position.z, max.z);
+    }
+    DirectX::BoundingBox::CreateFromPoints(AssetManager::GetInstance()->VertexBufferInfos[index].BestFitBox, min, max);
     return index;
 }
 
@@ -383,15 +511,47 @@ int32_t GeometryBuilder::BuildIcosahedron(float size)
 
         // Duplicate vertices to use face normals
         DirectX::XMVECTOR position = XMVectorScale(verts[v0], size);
-        Vertices.push_back({ position, Vector4::One, normal, Vector3::Zero, Vector3::Zero, Vector2::Zero });
+        Vertices.push_back({ position, normal, Vector3::Zero, Vector2::Zero });
 
         position = XMVectorScale(verts[v1], size);
-        Vertices.push_back({ position, Vector4::One, normal, Vector3::Zero, Vector3::Zero, {1.f, 0.f} });
+        Vertices.push_back({ position, normal, Vector3::Zero, {1.f, 0.f} });
 
         position = XMVectorScale(verts[v2], size);
-        Vertices.push_back({ position, Vector4::One, normal, Vector3::Zero, Vector3::Zero, {0.f, 1.f} });
+        Vertices.push_back({ position, normal, Vector3::Zero, {0.f, 1.f} });
+    }
+
+    //generate the tangents and binormals
+    for (size_t i = 0; i < Indices.size(); i += 3) {
+        Vertex& v0 = Vertices[Indices[i]];
+        Vertex& v1 = Vertices[Indices[i + 1]];
+        Vertex& v2 = Vertices[Indices[i + 2]];
+
+        Vector3 edge1 = v1.position - v0.position;
+        Vector3 edge2 = v2.position - v0.position;
+
+        Vector2 deltaUV1 = v1.texcoord - v0.texcoord;
+        Vector2 deltaUV2 = v2.texcoord - v0.texcoord;
+
+        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        Vector3 tangent;
+        tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+        // Normalize and store tangent
+        tangent.Normalize();
+        v0.tangent = v1.tangent = v2.tangent = tangent;
     }
 
     uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    Vector3 min, max;
+    min = max = Vertices[0].position;
+    for (const Vertex& v : Vertices) {
+        min.x = std::min(v.position.x, min.x); max.x = std::max(v.position.x, max.x);
+        min.y = std::min(v.position.y, min.y); max.y = std::max(v.position.y, max.y);
+        min.z = std::min(v.position.z, min.z); max.z = std::max(v.position.z, max.z);
+    }
+    DirectX::BoundingBox::CreateFromPoints(AssetManager::GetInstance()->VertexBufferInfos[index].BestFitBox, min, max);
     return index;
 }

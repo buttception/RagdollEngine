@@ -1,0 +1,34 @@
+{
+  "FileVersion": 2,
+  "Id": "8a10ac95-f6ef-2a31-ff07-b6076b669192",
+  "Items": [
+    {
+      "Id": "d36e3c71-6e55-421d-89c6-ff28750f637a",
+      "Command": "--custom"
+    },
+    {
+      "Id": "9fe3f89f-a35a-4da9-84a2-5b27a0cc5a0d",
+      "Command": "",
+      "Items": [
+        {
+          "Id": "6d9732a4-85a6-4928-8fce-b3da604b2a67",
+          "Command": "--dbgBoxes"
+        },
+        {
+          "Id": "79be8eeb-4578-4de4-a946-88f4dd8fd743",
+          "Command": "--dbgOctree"
+        }
+      ]
+    },
+    {
+      "Id": "74eef244-add6-4441-a3b9-639dd534aa61",
+      "Command": "",
+      "Items": [
+        {
+          "Id": "395cbeaa-ee05-47d8-8240-23067e17d7e7",
+          "Command": "--sample \"Sponza\""
+        }
+      ]
+    }
+  ]
+}

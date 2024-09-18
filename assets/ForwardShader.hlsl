@@ -3,6 +3,7 @@ cbuffer g_Const : register(b0) {
 	float4 lightDiffuseColor;
 	float4 sceneAmbientColor;
 	float3 lightDirection;
+	int instanceOffset;
 	float3 cameraPosition;
 };
 
@@ -28,30 +29,27 @@ Texture2D Textures[] : register(t0, space1);
 
 void main_vs(
 	in float3 inPos : POSITION,
-	in float4 inColor : COLOR,
 	in float3 inNormal : NORMAL,
 	in float3 inTangent : TANGENT,
-	in float3 inBinormal : BINORMAL,
 	in float2 inTexcoord : TEXCOORD,
 	in uint inInstanceId : SV_INSTANCEID,
 	out float4 outPos : SV_Position,
-	out float4 outColor : TEXCOORD1,
-	out float4 outFragPos : TEXCOORD2,
-	out float3 outNormal : TEXCOORD3,
-	out float3 outTangent : TEXCOORD4,
-	out float3 outBinormal : TEXCOORD5,
-	out float2 outTexcoord : TEXCOORD6,
-	out uint outInstanceId : TEXCOORD7
+	out float4 outFragPos : TEXCOORD1,
+	out float3 outNormal : TEXCOORD2,
+	out float3 outTangent : TEXCOORD3,
+	out float3 outBinormal : TEXCOORD4,
+	out float2 outTexcoord : TEXCOORD5,
+	out nointerpolation uint outInstanceId : TEXCOORD6
 )
 {
-	outFragPos = mul(float4(inPos, 1), InstanceDatas[inInstanceId].worldMatrix); 
+	InstanceData data = InstanceDatas[inInstanceId + instanceOffset];
+	outFragPos = mul(float4(inPos, 1), data.worldMatrix); 
 	outPos = mul(outFragPos, viewProjMatrix);
 
-	outNormal = normalize(mul(inNormal, transpose((float3x3)InstanceDatas[inInstanceId].invWorldMatrix)));
-	outTangent = normalize(mul(inTangent, transpose((float3x3)InstanceDatas[inInstanceId].invWorldMatrix)));
-	outBinormal = normalize(mul(inBinormal, transpose((float3x3)InstanceDatas[inInstanceId].invWorldMatrix)));
+	outNormal = normalize(mul(inNormal, transpose((float3x3)data.invWorldMatrix)));
+	outTangent = normalize(mul(inTangent, transpose((float3x3)data.invWorldMatrix)));
+	outBinormal = normalize(cross(outTangent, outNormal));
 	outTexcoord = inTexcoord;
-	outColor = inColor;
 	outInstanceId = inInstanceId;
 }
 
@@ -59,23 +57,22 @@ sampler Samplers[9] : register(s0);
 
 void main_ps(
 	in float4 inPos : SV_Position,
-	in float4 inColor : TEXCOORD1,
-	in float4 inFragPos : TEXCOORD2,
-	in float3 inNormal : TEXCOORD3,
-	in float3 inTangent : TEXCOORD4,
-	in float3 inBinormal : TEXCOORD5,
-	in float2 inTexcoord : TEXCOORD6,
-	in uint inInstanceId : TEXCOORD7,
+	in float4 inFragPos : TEXCOORD1,
+	in float3 inNormal : TEXCOORD2,
+	in float3 inTangent : TEXCOORD3,
+	in float3 inBinormal : TEXCOORD4,
+	in float2 inTexcoord : TEXCOORD5,
+	in uint inInstanceId : TEXCOORD6,
 	out float4 outColor : SV_Target0
 )
 {
-	InstanceData data = InstanceDatas[inInstanceId];
+	InstanceData data = InstanceDatas[inInstanceId + instanceOffset];
 	if(data.isLit)
 	{
 		// Sample textures
-		float4 albedo = data.albedoFactor * inColor;
+		float4 albedo = data.albedoFactor;
 		if(data.albedoIndex != -1){
-			albedo = Textures[data.albedoIndex].Sample(Samplers[data.albedoSamplerIndex], inTexcoord) * inColor;
+			albedo *= Textures[data.albedoIndex].Sample(Samplers[data.albedoSamplerIndex], inTexcoord);
 		}
 		float4 RM = float4(data.roughness, data.metallic, 0, 0);
 		if(data.roughnessMetallicIndex != -1){
@@ -103,6 +100,6 @@ void main_ps(
 	}
 	else
 	{
-		outColor = data.albedoFactor * inColor;
+		outColor = data.albedoFactor;
 	}
 }

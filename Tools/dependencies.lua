@@ -5,8 +5,7 @@ IncludesDir["entt"] = "%{wks.location}/Ragdoll/dependencies/entt/single_include"
 IncludesDir["nvrhi"] = "%{wks.location}/Ragdoll/src/nvrhi"
 IncludesDir["tinygltf"] = "%{wks.location}/Ragdoll/dependencies/tinygltf"
 IncludesDir["microprofile"] = "%{wks.location}/Ragdoll/dependencies/microprofile"
-
-IncludesDir["imgui"] = "%{wks.location}/Editor/dependencies/imgui"
-IncludesDir["rapidjson"] = "%{wks.location}/Editor/dependencies/rapidjson"
+IncludesDir["imgui"] = "%{wks.location}/Ragdoll/dependencies/imgui"
+IncludesDir["cxxopts"] = "%{wks.location}/Ragdoll/dependencies/cxxopts/include"
 
 LibDirs = {}

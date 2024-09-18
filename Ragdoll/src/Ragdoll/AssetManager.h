@@ -2,6 +2,7 @@
 
 #include <nvrhi/nvrhi.h>
 #include <tiny_gltf.h>
+#include "Ragdoll/Math/RagdollMath.h"
 
 struct Material {
 	int32_t AlbedoTextureIndex = -1;
@@ -17,10 +18,8 @@ struct Material {
 
 struct Vertex {
 	Vector3 position = Vector3::Zero;
-	Vector4 color = Vector4::One;
 	Vector3 normal = Vector3::Zero;
 	Vector3 tangent = Vector3::Zero;
-	Vector3 binormal = Vector3::Zero;
 	Vector2 texcoord = Vector2::Zero;
 };
 
@@ -30,6 +29,9 @@ struct VertexBufferInfo
 	uint32_t IBOffset;
 	uint32_t IndicesCount;
 	uint32_t VerticesCount;
+
+	//Best fit box for culling
+	DirectX::BoundingBox BestFitBox;
 };
 
 struct Submesh 
@@ -73,6 +75,7 @@ class AssetManager
 {
 public:
 	static AssetManager* GetInstance();
+	static void Release() { s_Instance = nullptr; }
 
 	std::vector<VertexBufferInfo> VertexBufferInfos;
 	std::vector<Mesh> Meshes;
