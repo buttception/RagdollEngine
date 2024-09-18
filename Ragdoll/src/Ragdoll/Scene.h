@@ -30,7 +30,6 @@ namespace ragdoll {
 	};
 
 	struct InstanceGroupInfo {
-		uint32_t InstanceOffset = 0;
 		uint32_t InstanceCount = 0;
 		int32_t VertexBufferIndex;
 	};

@@ -105,7 +105,10 @@ void ragdoll::Scene::Update(float _dt)
 	Renderer->DrawBoundingBoxes(StaticInstanceDebugBufferHandle, StaticDebugInstanceDatas.size(), CBuffer);
 
 	ImGui::Begin("Debug");
-	ImGui::Text("%d culled", DebugInfo.CulledObjectCount);
+	ImGui::Text("%d proxies to draw", StaticProxiesToDraw.size());
+	ImGui::Text("%d instance count", StaticInstanceDatas.size());
+	ImGui::Text("%d octants culled", DebugInfo.CulledObjectCount);
+	ImGui::Text("%d proxies in octree", Octree::TotalProxies);
 	ImGui::End();
 
 	ImguiInterface->Render();
@@ -289,81 +292,72 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 		return lhs.BufferIndex < rhs.BufferIndex;
 		});
 	//build the structured buffer
-	int32_t CurrBufferIndex{ -1 }, Start{ 0 };
-	if (StaticProxiesToDraw.size() != 0)
-		CurrBufferIndex = StaticProxiesToDraw[0].BufferIndex;
+	int32_t CurrBufferIndex{ -1 };
+	CurrBufferIndex = StaticProxiesToDraw[0].BufferIndex;
 
+	InstanceGroupInfo info;
+	info.VertexBufferIndex = CurrBufferIndex;
+	info.InstanceCount = 0;
 	for (int i = 0; i < StaticProxiesToDraw.size(); ++i) {
-		//iterate till i get a different buffer id, meaning is a diff mesh
-		if (StaticProxiesToDraw[i].BufferIndex != CurrBufferIndex || i == StaticProxiesToDraw.size() - 1)
-		{
-			if (i == 0)
-				i = 1;
-			{
-				MICROPROFILE_SCOPEI("Scene", "Building each instance buffer", MP_PALEVIOLETRED);
-				//add this as instance group
-				InstanceGroupInfo info;
-				info.InstanceOffset = StaticInstanceDatas.size();
-				info.VertexBufferIndex = CurrBufferIndex;
-				//populate the buffer data vector
-				for (int j = Start; j < i; j++) {
-					//set the instance data
-					TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)StaticProxiesToDraw[j].EnttId);
-					RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>((entt::entity)StaticProxiesToDraw[j].EnttId);
-					InstanceData Data;
+		//since already sorted by mesh, just add everything in
+		//set the instance data
+		TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)StaticProxiesToDraw[i].EnttId);
+		RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>((entt::entity)StaticProxiesToDraw[i].EnttId);
+		InstanceData Data;
 
-					const Material& mat = AssetManager::GetInstance()->Materials[StaticProxiesToDraw[j].MaterialIndex];
-					if (mat.AlbedoTextureIndex != -1)
-					{
-						const Texture& tex = AssetManager::GetInstance()->Textures[mat.AlbedoTextureIndex];
-						Data.AlbedoIndex = tex.ImageIndex;
-						Data.AlbedoSamplerIndex = tex.SamplerIndex;
-					}
-					if (mat.NormalTextureIndex != -1)
-					{
-						const Texture& tex = AssetManager::GetInstance()->Textures[mat.NormalTextureIndex];
-						Data.NormalIndex = tex.ImageIndex;
-						Data.NormalSamplerIndex = tex.SamplerIndex;
-					}
-					if (mat.RoughnessMetallicTextureIndex != -1)
-					{
-						const Texture& tex = AssetManager::GetInstance()->Textures[mat.RoughnessMetallicTextureIndex];
-						Data.RoughnessMetallicIndex = tex.ImageIndex;
-						Data.RoughnessMetallicSamplerIndex = tex.SamplerIndex;
-					}
-					Data.Color = mat.Color;
-					Data.Metallic = mat.Metallic;
-					Data.Roughness = mat.Roughness;
-					Data.bIsLit = mat.bIsLit;
-					Data.ModelToWorld = tComp->m_ModelToWorld;
-					Data.InvModelToWorld = tComp->m_ModelToWorld.Invert();
-					StaticInstanceDatas.emplace_back(Data);
-					info.InstanceCount++;
-				}
-				StaticInstanceGroupInfos.emplace_back(info);
-			}
-			if(Config.bDrawBoxes){
-				MICROPROFILE_SCOPEI("Scene", "Building boxes debug instances", MP_INDIANRED);
-				//building the debug instances
-				for (int j = Start; j < i; ++j)
-				{
-					//debug instances
-					InstanceData debugData;
-					Vector3 translate = StaticProxiesToDraw[j].BoundingBox.Center;
-					Vector3 scale = StaticProxiesToDraw[j].BoundingBox.Extents * 2;
-					Matrix matrix = Matrix::CreateScale(scale);
-					matrix *= Matrix::CreateTranslation(translate);
-					debugData.ModelToWorld = matrix;
-					debugData.bIsLit = false;
-					debugData.Color = { 0.f, 1.f, 0.f, 1.f };
-					StaticDebugInstanceDatas.emplace_back(debugData);
-				}
-			}
-			if(i < StaticProxiesToDraw.size())
-				CurrBufferIndex = StaticProxiesToDraw[i].BufferIndex;
-			Start = i;
+		const Material& mat = AssetManager::GetInstance()->Materials[StaticProxiesToDraw[i].MaterialIndex];
+		if (mat.AlbedoTextureIndex != -1)
+		{
+			const Texture& tex = AssetManager::GetInstance()->Textures[mat.AlbedoTextureIndex];
+			Data.AlbedoIndex = tex.ImageIndex;
+			Data.AlbedoSamplerIndex = tex.SamplerIndex;
+		}
+		if (mat.NormalTextureIndex != -1)
+		{
+			const Texture& tex = AssetManager::GetInstance()->Textures[mat.NormalTextureIndex];
+			Data.NormalIndex = tex.ImageIndex;
+			Data.NormalSamplerIndex = tex.SamplerIndex;
+		}
+		if (mat.RoughnessMetallicTextureIndex != -1)
+		{
+			const Texture& tex = AssetManager::GetInstance()->Textures[mat.RoughnessMetallicTextureIndex];
+			Data.RoughnessMetallicIndex = tex.ImageIndex;
+			Data.RoughnessMetallicSamplerIndex = tex.SamplerIndex;
+		}
+		Data.Color = mat.Color;
+		Data.Metallic = mat.Metallic;
+		Data.Roughness = mat.Roughness;
+		Data.bIsLit = mat.bIsLit;
+		Data.ModelToWorld = tComp->m_ModelToWorld;
+		Data.InvModelToWorld = tComp->m_ModelToWorld.Invert();
+		StaticInstanceDatas.emplace_back(Data);
+		info.InstanceCount++;
+
+		//iterate till i get a different buffer id, meaning is a diff mesh
+		if (StaticProxiesToDraw[i].BufferIndex != CurrBufferIndex)
+		{
+			//add the current info
+			StaticInstanceGroupInfos.emplace_back(info);
+			//reset count
+			info.InstanceCount = 0;
+			//set new buffer index
+			info.VertexBufferIndex = CurrBufferIndex = StaticProxiesToDraw[i].BufferIndex;
+		}
+
+		if (Config.bDrawBoxes) {
+			InstanceData debugData;
+			Vector3 translate = StaticProxiesToDraw[i].BoundingBox.Center;
+			Vector3 scale = StaticProxiesToDraw[i].BoundingBox.Extents * 2;
+			Matrix matrix = Matrix::CreateScale(scale);
+			matrix *= Matrix::CreateTranslation(translate);
+			debugData.ModelToWorld = matrix;
+			debugData.bIsLit = false;
+			debugData.Color = { 0.f, 1.f, 0.f, 1.f };
+			StaticDebugInstanceDatas.emplace_back(debugData);
 		}
 	}
+	//last info because i reached the end
+	StaticInstanceGroupInfos.emplace_back(info);
 	//adding the octants into the debug instance
 	if(Config.bDrawOctree){
 		MICROPROFILE_SCOPEI("Scene", "Building octree debug instances", MP_RED4);
@@ -416,7 +410,7 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 
 void ragdoll::Scene::CullOctant(const Octant& octant, const DirectX::BoundingFrustum& frustum)
 {
-	if (frustum.Contains(octant.Box) != DirectX::ContainmentType::DISJOINT)
+	if (frustum.Contains(octant.Box) != DirectX::ContainmentType::DISJOINT)	//so if contains or intersects
 	{
 		//if no children, all proxies go into the instance buffer
 		if (octant.Octants.empty())

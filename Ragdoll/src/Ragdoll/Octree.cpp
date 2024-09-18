@@ -1,6 +1,8 @@
 #include "ragdollpch.h"
 #include "Octree.h"
 
+uint32_t Octree::TotalProxies = 0;
+
 void Octree::Init()
 {
 	DirectX::BoundingBox::CreateFromPoints(Octant.Box, -Max, Max);
@@ -15,6 +17,7 @@ bool InsertProxy(Octant& octant, Proxy proxy) {
 		//intersecting with the current octant, add to parent
 		RD_ASSERT(octant.Parent == nullptr, "Bounding Box exceeds than origin octant, consider increasing octree size");
 		octant.Parent->Proxies.push_back(proxy);
+		Octree::TotalProxies++;
 		return true;
 	}
 	else if (result == DirectX::ContainmentType::CONTAINS) {
@@ -32,7 +35,10 @@ bool InsertProxy(Octant& octant, Proxy proxy) {
 		}
 		else { //no children can just add in
 			octant.Proxies.push_back(proxy);
+			Octree::TotalProxies++;
 			octant.CheckToSubdivide();
+			//return true because inserted
+			return true;
 		}
 	}
 	return false;
@@ -48,6 +54,7 @@ void Octree::Clear()
 {
 	Octant.Octants.clear();
 	Octant.Proxies.clear();
+	Octree::TotalProxies = 0;
 	Init();
 }
 
@@ -77,6 +84,7 @@ void Octant::Subdivide()
 	//insert nodes into children
 	//copy the current proxies
 	std::vector<Proxy> copy = Proxies;
+	Octree::TotalProxies -= Proxies.size();
 	Proxies.clear();
 	for (const Proxy& proxy : copy)
 	{
