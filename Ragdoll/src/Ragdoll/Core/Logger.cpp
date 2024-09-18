@@ -48,6 +48,8 @@ namespace ragdoll
 
 	void Logger::Shutdown()
 	{
+		s_CoreLogger.reset();
+		s_ClientLogger.reset();
 		spdlog::shutdown();
 	}
 }

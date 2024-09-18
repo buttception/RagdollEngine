@@ -97,7 +97,7 @@ namespace ragdoll
 			if (!Config.glTFSceneToLoad.empty())
 			{
 				GLTFLoader loader;
-				loader.Init(m_FileManager->GetRoot(), &m_Scene->Renderer, m_FileManager, m_EntityManager, m_Scene);
+				loader.Init(m_FileManager->GetRoot(), m_Scene->Renderer.get(), m_FileManager, m_EntityManager, m_Scene);
 				std::string sceneName = Config.glTFSceneToLoad;
 				std::filesystem::path fp = "gltf/2.0/";
 				fp = fp / sceneName / "glTF" / (sceneName + ".gltf");
@@ -148,9 +148,14 @@ namespace ragdoll
 		m_Scene->Shutdown();
 		m_FileManager->Shutdown();
 		m_PrimaryWindow->Shutdown();
+#ifdef _DEBUG
+		// to prevent the tzdb allocations from being reported as memory leaks
+		std::chrono::get_tzdb_list().~tzdb_list();
+#endif
 		GLFWContext::Shutdown();
 		MicroProfileShutdown();
 		RD_CORE_INFO("ragdoll Engine application shut down successfull");
+		Logger::Shutdown();
 	}
 
 	void Application::OnEvent(Event& event)

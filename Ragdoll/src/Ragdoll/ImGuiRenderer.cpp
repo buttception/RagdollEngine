@@ -202,6 +202,19 @@ void ImguiRenderer::BackbufferResizing()
 
 void ImguiRenderer::Shutdown()
 {
+	CommandList = nullptr;
+	FontSampler = nullptr;
+	FontTexture = nullptr;
+	ShaderAttribLayout = nullptr;
+	BindingLayout = nullptr;
+	PSO = nullptr;
+	VertexBufferHandle = nullptr;
+	IndexBufferHandle = nullptr;
+	VertexBufferRaw.clear();
+	IndexBufferRaw.clear();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
+	m_DirectXTest = nullptr;
 }
 
 bool ImguiRenderer::ReallocateBuffer(nvrhi::BufferHandle& buffer, size_t requiredSize, size_t reallocateSize, bool isIndexBuffer)

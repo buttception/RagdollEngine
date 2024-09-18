@@ -26,13 +26,25 @@ void ForwardRenderer::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr
 void ForwardRenderer::Shutdown()
 {
 	//release nvrhi stuff
-	DepthBuffer = nullptr;
-	GraphicsPipeline = nullptr;
-	ConstantBuffer = nullptr;
-	BindingSetHandle = nullptr;
 	BindingLayoutHandle = nullptr;
+	BindingSetHandle = nullptr;
+	VertexBuffer = nullptr;
+	IndexBuffer = nullptr;
+	GraphicsPipeline = nullptr;
+	WireframePipeline = nullptr;
+	CommandList = nullptr;
+	ImguiVertexShader = nullptr;
+	ImguiPixelShader = nullptr;
+	ForwardVertexShader = nullptr;
+	ForwardPixelShader = nullptr;
+	ConstantBuffer = nullptr;
+	DepthBuffer = nullptr;
+	VertexAttributes.clear();
+	InputLayoutHandle = nullptr;
+	DescriptorTable = nullptr;
+	BindlessLayoutHandle = nullptr;
 	Device->Shutdown();
-	Device->~DirectXDevice();
+	Device = nullptr;
 }
 
 void ForwardRenderer::CreateCustomMeshes()
@@ -199,6 +211,7 @@ void ForwardRenderer::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const
 
 	for (const ragdoll::InstanceGroupInfo& info : infos)
 	{
+		MICROPROFILE_SCOPEI("Render", "Each instance", MP_CADETBLUE);
 		const VertexBufferInfo& buffer = AssetManager::GetInstance()->VertexBufferInfos[info.VertexBufferIndex];
 		nvrhi::DrawArguments args;
 		args.vertexCount = buffer.IndicesCount;
@@ -445,6 +458,7 @@ void ForwardRenderer::CreateResource()
 
 void ForwardRenderer::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t instanceCount, CBuffer& Cbuf)
 {
+	MICROPROFILE_SCOPEI("Render", "Draw Bounding Box", MP_ALICEBLUE);
 	if (instanceCount == 0)
 		return;
 	//make it instanced next time

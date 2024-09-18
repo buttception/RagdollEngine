@@ -60,7 +60,4 @@ int main(int argc, char* argv[])
 	app->Shutdown();
 
 	delete app;
-#ifdef RAGDOLL_DEBUG
-	_CrtDumpMemoryLeaks();
-#endif
 }

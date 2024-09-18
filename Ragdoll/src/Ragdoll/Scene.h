@@ -50,7 +50,7 @@ namespace ragdoll {
 	};
 
 	class Scene {
-		ImguiRenderer ImguiInterface;
+		std::shared_ptr<ImguiRenderer> ImguiInterface;
 		std::shared_ptr<Window> PrimaryWindow;
 
 		//Transforms
@@ -75,7 +75,7 @@ namespace ragdoll {
 		nvrhi::BufferHandle StaticInstanceDebugBufferHandle;	//contains all the aabb boxes to draw
 
 	public:
-		ForwardRenderer Renderer;
+		std::shared_ptr<ForwardRenderer> Renderer;
 		SceneConfig Config;
 		DebugInfo DebugInfo;
 		Matrix CameraViewProjection;

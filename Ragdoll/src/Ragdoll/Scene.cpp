@@ -13,19 +13,21 @@ ragdoll::Scene::Scene(Application* app)
 {
 	EntityManager = app->m_EntityManager;
 	PrimaryWindow = app->m_PrimaryWindow;
-	Renderer.Init(app->m_PrimaryWindow, app->m_FileManager, app->m_EntityManager);
+	Renderer = std::make_shared<ForwardRenderer>();
+	Renderer->Init(app->m_PrimaryWindow, app->m_FileManager, app->m_EntityManager);
 	if (app->Config.bCreateCustomMeshes)
 	{
 		Config.bIsThereCustomMeshes = true;
-		Renderer.CreateCustomMeshes();
+		Renderer->CreateCustomMeshes();
 	}
-	ImguiInterface.Init(Renderer.Device.get(), Renderer.ImguiVertexShader, Renderer.ImguiPixelShader);
+	ImguiInterface = std::make_shared<ImguiRenderer>();
+	ImguiInterface->Init(Renderer->Device.get(), Renderer->ImguiVertexShader, Renderer->ImguiPixelShader);
 }
 
 void ragdoll::Scene::Update(float _dt)
 {
-	ImguiInterface.BeginFrame();
-	Renderer.BeginFrame();
+	ImguiInterface->BeginFrame();
+	Renderer->BeginFrame();
 	UpdateControls(_dt);
 
 	//spawn more shits temp
@@ -88,7 +90,7 @@ void ragdoll::Scene::Update(float _dt)
 				ResetTransformDirtyFlags();	//reset the dirty flags
 				bIsCameraDirty = true;
 			}
-			MicroProfileDumpFileImmediately("test.html", nullptr, nullptr);
+			//MicroProfileDumpFileImmediately("test.html", nullptr, nullptr);
 		}
 		ImGui::End();
 	}
@@ -97,15 +99,15 @@ void ragdoll::Scene::Update(float _dt)
 	{
 		BuildStaticInstances(CameraProjection, CameraView);
 	}
-	Renderer.DrawAllInstances(StaticInstanceBufferHandle, StaticInstanceGroupInfos, CBuffer);
-	Renderer.DrawBoundingBoxes(StaticInstanceDebugBufferHandle, StaticDebugInstanceDatas.size(), CBuffer);
+	Renderer->DrawAllInstances(StaticInstanceBufferHandle, StaticInstanceGroupInfos, CBuffer);
+	Renderer->DrawBoundingBoxes(StaticInstanceDebugBufferHandle, StaticDebugInstanceDatas.size(), CBuffer);
 
 	ImGui::Begin("Debug");
 	ImGui::Text("%d culled", DebugInfo.CulledObjectCount);
 	ImGui::End();
 
-	ImguiInterface.Render();
-	Renderer.Device->Present();
+	ImguiInterface->Render();
+	Renderer->Device->Present();
 
 	DebugInfo.CulledObjectCount = 0;
 	bIsCameraDirty = false;
@@ -113,7 +115,10 @@ void ragdoll::Scene::Update(float _dt)
 
 void ragdoll::Scene::Shutdown()
 {
-	Renderer.Shutdown();
+	ImguiInterface->Shutdown();
+	ImguiInterface = nullptr;
+	Renderer->Shutdown();
+	Renderer = nullptr;
 }
 
 void ragdoll::Scene::UpdateControls(float _dt)
@@ -269,6 +274,7 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 {
 	if(StaticProxies.empty())
 		return;
+	MICROPROFILE_SCOPEI("Scene", "Build Static", MP_RED);
 	//sort the proxies
 	std::sort(StaticProxies.begin(), StaticProxies.end(), [](const Proxy& lhs, const Proxy& rhs) {
 		return lhs.BufferIndex < rhs.BufferIndex;
@@ -292,64 +298,73 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 		{
 			if (i == 0)
 				i = 1;
-			//add this as instance group
-			InstanceGroupInfo info;
-			info.InstanceOffset = StaticInstanceDatas.size();
-			info.VertexBufferIndex = CurrBufferIndex;
-			//populate the buffer data vector
-			for (int j = Start; j < i; j++) {
-				//debug instances
-				InstanceData debugData;
-				Vector3 translate = StaticProxies[j].BoundingBox.Center;
-				Vector3 scale = StaticProxies[j].BoundingBox.Extents * 2;
-				Matrix matrix = Matrix::CreateScale(scale);
-				matrix *= Matrix::CreateTranslation(translate);
-				debugData.ModelToWorld = matrix;
-				debugData.bIsLit = false;
-				debugData.Color = { 0.f, 1.f, 0.f, 1.f };
-				StaticDebugInstanceDatas.emplace_back(debugData);
+			{
+				MICROPROFILE_SCOPEI("Scene", "Culling each instance", MP_PALEVIOLETRED);
+				//add this as instance group
+				InstanceGroupInfo info;
+				info.InstanceOffset = StaticInstanceDatas.size();
+				info.VertexBufferIndex = CurrBufferIndex;
+				//populate the buffer data vector
+				for (int j = Start; j < i; j++) {
+					//check if within the camera frustum
+					DirectX::ContainmentType result = frustum.Contains(StaticProxies[j].BoundingBox);
+					if (result == DirectX::ContainmentType::DISJOINT)
+					{
+						DebugInfo.CulledObjectCount++;
+						continue;
+					}
+					//set the instance data
+					TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)StaticProxies[j].EnttId);
+					RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>((entt::entity)StaticProxies[j].EnttId);
+					InstanceData Data;
 
-				//check if within the camera frustum
-				DirectX::ContainmentType result = frustum.Contains(StaticProxies[j].BoundingBox);
-				if (result == DirectX::ContainmentType::DISJOINT)
-				{
-					DebugInfo.CulledObjectCount++;
-					continue;
+					const Material& mat = AssetManager::GetInstance()->Materials[StaticProxies[j].MaterialIndex];
+					if (mat.AlbedoTextureIndex != -1)
+					{
+						const Texture& tex = AssetManager::GetInstance()->Textures[mat.AlbedoTextureIndex];
+						Data.AlbedoIndex = tex.ImageIndex;
+						Data.AlbedoSamplerIndex = tex.SamplerIndex;
+					}
+					if (mat.NormalTextureIndex != -1)
+					{
+						const Texture& tex = AssetManager::GetInstance()->Textures[mat.NormalTextureIndex];
+						Data.NormalIndex = tex.ImageIndex;
+						Data.NormalSamplerIndex = tex.SamplerIndex;
+					}
+					if (mat.RoughnessMetallicTextureIndex != -1)
+					{
+						const Texture& tex = AssetManager::GetInstance()->Textures[mat.RoughnessMetallicTextureIndex];
+						Data.RoughnessMetallicIndex = tex.ImageIndex;
+						Data.RoughnessMetallicSamplerIndex = tex.SamplerIndex;
+					}
+					Data.Color = mat.Color;
+					Data.Metallic = mat.Metallic;
+					Data.Roughness = mat.Roughness;
+					Data.bIsLit = mat.bIsLit;
+					Data.ModelToWorld = tComp->m_ModelToWorld;
+					Data.InvModelToWorld = tComp->m_ModelToWorld.Invert();
+					StaticInstanceDatas.emplace_back(Data);
+					info.InstanceCount++;
 				}
-				//set the instance data
-				TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)StaticProxies[j].EnttId);
-				RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>((entt::entity)StaticProxies[j].EnttId);
-				InstanceData Data;
-
-				const Material& mat = AssetManager::GetInstance()->Materials[StaticProxies[j].MaterialIndex];
-				if(mat.AlbedoTextureIndex != -1)
-				{
-					const Texture& tex = AssetManager::GetInstance()->Textures[mat.AlbedoTextureIndex];
-					Data.AlbedoIndex = tex.ImageIndex;
-					Data.AlbedoSamplerIndex = tex.SamplerIndex;
-				}
-				if(mat.NormalTextureIndex != -1)
-				{
-					const Texture& tex = AssetManager::GetInstance()->Textures[mat.NormalTextureIndex];
-					Data.NormalIndex = tex.ImageIndex;
-					Data.NormalSamplerIndex = tex.SamplerIndex;
-				}
-				if(mat.RoughnessMetallicTextureIndex != -1)
-				{
-					const Texture& tex = AssetManager::GetInstance()->Textures[mat.RoughnessMetallicTextureIndex];
-					Data.RoughnessMetallicIndex = tex.ImageIndex;
-					Data.RoughnessMetallicSamplerIndex = tex.SamplerIndex;
-				}
-				Data.Color = mat.Color;
-				Data.Metallic = mat.Metallic;
-				Data.Roughness = mat.Roughness;
-				Data.bIsLit = mat.bIsLit;
-				Data.ModelToWorld = tComp->m_ModelToWorld;
-				Data.InvModelToWorld = tComp->m_ModelToWorld.Invert();
-				StaticInstanceDatas.emplace_back(Data);
-				info.InstanceCount++;
+				StaticInstanceGroupInfos.emplace_back(info);
 			}
-			StaticInstanceGroupInfos.emplace_back(info);
+			{
+				MICROPROFILE_SCOPEI("Scene", "Building debug instances", MP_INDIANRED);
+				//building the debug instances
+				for (int j = Start; j < i; ++j)
+				{
+					//debug instances
+					InstanceData debugData;
+					Vector3 translate = StaticProxies[j].BoundingBox.Center;
+					Vector3 scale = StaticProxies[j].BoundingBox.Extents * 2;
+					Matrix matrix = Matrix::CreateScale(scale);
+					matrix *= Matrix::CreateTranslation(translate);
+					debugData.ModelToWorld = matrix;
+					debugData.bIsLit = false;
+					debugData.Color = { 0.f, 1.f, 0.f, 1.f };
+					StaticDebugInstanceDatas.emplace_back(debugData);
+				}
+			}
 			if(i < StaticProxies.size())
 				CurrBufferIndex = StaticProxies[i].BufferIndex;
 			Start = i;
@@ -362,37 +377,39 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 	}
 	else
 	{
-		Renderer.CommandList->open();
+		MICROPROFILE_SCOPEI("Scene", "Building Global Instance Buffer", MP_ORANGERED);
+		Renderer->CommandList->open();
 		//create the instance buffer handle
 		nvrhi::BufferDesc InstanceBufferDesc;
 		InstanceBufferDesc.byteSize = sizeof(InstanceData) * StaticInstanceDatas.size();
 		InstanceBufferDesc.debugName = "Global instance buffer";
 		InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
 		InstanceBufferDesc.structStride = sizeof(InstanceData);
-		StaticInstanceBufferHandle = Renderer.Device->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
+		StaticInstanceBufferHandle = Renderer->Device->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
 
 		//copy data over
-		Renderer.CommandList->beginTrackingBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::CopyDest);
-		Renderer.CommandList->writeBuffer(StaticInstanceBufferHandle, StaticInstanceDatas.data(), sizeof(InstanceData) * StaticInstanceDatas.size());
-		Renderer.CommandList->setPermanentBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::ShaderResource);
-		Renderer.CommandList->close();
-		Renderer.Device->m_NvrhiDevice->executeCommandList(Renderer.CommandList);
+		Renderer->CommandList->beginTrackingBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::CopyDest);
+		Renderer->CommandList->writeBuffer(StaticInstanceBufferHandle, StaticInstanceDatas.data(), sizeof(InstanceData) * StaticInstanceDatas.size());
+		Renderer->CommandList->setPermanentBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::ShaderResource);
+		Renderer->CommandList->close();
+		Renderer->Device->m_NvrhiDevice->executeCommandList(Renderer->CommandList);
 	}
+	MICROPROFILE_SCOPEI("Scene", "Building Debug Instance Buffer", MP_DARKRED);
 	//create the debug instance buffer
 	nvrhi::BufferDesc InstanceBufferDesc;
 	InstanceBufferDesc.byteSize = sizeof(InstanceData) * StaticDebugInstanceDatas.size();
 	InstanceBufferDesc.debugName = "Debug instance buffer";
 	InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
 	InstanceBufferDesc.structStride = sizeof(InstanceData);
-	StaticInstanceDebugBufferHandle = Renderer.Device->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
+	StaticInstanceDebugBufferHandle = Renderer->Device->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
 
 	//copy data over
-	Renderer.CommandList->open();
-	Renderer.CommandList->beginTrackingBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::CopyDest);
-	Renderer.CommandList->writeBuffer(StaticInstanceDebugBufferHandle, StaticDebugInstanceDatas.data(), sizeof(InstanceData)* StaticDebugInstanceDatas.size());
-	Renderer.CommandList->setPermanentBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::ShaderResource);
-	Renderer.CommandList->close();
-	Renderer.Device->m_NvrhiDevice->executeCommandList(Renderer.CommandList);
+	Renderer->CommandList->open();
+	Renderer->CommandList->beginTrackingBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::CopyDest);
+	Renderer->CommandList->writeBuffer(StaticInstanceDebugBufferHandle, StaticDebugInstanceDatas.data(), sizeof(InstanceData)* StaticDebugInstanceDatas.size());
+	Renderer->CommandList->setPermanentBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::ShaderResource);
+	Renderer->CommandList->close();
+	Renderer->Device->m_NvrhiDevice->executeCommandList(Renderer->CommandList);
 }
 
 void PrintRecursive(ragdoll::Guid id, int level, std::shared_ptr<ragdoll::EntityManager> em)
