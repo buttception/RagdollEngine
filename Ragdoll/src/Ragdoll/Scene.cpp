@@ -97,24 +97,32 @@ void ragdoll::Scene::Update(float _dt)
 		ImGui::End();
 	}
 
-	if (bIsCameraDirty)
-	{
-		BuildStaticInstances(CameraProjection, CameraView);
-	}
-	Renderer->DrawAllInstances(StaticInstanceBufferHandle, StaticInstanceGroupInfos, CBuffer);
-	Renderer->DrawBoundingBoxes(StaticInstanceDebugBufferHandle, StaticDebugInstanceDatas.size(), CBuffer);
-
 	ImGui::Begin("Debug");
+	if (ImGui::Checkbox("Freeze Culling Matrix", &bFreezeFrustumCulling))
+		bIsCameraDirty = true;
+	if (ImGui::Checkbox("Show Octree", &Config.bDrawOctree))
+		bIsCameraDirty = true;
+	if (ImGui::Checkbox("Show Boxes", &Config.bDrawBoxes))
+		bIsCameraDirty = true;
+	ImGui::Text("%d entities count", EntityManager->GetRegistry().view<entt::entity>().size_hint());
 	ImGui::Text("%d proxies to draw", StaticProxiesToDraw.size());
 	ImGui::Text("%d instance count", StaticInstanceDatas.size());
 	ImGui::Text("%d octants culled", DebugInfo.CulledObjectCount);
 	ImGui::Text("%d proxies in octree", Octree::TotalProxies);
 	ImGui::End();
 
+	if (bIsCameraDirty)
+	{
+		DebugInfo.CulledObjectCount = 0;
+		BuildStaticInstances(CameraProjection, CameraView);
+	}
+
+	Renderer->DrawAllInstances(StaticInstanceBufferHandle, StaticInstanceGroupInfos, CBuffer);
+	Renderer->DrawBoundingBoxes(StaticInstanceDebugBufferHandle, StaticDebugInstanceDatas.size(), CBuffer);
+
 	ImguiInterface->Render();
 	Renderer->Device->Present();
 
-	DebugInfo.CulledObjectCount = 0;
 	bIsCameraDirty = false;
 }
 
@@ -158,7 +166,9 @@ void ragdoll::Scene::UpdateControls(float _dt)
 	ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, -90.f, 90.f);
 	ImGui::End();
 
-	CameraProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraAspect, data.cameraNear, data.cameraFar);
+	Matrix proj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraAspect, data.cameraNear, data.cameraFar);
+	if (!bFreezeFrustumCulling)
+		CameraProjection = proj;
 	Vector3 cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
 
 	//hardcoded handling of movement now
@@ -196,8 +206,12 @@ void ragdoll::Scene::UpdateControls(float _dt)
 	}
 	cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
 
-	CameraView = DirectX::XMMatrixLookAtLH(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
-	CameraViewProjection = CBuffer.viewProj = CameraView * CameraProjection;
+	Matrix view = DirectX::XMMatrixLookAtLH(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
+	if (!bFreezeFrustumCulling)
+		CameraView = view;
+	CBuffer.viewProj = view * proj;
+	if (!bFreezeFrustumCulling)
+		CameraViewProjection = CBuffer.viewProj;
 	CBuffer.sceneAmbientColor = data.ambientLight;
 	CBuffer.lightDiffuseColor = data.dirLightColor;
 	Vector2 azimuthElevationRad = {
@@ -250,6 +264,7 @@ void ragdoll::Scene::PopulateStaticProxies()
 	//iterate through all the transforms and renderable
 	auto EcsView = EntityManager->GetRegistry().view<RenderableComp, TransformComp>();
 	for (const entt::entity& ent : EcsView) {
+		TransformComp* tComp = EntityManager->GetComponent<TransformComp>(ent);
 		RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>(ent);
 		Mesh mesh = AssetManager::GetInstance()->Meshes[rComp->meshIndex];
 		for (const Submesh& submesh : mesh.Submeshes)
@@ -260,7 +275,6 @@ void ragdoll::Scene::PopulateStaticProxies()
 			Proxy.BufferIndex = submesh.VertexBufferIndex;
 			Proxy.MaterialIndex = submesh.MaterialIndex;
 			//bounding box will be empty for now
-			TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)Proxy.EnttId);
 			AssetManager::GetInstance()->VertexBufferInfos[Proxy.BufferIndex].BestFitBox.Transform(Proxy.BoundingBox, tComp->m_ModelToWorld);
 			StaticOctree.AddProxy(Proxy);
 		}
@@ -289,7 +303,7 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 		return;
 	//sort
 	std::sort(StaticProxiesToDraw.begin(), StaticProxiesToDraw.end(), [](const Proxy& lhs, const Proxy& rhs) {
-		return lhs.BufferIndex < rhs.BufferIndex;
+		return lhs.BufferIndex != rhs.BufferIndex ? lhs.BufferIndex < rhs.BufferIndex : lhs.MaterialIndex < rhs.MaterialIndex;
 		});
 	//build the structured buffer
 	int32_t CurrBufferIndex{ -1 };
@@ -298,62 +312,63 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 	InstanceGroupInfo info;
 	info.VertexBufferIndex = CurrBufferIndex;
 	info.InstanceCount = 0;
-	for (int i = 0; i < StaticProxiesToDraw.size(); ++i) {
-		//since already sorted by mesh, just add everything in
-		//set the instance data
-		TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)StaticProxiesToDraw[i].EnttId);
-		RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>((entt::entity)StaticProxiesToDraw[i].EnttId);
-		InstanceData Data;
+	{
+		MICROPROFILE_SCOPEI("Scene", "Building instance buffer", MP_PALEVIOLETRED);
+		for (int i = 0; i < StaticProxiesToDraw.size(); ++i) {
+			//iterate till i get a different buffer id, meaning is a diff mesh
+			if (StaticProxiesToDraw[i].BufferIndex != CurrBufferIndex)
+			{
+				//add the current info
+				StaticInstanceGroupInfos.emplace_back(info);
+				//reset count
+				info.InstanceCount = 0;
+				//set new buffer index
+				info.VertexBufferIndex = CurrBufferIndex = StaticProxiesToDraw[i].BufferIndex;
+			}
+			//since already sorted by mesh, just add everything in
+			//set the instance data
+			TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)StaticProxiesToDraw[i].EnttId);
+			InstanceData Data;
 
-		const Material& mat = AssetManager::GetInstance()->Materials[StaticProxiesToDraw[i].MaterialIndex];
-		if (mat.AlbedoTextureIndex != -1)
-		{
-			const Texture& tex = AssetManager::GetInstance()->Textures[mat.AlbedoTextureIndex];
-			Data.AlbedoIndex = tex.ImageIndex;
-			Data.AlbedoSamplerIndex = tex.SamplerIndex;
-		}
-		if (mat.NormalTextureIndex != -1)
-		{
-			const Texture& tex = AssetManager::GetInstance()->Textures[mat.NormalTextureIndex];
-			Data.NormalIndex = tex.ImageIndex;
-			Data.NormalSamplerIndex = tex.SamplerIndex;
-		}
-		if (mat.RoughnessMetallicTextureIndex != -1)
-		{
-			const Texture& tex = AssetManager::GetInstance()->Textures[mat.RoughnessMetallicTextureIndex];
-			Data.RoughnessMetallicIndex = tex.ImageIndex;
-			Data.RoughnessMetallicSamplerIndex = tex.SamplerIndex;
-		}
-		Data.Color = mat.Color;
-		Data.Metallic = mat.Metallic;
-		Data.Roughness = mat.Roughness;
-		Data.bIsLit = mat.bIsLit;
-		Data.ModelToWorld = tComp->m_ModelToWorld;
-		Data.InvModelToWorld = tComp->m_ModelToWorld.Invert();
-		StaticInstanceDatas.emplace_back(Data);
-		info.InstanceCount++;
+			const Material& mat = AssetManager::GetInstance()->Materials[StaticProxiesToDraw[i].MaterialIndex];
+			if (mat.AlbedoTextureIndex != -1)
+			{
+				const Texture& tex = AssetManager::GetInstance()->Textures[mat.AlbedoTextureIndex];
+				Data.AlbedoIndex = tex.ImageIndex;
+				Data.AlbedoSamplerIndex = tex.SamplerIndex;
+			}
+			if (mat.NormalTextureIndex != -1)
+			{
+				const Texture& tex = AssetManager::GetInstance()->Textures[mat.NormalTextureIndex];
+				Data.NormalIndex = tex.ImageIndex;
+				Data.NormalSamplerIndex = tex.SamplerIndex;
+			}
+			if (mat.RoughnessMetallicTextureIndex != -1)
+			{
+				const Texture& tex = AssetManager::GetInstance()->Textures[mat.RoughnessMetallicTextureIndex];
+				Data.RoughnessMetallicIndex = tex.ImageIndex;
+				Data.RoughnessMetallicSamplerIndex = tex.SamplerIndex;
+			}
+			Data.Color = mat.Color;
+			Data.Metallic = mat.Metallic;
+			Data.Roughness = mat.Roughness;
+			Data.bIsLit = mat.bIsLit;
+			Data.ModelToWorld = tComp->m_ModelToWorld;
+			Data.InvModelToWorld = tComp->m_ModelToWorld.Invert();
+			StaticInstanceDatas.emplace_back(Data);
+			info.InstanceCount++;
 
-		//iterate till i get a different buffer id, meaning is a diff mesh
-		if (StaticProxiesToDraw[i].BufferIndex != CurrBufferIndex)
-		{
-			//add the current info
-			StaticInstanceGroupInfos.emplace_back(info);
-			//reset count
-			info.InstanceCount = 0;
-			//set new buffer index
-			info.VertexBufferIndex = CurrBufferIndex = StaticProxiesToDraw[i].BufferIndex;
-		}
-
-		if (Config.bDrawBoxes) {
-			InstanceData debugData;
-			Vector3 translate = StaticProxiesToDraw[i].BoundingBox.Center;
-			Vector3 scale = StaticProxiesToDraw[i].BoundingBox.Extents * 2;
-			Matrix matrix = Matrix::CreateScale(scale);
-			matrix *= Matrix::CreateTranslation(translate);
-			debugData.ModelToWorld = matrix;
-			debugData.bIsLit = false;
-			debugData.Color = { 0.f, 1.f, 0.f, 1.f };
-			StaticDebugInstanceDatas.emplace_back(debugData);
+			if (Config.bDrawBoxes) {
+				InstanceData debugData;
+				Vector3 translate = StaticProxiesToDraw[i].BoundingBox.Center;
+				Vector3 scale = StaticProxiesToDraw[i].BoundingBox.Extents * 2;
+				Matrix matrix = Matrix::CreateScale(scale);
+				matrix *= Matrix::CreateTranslation(translate);
+				debugData.ModelToWorld = matrix;
+				debugData.bIsLit = false;
+				debugData.Color = { 0.f, 1.f, 0.f, 1.f };
+				StaticDebugInstanceDatas.emplace_back(debugData);
+			}
 		}
 	}
 	//last info because i reached the end

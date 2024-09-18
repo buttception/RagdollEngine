@@ -219,8 +219,8 @@ void ForwardRenderer::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const
 		args.startIndexLocation = buffer.IBOffset;
 		args.instanceCount = info.InstanceCount;
 		CommandList->writeBuffer(ConstantBuffer, &Cbuf, sizeof(CBuffer));
-		Cbuf.instanceOffset += info.InstanceCount;
 		CommandList->drawIndexed(args);
+		Cbuf.instanceOffset += info.InstanceCount;
 	}
 	Cbuf.instanceOffset = 0;
 

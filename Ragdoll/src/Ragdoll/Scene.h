@@ -60,6 +60,7 @@ namespace ragdoll {
 
 		//Rendering
 		bool bIsCameraDirty{ true };
+		bool bFreezeFrustumCulling{ false };
 		CBuffer CBuffer;
 		Octree StaticOctree;
 		std::vector<Proxy> StaticProxiesToDraw;
