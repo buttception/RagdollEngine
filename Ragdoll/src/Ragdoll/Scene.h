@@ -5,18 +5,12 @@
 #include "Components/TransformComp.h"
 #include "Components/RenderableComp.h"
 #include "Entity/EntityManager.h"
+#include "Octree.h"
 
 namespace ragdoll {
 	class EntityManager;
 	class TransformSystem;
 	class Application;
-
-	struct Proxy {
-		ENTT_ID_TYPE EnttId;
-		int32_t BufferIndex = -1;
-		int32_t MaterialIndex = -1;
-		DirectX::BoundingBox BoundingBox;
-	};
 
 	struct InstanceData {
 		Matrix ModelToWorld;
@@ -66,11 +60,12 @@ namespace ragdoll {
 		//Rendering
 		bool bIsCameraDirty{ true };
 		CBuffer CBuffer;
-		std::vector<Proxy> StaticProxies;
-		std::vector<DirectX::BoundingBox> ProxyBoundingBoxes;
+		Octree StaticOctree;
+		std::vector<Proxy> StaticProxiesToDraw;
 		std::vector<InstanceData> StaticInstanceDatas;
 		std::vector<InstanceGroupInfo> StaticInstanceGroupInfos;
 		nvrhi::BufferHandle StaticInstanceBufferHandle;
+
 		std::vector<InstanceData> StaticDebugInstanceDatas;
 		nvrhi::BufferHandle StaticInstanceDebugBufferHandle;	//contains all the aabb boxes to draw
 
@@ -97,8 +92,8 @@ namespace ragdoll {
 
 		//Renderable
 		void PopulateStaticProxies();
-		void UpdateStaticProxies();
 		void BuildStaticInstances(const Matrix& cameraProjection, const Matrix& cameraView);
+		void CullOctant(const Octant& octant, const DirectX::BoundingFrustum& frustum);
 
 	private:
 		//Transforms
@@ -108,5 +103,8 @@ namespace ragdoll {
 		void TraverseNode(const Guid& guid);
 		Matrix GetLocalModelMatrix(const TransformComp& trans);
 		void UpdateTransform(TransformComp& comp, const Guid& id);
+
+		//Debug
+		void AddOctantDebug(Octant octant, uint32_t level);
 	};
 }

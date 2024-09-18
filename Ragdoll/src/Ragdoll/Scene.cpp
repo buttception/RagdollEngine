@@ -22,6 +22,7 @@ ragdoll::Scene::Scene(Application* app)
 	}
 	ImguiInterface = std::make_shared<ImguiRenderer>();
 	ImguiInterface->Init(Renderer->Device.get(), Renderer->ImguiVertexShader, Renderer->ImguiPixelShader);
+	StaticOctree.Init();
 }
 
 void ragdoll::Scene::Update(float _dt)
@@ -84,9 +85,8 @@ void ragdoll::Scene::Update(float _dt)
 			}
 			{
 				MICROPROFILE_SCOPEI("Creation", "Entity Update", MP_DARKSEAGREEN);
+				UpdateTransforms();			//update all the dirty transforms
 				PopulateStaticProxies();	//create all the proxies to iterate
-				UpdateTransforms();	//update all the dirty transforms
-				UpdateStaticProxies();	//update all the bounding box in the proxies
 				ResetTransformDirtyFlags();	//reset the dirty flags
 				bIsCameraDirty = true;
 			}
@@ -241,7 +241,7 @@ void ragdoll::Scene::AddEntityAtRootLevel(Guid entityId)
 
 void ragdoll::Scene::PopulateStaticProxies()
 {
-	StaticProxies.clear();
+	StaticOctree.Clear();
 	//iterate through all the transforms and renderable
 	auto EcsView = EntityManager->GetRegistry().view<RenderableComp, TransformComp>();
 	for (const entt::entity& ent : EcsView) {
@@ -255,34 +255,16 @@ void ragdoll::Scene::PopulateStaticProxies()
 			Proxy.BufferIndex = submesh.VertexBufferIndex;
 			Proxy.MaterialIndex = submesh.MaterialIndex;
 			//bounding box will be empty for now
-			StaticProxies.push_back(Proxy);
+			TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)Proxy.EnttId);
+			AssetManager::GetInstance()->VertexBufferInfos[Proxy.BufferIndex].BestFitBox.Transform(Proxy.BoundingBox, tComp->m_ModelToWorld);
+			StaticOctree.AddProxy(Proxy);
 		}
-	}
-}
-
-void ragdoll::Scene::UpdateStaticProxies()
-{
-	for (Proxy& proxy : StaticProxies)
-	{
-		//update all the bounding boxes of the static proxies
-		TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)proxy.EnttId);
-		AssetManager::GetInstance()->VertexBufferInfos[proxy.BufferIndex].BestFitBox.Transform(proxy.BoundingBox, tComp->m_ModelToWorld);
 	}
 }
 
 void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const Matrix& cameraView)
 {
-	if(StaticProxies.empty())
-		return;
 	MICROPROFILE_SCOPEI("Scene", "Build Static", MP_RED);
-	//sort the proxies
-	std::sort(StaticProxies.begin(), StaticProxies.end(), [](const Proxy& lhs, const Proxy& rhs) {
-		return lhs.BufferIndex < rhs.BufferIndex;
-		});
-	//build the structured buffer
-	int32_t CurrBufferIndex{ -1 }, Start{ 0 };
-	if (StaticProxies.size() != 0)
-		CurrBufferIndex = StaticProxies[0].BufferIndex;
 	//clear the old information
 	StaticInstanceGroupInfos.clear();
 	StaticInstanceDatas.clear();
@@ -292,33 +274,43 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 	DirectX::BoundingFrustum::CreateFromMatrix(frustum, cameraProjection);
 	frustum.Transform(frustum, cameraView.Invert());
 
-	for (int i = 0; i < StaticProxies.size(); ++i) {
+	//cull the octree
+	StaticProxiesToDraw.clear();
+	{
+		MICROPROFILE_SCOPEI("Scene", "Culling Octree", MP_VIOLETRED1);
+		CullOctant(StaticOctree.Octant, frustum);
+	}
+	if (StaticProxiesToDraw.empty())	//if got nothing to draw just return
+		return;
+	//sort
+	std::sort(StaticProxiesToDraw.begin(), StaticProxiesToDraw.end(), [](const Proxy& lhs, const Proxy& rhs) {
+		return lhs.BufferIndex < rhs.BufferIndex;
+		});
+	//build the structured buffer
+	int32_t CurrBufferIndex{ -1 }, Start{ 0 };
+	if (StaticProxiesToDraw.size() != 0)
+		CurrBufferIndex = StaticProxiesToDraw[0].BufferIndex;
+
+	for (int i = 0; i < StaticProxiesToDraw.size(); ++i) {
 		//iterate till i get a different buffer id, meaning is a diff mesh
-		if (StaticProxies[i].BufferIndex != CurrBufferIndex || i == StaticProxies.size() - 1)
+		if (StaticProxiesToDraw[i].BufferIndex != CurrBufferIndex || i == StaticProxiesToDraw.size() - 1)
 		{
 			if (i == 0)
 				i = 1;
 			{
-				MICROPROFILE_SCOPEI("Scene", "Culling each instance", MP_PALEVIOLETRED);
+				MICROPROFILE_SCOPEI("Scene", "Building each instance buffer", MP_PALEVIOLETRED);
 				//add this as instance group
 				InstanceGroupInfo info;
 				info.InstanceOffset = StaticInstanceDatas.size();
 				info.VertexBufferIndex = CurrBufferIndex;
 				//populate the buffer data vector
 				for (int j = Start; j < i; j++) {
-					//check if within the camera frustum
-					DirectX::ContainmentType result = frustum.Contains(StaticProxies[j].BoundingBox);
-					if (result == DirectX::ContainmentType::DISJOINT)
-					{
-						DebugInfo.CulledObjectCount++;
-						continue;
-					}
 					//set the instance data
-					TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)StaticProxies[j].EnttId);
-					RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>((entt::entity)StaticProxies[j].EnttId);
+					TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)StaticProxiesToDraw[j].EnttId);
+					RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>((entt::entity)StaticProxiesToDraw[j].EnttId);
 					InstanceData Data;
 
-					const Material& mat = AssetManager::GetInstance()->Materials[StaticProxies[j].MaterialIndex];
+					const Material& mat = AssetManager::GetInstance()->Materials[StaticProxiesToDraw[j].MaterialIndex];
 					if (mat.AlbedoTextureIndex != -1)
 					{
 						const Texture& tex = AssetManager::GetInstance()->Textures[mat.AlbedoTextureIndex];
@@ -355,8 +347,8 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 				{
 					//debug instances
 					InstanceData debugData;
-					Vector3 translate = StaticProxies[j].BoundingBox.Center;
-					Vector3 scale = StaticProxies[j].BoundingBox.Extents * 2;
+					Vector3 translate = StaticProxiesToDraw[j].BoundingBox.Center;
+					Vector3 scale = StaticProxiesToDraw[j].BoundingBox.Extents * 2;
 					Matrix matrix = Matrix::CreateScale(scale);
 					matrix *= Matrix::CreateTranslation(translate);
 					debugData.ModelToWorld = matrix;
@@ -365,11 +357,13 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 					StaticDebugInstanceDatas.emplace_back(debugData);
 				}
 			}
-			if(i < StaticProxies.size())
-				CurrBufferIndex = StaticProxies[i].BufferIndex;
+			if(i < StaticProxiesToDraw.size())
+				CurrBufferIndex = StaticProxiesToDraw[i].BufferIndex;
 			Start = i;
 		}
 	}
+	//adding the octants into the debug instance
+	AddOctantDebug(StaticOctree.Octant, 0);
 
 	if (StaticInstanceDatas.empty())
 	{
@@ -394,22 +388,51 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 		Renderer->CommandList->close();
 		Renderer->Device->m_NvrhiDevice->executeCommandList(Renderer->CommandList);
 	}
-	MICROPROFILE_SCOPEI("Scene", "Building Debug Instance Buffer", MP_DARKRED);
-	//create the debug instance buffer
-	nvrhi::BufferDesc InstanceBufferDesc;
-	InstanceBufferDesc.byteSize = sizeof(InstanceData) * StaticDebugInstanceDatas.size();
-	InstanceBufferDesc.debugName = "Debug instance buffer";
-	InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
-	InstanceBufferDesc.structStride = sizeof(InstanceData);
-	StaticInstanceDebugBufferHandle = Renderer->Device->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
+	if (!StaticDebugInstanceDatas.empty())
+	{
+		MICROPROFILE_SCOPEI("Scene", "Building Debug Instance Buffer", MP_DARKRED);
+		//create the debug instance buffer
+		nvrhi::BufferDesc InstanceBufferDesc;
+		InstanceBufferDesc.byteSize = sizeof(InstanceData) * StaticDebugInstanceDatas.size();
+		InstanceBufferDesc.debugName = "Debug instance buffer";
+		InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
+		InstanceBufferDesc.structStride = sizeof(InstanceData);
+		StaticInstanceDebugBufferHandle = Renderer->Device->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
 
-	//copy data over
-	Renderer->CommandList->open();
-	Renderer->CommandList->beginTrackingBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::CopyDest);
-	Renderer->CommandList->writeBuffer(StaticInstanceDebugBufferHandle, StaticDebugInstanceDatas.data(), sizeof(InstanceData)* StaticDebugInstanceDatas.size());
-	Renderer->CommandList->setPermanentBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::ShaderResource);
-	Renderer->CommandList->close();
-	Renderer->Device->m_NvrhiDevice->executeCommandList(Renderer->CommandList);
+		//copy data over
+		Renderer->CommandList->open();
+		Renderer->CommandList->beginTrackingBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::CopyDest);
+		Renderer->CommandList->writeBuffer(StaticInstanceDebugBufferHandle, StaticDebugInstanceDatas.data(), sizeof(InstanceData) * StaticDebugInstanceDatas.size());
+		Renderer->CommandList->setPermanentBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::ShaderResource);
+		Renderer->CommandList->close();
+		Renderer->Device->m_NvrhiDevice->executeCommandList(Renderer->CommandList);
+	}
+}
+
+void ragdoll::Scene::CullOctant(const Octant& octant, const DirectX::BoundingFrustum& frustum)
+{
+	if (frustum.Contains(octant.Box) != DirectX::ContainmentType::DISJOINT)
+	{
+		//if no children, all proxies go into the instance buffer
+		if (octant.Octants.empty())
+		{
+			for (const Proxy& proxy : octant.Proxies) {
+				StaticProxiesToDraw.emplace_back(proxy);
+			}
+		}
+		else {
+			//add all its children first
+			for (const Proxy& proxy : octant.Proxies) {
+				StaticProxiesToDraw.emplace_back(proxy);
+			}
+			for (const Octant& itOctant : octant.Octants) {
+				CullOctant(itOctant, frustum);
+			}
+		}
+	}
+	else {
+		DebugInfo.CulledObjectCount += 1;
+	}
 }
 
 void PrintRecursive(ragdoll::Guid id, int level, std::shared_ptr<ragdoll::EntityManager> em)
@@ -521,4 +544,59 @@ void ragdoll::Scene::UpdateTransform(TransformComp& comp, const Guid& guid)
 	//resets the dirty flags
 	if (dirtyFromHere)
 		m_DirtyOnwards = false;
+}
+
+void ragdoll::Scene::AddOctantDebug(Octant octant, uint32_t level)
+{
+	static constexpr Vector4 colors[32] = {
+		 {1.0f, 0.0f, 0.0f, 1.0f},  // Red
+		{0.0f, 1.0f, 0.0f, 1.0f},  // Green
+		{0.0f, 0.0f, 1.0f, 1.0f},  // Blue
+		{1.0f, 1.0f, 0.0f, 1.0f},  // Yellow
+		{1.0f, 0.0f, 1.0f, 1.0f},  // Magenta
+		{0.0f, 1.0f, 1.0f, 1.0f},  // Cyan
+		{1.0f, 0.5f, 0.0f, 1.0f},  // Orange
+		{0.5f, 0.0f, 0.5f, 1.0f},  // Purple
+		{0.5f, 1.0f, 0.5f, 1.0f},  // Light Green
+		{0.5f, 0.5f, 1.0f, 1.0f},  // Lavender
+		{0.75f, 0.25f, 0.5f, 1.0f},// Pink
+		{0.25f, 0.5f, 0.75f, 1.0f},// Steel Blue
+		{0.8f, 0.7f, 0.6f, 1.0f},  // Beige
+		{0.6f, 0.4f, 0.2f, 1.0f},  // Brown
+		{0.9f, 0.9f, 0.9f, 1.0f},  // Light Grey
+		{0.4f, 0.4f, 0.4f, 1.0f},  // Dark Grey
+		{0.7f, 0.3f, 0.3f, 1.0f},  // Salmon
+		{0.2f, 0.6f, 0.2f, 1.0f},  // Dark Green
+		{0.3f, 0.7f, 0.8f, 1.0f},  // Sky Blue
+		{0.9f, 0.4f, 0.2f, 1.0f},  // Coral
+		{0.5f, 0.5f, 0.0f, 1.0f},  // Olive
+		{0.6f, 0.2f, 0.8f, 1.0f},  // Violet
+		{0.2f, 0.2f, 0.6f, 1.0f},  // Navy Blue
+		{0.4f, 0.2f, 0.1f, 1.0f},  // Chocolate
+		{0.7f, 0.7f, 0.0f, 1.0f},  // Mustard
+		{0.2f, 0.7f, 0.5f, 1.0f},  // Teal
+		{0.9f, 0.7f, 0.5f, 1.0f},  // Peach
+		{0.7f, 0.4f, 0.4f, 1.0f},  // Light Brown
+		{0.5f, 0.8f, 0.6f, 1.0f},  // Mint
+		{0.6f, 0.6f, 1.0f, 1.0f},  // Light Blue
+		{0.9f, 0.3f, 0.3f, 1.0f},  // Crimson
+		{0.3f, 0.9f, 0.6f, 1.0f}   // Aquamarine
+	};
+	if (octant.Octants.empty())
+	{
+		//draw only if no children
+		InstanceData debugData;
+		Vector3 translate = octant.Box.Center;
+		Vector3 scale = octant.Box.Extents * 2;
+		Matrix matrix = Matrix::CreateScale(scale);
+		matrix *= Matrix::CreateTranslation(translate);
+		debugData.ModelToWorld = matrix;
+		debugData.bIsLit = false;
+		debugData.Color = colors[level];
+		StaticDebugInstanceDatas.emplace_back(debugData);
+	}
+	for (const Octant& itOctant : octant.Octants)
+	{
+		AddOctantDebug(itOctant, level + 1);
+	}
 }

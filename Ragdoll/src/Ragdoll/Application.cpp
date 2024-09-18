@@ -94,23 +94,24 @@ namespace ragdoll
 
 		MICROPROFILE_TIMELINE_ENTER_STATIC(MP_DARKGOLDENROD, "GLTF Load");
 		{
-			if (!Config.glTFSceneToLoad.empty())
+			GLTFLoader loader;
+			loader.Init(m_FileManager->GetRoot(), m_Scene->Renderer.get(), m_FileManager, m_EntityManager, m_Scene);
+			if (!Config.glTfSampleSceneToLoad.empty())
 			{
-				GLTFLoader loader;
-				loader.Init(m_FileManager->GetRoot(), m_Scene->Renderer.get(), m_FileManager, m_EntityManager, m_Scene);
-				std::string sceneName = Config.glTFSceneToLoad;
+				std::string sceneName = Config.glTfSampleSceneToLoad;
 				std::filesystem::path fp = "gltf/2.0/";
 				fp = fp / sceneName / "glTF" / (sceneName + ".gltf");
 				loader.LoadAndCreateModel(fp.string());
-
-				//loader.LoadAndCreateModel("Instancing Test/FlyingWorld-BattleOfTheTrashGod.gltf");
+			}
+			else if (!Config.glTfSceneToLoad.empty())
+			{
+				loader.LoadAndCreateModel(Config.glTfSceneToLoad);
 			}
 		}
 		MICROPROFILE_TIMELINE_LEAVE_STATIC("GLTF Load");
 
-		m_Scene->PopulateStaticProxies();
 		m_Scene->UpdateTransforms();
-		m_Scene->UpdateStaticProxies();
+		m_Scene->PopulateStaticProxies();
 		m_Scene->ResetTransformDirtyFlags();
 	}
 

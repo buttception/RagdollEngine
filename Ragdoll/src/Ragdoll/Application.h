@@ -55,8 +55,11 @@ namespace ragdoll
 	public:
 		struct ApplicationConfig
 		{
-			std::string glTFSceneToLoad;
+			std::string glTfSampleSceneToLoad;
+			std::string glTfSceneToLoad;
 			bool bCreateCustomMeshes{ false };
+			bool bDrawDebugOctree{ false };
+			bool bDrawDebugBoundingBoxes{ false };
 		};
 
 		std::shared_ptr<Window> m_PrimaryWindow;

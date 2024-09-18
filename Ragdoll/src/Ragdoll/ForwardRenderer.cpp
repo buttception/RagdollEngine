@@ -451,6 +451,7 @@ void ForwardRenderer::CreateResource()
 
 	GraphicsPipeline = Device->m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);
 
+	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
 	pipelineDesc.renderState.rasterState.fillMode = nvrhi::RasterFillMode::Wireframe;
 
 	WireframePipeline = Device->m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);

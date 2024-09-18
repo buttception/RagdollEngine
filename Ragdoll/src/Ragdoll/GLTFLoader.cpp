@@ -457,9 +457,12 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			gltfMat.pbrMetallicRoughness.baseColorFactor[2],
 			gltfMat.pbrMetallicRoughness.baseColorFactor[3]);
 		//get the textures
-		mat.AlbedoTextureIndex = gltfMat.pbrMetallicRoughness.baseColorTexture.index + textureIndicesOffset;
-		mat.RoughnessMetallicTextureIndex = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index + textureIndicesOffset;
-		mat.NormalTextureIndex = gltfMat.normalTexture.index + textureIndicesOffset;
+		if(gltfMat.pbrMetallicRoughness.baseColorTexture.index >= 0)
+			mat.AlbedoTextureIndex = gltfMat.pbrMetallicRoughness.baseColorTexture.index + textureIndicesOffset;
+		if(gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index >= 0)
+			mat.RoughnessMetallicTextureIndex = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index + textureIndicesOffset;
+		if(gltfMat.normalTexture.index >= 0)
+			mat.NormalTextureIndex = gltfMat.normalTexture.index + textureIndicesOffset;
 		mat.bIsLit = true;
 		AssetManager::GetInstance()->Materials.emplace_back(mat);
 	}
