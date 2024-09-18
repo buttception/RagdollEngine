@@ -43,7 +43,7 @@ struct Octant {
 
 	~Octant();
 
-	static constexpr uint32_t DivisionCriteria{ 20 };
+	static constexpr uint32_t DivisionCriteria{ 10 };
 	std::vector<Proxy> Proxies;
 	std::vector<Octant> Octants;
 	Octant* Parent{ nullptr };

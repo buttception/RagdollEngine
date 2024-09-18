@@ -20,6 +20,8 @@ ragdoll::Scene::Scene(Application* app)
 		Config.bIsThereCustomMeshes = true;
 		Renderer->CreateCustomMeshes();
 	}
+	Config.bDrawBoxes = app->Config.bDrawDebugBoundingBoxes;
+	Config.bDrawOctree = app->Config.bDrawDebugOctree;
 	ImguiInterface = std::make_shared<ImguiRenderer>();
 	ImguiInterface->Init(Renderer->Device.get(), Renderer->ImguiVertexShader, Renderer->ImguiPixelShader);
 	StaticOctree.Init();
@@ -340,8 +342,8 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 				}
 				StaticInstanceGroupInfos.emplace_back(info);
 			}
-			{
-				MICROPROFILE_SCOPEI("Scene", "Building debug instances", MP_INDIANRED);
+			if(Config.bDrawBoxes){
+				MICROPROFILE_SCOPEI("Scene", "Building boxes debug instances", MP_INDIANRED);
 				//building the debug instances
 				for (int j = Start; j < i; ++j)
 				{
@@ -363,7 +365,10 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 		}
 	}
 	//adding the octants into the debug instance
-	AddOctantDebug(StaticOctree.Octant, 0);
+	if(Config.bDrawOctree){
+		MICROPROFILE_SCOPEI("Scene", "Building octree debug instances", MP_RED4);
+		AddOctantDebug(StaticOctree.Octant, 0);
+	}
 
 	if (StaticInstanceDatas.empty())
 	{

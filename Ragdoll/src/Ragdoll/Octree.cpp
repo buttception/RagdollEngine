@@ -60,7 +60,7 @@ Octant::~Octant()
 
 void Octant::CheckToSubdivide()
 {
-	if (Proxies.size() > 20)
+	if (Proxies.size() >= DivisionCriteria)
 		Subdivide();
 }
 

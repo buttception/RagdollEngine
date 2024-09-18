@@ -41,6 +41,8 @@ namespace ragdoll {
 
 	struct SceneConfig {
 		bool bIsThereCustomMeshes{ false };
+		bool bDrawOctree{ false };
+		bool bDrawBoxes{ false };
 	};
 
 	class Scene {
