@@ -105,6 +105,14 @@ int32_t GeometryBuilder::BuildCube(float size)
     }
 
     uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    Vector3 min, max;
+    min = max = Vertices[0].position;
+    for (const Vertex& v : Vertices) {
+        min.x = std::min(v.position.x, min.x); max.x = std::max(v.position.x, max.x);
+        min.y = std::min(v.position.y, min.y); max.y = std::max(v.position.y, max.y);
+        min.z = std::min(v.position.z, min.z); max.z = std::max(v.position.z, max.z);
+    }
+    DirectX::BoundingBox::CreateFromPoints(AssetManager::GetInstance()->VertexBufferInfos[index].BestFitBox, min, max);
     return index;
 }
 
@@ -196,6 +204,14 @@ int32_t GeometryBuilder::BuildSphere(float diameter, uint32_t tessellation)
     }
 
     uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    Vector3 min, max;
+    min = max = Vertices[0].position;
+    for (const Vertex& v : Vertices) {
+        min.x = std::min(v.position.x, min.x); max.x = std::max(v.position.x, max.x);
+        min.y = std::min(v.position.y, min.y); max.y = std::max(v.position.y, max.y);
+        min.z = std::min(v.position.z, min.z); max.z = std::max(v.position.z, max.z);
+    }
+    DirectX::BoundingBox::CreateFromPoints(AssetManager::GetInstance()->VertexBufferInfos[index].BestFitBox, min, max);
     return index;
 }
 
@@ -335,6 +351,14 @@ int32_t GeometryBuilder::BuildCylinder(float height, float diameter, size_t tess
     }
 
     uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    Vector3 min, max;
+    min = max = Vertices[0].position;
+    for (const Vertex& v : Vertices) {
+        min.x = std::min(v.position.x, min.x); max.x = std::max(v.position.x, max.x);
+        min.y = std::min(v.position.y, min.y); max.y = std::max(v.position.y, max.y);
+        min.z = std::min(v.position.z, min.z); max.z = std::max(v.position.z, max.z);
+    }
+    DirectX::BoundingBox::CreateFromPoints(AssetManager::GetInstance()->VertexBufferInfos[index].BestFitBox, min, max);
     return index;
 }
 
@@ -410,6 +434,14 @@ int32_t GeometryBuilder::BuildCone(float diameter, float height, size_t tessella
     }
 
     uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    Vector3 min, max;
+    min = max = Vertices[0].position;
+    for (const Vertex& v : Vertices) {
+        min.x = std::min(v.position.x, min.x); max.x = std::max(v.position.x, max.x);
+        min.y = std::min(v.position.y, min.y); max.y = std::max(v.position.y, max.y);
+        min.z = std::min(v.position.z, min.z); max.z = std::max(v.position.z, max.z);
+    }
+    DirectX::BoundingBox::CreateFromPoints(AssetManager::GetInstance()->VertexBufferInfos[index].BestFitBox, min, max);
     return index;
 }
 
@@ -418,7 +450,6 @@ int32_t GeometryBuilder::BuildIcosahedron(float size)
     Vertices.clear();
     Indices.clear();
 
-    size /= 2.f;
     constexpr float  t = 1.618033988749894848205f; // (1 + sqrt(5)) / 2
     constexpr float t2 = 1.519544995837552493271f; // sqrt( 1 + sqr( (1 + sqrt(5)) / 2 ) )
 
@@ -514,5 +545,13 @@ int32_t GeometryBuilder::BuildIcosahedron(float size)
     }
 
     uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    Vector3 min, max;
+    min = max = Vertices[0].position;
+    for (const Vertex& v : Vertices) {
+        min.x = std::min(v.position.x, min.x); max.x = std::max(v.position.x, max.x);
+        min.y = std::min(v.position.y, min.y); max.y = std::max(v.position.y, max.y);
+        min.z = std::min(v.position.z, min.z); max.z = std::max(v.position.z, max.z);
+    }
+    DirectX::BoundingBox::CreateFromPoints(AssetManager::GetInstance()->VertexBufferInfos[index].BestFitBox, min, max);
     return index;
 }

@@ -432,7 +432,7 @@ void ForwardRenderer::CreateResource()
 	pipelineDesc.renderState.depthStencilState.depthTestEnable = true;
 	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
 	pipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
-	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::Front;
+	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::Back;
 	pipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 	pipelineDesc.inputLayout = InputLayoutHandle;
 

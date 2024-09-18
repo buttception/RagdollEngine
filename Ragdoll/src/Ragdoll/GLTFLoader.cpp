@@ -126,7 +126,8 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		uint32_t materialIndicesOffset = AssetManager::GetInstance()->Materials.size();
 		for (const tinygltf::Primitive& itPrim : itMesh.primitives) 
 		{
-			Submesh submesh;
+			Submesh submesh{};
+			DirectX::BoundingBox box;
 			VertexBufferInfo buffer;
 			IndexStagingBuffer.clear();
 			VertexStagingBuffer.clear();
@@ -192,7 +193,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 							if (itDesc.name == "POSITION")
 								type = AttributeType::Position;
 							else if (itDesc.name == "COLOR")
-								type = AttributeType::Color;
+								continue;	//skip vertex color
 							else if (itDesc.name == "NORMAL")
 								type = AttributeType::Normal;
 							else if (itDesc.name == "TANGENT") {
@@ -218,6 +219,27 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 						uint32_t byteOffset = accessor.byteOffset + bufferView.byteOffset;
 						uint32_t stride = bufferView.byteStride == 0 ? size : bufferView.byteStride;
 						memcpy(bytePos, data + byteOffset + i * stride, size);
+					}
+
+					if (type == AttributeType::Position)
+					{
+						if (accessor.maxValues.size() == 3 && accessor.minValues.size() == 3)
+						{
+							Vector3 max{ (float)accessor.maxValues[0], (float)accessor.maxValues[1], (float)accessor.maxValues[2] };
+							Vector3 min{ (float)accessor.minValues[0], (float)accessor.minValues[1], (float)accessor.minValues[2] };
+							DirectX::BoundingBox::CreateFromPoints(box, min, max);
+						}
+						else
+						{
+							Vector3 min, max;
+							min = max = VertexStagingBuffer[0].position;
+							for (const Vertex& v : VertexStagingBuffer) {
+								min.x = std::min(v.position.x, min.x); max.x = std::max(v.position.x, max.x);
+								min.y = std::min(v.position.y, min.y); max.y = std::max(v.position.y, max.y);
+								min.z = std::min(v.position.z, min.z); max.z = std::max(v.position.z, max.z);
+							}
+							DirectX::BoundingBox::CreateFromPoints(box, min, max);
+						}
 					}
 #if 0
 					RD_CORE_INFO("Loaded {} vertices of attribute: {}", vertexCount, desc->name);
@@ -262,19 +284,8 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			//add to the asset manager vertices
 			{
 				submesh.VertexBufferIndex = AssetManager::GetInstance()->AddVertices(VertexStagingBuffer, IndexStagingBuffer);
+				AssetManager::GetInstance()->VertexBufferInfos[submesh.VertexBufferIndex].BestFitBox = box;
 				mesh.Submeshes.emplace_back(submesh);
-			}
-
-			//create the best fit box by going through the vertices
-			{
-				Vector3 min, max;
-				min = max = VertexStagingBuffer[0].position;
-				for (const Vertex& v : VertexStagingBuffer) {
-					min.x = std::min(v.position.x, min.x); max.x = std::max(v.position.x, max.x);
-					min.y = std::min(v.position.y, min.y); max.y = std::max(v.position.y, max.y);
-					min.z = std::min(v.position.z, min.z); max.z = std::max(v.position.z, max.z);
-				}
-				DirectX::BoundingBox::CreateFromPoints(AssetManager::GetInstance()->VertexBufferInfos[submesh.VertexBufferIndex].BestFitBox, min, max);
 			}
 		}
 #if 0

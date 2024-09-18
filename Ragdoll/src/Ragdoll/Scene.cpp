@@ -94,7 +94,9 @@ void ragdoll::Scene::Update(float _dt)
 	}
 
 	if (bIsCameraDirty)
+	{
 		BuildStaticInstances(CameraProjection, CameraView);
+	}
 	Renderer.DrawAllInstances(StaticInstanceBufferHandle, StaticInstanceGroupInfos, CBuffer);
 	Renderer.DrawBoundingBoxes(StaticInstanceDebugBufferHandle, StaticDebugInstanceDatas.size(), CBuffer);
 
@@ -178,6 +180,8 @@ void ragdoll::Scene::UpdateControls(float _dt)
 			auto& io = ImGui::GetIO();
 			data.cameraYaw += io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindow->GetFrameTime();
 			data.cameraPitch += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindow->GetFrameTime();
+			data.cameraPitch = data.cameraPitch > DirectX::XM_PIDIV2 - 0.1f ? DirectX::XM_PIDIV2 - 0.1f : data.cameraPitch;
+			data.cameraPitch = data.cameraPitch < -DirectX::XM_PIDIV2 + 0.1f ? -DirectX::XM_PIDIV2 + 0.1f : data.cameraPitch;
 		}
 	}
 	cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
@@ -257,25 +261,7 @@ void ragdoll::Scene::UpdateStaticProxies()
 	{
 		//update all the bounding boxes of the static proxies
 		TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)proxy.EnttId);
-		proxy.BoundingBox = AssetManager::GetInstance()->VertexBufferInfos[proxy.BufferIndex].BestFitBox;
-		proxy.BoundingBox.Center.x += tComp->m_ModelToWorld._41;
-		proxy.BoundingBox.Center.y += tComp->m_ModelToWorld._42;
-		proxy.BoundingBox.Center.z += tComp->m_ModelToWorld._43;
-
-		//transforming the axis aligned vector instead
-		Vector3 E = proxy.BoundingBox.Extents;
-		proxy.BoundingBox.Extents.x =
-			E.x * abs(tComp->m_ModelToWorld._11) +
-			E.y * abs(tComp->m_ModelToWorld._21) +
-			E.z * abs(tComp->m_ModelToWorld._31);
-		proxy.BoundingBox.Extents.y =
-			E.x * abs(tComp->m_ModelToWorld._12) +
-			E.y * abs(tComp->m_ModelToWorld._22) +
-			E.z * abs(tComp->m_ModelToWorld._32);
-		proxy.BoundingBox.Extents.z =
-			E.x * abs(tComp->m_ModelToWorld._13) +
-			E.y * abs(tComp->m_ModelToWorld._23) +
-			E.z * abs(tComp->m_ModelToWorld._33);
+		AssetManager::GetInstance()->VertexBufferInfos[proxy.BufferIndex].BestFitBox.Transform(proxy.BoundingBox, tComp->m_ModelToWorld);
 	}
 }
 
@@ -311,17 +297,18 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 			info.InstanceOffset = StaticInstanceDatas.size();
 			info.VertexBufferIndex = CurrBufferIndex;
 			//populate the buffer data vector
-			for (int j = Start; j < i; ++j) {
+			for (int j = Start; j < i; j++) {
 				//debug instances
 				InstanceData debugData;
 				Vector3 translate = StaticProxies[j].BoundingBox.Center;
-				Vector3 scale = StaticProxies[j].BoundingBox.Extents;
+				Vector3 scale = StaticProxies[j].BoundingBox.Extents * 2;
 				Matrix matrix = Matrix::CreateScale(scale);
 				matrix *= Matrix::CreateTranslation(translate);
 				debugData.ModelToWorld = matrix;
 				debugData.bIsLit = false;
 				debugData.Color = { 0.f, 1.f, 0.f, 1.f };
 				StaticDebugInstanceDatas.emplace_back(debugData);
+
 				//check if within the camera frustum
 				DirectX::ContainmentType result = frustum.Contains(StaticProxies[j].BoundingBox);
 				if (result == DirectX::ContainmentType::DISJOINT)
@@ -329,6 +316,7 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 					DebugInfo.CulledObjectCount++;
 					continue;
 				}
+				//set the instance data
 				TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)StaticProxies[j].EnttId);
 				RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>((entt::entity)StaticProxies[j].EnttId);
 				InstanceData Data;
