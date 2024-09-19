@@ -13,28 +13,18 @@
 #include "Scene.h"
 #include "GeometryBuilder.h"
 
-void ForwardRenderer::Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em)
+void ForwardRenderer::Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win)
 {
 	DeviceRef = device;
 	PrimaryWindowRef = win;
-	FileManagerRef = fm;
-	EntityManagerRef = em;
 	CreateResource();
 }
 
 void ForwardRenderer::Shutdown()
 {
 	//release nvrhi stuff
-	BindingLayoutHandle = nullptr;
-	BindingSetHandle = nullptr;
-	GraphicsPipeline = nullptr;
-	WireframePipeline = nullptr;
 	CommandList = nullptr;
-	ForwardVertexShader = nullptr;
-	ForwardPixelShader = nullptr;
-	ConstantBufferHandle = nullptr;
 	DepthBuffer = nullptr;
-	InputLayoutHandle = nullptr;
 }
 
 void ForwardRenderer::BeginFrame()
@@ -80,20 +70,25 @@ void ForwardRenderer::Render(ragdoll::Scene* scene)
 void ForwardRenderer::CreateResource()
 {
 	CommandList = DeviceRef->m_NvrhiDevice->createCommandList();
-	//create a depth buffer
-	nvrhi::TextureDesc depthBufferDesc;
-	depthBufferDesc.width = PrimaryWindowRef->GetBufferWidth();
-	depthBufferDesc.height = PrimaryWindowRef->GetBufferHeight();
-	depthBufferDesc.initialState = nvrhi::ResourceStates::DepthWrite;
-	depthBufferDesc.isRenderTarget = true;
-	depthBufferDesc.sampleCount = 1;
-	depthBufferDesc.dimension = nvrhi::TextureDimension::Texture2D;
-	depthBufferDesc.keepInitialState = true;
-	depthBufferDesc.mipLevels = 1;
-	depthBufferDesc.format = nvrhi::Format::D32;
-	depthBufferDesc.isTypeless = true;
-	depthBufferDesc.debugName = "Depth";
-	DepthBuffer = DeviceRef->m_NvrhiDevice->createTexture(depthBufferDesc);
+	//check if the depth buffer i want is already in the asset manager
+	if (!AssetManager::GetInstance()->RenderTargetTextures.contains("SceneDepthZ")) {
+		//create a depth buffer
+		nvrhi::TextureDesc depthBufferDesc;
+		depthBufferDesc.width = PrimaryWindowRef->GetBufferWidth();
+		depthBufferDesc.height = PrimaryWindowRef->GetBufferHeight();
+		depthBufferDesc.initialState = nvrhi::ResourceStates::DepthWrite;
+		depthBufferDesc.isRenderTarget = true;
+		depthBufferDesc.sampleCount = 1;
+		depthBufferDesc.dimension = nvrhi::TextureDimension::Texture2D;
+		depthBufferDesc.keepInitialState = true;
+		depthBufferDesc.mipLevels = 1;
+		depthBufferDesc.format = nvrhi::Format::D32;
+		depthBufferDesc.isTypeless = true;
+		depthBufferDesc.debugName = "Depth";
+		DepthBuffer = DeviceRef->m_NvrhiDevice->createTexture(depthBufferDesc);
+	}
+	else
+		DepthBuffer = AssetManager::GetInstance()->RenderTargetTextures.at("SceneDepthZ");
 
 	//create the fb for the graphics pipeline to draw on
 	nvrhi::FramebufferHandle fb;

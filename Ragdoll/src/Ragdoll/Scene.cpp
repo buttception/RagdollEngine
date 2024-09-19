@@ -19,7 +19,9 @@ ragdoll::Scene::Scene(Application* app)
 	CommandList = DeviceRef->m_NvrhiDevice->createCommandList();
 	//TODO: create the cmd args renderer
 	ForwardRenderer = std::make_shared<class ForwardRenderer>();
-	ForwardRenderer->Init(DeviceRef, app->m_PrimaryWindow, app->m_FileManager, app->m_EntityManager);
+	ForwardRenderer->Init(DeviceRef, app->m_PrimaryWindow);
+	DeferredRenderer = std::make_shared<class DeferredRenderer>();
+	DeferredRenderer->Init(DeviceRef, app->m_PrimaryWindow);
 	if (app->Config.bCreateCustomMeshes)
 	{
 		Config.bIsThereCustomMeshes = true;
@@ -121,7 +123,8 @@ void ragdoll::Scene::Update(float _dt)
 		BuildStaticInstances(CameraProjection, CameraView);
 	}
 
-	ForwardRenderer->Render(this);
+	//ForwardRenderer->Render(this);
+	DeferredRenderer->Render(this);
 
 	ImguiInterface->Render();
 	DeviceRef->Present();
@@ -135,6 +138,8 @@ void ragdoll::Scene::Shutdown()
 	ImguiInterface = nullptr;
 	ForwardRenderer->Shutdown();
 	ForwardRenderer = nullptr;
+	DeferredRenderer->Shutdown();
+	DeferredRenderer = nullptr;
 }
 
 void ragdoll::Scene::UpdateControls(float _dt)

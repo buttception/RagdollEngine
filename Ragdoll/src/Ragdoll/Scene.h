@@ -1,6 +1,7 @@
 #pragma once
 #include "ImGuiRenderer.h"
 #include "ForwardRenderer.h"
+#include "DeferredRenderer.h"
 
 #include "Components/TransformComp.h"
 #include "Components/RenderableComp.h"
@@ -77,6 +78,7 @@ namespace ragdoll {
 
 	public:
 		std::shared_ptr<ForwardRenderer> ForwardRenderer;
+		std::shared_ptr<DeferredRenderer> DeferredRenderer;
 		SceneConfig Config;
 		DebugInfo DebugInfo;
 

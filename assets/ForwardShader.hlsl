@@ -46,9 +46,10 @@ void main_vs(
 	outFragPos = mul(float4(inPos, 1), data.worldMatrix); 
 	outPos = mul(outFragPos, viewProjMatrix);
 
+	float binormalSign = inNormal.x > 0.0f ? -1.0f : 1.0f;
 	outNormal = normalize(mul(inNormal, transpose((float3x3)data.invWorldMatrix)));
 	outTangent = normalize(mul(inTangent, transpose((float3x3)data.invWorldMatrix)));
-	outBinormal = normalize(cross(outTangent, outNormal));
+	outBinormal = normalize(cross(outTangent, outNormal)) * binormalSign;
 	outTexcoord = inTexcoord;
 	outInstanceId = inInstanceId;
 }

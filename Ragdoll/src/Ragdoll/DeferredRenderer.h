@@ -1,8 +1,7 @@
 #pragma once
 #include <nvrhi/nvrhi.h>
 
-#include "RenderPasses/ForwardPass.h"
-#include "RenderPasses/DebugPass.h"
+#include "RenderPasses/GBufferPass.h"
 
 namespace ragdoll {
 	class Window;
@@ -13,12 +12,15 @@ namespace ragdoll {
 }
 class DirectXDevice;
 
-class ForwardRenderer {
+class DeferredRenderer {
 public:
-	std::shared_ptr<ForwardPass> ForwardPass;
-	std::shared_ptr<DebugPass> DebugPass;
+	std::shared_ptr<GBufferPass> GBufferPass;
 
+	nvrhi::TextureHandle AlbedoHandle;
+	nvrhi::TextureHandle NormalHandle;
+	nvrhi::TextureHandle RoughnessMetallicHandle;
 	nvrhi::TextureHandle DepthBuffer;
+	nvrhi::FramebufferHandle GBuffer;
 	nvrhi::CommandListHandle CommandList;
 
 	void Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win);
