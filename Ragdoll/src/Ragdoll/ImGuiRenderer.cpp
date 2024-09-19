@@ -2,10 +2,11 @@
 #include "ImGuiRenderer.h"
 #include "DirectXDevice.h"
 #include "backends/imgui_impl_glfw.cpp"
+#include "AssetManager.h"
 
 #include <microprofile.h>
 
-void ImguiRenderer::Init(DirectXDevice* dx, nvrhi::ShaderHandle imGuiVS, nvrhi::ShaderHandle imGuiPS)
+void ImguiRenderer::Init(DirectXDevice* dx)
 {
 	m_DirectXTest = dx;
 	IMGUI_CHECKVERSION();
@@ -20,7 +21,9 @@ void ImguiRenderer::Init(DirectXDevice* dx, nvrhi::ShaderHandle imGuiVS, nvrhi::
 
 	CommandList = m_DirectXTest->m_NvrhiDevice->createCommandList();
 	CommandList->open();
-	RD_ASSERT(imGuiVS == nullptr || imGuiPS == nullptr, "Failed to load Imgui shaders");
+
+	nvrhi::ShaderHandle imGuiVS = AssetManager::GetInstance()->GetShader("imgui.vs.cso");
+	nvrhi::ShaderHandle imGuiPS = AssetManager::GetInstance()->GetShader("imgui.ps.cso");
 	// create attribute layout object
 	nvrhi::VertexAttributeDesc vertexAttribLayout[] = {
 		{ "POSITION", nvrhi::Format::RG32_FLOAT,  1, 0, offsetof(ImDrawVert,pos), sizeof(ImDrawVert), false },

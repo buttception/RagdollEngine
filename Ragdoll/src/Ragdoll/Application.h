@@ -30,6 +30,7 @@ ________________________________________________________________________________
 #pragma once
 #include "Core/Guid.h"
 
+class DirectXDevice;
 namespace ragdoll
 {
 	class EntityManager;
@@ -67,6 +68,7 @@ namespace ragdoll
 		std::shared_ptr<EntityManager> m_EntityManager;
 		std::shared_ptr<FileManager> m_FileManager;
 		std::shared_ptr<Scene> m_Scene;
+		std::shared_ptr<DirectXDevice> Device;
 		ApplicationConfig Config;
 
 		Application() = default;

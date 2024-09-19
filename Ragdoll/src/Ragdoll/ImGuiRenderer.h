@@ -19,7 +19,7 @@ public:
 	std::vector<ImDrawVert> VertexBufferRaw;
 	std::vector<ImDrawIdx> IndexBufferRaw;
 
-	void Init(DirectXDevice* dx, nvrhi::ShaderHandle imguiVS, nvrhi::ShaderHandle imguiPS);
+	void Init(DirectXDevice* dx);
 	void BeginFrame();
 	void Render();
 	void BackbufferResizing();

@@ -1,7 +1,6 @@
 #include "ragdollpch.h"
 
 #include "GLTFLoader.h"
-#include "Renderer.h"
 #include "DirectXDevice.h"
 #include "AssetManager.h"
 #include "Ragdoll/Entity/EntityManager.h"
@@ -17,13 +16,13 @@
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 #include <tiny_gltf.h>
 
-void GLTFLoader::Init(std::filesystem::path root, class Renderer* renderer, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> scene)
+void GLTFLoader::Init(std::filesystem::path root, std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> scene)
 {
 	Root = root;
-	Renderer = renderer;
-	FileManager = fm;
-	EntityManager = em;
-	Scene = scene;
+	DeviceRef = device;
+	FileManagerRef = fm;
+	EntityManagerRef = em;
+	SceneRef = scene;
 }
 
 void AddToFurthestSibling(ragdoll::Guid child, ragdoll::Guid newChild, std::shared_ptr<ragdoll::EntityManager> em)
@@ -101,7 +100,6 @@ enum AttributeType {
 void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 {
 	//ownself open command list
-	Renderer->CommandList->open();
 	tinygltf::TinyGLTF loader;
 	tinygltf::Model model;
 	std::string err, warn;
@@ -187,7 +185,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 					const tinygltf::Accessor& accessor = it.second;
 					const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
 					AttributeType type;
-					for (const nvrhi::VertexAttributeDesc& itDesc : Renderer->VertexAttributes) {
+					for (const nvrhi::VertexAttributeDesc& itDesc : AssetManager::GetInstance()->VertexAttributes) {
 						if (it.first.find(itDesc.name) != std::string::npos)
 						{
 							if (itDesc.name == "POSITION")
@@ -302,7 +300,10 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
 	//create the buffers
-	AssetManager::GetInstance()->UpdateVBOIBO(Renderer);
+	AssetManager::GetInstance()->UpdateVBOIBO();
+
+	CommandList = DeviceRef->m_NvrhiDevice->createCommandList();
+	CommandList->open();
 	//load the images
 	std::unordered_map<int32_t, int32_t> gltfSourceToImageIndex{};
 	for(int i = 0; i < model.images.size(); ++i)
@@ -335,16 +336,14 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		texDesc.keepInitialState = true;
 
 		Image img;
-		img.TextureHandle = Renderer->Device->m_NvrhiDevice->createTexture(texDesc);
+		img.TextureHandle = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
 		RD_ASSERT(img.TextureHandle == nullptr, "Issue creating texture handle: {}", itImg.uri);
 
 		//upload the texture data
-		Renderer->CommandList->writeTexture(img.TextureHandle, 0, 0, itImg.image.data(), itImg.width * itImg.component);
+		CommandList->writeTexture(img.TextureHandle, 0, 0, itImg.image.data(), itImg.width * itImg.component);
 		//write to descriptor table
-		int32_t index = Renderer->AddTextureToTable(img.TextureHandle);
+		int32_t index = AssetManager::GetInstance()->AddImage(img);
 		gltfSourceToImageIndex[i] = index;
-
-		AssetManager::GetInstance()->Images.emplace_back(img);
 	}
 	uint32_t textureIndicesOffset = AssetManager::GetInstance()->Textures.size();
 	for(const tinygltf::Texture& itTex : model.textures)
@@ -442,8 +441,8 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 
 		TINYGLTF_MODE_POINTS;
 	}
-	Renderer->CommandList->close();
-	Renderer->Device->m_NvrhiDevice->executeCommandList(Renderer->CommandList);
+	CommandList->close();
+	DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
 
 	//load all of the materials
 	for (const tinygltf::Material& gltfMat : model.materials) 
@@ -469,7 +468,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 
 	//create all the entities and their components
 	for (const int& rootIndex : model.scenes[0].nodes) {	//iterating through the root nodes
-		TraverseNode(rootIndex, 0, meshIndicesOffset, model, EntityManager, Scene);
+		TraverseNode(rootIndex, 0, meshIndicesOffset, model, EntityManagerRef, SceneRef);
 	}
 #if 0
 	TransformLayer->DebugPrintHierarchy();
