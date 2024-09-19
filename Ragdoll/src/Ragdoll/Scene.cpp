@@ -2,12 +2,13 @@
 
 #include "Scene.h"
 
+#include <nvrhi/utils.h>
+#include <microprofile.h>
 #include "Application.h"
 #include "Entity/EntityManager.h"
 #include "AssetManager.h"
 #include "DirectXDevice.h"
-#include "nvrhi/utils.h"
-#include "microprofile.h"
+#include "GeometryBuilder.h"
 
 ragdoll::Scene::Scene(Application* app)
 {
@@ -18,7 +19,7 @@ ragdoll::Scene::Scene(Application* app)
 	if (app->Config.bCreateCustomMeshes)
 	{
 		Config.bIsThereCustomMeshes = true;
-		Renderer->CreateCustomMeshes();
+		CreateCustomMeshes();
 	}
 	Config.bDrawBoxes = app->Config.bDrawDebugBoundingBoxes;
 	Config.bDrawOctree = app->Config.bDrawDebugOctree;
@@ -223,6 +224,104 @@ void ragdoll::Scene::UpdateControls(float _dt)
 		sinf(azimuthElevationRad.x));
 	CBuffer.cameraPosition = data.cameraPos;
 	CBuffer.lightDiffuseColor = data.dirLightColor;
+}
+
+void ragdoll::Scene::CreateCustomMeshes()
+{
+	//create 5 random textures
+	uint8_t colors[5][4] = {
+		{255, 0, 0, 255},
+		{255, 255, 0, 255},
+		{0, 255, 255, 255},
+		{0, 0, 255, 255},
+		{0, 255, 0, 255},
+	};
+	std::string debugNames[5] = {
+		"Custom Red",
+		"Custom Yellow",
+		"Custom Cyan",
+		"Custom Blue",
+		"Custom Green",
+	};
+	Renderer->CommandList->open();
+	for (int i = 0; i < 5; ++i)
+	{
+		Image img;
+		nvrhi::TextureDesc textureDesc;
+		textureDesc.width = 1;
+		textureDesc.height = 1;
+		textureDesc.format = nvrhi::Format::RGBA8_UNORM;
+		textureDesc.dimension = nvrhi::TextureDimension::Texture2D;
+		textureDesc.isRenderTarget = false;
+		textureDesc.isTypeless = false;
+		textureDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+		textureDesc.keepInitialState = true;
+		textureDesc.debugName = debugNames[i];
+		nvrhi::TextureHandle texHandle = Renderer->Device->m_NvrhiDevice->createTexture(textureDesc);
+		Renderer->CommandList->writeTexture(texHandle, 0, 0, &colors[i], 4);
+		img.TextureHandle = texHandle;
+		AssetManager::GetInstance()->Images.emplace_back(img);
+		Texture texture;
+		texture.ImageIndex = i;
+		texture.SamplerIndex = i;
+		AssetManager::GetInstance()->Textures.emplace_back(texture);
+
+		Renderer->AddTextureToTable(texHandle);
+	}
+	Renderer->CommandList->close();
+	Renderer->Device->m_NvrhiDevice->executeCommandList(Renderer->CommandList);
+
+	Material mat;
+	mat.bIsLit = true;
+	mat.Color = Vector4::One;
+	mat.AlbedoTextureIndex = 0;
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	mat.AlbedoTextureIndex = 1;
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	mat.AlbedoTextureIndex = 2;
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	mat.AlbedoTextureIndex = 3;
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	mat.AlbedoTextureIndex = 4;
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+
+	//build primitives
+	GeometryBuilder geomBuilder;
+	geomBuilder.Init(Renderer->Device->m_NvrhiDevice);
+	int32_t id = geomBuilder.BuildCube(1.f);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildSphere(1.f, 16);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildCylinder(1.f, 1.f, 16);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildCone(1.f, 1.f, 16);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildIcosahedron(1.f);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	Renderer->CommandList->open();
+	AssetManager::GetInstance()->UpdateVBOIBO(Renderer.get());
+	Renderer->CommandList->close();
+	Renderer->Device->m_NvrhiDevice->executeCommandList(Renderer->CommandList);
 }
 
 void ragdoll::Scene::UpdateTransforms()

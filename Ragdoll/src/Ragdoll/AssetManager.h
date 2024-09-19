@@ -2,6 +2,7 @@
 
 #include <nvrhi/nvrhi.h>
 #include <tiny_gltf.h>
+#include "Renderer.h"
 #include "Ragdoll/Math/RagdollMath.h"
 
 struct Material {
@@ -75,7 +76,7 @@ class AssetManager
 {
 public:
 	static AssetManager* GetInstance();
-	static void Release() { s_Instance = nullptr; }
+	static void Release() { s_Instance.reset(); s_Instance = nullptr; }
 
 	std::vector<VertexBufferInfo> VertexBufferInfos;
 	std::vector<Mesh> Meshes;
@@ -96,7 +97,7 @@ public:
 	//this function will just add the vertices and indices, and populate the vector of objects
 	uint32_t AddVertices(const std::vector<Vertex>& newVertices, const std::vector<uint32_t>& newIndices);
 	//this function will create the buffer handles and copy the data over
-	void UpdateVBOIBO(ForwardRenderer* device);
+	void UpdateVBOIBO(Renderer* device);
 private:
 	inline static std::unique_ptr<AssetManager> s_Instance;
 };

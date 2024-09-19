@@ -31,7 +31,7 @@ uint32_t AssetManager::AddVertices(const std::vector<Vertex>& newVertices, const
 	return VertexBufferInfos.size() - 1;
 }
 
-void AssetManager::UpdateVBOIBO(ForwardRenderer* renderer)
+void AssetManager::UpdateVBOIBO(Renderer* renderer)
 {
 	nvrhi::BufferDesc vertexBufDesc;
 	vertexBufDesc.byteSize = Vertices.size() * sizeof(Vertex);	//the offset is already the size of the vb

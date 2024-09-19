@@ -1,7 +1,7 @@
 #pragma once
 #include <nvrhi/nvrhi.h>
-
 #include "Renderer.h"
+
 namespace ragdoll {
 	class Window;
 	class FileManager;
@@ -10,7 +10,7 @@ namespace ragdoll {
 }
 class DirectXDevice;
 
-class ForwardRenderer : public Renderer {
+class DeferredRenderer : public Renderer {
 public:
 	nvrhi::ShaderHandle ForwardVertexShader;
 	nvrhi::ShaderHandle ForwardPixelShader;

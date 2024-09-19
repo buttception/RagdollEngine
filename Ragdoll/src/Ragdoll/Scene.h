@@ -1,6 +1,7 @@
 #pragma once
 #include "ImGuiRenderer.h"
 #include "ForwardRenderer.h"
+#include "DeferredRenderer.h"
 
 #include "Components/TransformComp.h"
 #include "Components/RenderableComp.h"
@@ -72,7 +73,7 @@ namespace ragdoll {
 		nvrhi::BufferHandle StaticInstanceDebugBufferHandle;	//contains all the aabb boxes to draw
 
 	public:
-		std::shared_ptr<ForwardRenderer> Renderer;
+		std::shared_ptr<Renderer> Renderer;
 		SceneConfig Config;
 		DebugInfo DebugInfo;
 		Matrix CameraViewProjection;
@@ -81,11 +82,11 @@ namespace ragdoll {
 
 		Scene(Application*);
 
-		void Init();
 		void Update(float _dt);
 		void Shutdown();
 
 		void UpdateControls(float _dt);
+		void CreateCustomMeshes();
 
 		//Transforms
 		void UpdateTransforms();

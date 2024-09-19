@@ -3,7 +3,7 @@
 #include <nvrhi/utils.h>
 #include <microprofile.h>
 #include <nvrhi/d3d12-backend.h>
-#include "ForwardRenderer.h"
+#include "DeferredRenderer.h"
 #include "DirectXDevice.h"
 
 #include "AssetManager.h"
@@ -13,7 +13,7 @@
 #include "Scene.h"
 #include "GeometryBuilder.h"
 
-void ForwardRenderer::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em)
+void DeferredRenderer::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em)
 {
 	PrimaryWindow = win;
 	FileManager = fm;
@@ -22,7 +22,7 @@ void ForwardRenderer::Init(std::shared_ptr<ragdoll::Window> win, std::shared_ptr
 	CreateResource();
 }
 
-void ForwardRenderer::Shutdown()
+void DeferredRenderer::Shutdown()
 {
 	//release nvrhi stuff
 	BindingLayoutHandle = nullptr;
@@ -44,7 +44,7 @@ void ForwardRenderer::Shutdown()
 	Device = nullptr;
 }
 
-void ForwardRenderer::BeginFrame()
+void DeferredRenderer::BeginFrame()
 {
 	MICROPROFILE_SCOPEI("Render", "Begin Frame", MP_BLUE);
 	Device->BeginFrame();
@@ -64,7 +64,7 @@ void ForwardRenderer::BeginFrame()
 	}
 }
 
-void ForwardRenderer::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, CBuffer& Cbuf)
+void DeferredRenderer::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, CBuffer& Cbuf)
 {
 	if (infos.empty())
 		return;
@@ -122,7 +122,7 @@ void ForwardRenderer::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const
 	Device->m_NvrhiDevice->executeCommandList(CommandList);
 }
 
-void ForwardRenderer::CreateResource()
+void DeferredRenderer::CreateResource()
 {
 	CommandList = Device->m_NvrhiDevice->createCommandList();
 	CommandList->open();
@@ -351,7 +351,7 @@ void ForwardRenderer::CreateResource()
 	WireframePipeline = Device->m_NvrhiDevice->createGraphicsPipeline(pipelineDesc, fb);
 }
 
-void ForwardRenderer::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t instanceCount, CBuffer& Cbuf)
+void DeferredRenderer::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t instanceCount, CBuffer& Cbuf)
 {
 	MICROPROFILE_SCOPEI("Render", "Draw Bounding Box", MP_ALICEBLUE);
 	if (instanceCount == 0)

@@ -3,7 +3,7 @@
 #include "Ragdoll/AssetManager.h"
 #include <nvrhi/nvrhi.h>
 
-class ForwardRenderer;
+class Renderer;
 namespace ragdoll {
 	class FileManager;
 	class EntityManager;
@@ -12,7 +12,7 @@ namespace ragdoll {
 
 class GLTFLoader {
 	std::filesystem::path Root;
-	ForwardRenderer* Renderer;
+	Renderer* Renderer;
 	std::shared_ptr<ragdoll::FileManager> FileManager;
 	std::shared_ptr<ragdoll::EntityManager> EntityManager;
 	std::shared_ptr<ragdoll::Scene> Scene;
@@ -20,7 +20,7 @@ class GLTFLoader {
 	std::vector<uint32_t> IndexStagingBuffer;
 	std::vector<Vertex> VertexStagingBuffer;
 public:
-	void Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> tl);
+	void Init(std::filesystem::path root, class Renderer* renderer, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> tl);
 	void LoadAndCreateModel(const std::string& fileName);
 private:
 };

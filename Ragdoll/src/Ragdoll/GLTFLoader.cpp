@@ -1,7 +1,7 @@
 #include "ragdollpch.h"
 
 #include "GLTFLoader.h"
-#include "ForwardRenderer.h"
+#include "Renderer.h"
 #include "DirectXDevice.h"
 #include "AssetManager.h"
 #include "Ragdoll/Entity/EntityManager.h"
@@ -17,7 +17,7 @@
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 #include <tiny_gltf.h>
 
-void GLTFLoader::Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> scene)
+void GLTFLoader::Init(std::filesystem::path root, class Renderer* renderer, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> scene)
 {
 	Root = root;
 	Renderer = renderer;

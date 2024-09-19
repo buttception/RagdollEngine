@@ -31,6 +31,7 @@ ________________________________________________________________________________
 #include "ragdollpch.h"
 
 #include "Application.h"
+#include <microprofile.h>
 
 #include "Core/Logger.h"
 #include "Core/Core.h"
@@ -45,7 +46,7 @@ ________________________________________________________________________________
 #include "Scene.h"
 
 #include "DirectXDevice.h"
-#include "microprofile.h"
+#include "GLTFLoader.h"
 
 MICROPROFILE_DEFINE(MAIN, "MAIN", "Main", MP_AUTO);
 
