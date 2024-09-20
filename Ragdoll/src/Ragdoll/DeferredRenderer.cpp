@@ -51,10 +51,20 @@ void DeferredRenderer::BeginFrame()
 
 void DeferredRenderer::Render(ragdoll::Scene* scene)
 {
+	nvrhi::FramebufferHandle fb;
+	nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
+		.addColorAttachment(DeviceRef->GetCurrentBackbuffer())
+		.setDepthAttachment(DepthBuffer);
+	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
+
 	BeginFrame();
 	
 	CommandList->open();
 	GBufferPass->DrawAllInstances(scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo);
+	DeferredLightPass->SetRenderTarget(fb);
+	DeferredLightPass->LightPass(scene->SceneInfo);
+	DebugPass->SetRenderTarget(fb);
+	DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo);
 	CommandList->close();
 	DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
 }
@@ -111,7 +121,7 @@ void DeferredRenderer::CreateResource()
 		texDesc.format = nvrhi::Format::RG16_FLOAT;
 		texDesc.debugName = name;
 		NormalHandle = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
-		AssetManager::GetInstance()->RenderTargetTextures[name] = AlbedoHandle;
+		AssetManager::GetInstance()->RenderTargetTextures[name] = NormalHandle;
 	}
 	else
 		NormalHandle = AssetManager::GetInstance()->RenderTargetTextures.at(name);
@@ -120,7 +130,7 @@ void DeferredRenderer::CreateResource()
 		texDesc.format = nvrhi::Format::RG8_UNORM;
 		texDesc.debugName = name;
 		RoughnessMetallicHandle = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
-		AssetManager::GetInstance()->RenderTargetTextures[name] = AlbedoHandle;
+		AssetManager::GetInstance()->RenderTargetTextures[name] = RoughnessMetallicHandle;
 	}
 	else
 		RoughnessMetallicHandle = AssetManager::GetInstance()->RenderTargetTextures.at(name);
@@ -136,4 +146,17 @@ void DeferredRenderer::CreateResource()
 	GBufferPass = std::make_shared<class GBufferPass>();
 	GBufferPass->SetRenderTarget(GBuffer);
 	GBufferPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
+
+	nvrhi::FramebufferHandle fb;
+	fbDesc = nvrhi::FramebufferDesc()
+		.addColorAttachment(DeviceRef->GetCurrentBackbuffer())
+		.setDepthAttachment(DepthBuffer);;
+	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
+	DeferredLightPass = std::make_shared<class DeferredLightPass>();
+	DeferredLightPass->SetRenderTarget(fb);
+	DeferredLightPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
+
+	DebugPass = std::make_shared<class DebugPass>();
+	DebugPass->SetRenderTarget(fb);
+	DebugPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
 }

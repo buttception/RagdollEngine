@@ -106,27 +106,52 @@ void gbuffer_ps(
 	outNormals.xy = Encode(N);
 	outRoughnessMetallic = float2(roughness, metallic);
 }
+cbuffer g_LightConst : register(b1) {
+	float4x4 LightViewProjMatrix;
+	float4 LightlightDiffuseColor;
+	float4 LightsceneAmbientColor;
+	float3 LightlightDirection;
+	float3 LightcameraPosition;
+};
+
 
 void deferred_light_vs(
 	in float3 inPos : POSITION,
 	in float2 inTexcoord : TEXCOORD,
 	out float4 outPos : SV_Position,
-	out float4 outFragPos : TEXCOORD1,
-	out float2 outTexcoord : TEXCOORD5
+	out float2 outTexcoord : TEXCOORD1
 )
 {
-	
+	outPos = float4(inPos, 1.f);
+	outTexcoord = inTexcoord;
 }
 
 Texture2D albedoTexture : register(t0);
 Texture2D normalTexture : register(t1);
 Texture2D RMTexture : register(t2);
 
+float3 Decode(float2 f)
+{
+    f = f * 2.0 - 1.0;
+ 
+    // https://twitter.com/Stubbesaurus/status/937994790553227264
+    float3 n = float3(f.x, f.y, 1.0 - abs(f.x) - abs(f.y));
+    float t = saturate(-n.z);
+    n.xy += n.xy >= 0.0 ? -t : t;
+    return normalize(n);
+}
+
 void deferred_light_ps(
-	in float3 inPos : SV_Position,
-	in float2 inTexcoord : TEXCOORD,
+	in float4 inPos : SV_Position,
+	in float2 inTexcoord : TEXCOORD1,
 	out float4 outColor : SV_Target0
 )
 {
-
+	float4 albedo = albedoTexture.Sample(Samplers[5], inTexcoord);
+	float3 N = Decode(normalTexture.Sample(Samplers[5], inTexcoord).xy);
+	float2 RM = RMTexture.Sample(Samplers[5], inTexcoord).xy;
+	float3 diffuse = max(dot(N, LightlightDirection), 0) * albedo.rgb;
+	float3 ambient = LightsceneAmbientColor.rgb * albedo.rgb;
+	float3 lighting = ambient + diffuse;
+	outColor = float4(lighting, 1.f);
 }

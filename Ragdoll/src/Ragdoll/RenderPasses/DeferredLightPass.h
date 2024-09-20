@@ -26,8 +26,6 @@ class DeferredLightPass {
 	nvrhi::GraphicsPipelineHandle GraphicsPipeline;
 	nvrhi::BufferHandle ConstantBufferHandle;
 
-	nvrhi::InputLayoutHandle InputLayoutHandle;
-
 public:
 	void Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle cmdList);
 

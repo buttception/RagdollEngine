@@ -2,6 +2,8 @@
 #include <nvrhi/nvrhi.h>
 
 #include "RenderPasses/GBufferPass.h"
+#include "RenderPasses/DeferredLightPass.h"
+#include "RenderPasses/DebugPass.h"
 
 namespace ragdoll {
 	class Window;
@@ -15,6 +17,8 @@ class DirectXDevice;
 class DeferredRenderer {
 public:
 	std::shared_ptr<GBufferPass> GBufferPass;
+	std::shared_ptr<DeferredLightPass> DeferredLightPass;
+	std::shared_ptr<DebugPass> DebugPass;
 
 	nvrhi::TextureHandle AlbedoHandle;
 	nvrhi::TextureHandle NormalHandle;

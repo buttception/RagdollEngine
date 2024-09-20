@@ -103,6 +103,9 @@ public:
 	std::vector<uint32_t> Indices;
 	//the information on how to use the global buffer
 	std::vector<nvrhi::VertexAttributeDesc> VertexAttributes;
+	
+	//mesh for fullscreen pass
+	nvrhi::BufferHandle FullscreenTriangleHandle;
 
 	//descriptor table for all the bindless stuff
 	nvrhi::DescriptorTableHandle DescriptorTable;

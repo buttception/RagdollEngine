@@ -14,8 +14,8 @@ void DebugPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle c
 
 	//create the pipeline
 	//load outputted shaders objects
-	ForwardVertexShader = AssetManager::GetInstance()->GetShader("ForwardShader.vs.cso");
-	ForwardPixelShader = AssetManager::GetInstance()->GetShader("ForwardShader.ps.cso");
+	VertexShader = AssetManager::GetInstance()->GetShader("ForwardShader.vs.cso");
+	PixelShader = AssetManager::GetInstance()->GetShader("ForwardShader.ps.cso");
 	//TODO: move into draw call then create only if needed
 	nvrhi::BindingLayoutDesc layoutDesc = nvrhi::BindingLayoutDesc();
 	layoutDesc.visibility = nvrhi::ShaderType::All;
@@ -38,7 +38,7 @@ void DebugPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle c
 	ConstantBufferHandle = NvrhiDeviceRef->createBuffer(cBufDesc);
 
 	const auto& attribs = AssetManager::GetInstance()->VertexAttributes;
-	nvrhi::InputLayoutHandle inputLayoutHandle = NvrhiDeviceRef->createInputLayout(attribs.data(), attribs.size(), ForwardVertexShader);
+	nvrhi::InputLayoutHandle inputLayoutHandle = NvrhiDeviceRef->createInputLayout(attribs.data(), attribs.size(), VertexShader);
 
 	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
 
@@ -47,14 +47,14 @@ void DebugPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle c
 
 	pipelineDesc.addBindingLayout(BindingLayoutHandle);
 	pipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
-	pipelineDesc.setVertexShader(ForwardVertexShader);
-	pipelineDesc.setFragmentShader(ForwardPixelShader);
+	pipelineDesc.setVertexShader(VertexShader);
+	pipelineDesc.setFragmentShader(PixelShader);
 
 	pipelineDesc.renderState.depthStencilState.depthTestEnable = true;
 	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
 	pipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
 	pipelineDesc.renderState.depthStencilState.depthFunc = nvrhi::ComparisonFunc::Greater;
-	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::Back;
 	pipelineDesc.renderState.rasterState.fillMode = nvrhi::RasterFillMode::Wireframe;
 	pipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 	pipelineDesc.inputLayout = inputLayoutHandle;

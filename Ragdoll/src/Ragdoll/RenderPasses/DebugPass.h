@@ -21,8 +21,8 @@ class DebugPass {
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
 	nvrhi::DeviceHandle NvrhiDeviceRef{ nullptr };
 
-	nvrhi::ShaderHandle ForwardVertexShader;
-	nvrhi::ShaderHandle ForwardPixelShader;
+	nvrhi::ShaderHandle VertexShader;
+	nvrhi::ShaderHandle PixelShader;
 	nvrhi::BindingLayoutHandle BindingLayoutHandle;
 	nvrhi::BindingSetHandle BindingSetHandle;
 	nvrhi::GraphicsPipelineHandle GraphicsPipeline;

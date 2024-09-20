@@ -123,8 +123,8 @@ void ragdoll::Scene::Update(float _dt)
 		BuildStaticInstances(CameraProjection, CameraView);
 	}
 
-	//ForwardRenderer->Render(this);
-	DeferredRenderer->Render(this);
+	ForwardRenderer->Render(this);
+	//DeferredRenderer->Render(this);
 
 	ImguiInterface->Render();
 	DeviceRef->Present();
@@ -149,10 +149,11 @@ void ragdoll::Scene::UpdateControls(float _dt)
 		Vector3 cameraPos = { 0.f, 1.f, 5.f };
 		float cameraYaw = DirectX::XM_PI;
 		float cameraPitch = 0.f;
-		float cameraFov = 60.f;
+		float cameraFov = 90.f;
 		float cameraNear = 0.01f;
 		float cameraFar = 1000.f;
-		float cameraAspect = 16.f / 9.f;
+		float cameraWidth = 16.f;
+		float cameraHeight = 9.f;
 		float cameraSpeed = 5.f;
 		float cameraRotationSpeed = 15.f;
 		Color dirLightColor = { 1.f,1.f,1.f,1.f };
@@ -165,7 +166,8 @@ void ragdoll::Scene::UpdateControls(float _dt)
 	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera FOV (Degrees)", &data.cameraFov, 60.f, 120.f) : true;
 	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera Near", &data.cameraNear, 0.01f, 1.f) : true;
 	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera Far", &data.cameraFar, 10.f, 10000.f) : true;
-	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera Aspect Ratio", &data.cameraAspect, 0.01f, 5.f) : true;
+	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera Width", &data.cameraWidth, 0.01f, 30.f) : true;
+	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera Height", &data.cameraHeight, 0.01f, 20.f) : true;
 	ImGui::SliderFloat("Camera Speed", &data.cameraSpeed, 0.01f, 30.f);
 	ImGui::SliderFloat("Camera Rotation Speed (Degrees)", &data.cameraRotationSpeed, 5.f, 100.f);
 	ImGui::ColorEdit3("Light Diffuse", &data.dirLightColor.x);
@@ -174,9 +176,17 @@ void ragdoll::Scene::UpdateControls(float _dt)
 	ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, -90.f, 90.f);
 	ImGui::End();
 
-	Matrix proj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraAspect, data.cameraFar, data.cameraNear);
+	//make a infinite z inverse projection matrix
+	Matrix infiniteProj;
+	float e = 1 / tanf(DirectX::XMConvertToRadians(data.cameraFov) / 2.f);
+	infiniteProj._11 = e;
+	infiniteProj._22 = e * (data.cameraWidth / data.cameraHeight);
+	infiniteProj._33 = 0.f;
+	infiniteProj._44 = 0.f;
+	infiniteProj._43 = data.cameraNear;
+	infiniteProj._34 = 1.f;
 	if (!bFreezeFrustumCulling)
-		CameraProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraAspect, data.cameraNear, data.cameraFar);
+		CameraProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraWidth / data.cameraHeight, data.cameraNear, data.cameraFar);
 	Vector3 cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
 
 	//hardcoded handling of movement now
@@ -217,7 +227,7 @@ void ragdoll::Scene::UpdateControls(float _dt)
 	Matrix view = DirectX::XMMatrixLookAtLH(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
 	if (!bFreezeFrustumCulling)
 		CameraView = view;
-	SceneInfo.MainCameraViewProj = view * proj;
+	SceneInfo.MainCameraViewProj = view * infiniteProj;
 	if (!bFreezeFrustumCulling)
 		CameraViewProjection = SceneInfo.MainCameraViewProj;
 	SceneInfo.SceneAmbientColor = data.ambientLight;
