@@ -39,6 +39,7 @@ void DeferredRenderer::BeginFrame()
 		CommandList->beginMarker("ClearGBuffer");
 		CommandList->clearDepthStencilTexture(DepthBuffer, nvrhi::AllSubresources, true, 0.f, false, 0);
 		col = 0.f;
+		CommandList->clearTextureFloat(DeviceRef->GetCurrentBackbuffer(), nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(AlbedoHandle, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(NormalHandle, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(RoughnessMetallicHandle, nvrhi::AllSubresources, col);
@@ -51,20 +52,26 @@ void DeferredRenderer::BeginFrame()
 
 void DeferredRenderer::Render(ragdoll::Scene* scene)
 {
-	nvrhi::FramebufferHandle fb;
-	nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(DeviceRef->GetCurrentBackbuffer())
-		.setDepthAttachment(DepthBuffer);
-	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
-
 	BeginFrame();
 	
 	CommandList->open();
+
 	GBufferPass->DrawAllInstances(scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo);
+
+	nvrhi::FramebufferHandle fb;
+	nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
+		.addColorAttachment(DeviceRef->GetCurrentBackbuffer());
+	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
 	DeferredLightPass->SetRenderTarget(fb);
 	DeferredLightPass->LightPass(scene->SceneInfo);
+
+	fbDesc = nvrhi::FramebufferDesc()
+		.addColorAttachment(DeviceRef->GetCurrentBackbuffer())
+		.setDepthAttachment(DepthBuffer);
+	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
 	DebugPass->SetRenderTarget(fb);
 	DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo);
+
 	CommandList->close();
 	DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
 }
@@ -118,7 +125,7 @@ void DeferredRenderer::CreateResource()
 		AlbedoHandle = AssetManager::GetInstance()->RenderTargetTextures.at(name);
 	name = "GBufferNormal";
 	if (!AssetManager::GetInstance()->RenderTargetTextures.contains(name)) {
-		texDesc.format = nvrhi::Format::RG16_FLOAT;
+		texDesc.format = nvrhi::Format::RG16_UNORM;
 		texDesc.debugName = name;
 		NormalHandle = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
 		AssetManager::GetInstance()->RenderTargetTextures[name] = NormalHandle;
@@ -149,13 +156,16 @@ void DeferredRenderer::CreateResource()
 
 	nvrhi::FramebufferHandle fb;
 	fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(DeviceRef->GetCurrentBackbuffer())
-		.setDepthAttachment(DepthBuffer);;
+		.addColorAttachment(DeviceRef->GetCurrentBackbuffer());
 	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
 	DeferredLightPass = std::make_shared<class DeferredLightPass>();
 	DeferredLightPass->SetRenderTarget(fb);
 	DeferredLightPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
 
+	fbDesc = nvrhi::FramebufferDesc()
+		.addColorAttachment(DeviceRef->GetCurrentBackbuffer())
+		.setDepthAttachment(DepthBuffer);;
+	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
 	DebugPass = std::make_shared<class DebugPass>();
 	DebugPass->SetRenderTarget(fb);
 	DebugPass->Init(DeviceRef->m_NvrhiDevice, CommandList);

@@ -47,10 +47,13 @@ namespace ragdoll {
 
 	struct SceneInformation {
 		Matrix MainCameraViewProj;
+		Matrix InfiniteReverseZProj;
+		Matrix MainCameraView;
 		Vector3 MainCameraPosition;
 		Vector4 LightDiffuseColor = { 1.f, 1.f, 1.f, 1.f };
 		Vector4 SceneAmbientColor = { 0.2f, 0.2f, 0.2f, 1.f };
 		Vector3 LightDirection = { 1.f, -1.f, 1.f };
+		float LightIntensity = 1.f;
 	};
 
 	class Scene {
@@ -86,6 +89,13 @@ namespace ragdoll {
 		Matrix CameraProjection;
 		Matrix CameraView;
 
+		//render targets
+		nvrhi::TextureHandle SceneColor;
+		nvrhi::TextureHandle SceneDepthZ;
+		nvrhi::TextureHandle GBufferAlbedo;
+		nvrhi::TextureHandle GBufferNormal;
+		nvrhi::TextureHandle GBufferORM;
+
 		Scene(Application*);
 
 		void Update(float _dt);
@@ -109,6 +119,7 @@ namespace ragdoll {
 
 		void PopulateStaticProxies();
 		void BuildStaticInstances(const Matrix& cameraProjection, const Matrix& cameraView);
+		void BuildDebugInstances();
 		void CullOctant(const Octant& octant, const DirectX::BoundingFrustum& frustum);
 
 	private:

@@ -79,6 +79,7 @@ void ForwardPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 	CBuffer.LightDiffuseColor = sceneInfo.LightDiffuseColor;
 	CBuffer.LightDirection = sceneInfo.LightDirection;
 	CBuffer.SceneAmbientColor = sceneInfo.SceneAmbientColor;
+	CBuffer.LightIntensity = sceneInfo.LightIntensity;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {

@@ -52,7 +52,7 @@ void DebugPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle c
 
 	pipelineDesc.renderState.depthStencilState.depthTestEnable = true;
 	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
-	pipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
+	pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
 	pipelineDesc.renderState.depthStencilState.depthFunc = nvrhi::ComparisonFunc::Greater;
 	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::Back;
 	pipelineDesc.renderState.rasterState.fillMode = nvrhi::RasterFillMode::Wireframe;

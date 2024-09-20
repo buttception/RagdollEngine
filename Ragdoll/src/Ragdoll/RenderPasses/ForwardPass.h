@@ -14,6 +14,7 @@ class ForwardPass {
 		Vector3 LightDirection = { 1.f, -1.f, 1.f };
 		int InstanceOffset{ 0 };
 		Vector3 CameraPosition;
+		float LightIntensity;
 	}CBuffer;
 
 	nvrhi::FramebufferHandle RenderTarget{ nullptr };

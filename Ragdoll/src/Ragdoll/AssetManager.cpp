@@ -174,22 +174,6 @@ void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_pt
 	//TODO: not sure why i am forced to resize
 	DeviceRef->m_NvrhiDevice->resizeDescriptorTable(DescriptorTable, bindlessDesc.maxCapacity, true);
 
-	//create the fullscreen buffer
-	float vertices[] = {
-		-1.f, -1.f, 0.f, 0.f, 1.f,
-		3.f, -1.f, 0.f, 2.f, 1.f,
-		-1.f, 3.f, 0.f, 0.f, -1.f
-	};
-	nvrhi::BufferDesc vertexBufDesc;
-	vertexBufDesc.byteSize = sizeof(vertices);	//the offset is already the size of the vb
-	vertexBufDesc.isVertexBuffer = true;
-	vertexBufDesc.debugName = "Fullscreen Triangle";
-	vertexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;	//set as copy dest to copy over data
-	FullscreenTriangleHandle = DeviceRef->m_NvrhiDevice->createBuffer(vertexBufDesc);
-	CommandList->beginTrackingBufferState(FullscreenTriangleHandle, nvrhi::ResourceStates::CopyDest);
-	CommandList->writeBuffer(FullscreenTriangleHandle, vertices, vertexBufDesc.byteSize);
-	CommandList->setPermanentBufferState(FullscreenTriangleHandle, nvrhi::ResourceStates::VertexBuffer);
-
 	CommandList->close();
 	DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
 }

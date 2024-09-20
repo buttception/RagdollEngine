@@ -14,7 +14,7 @@ void DeferredLightPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandList
 
 	//create the pipeline
 	//load outputted shaders objects
-	VertexShader = AssetManager::GetInstance()->GetShader("DeferredLight.vs.cso");
+	VertexShader = AssetManager::GetInstance()->GetShader("Fullscreen.vs.cso");
 	PixelShader = AssetManager::GetInstance()->GetShader("DeferredLight.ps.cso");
 	//TODO: move into draw call then create only if needed
 	nvrhi::BindingLayoutDesc layoutDesc = nvrhi::BindingLayoutDesc();
@@ -33,24 +33,12 @@ void DeferredLightPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandList
 		nvrhi::BindingLayoutItem::Texture_SRV(0),
 		nvrhi::BindingLayoutItem::Texture_SRV(1),
 		nvrhi::BindingLayoutItem::Texture_SRV(2),
+		nvrhi::BindingLayoutItem::Texture_SRV(3),
 	};
 	BindingLayoutHandle = NvrhiDeviceRef->createBindingLayout(layoutDesc);
 	//create a constant buffer here
 	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "DeferredLight CBuffer", 1);
 	ConstantBufferHandle = NvrhiDeviceRef->createBuffer(cBufDesc);
-
-	nvrhi::VertexAttributeDesc trianglePos;
-	trianglePos.name = "POSITION";
-	trianglePos.elementStride = sizeof(float) * 5;
-	trianglePos.format = nvrhi::Format::RGB32_FLOAT;
-	nvrhi::VertexAttributeDesc triangleTexcoord;
-	triangleTexcoord.name = "TEXCOORD";
-	triangleTexcoord.offset = sizeof(float) * 3;
-	triangleTexcoord.elementStride = sizeof(float) * 5;
-	triangleTexcoord.format = nvrhi::Format::RG32_FLOAT;
-	nvrhi::VertexAttributeDesc attribs[] = { trianglePos, triangleTexcoord };
-	nvrhi::InputLayoutHandle inputLayoutHandle = NvrhiDeviceRef->createInputLayout(attribs, 2, VertexShader);
-
 	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
 
 	const static int32_t seed = 42;
@@ -63,9 +51,8 @@ void DeferredLightPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandList
 	pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
 	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
 	pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
-	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::Front;
+	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
 	pipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
-	pipelineDesc.inputLayout = inputLayoutHandle;
 
 	RD_ASSERT(RenderTarget == nullptr, "Render Target Framebuffer not set");
 	GraphicsPipeline = NvrhiDeviceRef->createGraphicsPipeline(pipelineDesc, RenderTarget);
@@ -81,11 +68,12 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
 	MICROPROFILE_SCOPEI("Render", "Light Pass", MP_BLUEVIOLET);
 	//create and set the state
 	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
-	CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
+	CBuffer.InvViewProj = sceneInfo.MainCameraViewProj.Invert();
 	CBuffer.LightDiffuseColor = sceneInfo.LightDiffuseColor;
 	CBuffer.SceneAmbientColor = sceneInfo.SceneAmbientColor;
 	CBuffer.LightDirection = sceneInfo.LightDirection;
 	CBuffer.CameraPosition = sceneInfo.MainCameraPosition;
+	CBuffer.LightIntensity = sceneInfo.LightIntensity;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
@@ -98,17 +86,13 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
 	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(0, AssetManager::GetInstance()->RenderTargetTextures.at("GBufferAlbedo")));
 	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(1, AssetManager::GetInstance()->RenderTargetTextures.at("GBufferNormal")));
 	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(2, AssetManager::GetInstance()->RenderTargetTextures.at("GBufferRM")));
+	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(3, AssetManager::GetInstance()->RenderTargetTextures.at("SceneDepthZ")));
 	BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
 	nvrhi::GraphicsState state;
 	state.pipeline = GraphicsPipeline;
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
-	//TODO: make its own index buffer
-	state.indexBuffer = { AssetManager::GetInstance()->IBO, nvrhi::Format::R32_UINT, 0 };
-	state.vertexBuffers = {
-		{ AssetManager::GetInstance()->FullscreenTriangleHandle }
-	};
 	state.addBindingSet(BindingSetHandle);
 
 	CommandListRef->beginMarker("Light Pass");
@@ -116,9 +100,8 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
 	CommandListRef->setGraphicsState(state);
 	
 	nvrhi::DrawArguments args;
-	args.instanceCount = 1;
 	args.vertexCount = 3;
-	CommandListRef->drawIndexed(args);
+	CommandListRef->draw(args);
 
 	CommandListRef->endMarker();
 }

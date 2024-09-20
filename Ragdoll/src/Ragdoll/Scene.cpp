@@ -123,8 +123,8 @@ void ragdoll::Scene::Update(float _dt)
 		BuildStaticInstances(CameraProjection, CameraView);
 	}
 
-	ForwardRenderer->Render(this);
-	//DeferredRenderer->Render(this);
+	//ForwardRenderer->Render(this);
+	DeferredRenderer->Render(this);
 
 	ImguiInterface->Render();
 	DeviceRef->Present();
@@ -158,7 +158,7 @@ void ragdoll::Scene::UpdateControls(float _dt)
 		float cameraRotationSpeed = 15.f;
 		Color dirLightColor = { 1.f,1.f,1.f,1.f };
 		Color ambientLight = { 0.2f, 0.2f, 0.2f, 1.f };
-		float ambientIntensity = 0.2f;
+		float lightIntensity = 1.f;
 		Vector2 azimuthAndElevation = { 0.f, 45.f };
 	};
 	static Data data;
@@ -171,20 +171,20 @@ void ragdoll::Scene::UpdateControls(float _dt)
 	ImGui::SliderFloat("Camera Speed", &data.cameraSpeed, 0.01f, 30.f);
 	ImGui::SliderFloat("Camera Rotation Speed (Degrees)", &data.cameraRotationSpeed, 5.f, 100.f);
 	ImGui::ColorEdit3("Light Diffuse", &data.dirLightColor.x);
+	ImGui::SliderFloat("Light Intensity", &data.lightIntensity, 0.1f, 10.f);
 	ImGui::ColorEdit3("Ambient Light Diffuse", &data.ambientLight.x);
-	ImGui::SliderFloat("Azimuth (Degrees)", &data.azimuthAndElevation.x, 0.f, 360.f);
-	ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, -90.f, 90.f);
+	if(ImGui::SliderFloat("Azimuth (Degrees)", &data.azimuthAndElevation.x, 0.f, 360.f)) BuildDebugInstances();
+	if(ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, -90.f, 90.f)) BuildDebugInstances();
 	ImGui::End();
 
 	//make a infinite z inverse projection matrix
-	Matrix infiniteProj;
 	float e = 1 / tanf(DirectX::XMConvertToRadians(data.cameraFov) / 2.f);
-	infiniteProj._11 = e;
-	infiniteProj._22 = e * (data.cameraWidth / data.cameraHeight);
-	infiniteProj._33 = 0.f;
-	infiniteProj._44 = 0.f;
-	infiniteProj._43 = data.cameraNear;
-	infiniteProj._34 = 1.f;
+	SceneInfo.InfiniteReverseZProj._11 = e;
+	SceneInfo.InfiniteReverseZProj._22 = e * (data.cameraWidth / data.cameraHeight);
+	SceneInfo.InfiniteReverseZProj._33 = 0.f;
+	SceneInfo.InfiniteReverseZProj._44 = 0.f;
+	SceneInfo.InfiniteReverseZProj._43 = data.cameraNear;
+	SceneInfo.InfiniteReverseZProj._34 = 1.f;
 	if (!bFreezeFrustumCulling)
 		CameraProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraWidth / data.cameraHeight, data.cameraNear, data.cameraFar);
 	Vector3 cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
@@ -224,14 +224,15 @@ void ragdoll::Scene::UpdateControls(float _dt)
 	}
 	cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
 
-	Matrix view = DirectX::XMMatrixLookAtLH(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
+	SceneInfo.MainCameraView = DirectX::XMMatrixLookAtLH(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
 	if (!bFreezeFrustumCulling)
-		CameraView = view;
-	SceneInfo.MainCameraViewProj = view * infiniteProj;
+		CameraView = SceneInfo.MainCameraView;
+	SceneInfo.MainCameraViewProj = SceneInfo.MainCameraView * SceneInfo.InfiniteReverseZProj;
 	if (!bFreezeFrustumCulling)
 		CameraViewProjection = SceneInfo.MainCameraViewProj;
 	SceneInfo.SceneAmbientColor = data.ambientLight;
 	SceneInfo.LightDiffuseColor = data.dirLightColor;
+	SceneInfo.LightIntensity = data.lightIntensity;
 	Vector2 azimuthElevationRad = {
 		DirectX::XMConvertToRadians(data.azimuthAndElevation.x),
 		DirectX::XMConvertToRadians(data.azimuthAndElevation.y) };
@@ -399,7 +400,6 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 	//clear the old information
 	StaticInstanceGroupInfos.clear();
 	StaticInstanceDatas.clear();
-	StaticDebugInstanceDatas.clear();
 
 	DirectX::BoundingFrustum frustum;
 	DirectX::BoundingFrustum::CreateFromMatrix(frustum, cameraProjection);
@@ -469,27 +469,10 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 			Data.InvModelToWorld = tComp->m_ModelToWorld.Invert();
 			StaticInstanceDatas.emplace_back(Data);
 			info.InstanceCount++;
-
-			if (Config.bDrawBoxes) {
-				InstanceData debugData;
-				Vector3 translate = StaticProxiesToDraw[i].BoundingBox.Center;
-				Vector3 scale = StaticProxiesToDraw[i].BoundingBox.Extents * 2;
-				Matrix matrix = Matrix::CreateScale(scale);
-				matrix *= Matrix::CreateTranslation(translate);
-				debugData.ModelToWorld = matrix;
-				debugData.bIsLit = false;
-				debugData.Color = { 0.f, 1.f, 0.f, 1.f };
-				StaticDebugInstanceDatas.emplace_back(debugData);
-			}
 		}
 	}
 	//last info because i reached the end
 	StaticInstanceGroupInfos.emplace_back(info);
-	//adding the octants into the debug instance
-	if(Config.bDrawOctree){
-		MICROPROFILE_SCOPEI("Scene", "Building octree debug instances", MP_RED4);
-		AddOctantDebug(StaticOctree.Octant, 0);
-	}
 
 	if (StaticInstanceDatas.empty())
 	{
@@ -514,9 +497,46 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 		CommandList->close();
 		DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
 	}
+	BuildDebugInstances();
+}
+
+void ragdoll::Scene::BuildDebugInstances()
+{
+	StaticDebugInstanceDatas.clear();
+	for (int i = 0; i < StaticProxiesToDraw.size(); ++i) {
+		if (Config.bDrawBoxes) {
+			InstanceData debugData;
+			Vector3 translate = StaticProxiesToDraw[i].BoundingBox.Center;
+			Vector3 scale = StaticProxiesToDraw[i].BoundingBox.Extents * 2;
+			Matrix matrix = Matrix::CreateScale(scale);
+			matrix *= Matrix::CreateTranslation(translate);
+			debugData.ModelToWorld = matrix;
+			debugData.bIsLit = false;
+			debugData.Color = { 0.f, 1.f, 0.f, 1.f };
+			StaticDebugInstanceDatas.emplace_back(debugData);
+		}
+	}
+
+	//adding the octants into the debug instance
+	if (Config.bDrawOctree) {
+		MICROPROFILE_SCOPEI("Scene", "Building octree debug instances", MP_RED4);
+		AddOctantDebug(StaticOctree.Octant, 0);
+	}
+
 	if (!StaticDebugInstanceDatas.empty())
 	{
 		MICROPROFILE_SCOPEI("Scene", "Building Debug Instance Buffer", MP_DARKRED);
+		//add one more cube at where the sun is
+		InstanceData debugData;
+		Vector3 translate = SceneInfo.LightDirection;
+		Vector3 scale = Vector3::One;
+		Matrix matrix = Matrix::CreateScale(scale);
+		matrix *= Matrix::CreateTranslation(translate);
+		debugData.ModelToWorld = matrix;
+		debugData.bIsLit = false;
+		debugData.Color = { 1.f, 1.f, 1.f, 1.f };
+		StaticDebugInstanceDatas.emplace_back(debugData);
+
 		//create the debug instance buffer
 		nvrhi::BufferDesc InstanceBufferDesc;
 		InstanceBufferDesc.byteSize = sizeof(InstanceData) * StaticDebugInstanceDatas.size();
@@ -674,9 +694,8 @@ void ragdoll::Scene::UpdateTransform(TransformComp& comp, const Guid& guid)
 
 void ragdoll::Scene::AddOctantDebug(Octant octant, uint32_t level)
 {
-	static constexpr Vector4 colors[32] = {
+	static constexpr Vector4 colors[] = {
 		 {1.0f, 0.0f, 0.0f, 1.0f},  // Red
-		{0.0f, 1.0f, 0.0f, 1.0f},  // Green
 		{0.0f, 0.0f, 1.0f, 1.0f},  // Blue
 		{1.0f, 1.0f, 0.0f, 1.0f},  // Yellow
 		{1.0f, 0.0f, 1.0f, 1.0f},  // Magenta

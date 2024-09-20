@@ -1,7 +1,6 @@
 cbuffer g_Const : register(b0) {
 	float4x4 viewProjMatrix;
 	int instanceOffset;
-	float3 cameraPosition;
 };
 
 struct InstanceData{
@@ -86,12 +85,13 @@ void gbuffer_ps(
 	if(data.albedoIndex != -1){
 		albedo *= Textures[data.albedoIndex].Sample(Samplers[data.albedoSamplerIndex], inTexcoord);
 	}
-	float4 RM = float4(data.roughness, data.metallic, 0, 0);
+	clip(albedo.a - 0.01f);
+	float4 RM = float4(0, data.roughness, data.metallic, 0);
 	if(data.roughnessMetallicIndex != -1){
 		RM = Textures[data.roughnessMetallicIndex].Sample(Samplers[data.roughnessMetallicSamplerIndex], inTexcoord);
 	}
-	float roughness = RM.r;
-	float metallic = RM.g;
+	float roughness = RM.g;
+	float metallic = RM.b;
 
 	// Sample normal map and leave it in model space, the deferred lighting will calculate this instead
 	float3 N = inNormal;
@@ -107,28 +107,21 @@ void gbuffer_ps(
 	outRoughnessMetallic = float2(roughness, metallic);
 }
 cbuffer g_LightConst : register(b1) {
-	float4x4 LightViewProjMatrix;
-	float4 LightlightDiffuseColor;
-	float4 LightsceneAmbientColor;
-	float3 LightlightDirection;
-	float3 LightcameraPosition;
+	float4x4 InvViewProjMatrix;
+	float4 LightDiffuseColor;
+	float4 SceneAmbientColor;
+	float3 LightDirection;
+	float LightIntensity;
+	float3 CameraPosition;
 };
-
-
-void deferred_light_vs(
-	in float3 inPos : POSITION,
-	in float2 inTexcoord : TEXCOORD,
-	out float4 outPos : SV_Position,
-	out float2 outTexcoord : TEXCOORD1
-)
-{
-	outPos = float4(inPos, 1.f);
-	outTexcoord = inTexcoord;
-}
 
 Texture2D albedoTexture : register(t0);
 Texture2D normalTexture : register(t1);
 Texture2D RMTexture : register(t2);
+Texture2D DepthBuffer : register(t3);
+
+//numeric constants
+static const float PI = 3.14159265;
 
 float3 Decode(float2 f)
 {
@@ -141,17 +134,96 @@ float3 Decode(float2 f)
     return normalize(n);
 }
 
+// Utility Functions for PBR Lighting
+float3 FresnelSchlick(float cosTheta, float3 F0) {
+    return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
+}
+
+float DistributionGGX(float3 N, float3 H, float roughness) {
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
+
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    return a2 / (PI * denom * denom);
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness) {
+    float r = (roughness + 1.0);
+    float k = (r * r) / 8.0;
+    return NdotV / (NdotV * (1.0 - k) + k);
+}
+
+float GeometrySmith(float3 N, float3 V, float3 L, float roughness) {
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx1 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx2 = GeometrySchlickGGX(NdotL, roughness);
+    return ggx1 * ggx2;
+}
+
+// PBR Lighting Calculation
+float3 PBRLighting(float3 albedo, float3 normal, float3 viewDir, float3 lightDir, float3 lightColor, float metallic, float roughness, float ao) {
+    float3 N = normalize(normal);
+    float3 V = normalize(viewDir);
+    float3 L = normalize(lightDir);
+    float3 H = normalize(V + L); // Halfway vector
+
+    // Fresnel-Schlick approximation
+    float3 F0 = float3(0.04, 0.04, 0.04); // Base reflectivity
+    F0 = lerp(F0, albedo, metallic); // Mix with albedo for metallic surfaces
+    float3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+
+    // GGX Normal Distribution Function (NDF)
+    float NDF = DistributionGGX(N, H, roughness);
+
+    // Smith's Geometry Function (Visibility)
+    float G = GeometrySmith(N, V, L, roughness);
+
+    // Specular BRDF
+    float3 numerator = NDF * G * F;
+    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.001; // Prevent divide by zero
+    float3 specular = numerator / denominator;
+
+    // Lambertian diffuse
+    float3 kS = F; // Fresnel reflectance
+    float3 kD = 1.0 - kS; // Diffuse reflection (1.0 - specular)
+    kD *= 1.0 - metallic; // Metallic surfaces don't have diffuse reflection
+
+    float3 diffuse = albedo * max(dot(N, L), 0.0);
+
+    // Combine the two contributions
+    float3 color = (kD * diffuse + specular) * lightColor * max(dot(N, L), 0.0);
+
+    // Apply ambient occlusion
+    color *= ao;
+
+    return color;
+}
+
 void deferred_light_ps(
 	in float4 inPos : SV_Position,
 	in float2 inTexcoord : TEXCOORD1,
 	out float4 outColor : SV_Target0
 )
 {
+	//getting texture values
 	float4 albedo = albedoTexture.Sample(Samplers[5], inTexcoord);
 	float3 N = Decode(normalTexture.Sample(Samplers[5], inTexcoord).xy);
 	float2 RM = RMTexture.Sample(Samplers[5], inTexcoord).xy;
-	float3 diffuse = max(dot(N, LightlightDirection), 0) * albedo.rgb;
-	float3 ambient = LightsceneAmbientColor.rgb * albedo.rgb;
+
+	//getting fragpos
+	float depth = DepthBuffer.Sample(Samplers[5], inTexcoord).r;
+	float4 clipspacePos = float4(inTexcoord * 2.0 - 1.0, depth, 1.0);
+	float4 homogenousPos = mul(clipspacePos, InvViewProjMatrix);
+	float3 fragPos = homogenousPos.xyz / homogenousPos.w;
+
+	//apply pbr lighting, AO is 1.f for now so it does nth
+	//float3 diffuse = max(dot(N, LightDirection), 0) * albedo.rgb;
+	float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.y, RM.x, 1.f);
+
+	float3 ambient = SceneAmbientColor.rgb * albedo.rgb;
 	float3 lighting = ambient + diffuse;
 	outColor = float4(lighting, 1.f);
 }
