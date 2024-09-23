@@ -161,6 +161,7 @@ void main_ps(
 		if(data.albedoIndex != -1){
 			albedo *= Textures[data.albedoIndex].Sample(Samplers[data.albedoSamplerIndex], inTexcoord);
 		}
+		clip(albedo.a - 0.01f);
 		float4 RM = float4(1.f, data.roughness, data.metallic, 0);
 		if(data.roughnessMetallicIndex != -1){
 			RM = Textures[data.roughnessMetallicIndex].Sample(Samplers[data.roughnessMetallicSamplerIndex], inTexcoord);
@@ -194,16 +195,10 @@ void main_ps(
 			{
 				float2 offset = float2(x, y) * texelSize;
 				shadow += ShadowMap.SampleCmpLevelZero(ShadowSample, projCoord.xy + offset, projCoord.z);
-				//shadow += projCoord.z < ShadowMap.Sample(Samplers[0], projCoord.xy + offset).r ? 1.f : 0.f;
 			}
 		}
 		// Divide by number of samples (9)
 		shadow /= 9.f;
-
-		//float depth = ShadowMap.Sample(Samplers[0], projCoord.xy).r;
-		//shadow = projCoord.z < depth ? 1.f : 0.f;
-
-		//shadow = ShadowMap.SampleCmpLevelZero(ShadowSample, projCoord.xy, projCoord.z);
 
 		// Combine lighting contributions
 		float3 ambient = sceneAmbientColor.rgb * albedo.rgb;

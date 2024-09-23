@@ -62,10 +62,6 @@ void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std:
 	//create and set the state
 	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
 	//create the light view proj
-	//hardcode for now, reversed z
-	Matrix proj = DirectX::XMMatrixOrthographicLH(40.f, 40.f, 30.f, -30.f);
-	Matrix view = DirectX::XMMatrixLookAtLH({ 0.f, 0.f, 0.f }, -sceneInfo.LightDirection, { 0.f, 1.f, 0.f });
-	CBuffer.LightViewProj = view * proj;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
@@ -89,21 +85,26 @@ void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std:
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
 	CommandListRef->setGraphicsState(state);
 
-	uint32_t instanceCount = 0;
-	for (const ragdoll::InstanceGroupInfo& info : infos)
-	{
-		MICROPROFILE_SCOPEI("Render", "Each instance", MP_CADETBLUE);
-		const VertexBufferInfo& buffer = AssetManager::GetInstance()->VertexBufferInfos[info.VertexBufferIndex];
-		nvrhi::DrawArguments args;
-		args.vertexCount = buffer.IndicesCount;
-		args.startVertexLocation = buffer.VBOffset;
-		args.startIndexLocation = buffer.IBOffset;
-		args.instanceCount = info.InstanceCount;
-		CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
-		CommandListRef->drawIndexed(args);
-		CBuffer.InstanceOffset += info.InstanceCount;
+	for (int i = 0; i < 4; ++i) {
+		CBuffer.CascadeIndex = i;
+		CBuffer.LightViewProj = sceneInfo.LightViewProj[i];
+
+		uint32_t instanceCount = 0;
+		for (const ragdoll::InstanceGroupInfo& info : infos)
+		{
+			MICROPROFILE_SCOPEI("Render", "Each instance", MP_CADETBLUE);
+			const VertexBufferInfo& buffer = AssetManager::GetInstance()->VertexBufferInfos[info.VertexBufferIndex];
+			nvrhi::DrawArguments args;
+			args.vertexCount = buffer.IndicesCount;
+			args.startVertexLocation = buffer.VBOffset;
+			args.startIndexLocation = buffer.IBOffset;
+			args.instanceCount = info.InstanceCount;
+			CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
+			CommandListRef->drawIndexed(args);
+			CBuffer.InstanceOffset += info.InstanceCount;
+		}
+		CBuffer.InstanceOffset = 0;
 	}
-	CBuffer.InstanceOffset = 0;
 
 	CommandListRef->endMarker();
 }

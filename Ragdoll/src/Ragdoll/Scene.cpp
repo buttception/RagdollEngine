@@ -121,6 +121,7 @@ void ragdoll::Scene::Update(float _dt)
 	if (bIsCameraDirty)
 	{
 		DebugInfo.CulledObjectCount = 0;
+		UpdateShadowCascades();
 		BuildStaticInstances(CameraProjection, CameraView);
 	}
 
@@ -177,6 +178,9 @@ void ragdoll::Scene::UpdateControls(float _dt)
 	if(ImGui::SliderFloat("Azimuth (Degrees)", &data.azimuthAndElevation.x, 0.f, 360.f)) BuildDebugInstances();
 	if(ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, -90.f, 90.f)) BuildDebugInstances();
 	ImGui::End();
+
+	SceneInfo.CameraFov = data.cameraFov;
+	SceneInfo.CameraAspect = data.cameraWidth / data.cameraHeight;
 
 	//make a infinite z inverse projection matrix
 	float e = 1 / tanf(DirectX::XMConvertToRadians(data.cameraFov) / 2.f);
@@ -636,6 +640,47 @@ void ragdoll::Scene::CullOctant(const Octant& octant, const DirectX::BoundingFru
 	}
 	else {
 		DebugInfo.CulledObjectCount += 1;
+	}
+}
+
+void ragdoll::Scene::UpdateShadowCascades()
+{
+	//for each subfrusta
+	for (int i = 1; i < 5; ++i)
+	{
+		//create the subfrusta
+		DirectX::BoundingFrustum frustum;
+		//no need to be reverse z
+		Matrix proj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(SceneInfo.CameraFov), SceneInfo.CameraAspect, SubfrustaFarPlanes[i-1], SubfrustaFarPlanes[i]);
+		DirectX::BoundingFrustum::CreateFromMatrix(frustum, proj);
+		frustum.Transform(frustum, SceneInfo.MainCameraView);
+		//get the corners
+		Vector3 corners[8];
+		frustum.GetCorners(corners);
+		//get the new center
+		Vector3 center;
+		for (int j = 0; j < 8; ++j) {
+			center += corners[i];
+		}
+		center /= 8.f;
+		//move all corners into a 1x1x1 cube lightspace with the directional light
+		Matrix lightProj = DirectX::XMMatrixOrthographicLH(1.f, 1.f, -0.5f, 0.5f);	//should be a 1x1x1 cube?
+		Matrix lightView = DirectX::XMMatrixLookAtLH(center, center - SceneInfo.LightDirection, { 0.f, 1.f, 0.f });
+		Matrix lightViewProj = lightView * lightProj;
+		for (int j = 0; j < 8; ++j) {
+			corners[j] = Vector3::Transform(corners[j], lightViewProj);
+		}
+		//get the furthest extents of the corners for the left right top and bottom values
+		Vector3 min = { FLT_MAX, FLT_MAX, FLT_MAX };
+		Vector3 max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+		for (int j = 0; j < 8; ++j) {
+			min.x = std::min(min.x, corners[j].x); max.x = std::max(max.x, corners[j].x);
+			min.y = std::min(min.y, corners[j].y); max.y = std::max(max.y, corners[j].y);
+			min.z = std::min(min.z, corners[j].z); max.z = std::max(max.z, corners[j].z);
+		}
+		//create the new view proj matrix
+		lightProj = DirectX::XMMatrixOrthographicLH(max.x - min.x, max.y - min.y, 100.f, -100.f);
+		SceneInfo.LightViewProj[i - 1] = lightView * lightProj;
 	}
 }
 

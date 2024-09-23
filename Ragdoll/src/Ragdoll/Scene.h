@@ -49,11 +49,14 @@ namespace ragdoll {
 		Matrix MainCameraViewProj;
 		Matrix InfiniteReverseZProj;
 		Matrix MainCameraView;
+		Matrix LightViewProj[4];
 		Vector3 MainCameraPosition;
 		Vector4 LightDiffuseColor = { 1.f, 1.f, 1.f, 1.f };
 		Vector4 SceneAmbientColor = { 0.2f, 0.2f, 0.2f, 1.f };
 		Vector3 LightDirection = { 1.f, -1.f, 1.f };
 		float LightIntensity = 1.f;
+		float CameraFov;
+		float CameraAspect;
 	};
 
 	class Scene {
@@ -97,6 +100,11 @@ namespace ragdoll {
 		nvrhi::TextureHandle GBufferORM;
 		//shadows
 		nvrhi::TextureHandle ShadowMap;
+		//distance where the subfrusta are seperated
+		//0 -> 5, 5 -> 10, 10 -> 20 and 20 -> 50
+		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 20.f, 50.f };
+		//the cascades
+		Matrix DirectionalLightViewProjections[4];
 
 		Scene(Application*);
 
@@ -124,6 +132,7 @@ namespace ragdoll {
 		void BuildStaticInstances(const Matrix& cameraProjection, const Matrix& cameraView);
 		void BuildDebugInstances();
 		void CullOctant(const Octant& octant, const DirectX::BoundingFrustum& frustum);
+		void UpdateShadowCascades();
 
 	private:
 		//Transforms

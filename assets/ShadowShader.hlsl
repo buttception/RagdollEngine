@@ -1,6 +1,7 @@
 cbuffer g_Const : register(b0) {
     float4x4 LightViewProj;
 	uint InstanceOffset;
+	uint CascadeIndex;
 };
 
 struct InstanceData{
@@ -33,6 +34,18 @@ void directional_vs(
 {
 	InstanceData data = InstanceDatas[inInstanceId + InstanceOffset];
 	float4 worldPos = mul(float4(inPos, 1), data.worldMatrix);
-	outPos = mul(worldPos, LightViewProj); 
+	outPos = mul(worldPos, LightViewProj) * 0.5f;
+	if(CascadeIndex == 0){
+		outPos.xy += float2(-0.5f, -0.5f);
+	}
+	else if(CascadeIndex == 1){
+		outPos.xy += float2(0.5f, -0.5f);
+	}
+	else if(CascadeIndex == 2){
+		outPos.xy += float2(-0.5f, 0.5f);
+	}
+	else if(CascadeIndex == 3){
+		outPos.xy += float2(0.5f, 0.5f);
+	}
 }
 

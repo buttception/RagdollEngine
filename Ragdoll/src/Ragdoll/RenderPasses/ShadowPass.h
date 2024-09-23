@@ -9,6 +9,7 @@ class ShadowPass {
 	struct ConstantBuffer {
 		Matrix LightViewProj;
 		uint32_t InstanceOffset;
+		uint32_t CascadeIndex;
 	}CBuffer;
 
 	nvrhi::FramebufferHandle RenderTarget{ nullptr };
