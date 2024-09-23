@@ -71,11 +71,15 @@ enum class SamplerTypes
 };
 
 class ForwardRenderer;
+class DirectXDevice;
+namespace ragdoll {
+	class FileManager;
+}
 class AssetManager
 {
 public:
 	static AssetManager* GetInstance();
-	static void Release() { s_Instance = nullptr; }
+	static void Release() { s_Instance.reset(); s_Instance = nullptr; }
 
 	std::vector<VertexBufferInfo> VertexBufferInfos;
 	std::vector<Mesh> Meshes;
@@ -84,8 +88,12 @@ public:
 	std::vector<Material> Materials;
 
 	nvrhi::TextureHandle DefaultTex;
-	nvrhi::SamplerHandle DefaultSampler;
+	nvrhi::TextureHandle ErrorTex;
 	std::vector<nvrhi::SamplerHandle> Samplers;
+
+	std::unordered_map<std::string, nvrhi::ShaderHandle> Shaders;
+
+	std::unordered_map<std::string, nvrhi::TextureHandle> RenderTargetTextures;
 
 	//no more vbo vectors, but instead is a vector of vb ib offsets
 	//hold onto 1 vbo and ibo here
@@ -93,10 +101,24 @@ public:
 	nvrhi::BufferHandle IBO;
 	std::vector<Vertex> Vertices;
 	std::vector<uint32_t> Indices;
+	//the information on how to use the global buffer
+	std::vector<nvrhi::VertexAttributeDesc> VertexAttributes;
+
+	//descriptor table for all the bindless stuff
+	nvrhi::DescriptorTableHandle DescriptorTable;
+	nvrhi::BindingLayoutHandle BindlessLayoutHandle;
+	int32_t AddImage(Image img);
+
+	void Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::FileManager> fm);
 	//this function will just add the vertices and indices, and populate the vector of objects
 	uint32_t AddVertices(const std::vector<Vertex>& newVertices, const std::vector<uint32_t>& newIndices);
 	//this function will create the buffer handles and copy the data over
-	void UpdateVBOIBO(ForwardRenderer* device);
+	void UpdateVBOIBO();
+
+	nvrhi::ShaderHandle GetShader(const std::string& shaderFilename);
 private:
+	nvrhi::CommandListHandle CommandList;	//asset manager commandlist
+	std::shared_ptr<DirectXDevice> DeviceRef;
+	std::shared_ptr<ragdoll::FileManager> FileManagerRef;
 	inline static std::unique_ptr<AssetManager> s_Instance;
 };

@@ -59,6 +59,7 @@ static bool IsNvDeviceID(UINT id)
 std::shared_ptr<DirectXDevice> DirectXDevice::Create(DeviceCreationParameters creationParam, std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm)
 {
 	std::shared_ptr<DirectXDevice> device = std::make_shared<DirectXDevice>();
+	device->m_DeviceParams = creationParam;
 	device->m_PrimaryWindow = win;
 	device->m_FileManager = fm;
 	device->CreateDevice();
@@ -86,12 +87,6 @@ nvrhi::TextureHandle DirectXDevice::GetCurrentBackbuffer()
 
 bool DirectXDevice::CreateDevice()
 {
-	m_DeviceParams.enableDebugRuntime = true;
-	m_DeviceParams.enableNvrhiValidationLayer = true;
-	m_DeviceParams.swapChainBufferCount = 2;
-	m_DeviceParams.backBufferWidth = m_PrimaryWindow->GetBufferWidth();
-	m_DeviceParams.backBufferHeight = m_PrimaryWindow->GetBufferHeight();
-	//m_DeviceParams.vsyncEnabled = true;
 #define HR_RETURN(hr) if(FAILED(hr)) return false;
 	if (m_DeviceParams.enableDebugRuntime)
 	{

@@ -31,6 +31,7 @@ ________________________________________________________________________________
 #include "ragdollpch.h"
 
 #include "Application.h"
+#include <microprofile.h>
 
 #include "Core/Logger.h"
 #include "Core/Core.h"
@@ -45,7 +46,7 @@ ________________________________________________________________________________
 #include "Scene.h"
 
 #include "DirectXDevice.h"
-#include "microprofile.h"
+#include "GLTFLoader.h"
 
 MICROPROFILE_DEFINE(MAIN, "MAIN", "Main", MP_AUTO);
 
@@ -87,6 +88,17 @@ namespace ragdoll
 			m_FileManager = std::make_shared<FileManager>();
 			m_FileManager->Init();
 
+			DeviceCreationParameters params;
+			params.enableDebugRuntime = true;
+			params.enableNvrhiValidationLayer = true;
+			params.swapChainBufferCount = 2;
+			params.backBufferWidth = m_PrimaryWindow->GetBufferWidth();
+			params.backBufferHeight = m_PrimaryWindow->GetBufferHeight();
+			params.vsyncEnabled = true;
+			Device = DirectXDevice::Create(params, m_PrimaryWindow, m_FileManager);
+
+			AssetManager::GetInstance()->Init(Device, m_FileManager);
+
 			m_Scene = std::make_shared<Scene>(this);
 		}
 		MICROPROFILE_TIMELINE_LEAVE_STATIC("Application Initialization");
@@ -95,7 +107,7 @@ namespace ragdoll
 		MICROPROFILE_TIMELINE_ENTER_STATIC(MP_DARKGOLDENROD, "GLTF Load");
 		{
 			GLTFLoader loader;
-			loader.Init(m_FileManager->GetRoot(), m_Scene->Renderer.get(), m_FileManager, m_EntityManager, m_Scene);
+			loader.Init(m_FileManager->GetRoot(), Device, m_FileManager, m_EntityManager, m_Scene);
 			if (!Config.glTfSampleSceneToLoad.empty())
 			{
 				std::string sceneName = Config.glTfSampleSceneToLoad;
@@ -147,6 +159,8 @@ namespace ragdoll
 	{
 		AssetManager::GetInstance()->Release();
 		m_Scene->Shutdown();
+		Device->Shutdown();
+		Device = nullptr;
 		m_FileManager->Shutdown();
 		m_PrimaryWindow->Shutdown();
 #ifdef _DEBUG

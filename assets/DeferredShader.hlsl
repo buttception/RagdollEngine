@@ -1,11 +1,6 @@
 cbuffer g_Const : register(b0) {
 	float4x4 viewProjMatrix;
-	float4 lightDiffuseColor;
-	float4 sceneAmbientColor;
-	float3 lightDirection;
 	int instanceOffset;
-	float3 cameraPosition;
-	float lightIntensity;
 };
 
 struct InstanceData{
@@ -28,7 +23,7 @@ struct InstanceData{
 StructuredBuffer<InstanceData> InstanceDatas : register(t0);
 Texture2D Textures[] : register(t0, space1);
 
-void main_vs(
+void gbuffer_vs(
 	in float3 inPos : POSITION,
 	in float3 inNormal : NORMAL,
 	in float3 inTangent : TANGENT,
@@ -50,12 +45,80 @@ void main_vs(
 	float binormalSign = inNormal.x > 0.0f ? -1.0f : 1.0f;
 	outNormal = normalize(mul(inNormal, transpose((float3x3)data.invWorldMatrix)));
 	outTangent = normalize(mul(inTangent, transpose((float3x3)data.invWorldMatrix)));
-	outBinormal = cross(outTangent, outNormal) * binormalSign;
+	//still need so we can sample the normal properly
+	outBinormal = normalize(cross(outTangent, outNormal));
 	outTexcoord = inTexcoord;
 	outInstanceId = inInstanceId;
 }
 
 sampler Samplers[9] : register(s0);
+
+float2 OctWrap(float2 v)
+{
+    return (1.0 - abs(v.yx)) * (v.xy >= 0.0 ? 1.0 : -1.0);
+}
+ 
+float2 Encode(float3 n)
+{
+    n /= (abs(n.x) + abs(n.y) + abs(n.z));
+    n.xy = n.z >= 0.0 ? n.xy : OctWrap(n.xy);
+    n.xy = n.xy * 0.5 + 0.5;
+    return n.xy;
+}
+
+void gbuffer_ps(
+	in float4 inPos : SV_Position,
+	in float4 inFragPos : TEXCOORD1,
+	in float3 inNormal : TEXCOORD2,
+	in float3 inTangent : TEXCOORD3,
+	in float3 inBinormal : TEXCOORD4,
+	in float2 inTexcoord : TEXCOORD5,
+	in uint inInstanceId : TEXCOORD6,
+	out float4 outColor : SV_Target0,
+	out float2 outNormals: SV_Target1,
+	out float2 outRoughnessMetallic: SV_Target2
+)
+{
+	InstanceData data = InstanceDatas[inInstanceId + instanceOffset];
+	// Sample textures
+	float4 albedo = data.albedoFactor;
+	if(data.albedoIndex != -1){
+		albedo *= Textures[data.albedoIndex].Sample(Samplers[data.albedoSamplerIndex], inTexcoord);
+	}
+	clip(albedo.a - 0.01f);
+	float4 RM = float4(0, data.roughness, data.metallic, 0);
+	if(data.roughnessMetallicIndex != -1){
+		RM = Textures[data.roughnessMetallicIndex].Sample(Samplers[data.roughnessMetallicSamplerIndex], inTexcoord);
+	}
+	float roughness = RM.g;
+	float metallic = RM.b;
+
+	// Sample normal map and leave it in model space, the deferred lighting will calculate this instead
+	float3 N = inNormal;
+	if(data.normalIndex != -1){
+		float3 normalMapValue = normalize(Textures[data.normalIndex].Sample(Samplers[data.normalSamplerIndex], inTexcoord).xyz * 2.0f - 1.0f);
+		float3x3 TBN = float3x3(inTangent, inBinormal, inNormal);
+		N = normalize(mul(normalMapValue, TBN));
+	}
+
+	//draw to the targets
+	outColor = albedo;
+	outNormals.xy = Encode(N);
+	outRoughnessMetallic = float2(roughness, metallic);
+}
+cbuffer g_LightConst : register(b1) {
+	float4x4 InvViewProjMatrix;
+	float4 LightDiffuseColor;
+	float4 SceneAmbientColor;
+	float3 LightDirection;
+	float LightIntensity;
+	float3 CameraPosition;
+};
+
+Texture2D albedoTexture : register(t0);
+Texture2D normalTexture : register(t1);
+Texture2D RMTexture : register(t2);
+Texture2D DepthBuffer : register(t3);
 
 //numeric constants
 static const float PI = 3.14159265;
@@ -108,7 +171,7 @@ float3 PBRLighting(float3 albedo, float3 normal, float3 viewDir, float3 lightDir
     float3 H = normalize(V + L); // Halfway vector
 
     // Fresnel-Schlick approximation
-    float3 F0 = float3(0.1, 0.1, 0.1); // Base reflectivity
+    float3 F0 = float3(0.04, 0.04, 0.04); // Base reflectivity
     F0 = lerp(F0, albedo, metallic); // Mix with albedo for metallic surfaces
     float3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
 
@@ -139,51 +202,28 @@ float3 PBRLighting(float3 albedo, float3 normal, float3 viewDir, float3 lightDir
     return color;
 }
 
-void main_ps(
+void deferred_light_ps(
 	in float4 inPos : SV_Position,
-	in float4 inFragPos : TEXCOORD1,
-	in float3 inNormal : TEXCOORD2,
-	in float3 inTangent : TEXCOORD3,
-	in float3 inBinormal : TEXCOORD4,
-	in float2 inTexcoord : TEXCOORD5,
-	in uint inInstanceId : TEXCOORD6,
+	in float2 inTexcoord : TEXCOORD1,
 	out float4 outColor : SV_Target0
 )
 {
-	InstanceData data = InstanceDatas[inInstanceId + instanceOffset];
-	if(data.isLit)
-	{
-		// Sample textures
-		float4 albedo = data.albedoFactor;
-		if(data.albedoIndex != -1){
-			albedo *= Textures[data.albedoIndex].Sample(Samplers[data.albedoSamplerIndex], inTexcoord);
-		}
-		float4 RM = float4(data.roughness, data.metallic, 0, 0);
-		if(data.roughnessMetallicIndex != -1){
-			RM = Textures[data.roughnessMetallicIndex].Sample(Samplers[data.roughnessMetallicSamplerIndex], inTexcoord);
-		}
-		float roughness = RM.r;
-		float metallic = RM.g;
+	//getting texture values
+	float4 albedo = albedoTexture.Sample(Samplers[5], inTexcoord);
+	float3 N = Decode(normalTexture.Sample(Samplers[5], inTexcoord).xy);
+	float2 RM = RMTexture.Sample(Samplers[5], inTexcoord).xy;
 
-		// Sample normal map and transform to world space
-		float3 N = inNormal;
-		if(data.normalIndex != -1){
-			float3 normalMapValue = normalize(Textures[data.normalIndex].Sample(Samplers[data.normalSamplerIndex], inTexcoord).xyz * 2.0f - 1.0f);
-			float3x3 TBN = float3x3(inTangent, inBinormal, inNormal);
-			N = normalize(mul(normalMapValue, TBN));
-		}
+	//getting fragpos
+	float depth = DepthBuffer.Sample(Samplers[5], inTexcoord).r;
+	float4 clipspacePos = float4(inTexcoord * 2.0 - 1.0, depth, 1.0);
+	float4 homogenousPos = mul(clipspacePos, InvViewProjMatrix);
+	float3 fragPos = homogenousPos.xyz / homogenousPos.w;
 
-		float3 diffuse = PBRLighting(albedo.rgb, N, cameraPosition - inFragPos.xyz, lightDirection, lightDiffuseColor.rgb * lightIntensity, metallic, roughness, 0.5f);
+	//apply pbr lighting, AO is 1.f for now so it does nth
+	//float3 diffuse = max(dot(N, LightDirection), 0) * albedo.rgb;
+	float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.y, RM.x, 1.f);
 
-		// Combine lighting contributions
-		float3 ambient = sceneAmbientColor.rgb * albedo.rgb;
-		float3 lighting = ambient + diffuse;
-
-		// Final color output
-		outColor = float4(lighting, albedo.a);
-	}
-	else
-	{
-		outColor = data.albedoFactor;
-	}
+	float3 ambient = SceneAmbientColor.rgb * albedo.rgb;
+	float3 lighting = ambient + diffuse;
+	outColor = float4(lighting, 1.f);
 }

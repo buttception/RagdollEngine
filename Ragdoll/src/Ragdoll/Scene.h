@@ -1,6 +1,7 @@
 #pragma once
 #include "ImGuiRenderer.h"
 #include "ForwardRenderer.h"
+#include "DeferredRenderer.h"
 
 #include "Components/TransformComp.h"
 #include "Components/RenderableComp.h"
@@ -44,12 +45,25 @@ namespace ragdoll {
 		bool bDrawBoxes{ false };
 	};
 
+	struct SceneInformation {
+		Matrix MainCameraViewProj;
+		Matrix InfiniteReverseZProj;
+		Matrix MainCameraView;
+		Vector3 MainCameraPosition;
+		Vector4 LightDiffuseColor = { 1.f, 1.f, 1.f, 1.f };
+		Vector4 SceneAmbientColor = { 0.2f, 0.2f, 0.2f, 1.f };
+		Vector3 LightDirection = { 1.f, -1.f, 1.f };
+		float LightIntensity = 1.f;
+	};
+
 	class Scene {
+		std::shared_ptr<EntityManager> EntityManagerRef;
+		std::shared_ptr<Window> PrimaryWindowRef;
+		std::shared_ptr<DirectXDevice> DeviceRef;
+
 		std::shared_ptr<ImguiRenderer> ImguiInterface;
-		std::shared_ptr<Window> PrimaryWindow;
 
 		//Transforms
-		std::shared_ptr<EntityManager> EntityManager;
 		std::stack<Matrix> m_ModelStack;
 		//the root details
 		Guid m_RootEntity;
@@ -59,33 +73,36 @@ namespace ragdoll {
 		bool m_DirtyOnwards{ false };
 
 		//Rendering
+		nvrhi::CommandListHandle CommandList;
 		bool bIsCameraDirty{ true };
 		bool bFreezeFrustumCulling{ false };
-		CBuffer CBuffer;
 		Octree StaticOctree;
 		std::vector<Proxy> StaticProxiesToDraw;
-		std::vector<InstanceData> StaticInstanceDatas;
-		std::vector<InstanceGroupInfo> StaticInstanceGroupInfos;
-		nvrhi::BufferHandle StaticInstanceBufferHandle;
-
-		std::vector<InstanceData> StaticDebugInstanceDatas;
-		nvrhi::BufferHandle StaticInstanceDebugBufferHandle;	//contains all the aabb boxes to draw
 
 	public:
-		std::shared_ptr<ForwardRenderer> Renderer;
+		std::shared_ptr<ForwardRenderer> ForwardRenderer;
+		std::shared_ptr<DeferredRenderer> DeferredRenderer;
 		SceneConfig Config;
 		DebugInfo DebugInfo;
+
 		Matrix CameraViewProjection;
 		Matrix CameraProjection;
 		Matrix CameraView;
 
+		//render targets
+		nvrhi::TextureHandle SceneColor;
+		nvrhi::TextureHandle SceneDepthZ;
+		nvrhi::TextureHandle GBufferAlbedo;
+		nvrhi::TextureHandle GBufferNormal;
+		nvrhi::TextureHandle GBufferORM;
+
 		Scene(Application*);
 
-		void Init();
 		void Update(float _dt);
 		void Shutdown();
 
 		void UpdateControls(float _dt);
+		void CreateCustomMeshes();
 
 		//Transforms
 		void UpdateTransforms();
@@ -93,8 +110,16 @@ namespace ragdoll {
 		void AddEntityAtRootLevel(Guid entityId);
 
 		//Renderable
+		SceneInformation SceneInfo;
+		std::vector<InstanceData> StaticInstanceDatas;
+		std::vector<InstanceData> StaticDebugInstanceDatas;
+		std::vector<InstanceGroupInfo> StaticInstanceGroupInfos;
+		nvrhi::BufferHandle StaticInstanceBufferHandle;
+		nvrhi::BufferHandle StaticInstanceDebugBufferHandle;	//contains all the aabb boxes to draw
+
 		void PopulateStaticProxies();
 		void BuildStaticInstances(const Matrix& cameraProjection, const Matrix& cameraView);
+		void BuildDebugInstances();
 		void CullOctant(const Octant& octant, const DirectX::BoundingFrustum& frustum);
 
 	private:

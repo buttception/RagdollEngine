@@ -3,7 +3,7 @@
 #include "Ragdoll/AssetManager.h"
 #include <nvrhi/nvrhi.h>
 
-class ForwardRenderer;
+class DirectXDevice;
 namespace ragdoll {
 	class FileManager;
 	class EntityManager;
@@ -12,15 +12,17 @@ namespace ragdoll {
 
 class GLTFLoader {
 	std::filesystem::path Root;
-	ForwardRenderer* Renderer;
-	std::shared_ptr<ragdoll::FileManager> FileManager;
-	std::shared_ptr<ragdoll::EntityManager> EntityManager;
-	std::shared_ptr<ragdoll::Scene> Scene;
+	std::shared_ptr<DirectXDevice> DeviceRef;
+	std::shared_ptr<ragdoll::FileManager> FileManagerRef;
+	std::shared_ptr<ragdoll::EntityManager> EntityManagerRef;
+	std::shared_ptr<ragdoll::Scene> SceneRef;
 
 	std::vector<uint32_t> IndexStagingBuffer;
 	std::vector<Vertex> VertexStagingBuffer;
+
+	nvrhi::CommandListHandle CommandList;
 public:
-	void Init(std::filesystem::path root, ForwardRenderer* renderer, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> tl);
+	void Init(std::filesystem::path root, std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> tl);
 	void LoadAndCreateModel(const std::string& fileName);
 private:
 };

@@ -2,35 +2,41 @@
 
 #include "Scene.h"
 
+#include <nvrhi/utils.h>
+#include <microprofile.h>
 #include "Application.h"
 #include "Entity/EntityManager.h"
 #include "AssetManager.h"
 #include "DirectXDevice.h"
-#include "nvrhi/utils.h"
-#include "microprofile.h"
+#include "GeometryBuilder.h"
 
 ragdoll::Scene::Scene(Application* app)
 {
-	EntityManager = app->m_EntityManager;
-	PrimaryWindow = app->m_PrimaryWindow;
-	Renderer = std::make_shared<ForwardRenderer>();
-	Renderer->Init(app->m_PrimaryWindow, app->m_FileManager, app->m_EntityManager);
+	EntityManagerRef = app->m_EntityManager;
+	PrimaryWindowRef = app->m_PrimaryWindow;
+	DeviceRef = app->Device;
+
+	CommandList = DeviceRef->m_NvrhiDevice->createCommandList();
+	//TODO: create the cmd args renderer
+	ForwardRenderer = std::make_shared<class ForwardRenderer>();
+	ForwardRenderer->Init(DeviceRef, app->m_PrimaryWindow);
+	DeferredRenderer = std::make_shared<class DeferredRenderer>();
+	DeferredRenderer->Init(DeviceRef, app->m_PrimaryWindow);
 	if (app->Config.bCreateCustomMeshes)
 	{
 		Config.bIsThereCustomMeshes = true;
-		Renderer->CreateCustomMeshes();
+		CreateCustomMeshes();
 	}
 	Config.bDrawBoxes = app->Config.bDrawDebugBoundingBoxes;
 	Config.bDrawOctree = app->Config.bDrawDebugOctree;
 	ImguiInterface = std::make_shared<ImguiRenderer>();
-	ImguiInterface->Init(Renderer->Device.get(), Renderer->ImguiVertexShader, Renderer->ImguiPixelShader);
+	ImguiInterface->Init(DeviceRef.get());
 	StaticOctree.Init();
 }
 
 void ragdoll::Scene::Update(float _dt)
 {
 	ImguiInterface->BeginFrame();
-	Renderer->BeginFrame();
 	UpdateControls(_dt);
 
 	//spawn more shits temp
@@ -66,22 +72,22 @@ void ragdoll::Scene::Update(float _dt)
 				entt::entity ent;
 				{
 					MICROPROFILE_SCOPEI("Creation", "Creating Entity", MP_DARKGREEN);
-					ent = EntityManager->CreateEntity();
+					ent = EntityManagerRef->CreateEntity();
 				}
 				{
 					MICROPROFILE_SCOPEI("Creation", "Setting Transform", MP_GREENYELLOW);
-					auto tcomp = EntityManager->AddComponent<TransformComp>(ent);
+					auto tcomp = EntityManagerRef->AddComponent<TransformComp>(ent);
 					tcomp->m_LocalPosition = pos;
 					tcomp->m_LocalScale = scale;
 					tcomp->m_LocalRotation = Quaternion::CreateFromYawPitchRoll(eulerRotate.y, eulerRotate.x, eulerRotate.z);
 					{
 						MICROPROFILE_SCOPEI("Creation", "Adding at Root", MP_DARKOLIVEGREEN);
-						AddEntityAtRootLevel(EntityManager->GetGuid(ent));
+						AddEntityAtRootLevel(EntityManagerRef->GetGuid(ent));
 					}
 				}
 				{
 					MICROPROFILE_SCOPEI("Creation", "Setting Renderable", MP_FORESTGREEN);
-					auto rcomp = EntityManager->AddComponent<RenderableComp>(ent);
+					auto rcomp = EntityManagerRef->AddComponent<RenderableComp>(ent);
 					rcomp->meshIndex = std::rand() / (float)RAND_MAX * 25;
 				}
 			}
@@ -104,7 +110,7 @@ void ragdoll::Scene::Update(float _dt)
 		bIsCameraDirty = true;
 	if (ImGui::Checkbox("Show Boxes", &Config.bDrawBoxes))
 		bIsCameraDirty = true;
-	ImGui::Text("%d entities count", EntityManager->GetRegistry().view<entt::entity>().size_hint());
+	ImGui::Text("%d entities count", EntityManagerRef->GetRegistry().view<entt::entity>().size_hint());
 	ImGui::Text("%d proxies to draw", StaticProxiesToDraw.size());
 	ImGui::Text("%d instance count", StaticInstanceDatas.size());
 	ImGui::Text("%d octants culled", DebugInfo.CulledObjectCount);
@@ -117,11 +123,11 @@ void ragdoll::Scene::Update(float _dt)
 		BuildStaticInstances(CameraProjection, CameraView);
 	}
 
-	Renderer->DrawAllInstances(StaticInstanceBufferHandle, StaticInstanceGroupInfos, CBuffer);
-	Renderer->DrawBoundingBoxes(StaticInstanceDebugBufferHandle, StaticDebugInstanceDatas.size(), CBuffer);
+	//ForwardRenderer->Render(this);
+	DeferredRenderer->Render(this);
 
 	ImguiInterface->Render();
-	Renderer->Device->Present();
+	DeviceRef->Present();
 
 	bIsCameraDirty = false;
 }
@@ -130,8 +136,10 @@ void ragdoll::Scene::Shutdown()
 {
 	ImguiInterface->Shutdown();
 	ImguiInterface = nullptr;
-	Renderer->Shutdown();
-	Renderer = nullptr;
+	ForwardRenderer->Shutdown();
+	ForwardRenderer = nullptr;
+	DeferredRenderer->Shutdown();
+	DeferredRenderer = nullptr;
 }
 
 void ragdoll::Scene::UpdateControls(float _dt)
@@ -141,15 +149,16 @@ void ragdoll::Scene::UpdateControls(float _dt)
 		Vector3 cameraPos = { 0.f, 1.f, 5.f };
 		float cameraYaw = DirectX::XM_PI;
 		float cameraPitch = 0.f;
-		float cameraFov = 60.f;
+		float cameraFov = 90.f;
 		float cameraNear = 0.01f;
 		float cameraFar = 1000.f;
-		float cameraAspect = 16.f / 9.f;
+		float cameraWidth = 16.f;
+		float cameraHeight = 9.f;
 		float cameraSpeed = 5.f;
 		float cameraRotationSpeed = 15.f;
 		Color dirLightColor = { 1.f,1.f,1.f,1.f };
 		Color ambientLight = { 0.2f, 0.2f, 0.2f, 1.f };
-		float ambientIntensity = 0.2f;
+		float lightIntensity = 1.f;
 		Vector2 azimuthAndElevation = { 0.f, 45.f };
 	};
 	static Data data;
@@ -157,18 +166,27 @@ void ragdoll::Scene::UpdateControls(float _dt)
 	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera FOV (Degrees)", &data.cameraFov, 60.f, 120.f) : true;
 	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera Near", &data.cameraNear, 0.01f, 1.f) : true;
 	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera Far", &data.cameraFar, 10.f, 10000.f) : true;
-	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera Aspect Ratio", &data.cameraAspect, 0.01f, 5.f) : true;
+	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera Width", &data.cameraWidth, 0.01f, 30.f) : true;
+	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera Height", &data.cameraHeight, 0.01f, 20.f) : true;
 	ImGui::SliderFloat("Camera Speed", &data.cameraSpeed, 0.01f, 30.f);
 	ImGui::SliderFloat("Camera Rotation Speed (Degrees)", &data.cameraRotationSpeed, 5.f, 100.f);
 	ImGui::ColorEdit3("Light Diffuse", &data.dirLightColor.x);
+	ImGui::SliderFloat("Light Intensity", &data.lightIntensity, 0.1f, 10.f);
 	ImGui::ColorEdit3("Ambient Light Diffuse", &data.ambientLight.x);
-	ImGui::SliderFloat("Azimuth (Degrees)", &data.azimuthAndElevation.x, 0.f, 360.f);
-	ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, -90.f, 90.f);
+	if(ImGui::SliderFloat("Azimuth (Degrees)", &data.azimuthAndElevation.x, 0.f, 360.f)) BuildDebugInstances();
+	if(ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, -90.f, 90.f)) BuildDebugInstances();
 	ImGui::End();
 
-	Matrix proj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraAspect, data.cameraNear, data.cameraFar);
+	//make a infinite z inverse projection matrix
+	float e = 1 / tanf(DirectX::XMConvertToRadians(data.cameraFov) / 2.f);
+	SceneInfo.InfiniteReverseZProj._11 = e;
+	SceneInfo.InfiniteReverseZProj._22 = e * (data.cameraWidth / data.cameraHeight);
+	SceneInfo.InfiniteReverseZProj._33 = 0.f;
+	SceneInfo.InfiniteReverseZProj._44 = 0.f;
+	SceneInfo.InfiniteReverseZProj._43 = data.cameraNear;
+	SceneInfo.InfiniteReverseZProj._34 = 1.f;
 	if (!bFreezeFrustumCulling)
-		CameraProjection = proj;
+		CameraProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraWidth / data.cameraHeight, data.cameraNear, data.cameraFar);
 	Vector3 cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
 
 	//hardcoded handling of movement now
@@ -176,53 +194,148 @@ void ragdoll::Scene::UpdateControls(float _dt)
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_W))
 		{
 			bIsCameraDirty = true;
-			data.cameraPos += cameraDir * data.cameraSpeed * PrimaryWindow->GetFrameTime();
+			data.cameraPos += cameraDir * data.cameraSpeed * PrimaryWindowRef->GetFrameTime();
 		}
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_S))
 		{
 			bIsCameraDirty = true;
-			data.cameraPos -= cameraDir * data.cameraSpeed * PrimaryWindow->GetFrameTime();
+			data.cameraPos -= cameraDir * data.cameraSpeed * PrimaryWindowRef->GetFrameTime();
 		}
 		Vector3 cameraRight = cameraDir.Cross(Vector3(0.f, 1.f, 0.f));
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_A))
 		{
 			bIsCameraDirty = true;
-			data.cameraPos += cameraRight * data.cameraSpeed * PrimaryWindow->GetFrameTime();
+			data.cameraPos += cameraRight * data.cameraSpeed * PrimaryWindowRef->GetFrameTime();
 		}
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_D))
 		{
 			bIsCameraDirty = true;
-			data.cameraPos -= cameraRight * data.cameraSpeed * PrimaryWindow->GetFrameTime();
+			data.cameraPos -= cameraRight * data.cameraSpeed * PrimaryWindowRef->GetFrameTime();
 		}
 		if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
 		{
 			bIsCameraDirty = true;
 			auto& io = ImGui::GetIO();
-			data.cameraYaw += io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindow->GetFrameTime();
-			data.cameraPitch += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindow->GetFrameTime();
+			data.cameraYaw += io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindowRef->GetFrameTime();
+			data.cameraPitch += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindowRef->GetFrameTime();
 			data.cameraPitch = data.cameraPitch > DirectX::XM_PIDIV2 - 0.1f ? DirectX::XM_PIDIV2 - 0.1f : data.cameraPitch;
 			data.cameraPitch = data.cameraPitch < -DirectX::XM_PIDIV2 + 0.1f ? -DirectX::XM_PIDIV2 + 0.1f : data.cameraPitch;
 		}
 	}
 	cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
 
-	Matrix view = DirectX::XMMatrixLookAtLH(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
+	SceneInfo.MainCameraView = DirectX::XMMatrixLookAtLH(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
 	if (!bFreezeFrustumCulling)
-		CameraView = view;
-	CBuffer.viewProj = view * proj;
+		CameraView = SceneInfo.MainCameraView;
+	SceneInfo.MainCameraViewProj = SceneInfo.MainCameraView * SceneInfo.InfiniteReverseZProj;
 	if (!bFreezeFrustumCulling)
-		CameraViewProjection = CBuffer.viewProj;
-	CBuffer.sceneAmbientColor = data.ambientLight;
-	CBuffer.lightDiffuseColor = data.dirLightColor;
+		CameraViewProjection = SceneInfo.MainCameraViewProj;
+	SceneInfo.SceneAmbientColor = data.ambientLight;
+	SceneInfo.LightDiffuseColor = data.dirLightColor;
+	SceneInfo.LightIntensity = data.lightIntensity;
 	Vector2 azimuthElevationRad = {
 		DirectX::XMConvertToRadians(data.azimuthAndElevation.x),
 		DirectX::XMConvertToRadians(data.azimuthAndElevation.y) };
-	CBuffer.lightDirection = Vector3(
+	SceneInfo.LightDirection = Vector3(
 		sinf(azimuthElevationRad.y) * cosf(azimuthElevationRad.x),
 		cosf(azimuthElevationRad.y) * cosf(azimuthElevationRad.x),
 		sinf(azimuthElevationRad.x));
-	CBuffer.cameraPosition = data.cameraPos;
-	CBuffer.lightDiffuseColor = data.dirLightColor;
+	SceneInfo.MainCameraPosition = data.cameraPos;
+}
+
+void ragdoll::Scene::CreateCustomMeshes()
+{
+	//create 5 random textures
+	uint8_t colors[5][4] = {
+		{255, 0, 0, 255},
+		{255, 255, 0, 255},
+		{0, 255, 255, 255},
+		{0, 0, 255, 255},
+		{0, 255, 0, 255},
+	};
+	std::string debugNames[5] = {
+		"Custom Red",
+		"Custom Yellow",
+		"Custom Cyan",
+		"Custom Blue",
+		"Custom Green",
+	};
+	CommandList->open();
+	for (int i = 0; i < 5; ++i)
+	{
+		Image img;
+		nvrhi::TextureDesc textureDesc;
+		textureDesc.width = 1;
+		textureDesc.height = 1;
+		textureDesc.format = nvrhi::Format::RGBA8_UNORM;
+		textureDesc.dimension = nvrhi::TextureDimension::Texture2D;
+		textureDesc.isRenderTarget = false;
+		textureDesc.isTypeless = false;
+		textureDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+		textureDesc.keepInitialState = true;
+		textureDesc.debugName = debugNames[i];
+		nvrhi::TextureHandle texHandle = DeviceRef->m_NvrhiDevice->createTexture(textureDesc);
+		CommandList->writeTexture(texHandle, 0, 0, &colors[i], 4);
+		img.TextureHandle = texHandle;
+		AssetManager::GetInstance()->AddImage(img);
+
+		Texture texture;
+		texture.ImageIndex = i;
+		texture.SamplerIndex = i;
+		AssetManager::GetInstance()->Textures.emplace_back(texture);
+
+	}
+	CommandList->close();
+	DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
+
+	Material mat;
+	mat.bIsLit = true;
+	mat.Color = Vector4::One;
+	mat.AlbedoTextureIndex = 0;
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	mat.AlbedoTextureIndex = 1;
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	mat.AlbedoTextureIndex = 2;
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	mat.AlbedoTextureIndex = 3;
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+	mat.AlbedoTextureIndex = 4;
+	AssetManager::GetInstance()->Materials.emplace_back(mat);
+
+	//build primitives
+	GeometryBuilder geomBuilder;
+	geomBuilder.Init(DeviceRef->m_NvrhiDevice);
+	int32_t id = geomBuilder.BuildCube(1.f);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildSphere(1.f, 16);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildCylinder(1.f, 1.f, 16);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildCone(1.f, 1.f, 16);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	id = geomBuilder.BuildIcosahedron(1.f);
+	for (int i = 0; i < 5; ++i) {
+		Mesh mesh;
+		mesh.Submeshes.push_back({ id, i });
+		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
+	}
+	AssetManager::GetInstance()->UpdateVBOIBO();
 }
 
 void ragdoll::Scene::UpdateTransforms()
@@ -232,9 +345,9 @@ void ragdoll::Scene::UpdateTransforms()
 
 void ragdoll::Scene::ResetTransformDirtyFlags()
 {
-	auto EcsView = EntityManager->GetRegistry().view<TransformComp>();
+	auto EcsView = EntityManagerRef->GetRegistry().view<TransformComp>();
 	for (const entt::entity& ent : EcsView) {
-		TransformComp* comp = EntityManager->GetComponent<TransformComp>(ent);
+		TransformComp* comp = EntityManagerRef->GetComponent<TransformComp>(ent);
 		comp->m_Dirty = false;
 	}
 }
@@ -251,7 +364,7 @@ void ragdoll::Scene::AddEntityAtRootLevel(Guid entityId)
 		}
 		else
 		{
-			TransformComp* furthestTrans = EntityManager->GetComponent<TransformComp>(m_FurthestSibling);
+			TransformComp* furthestTrans = EntityManagerRef->GetComponent<TransformComp>(m_FurthestSibling);
 			furthestTrans->m_Sibling = entityId;
 			m_FurthestSibling = entityId;
 		}
@@ -262,10 +375,10 @@ void ragdoll::Scene::PopulateStaticProxies()
 {
 	StaticOctree.Clear();
 	//iterate through all the transforms and renderable
-	auto EcsView = EntityManager->GetRegistry().view<RenderableComp, TransformComp>();
+	auto EcsView = EntityManagerRef->GetRegistry().view<RenderableComp, TransformComp>();
 	for (const entt::entity& ent : EcsView) {
-		TransformComp* tComp = EntityManager->GetComponent<TransformComp>(ent);
-		RenderableComp* rComp = EntityManager->GetComponent<RenderableComp>(ent);
+		TransformComp* tComp = EntityManagerRef->GetComponent<TransformComp>(ent);
+		RenderableComp* rComp = EntityManagerRef->GetComponent<RenderableComp>(ent);
 		Mesh mesh = AssetManager::GetInstance()->Meshes[rComp->meshIndex];
 		for (const Submesh& submesh : mesh.Submeshes)
 		{
@@ -287,7 +400,6 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 	//clear the old information
 	StaticInstanceGroupInfos.clear();
 	StaticInstanceDatas.clear();
-	StaticDebugInstanceDatas.clear();
 
 	DirectX::BoundingFrustum frustum;
 	DirectX::BoundingFrustum::CreateFromMatrix(frustum, cameraProjection);
@@ -327,7 +439,7 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 			}
 			//since already sorted by mesh, just add everything in
 			//set the instance data
-			TransformComp* tComp = EntityManager->GetComponent<TransformComp>((entt::entity)StaticProxiesToDraw[i].EnttId);
+			TransformComp* tComp = EntityManagerRef->GetComponent<TransformComp>((entt::entity)StaticProxiesToDraw[i].EnttId);
 			InstanceData Data;
 
 			const Material& mat = AssetManager::GetInstance()->Materials[StaticProxiesToDraw[i].MaterialIndex];
@@ -357,27 +469,10 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 			Data.InvModelToWorld = tComp->m_ModelToWorld.Invert();
 			StaticInstanceDatas.emplace_back(Data);
 			info.InstanceCount++;
-
-			if (Config.bDrawBoxes) {
-				InstanceData debugData;
-				Vector3 translate = StaticProxiesToDraw[i].BoundingBox.Center;
-				Vector3 scale = StaticProxiesToDraw[i].BoundingBox.Extents * 2;
-				Matrix matrix = Matrix::CreateScale(scale);
-				matrix *= Matrix::CreateTranslation(translate);
-				debugData.ModelToWorld = matrix;
-				debugData.bIsLit = false;
-				debugData.Color = { 0.f, 1.f, 0.f, 1.f };
-				StaticDebugInstanceDatas.emplace_back(debugData);
-			}
 		}
 	}
 	//last info because i reached the end
 	StaticInstanceGroupInfos.emplace_back(info);
-	//adding the octants into the debug instance
-	if(Config.bDrawOctree){
-		MICROPROFILE_SCOPEI("Scene", "Building octree debug instances", MP_RED4);
-		AddOctantDebug(StaticOctree.Octant, 0);
-	}
 
 	if (StaticInstanceDatas.empty())
 	{
@@ -386,40 +481,77 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 	else
 	{
 		MICROPROFILE_SCOPEI("Scene", "Building Global Instance Buffer", MP_ORANGERED);
-		Renderer->CommandList->open();
+		CommandList->open();
 		//create the instance buffer handle
 		nvrhi::BufferDesc InstanceBufferDesc;
 		InstanceBufferDesc.byteSize = sizeof(InstanceData) * StaticInstanceDatas.size();
 		InstanceBufferDesc.debugName = "Global instance buffer";
 		InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
 		InstanceBufferDesc.structStride = sizeof(InstanceData);
-		StaticInstanceBufferHandle = Renderer->Device->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
+		StaticInstanceBufferHandle = DeviceRef->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
 
 		//copy data over
-		Renderer->CommandList->beginTrackingBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::CopyDest);
-		Renderer->CommandList->writeBuffer(StaticInstanceBufferHandle, StaticInstanceDatas.data(), sizeof(InstanceData) * StaticInstanceDatas.size());
-		Renderer->CommandList->setPermanentBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::ShaderResource);
-		Renderer->CommandList->close();
-		Renderer->Device->m_NvrhiDevice->executeCommandList(Renderer->CommandList);
+		CommandList->beginTrackingBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::CopyDest);
+		CommandList->writeBuffer(StaticInstanceBufferHandle, StaticInstanceDatas.data(), sizeof(InstanceData) * StaticInstanceDatas.size());
+		CommandList->setPermanentBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::ShaderResource);
+		CommandList->close();
+		DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
 	}
+	BuildDebugInstances();
+}
+
+void ragdoll::Scene::BuildDebugInstances()
+{
+	StaticDebugInstanceDatas.clear();
+	for (int i = 0; i < StaticProxiesToDraw.size(); ++i) {
+		if (Config.bDrawBoxes) {
+			InstanceData debugData;
+			Vector3 translate = StaticProxiesToDraw[i].BoundingBox.Center;
+			Vector3 scale = StaticProxiesToDraw[i].BoundingBox.Extents * 2;
+			Matrix matrix = Matrix::CreateScale(scale);
+			matrix *= Matrix::CreateTranslation(translate);
+			debugData.ModelToWorld = matrix;
+			debugData.bIsLit = false;
+			debugData.Color = { 0.f, 1.f, 0.f, 1.f };
+			StaticDebugInstanceDatas.emplace_back(debugData);
+		}
+	}
+
+	//adding the octants into the debug instance
+	if (Config.bDrawOctree) {
+		MICROPROFILE_SCOPEI("Scene", "Building octree debug instances", MP_RED4);
+		AddOctantDebug(StaticOctree.Octant, 0);
+	}
+
 	if (!StaticDebugInstanceDatas.empty())
 	{
 		MICROPROFILE_SCOPEI("Scene", "Building Debug Instance Buffer", MP_DARKRED);
+		//add one more cube at where the sun is
+		InstanceData debugData;
+		Vector3 translate = SceneInfo.LightDirection;
+		Vector3 scale = Vector3::One;
+		Matrix matrix = Matrix::CreateScale(scale);
+		matrix *= Matrix::CreateTranslation(translate);
+		debugData.ModelToWorld = matrix;
+		debugData.bIsLit = false;
+		debugData.Color = { 1.f, 1.f, 1.f, 1.f };
+		StaticDebugInstanceDatas.emplace_back(debugData);
+
 		//create the debug instance buffer
 		nvrhi::BufferDesc InstanceBufferDesc;
 		InstanceBufferDesc.byteSize = sizeof(InstanceData) * StaticDebugInstanceDatas.size();
 		InstanceBufferDesc.debugName = "Debug instance buffer";
 		InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
 		InstanceBufferDesc.structStride = sizeof(InstanceData);
-		StaticInstanceDebugBufferHandle = Renderer->Device->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
+		StaticInstanceDebugBufferHandle = DeviceRef->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
 
 		//copy data over
-		Renderer->CommandList->open();
-		Renderer->CommandList->beginTrackingBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::CopyDest);
-		Renderer->CommandList->writeBuffer(StaticInstanceDebugBufferHandle, StaticDebugInstanceDatas.data(), sizeof(InstanceData) * StaticDebugInstanceDatas.size());
-		Renderer->CommandList->setPermanentBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::ShaderResource);
-		Renderer->CommandList->close();
-		Renderer->Device->m_NvrhiDevice->executeCommandList(Renderer->CommandList);
+		CommandList->open();
+		CommandList->beginTrackingBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::CopyDest);
+		CommandList->writeBuffer(StaticInstanceDebugBufferHandle, StaticDebugInstanceDatas.data(), sizeof(InstanceData) * StaticDebugInstanceDatas.size());
+		CommandList->setPermanentBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::ShaderResource);
+		CommandList->close();
+		DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
 	}
 }
 
@@ -480,9 +612,9 @@ void PrintRecursive(ragdoll::Guid id, int level, std::shared_ptr<ragdoll::Entity
 void ragdoll::Scene::DebugPrintHierarchy()
 {
 	if (m_RootEntity.m_RawId)
-		PrintRecursive(m_RootEntity, 0, EntityManager);
+		PrintRecursive(m_RootEntity, 0, EntityManagerRef);
 	if (m_RootSibling.m_RawId)
-		PrintRecursive(m_RootSibling, 0, EntityManager);
+		PrintRecursive(m_RootSibling, 0, EntityManagerRef);
 }
 
 void ragdoll::Scene::TraverseTreeAndUpdateTransforms()
@@ -497,14 +629,14 @@ void ragdoll::Scene::TraverseTreeAndUpdateTransforms()
 
 void ragdoll::Scene::TraverseNode(const Guid& guid)
 {
-	TransformComp* transform = EntityManager->GetComponent<TransformComp>(guid);
+	TransformComp* transform = EntityManagerRef->GetComponent<TransformComp>(guid);
 	if (transform)
 	{
 		UpdateTransform(*transform, guid);
 
 		//traverse siblings with a for loop
 		while (transform->m_Sibling.m_RawId != 0) {
-			transform = EntityManager->GetComponent<TransformComp>(transform->m_Sibling);
+			transform = EntityManagerRef->GetComponent<TransformComp>(transform->m_Sibling);
 			UpdateTransform(*transform, guid);
 		}
 	}
@@ -562,9 +694,8 @@ void ragdoll::Scene::UpdateTransform(TransformComp& comp, const Guid& guid)
 
 void ragdoll::Scene::AddOctantDebug(Octant octant, uint32_t level)
 {
-	static constexpr Vector4 colors[32] = {
+	static constexpr Vector4 colors[] = {
 		 {1.0f, 0.0f, 0.0f, 1.0f},  // Red
-		{0.0f, 1.0f, 0.0f, 1.0f},  // Green
 		{0.0f, 0.0f, 1.0f, 1.0f},  // Blue
 		{1.0f, 1.0f, 0.0f, 1.0f},  // Yellow
 		{1.0f, 0.0f, 1.0f, 1.0f},  // Magenta
