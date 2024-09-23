@@ -157,14 +157,16 @@ void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_pt
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
 	Samplers[(int)SamplerTypes::Trilinear_Repeat] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
-	samplerDesc.minFilter = 1;
-	samplerDesc.magFilter = 1;
-	samplerDesc.mipFilter = 1;
+
+	samplerDesc.minFilter = 0;
+	samplerDesc.magFilter = 0;
+	samplerDesc.mipFilter = 0;
 	samplerDesc.borderColor = 1.f;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Border;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Border;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Border;
-	Samplers[(int)SamplerTypes::Shadow_Border] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	samplerDesc.reductionType = nvrhi::SamplerReductionType::Comparison;
+	ShadowSampler = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
 #pragma endregion
 
 	//create the bindless descriptor table

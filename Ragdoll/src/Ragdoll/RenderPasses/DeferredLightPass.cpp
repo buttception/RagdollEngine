@@ -89,6 +89,7 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
 	{
 		bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler(i, AssetManager::GetInstance()->Samplers[i]));
 	}
+	bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler((int)SamplerTypes::COUNT, AssetManager::GetInstance()->ShadowSampler));
 	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(0, AlbedoHandle));
 	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(1, NormalHandle));
 	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(2, AORoughnessMetallicHandle));

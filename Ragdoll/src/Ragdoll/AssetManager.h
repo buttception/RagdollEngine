@@ -67,7 +67,6 @@ enum class SamplerTypes
 	Trilinear_Clamp,
 	Trilinear_Wrap,
 	Trilinear_Repeat,
-	Shadow_Border,
 	COUNT
 };
 
@@ -91,6 +90,7 @@ public:
 	nvrhi::TextureHandle DefaultTex;
 	nvrhi::TextureHandle ErrorTex;
 	std::vector<nvrhi::SamplerHandle> Samplers;
+	nvrhi::SamplerHandle ShadowSampler;
 
 	std::unordered_map<std::string, nvrhi::ShaderHandle> Shaders;
 

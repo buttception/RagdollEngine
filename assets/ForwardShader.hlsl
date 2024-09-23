@@ -139,7 +139,8 @@ float3 PBRLighting(float3 albedo, float3 normal, float3 viewDir, float3 lightDir
 }
 
 Texture2D ShadowMap : register(t1);
-sampler Samplers[9] : register(s0);
+sampler Samplers[8] : register(s0);
+SamplerComparisonState ShadowSample : register(s8);
 
 void main_ps(
 	in float4 inPos : SV_Position,
@@ -181,35 +182,35 @@ void main_ps(
 		float4 fragPosLightSpace = mul(inFragPos, LightViewProj);
 		float3 projCoord = fragPosLightSpace.xyz / fragPosLightSpace.w;
 		projCoord.xy = projCoord.xy * 0.5f + float2(0.5f, 0.5f);
-		projCoord.y = 1.f - projCoord.y;
+		projCoord.y = projCoord.y * -1.0f + 1.0f;
+		projCoord.z += 0.005f;
 		float shadow = 0.f;
-		if(projCoord.z <= 1.f){
-			// Get depths.
-			const float currentDepth = projCoord.z;
 
-			// Percentage-Closer Filtering (PCF) for smoother shadow edges.
-			float2 texelSize = float2(1.f, 1.f) / 2000.f;
-			// Sample all neighbouring texels.
-			for(int x = -1; x <= 1; ++x)
+		// Percentage-Closer Filtering (PCF) for smoother shadow edges.
+		float2 texelSize = float2(1.f, 1.f) / 2000.f;
+		for(int x = -1; x <= 1; ++x)
+		{
+			for(int y = -1; y <= 1; ++y)
 			{
-				for(int y = -1; y <= 1; ++y)
-				{
-					float pcfDepth = ShadowMap.Sample(Samplers[8], projCoord.xy + float2(x, y) * texelSize).r - 0.005f;
-					shadow += currentDepth < pcfDepth ? 1.f : 0.f;
-				}
+				float2 offset = float2(x, y) * texelSize;
+				shadow += ShadowMap.SampleCmpLevelZero(ShadowSample, projCoord.xy + offset, projCoord.z);
+				//shadow += projCoord.z < ShadowMap.Sample(Samplers[0], projCoord.xy + offset).r ? 1.f : 0.f;
 			}
-			// Divide by number of samples (9)
-			shadow /= 9.f;
 		}
-		//float depth = ShadowMap.Sample(Samplers[8], projCoord.xy).r - 0.005f;
+		// Divide by number of samples (9)
+		shadow /= 9.f;
+
+		//float depth = ShadowMap.Sample(Samplers[0], projCoord.xy).r;
 		//shadow = projCoord.z < depth ? 1.f : 0.f;
+
+		shadow = ShadowMap.SampleCmpLevelZero(ShadowSample, projCoord.xy, projCoord.z);
 
 		// Combine lighting contributions
 		float3 ambient = sceneAmbientColor.rgb * albedo.rgb;
 		float3 lighting = ambient + diffuse * (1.f - shadow);
 
 		// Final color output
-		outColor = float4(lighting.rgb, albedo.a);
+		outColor = float4(shadow.xxx, albedo.a);
 	}
 	else
 	{
