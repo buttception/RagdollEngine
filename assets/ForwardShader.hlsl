@@ -140,7 +140,7 @@ float3 PBRLighting(float3 albedo, float3 normal, float3 viewDir, float3 lightDir
 
 Texture2D ShadowMap : register(t1);
 sampler Samplers[8] : register(s0);
-SamplerComparisonState ShadowSample : register(s8);
+SamplerComparisonState ShadowSample : register(s9);
 
 void main_ps(
 	in float4 inPos : SV_Position,
@@ -203,14 +203,14 @@ void main_ps(
 		//float depth = ShadowMap.Sample(Samplers[0], projCoord.xy).r;
 		//shadow = projCoord.z < depth ? 1.f : 0.f;
 
-		shadow = ShadowMap.SampleCmpLevelZero(ShadowSample, projCoord.xy, projCoord.z);
+		//shadow = ShadowMap.SampleCmpLevelZero(ShadowSample, projCoord.xy, projCoord.z);
 
 		// Combine lighting contributions
 		float3 ambient = sceneAmbientColor.rgb * albedo.rgb;
 		float3 lighting = ambient + diffuse * (1.f - shadow);
 
 		// Final color output
-		outColor = float4(shadow.xxx, albedo.a);
+		outColor = float4(lighting.rgb, albedo.a);
 	}
 	else
 	{

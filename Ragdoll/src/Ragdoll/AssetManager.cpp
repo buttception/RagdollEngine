@@ -158,8 +158,8 @@ void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_pt
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
 	Samplers[(int)SamplerTypes::Trilinear_Repeat] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
 
-	samplerDesc.minFilter = 0;
-	samplerDesc.magFilter = 0;
+	samplerDesc.minFilter = 1;
+	samplerDesc.magFilter = 1;
 	samplerDesc.mipFilter = 0;
 	samplerDesc.borderColor = 1.f;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Border;
