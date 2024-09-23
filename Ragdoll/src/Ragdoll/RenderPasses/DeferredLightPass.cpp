@@ -41,9 +41,6 @@ void DeferredLightPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandList
 	ConstantBufferHandle = NvrhiDeviceRef->createBuffer(cBufDesc);
 	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
 
-	const static int32_t seed = 42;
-	std::srand(seed);
-
 	pipelineDesc.addBindingLayout(BindingLayoutHandle);
 	pipelineDesc.setVertexShader(VertexShader);
 	pipelineDesc.setFragmentShader(PixelShader);
@@ -61,6 +58,14 @@ void DeferredLightPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandList
 void DeferredLightPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
 {
 	RenderTarget = renderTarget;
+}
+
+void DeferredLightPass::SetDependencies(nvrhi::TextureHandle albedo, nvrhi::TextureHandle normal, nvrhi::TextureHandle orm, nvrhi::TextureHandle depth)
+{
+	AlbedoHandle = albedo;
+	NormalHandle = normal;
+	AORoughnessMetallicHandle = orm;
+	DepthHandle = depth;
 }
 
 void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
@@ -83,10 +88,10 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
 	{
 		bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler(i, AssetManager::GetInstance()->Samplers[i]));
 	}
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(0, AssetManager::GetInstance()->RenderTargetTextures.at("GBufferAlbedo")));
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(1, AssetManager::GetInstance()->RenderTargetTextures.at("GBufferNormal")));
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(2, AssetManager::GetInstance()->RenderTargetTextures.at("GBufferRM")));
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(3, AssetManager::GetInstance()->RenderTargetTextures.at("SceneDepthZ")));
+	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(0, AlbedoHandle));
+	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(1, NormalHandle));
+	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(2, AORoughnessMetallicHandle));
+	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(3, DepthHandle));
 	BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
 	nvrhi::GraphicsState state;

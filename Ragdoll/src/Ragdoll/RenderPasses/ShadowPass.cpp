@@ -1,5 +1,5 @@
 #include "ragdollpch.h"
-#include "ForwardPass.h"
+#include "ShadowPass.h"
 
 #include <nvrhi/utils.h>
 #include <microprofile.h>
@@ -7,31 +7,20 @@
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
 
-void ForwardPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle cmdList)
+void ShadowPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle cmdList)
 {
 	CommandListRef = cmdList;
 	NvrhiDeviceRef = nvrhiDevice;
 
 	//create the pipeline
 	//load outputted shaders objects
-	ForwardVertexShader = AssetManager::GetInstance()->GetShader("ForwardShader.vs.cso");
-	ForwardPixelShader = AssetManager::GetInstance()->GetShader("ForwardShader.ps.cso");
+	VertexShader = AssetManager::GetInstance()->GetShader("DirectionalShadow.vs.cso");
 	//TODO: move into draw call then create only if needed
 	nvrhi::BindingLayoutDesc layoutDesc = nvrhi::BindingLayoutDesc();
 	layoutDesc.visibility = nvrhi::ShaderType::All;
 	layoutDesc.bindings = {
 		nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
 		nvrhi::BindingLayoutItem::StructuredBuffer_SRV(0),
-		nvrhi::BindingLayoutItem::Texture_SRV(1),
-		nvrhi::BindingLayoutItem::Sampler(0),
-		nvrhi::BindingLayoutItem::Sampler(1),
-		nvrhi::BindingLayoutItem::Sampler(2),
-		nvrhi::BindingLayoutItem::Sampler(3),
-		nvrhi::BindingLayoutItem::Sampler(4),
-		nvrhi::BindingLayoutItem::Sampler(5),
-		nvrhi::BindingLayoutItem::Sampler(6),
-		nvrhi::BindingLayoutItem::Sampler(7),
-		nvrhi::BindingLayoutItem::Sampler(8),
 	};
 	BindingLayoutHandle = NvrhiDeviceRef->createBindingLayout(layoutDesc);
 	//create a constant buffer here
@@ -39,20 +28,19 @@ void ForwardPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle
 	ConstantBufferHandle = NvrhiDeviceRef->createBuffer(cBufDesc);
 
 	const auto& attribs = AssetManager::GetInstance()->VertexAttributes;
-	nvrhi::InputLayoutHandle inputLayoutHandle = NvrhiDeviceRef->createInputLayout(attribs.data(), attribs.size(), ForwardVertexShader);
+	nvrhi::InputLayoutHandle inputLayoutHandle = NvrhiDeviceRef->createInputLayout(attribs.data(), attribs.size(), VertexShader);
 
 	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
 
 	pipelineDesc.addBindingLayout(BindingLayoutHandle);
 	pipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
-	pipelineDesc.setVertexShader(ForwardVertexShader);
-	pipelineDesc.setFragmentShader(ForwardPixelShader);
+	pipelineDesc.setVertexShader(VertexShader);
 
 	pipelineDesc.renderState.depthStencilState.depthTestEnable = true;
 	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
 	pipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
 	pipelineDesc.renderState.depthStencilState.depthFunc = nvrhi::ComparisonFunc::Greater;
-	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::Back;
+	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
 	pipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 	pipelineDesc.inputLayout = inputLayoutHandle;
 
@@ -60,49 +48,36 @@ void ForwardPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle
 	GraphicsPipeline = NvrhiDeviceRef->createGraphicsPipeline(pipelineDesc, RenderTarget);
 }
 
-void ForwardPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
+void ShadowPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
 {
 	RenderTarget = renderTarget;
 }
 
-void ForwardPass::SetDependencies(nvrhi::TextureHandle shadowMap)
+void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo)
 {
-	ShadowMap = shadowMap;
-}
 
-void ForwardPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo)
-{
 	if (infos.empty())
 		return;
-	MICROPROFILE_SCOPEI("Render", "Draw All Instances", MP_BLUEVIOLET);
+	MICROPROFILE_SCOPEI("Render", "Directional Light Shadow Pass", MP_BLUEVIOLET);
 	//create and set the state
 	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
-	CBuffer.CameraPosition = sceneInfo.MainCameraPosition;
-	CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
+	//create the light view proj
+	//hardcode for now, reversed z
 	Matrix proj = DirectX::XMMatrixOrthographicLH(50.f, 50.f, 50.f, -50.f);
 	Matrix view = DirectX::XMMatrixLookAtLH({ 0.f, 0.f, 0.f }, -sceneInfo.LightDirection, { 0.f, 1.f, 0.f });
 	CBuffer.LightViewProj = view * proj;
-	CBuffer.LightDiffuseColor = sceneInfo.LightDiffuseColor;
-	CBuffer.LightDirection = sceneInfo.LightDirection;
-	CBuffer.SceneAmbientColor = sceneInfo.SceneAmbientColor;
-	CBuffer.LightIntensity = sceneInfo.LightIntensity;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, instanceBuffer),
-		nvrhi::BindingSetItem::Texture_SRV(1, ShadowMap),
 	};
-	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
-	{
-		bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler(i, AssetManager::GetInstance()->Samplers[i]));
-	}
 	BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
 	nvrhi::GraphicsState state;
 	state.pipeline = GraphicsPipeline;
 	state.framebuffer = pipelineFb;
-	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
+	state.viewport.addViewportAndScissorRect({ 2000.f, 2000.f });
 	state.indexBuffer = { AssetManager::GetInstance()->IBO, nvrhi::Format::R32_UINT, 0 };
 	state.vertexBuffers = {
 		{ AssetManager::GetInstance()->VBO }
@@ -110,7 +85,7 @@ void ForwardPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 	state.addBindingSet(BindingSetHandle);
 	state.addBindingSet(AssetManager::GetInstance()->DescriptorTable);
 
-	CommandListRef->beginMarker("Instance Draws");
+	CommandListRef->beginMarker("Directional Light Shadow Pass");
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
 	CommandListRef->setGraphicsState(state);
 

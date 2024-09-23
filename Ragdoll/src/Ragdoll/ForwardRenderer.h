@@ -3,6 +3,7 @@
 
 #include "RenderPasses/ForwardPass.h"
 #include "RenderPasses/DebugPass.h"
+#include "RenderPasses/ShadowPass.h"
 
 namespace ragdoll {
 	class Window;
@@ -17,11 +18,13 @@ class ForwardRenderer {
 public:
 	std::shared_ptr<ForwardPass> ForwardPass;
 	std::shared_ptr<DebugPass> DebugPass;
+	std::shared_ptr<ShadowPass> ShadowPass;
 
-	nvrhi::TextureHandle DepthBuffer;
+	nvrhi::TextureHandle DepthHandle;
+	nvrhi::TextureHandle ShadowMap;
 	nvrhi::CommandListHandle CommandList;
 
-	void Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win);
+	void Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene);
 	void Shutdown();
 
 	void BeginFrame();

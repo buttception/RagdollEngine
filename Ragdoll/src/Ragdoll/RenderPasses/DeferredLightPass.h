@@ -20,6 +20,11 @@ class DeferredLightPass {
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
 	nvrhi::DeviceHandle NvrhiDeviceRef{ nullptr };
 
+	nvrhi::TextureHandle AlbedoHandle;
+	nvrhi::TextureHandle NormalHandle;
+	nvrhi::TextureHandle AORoughnessMetallicHandle;
+	nvrhi::TextureHandle DepthHandle;
+
 	nvrhi::ShaderHandle VertexShader;
 	nvrhi::ShaderHandle PixelShader;
 	nvrhi::BindingLayoutHandle BindingLayoutHandle;
@@ -31,6 +36,7 @@ public:
 	void Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle cmdList);
 
 	void SetRenderTarget(nvrhi::FramebufferHandle renderTarget);
+	void SetDependencies(nvrhi::TextureHandle albedo, nvrhi::TextureHandle normal, nvrhi::TextureHandle orm, nvrhi::TextureHandle depth);
 
 	void LightPass(const ragdoll::SceneInformation& sceneInfo);
 };

@@ -1,5 +1,6 @@
 cbuffer g_Const : register(b0) {
 	float4x4 viewProjMatrix;
+    float4x4 LightViewProj;
 	float4 lightDiffuseColor;
 	float4 sceneAmbientColor;
 	float3 lightDirection;
@@ -54,8 +55,6 @@ void main_vs(
 	outTexcoord = inTexcoord;
 	outInstanceId = inInstanceId;
 }
-
-sampler Samplers[9] : register(s0);
 
 //numeric constants
 static const float PI = 3.14159265;
@@ -139,6 +138,9 @@ float3 PBRLighting(float3 albedo, float3 normal, float3 viewDir, float3 lightDir
     return color;
 }
 
+Texture2D ShadowMap : register(t1);
+sampler Samplers[9] : register(s0);
+
 void main_ps(
 	in float4 inPos : SV_Position,
 	in float4 inFragPos : TEXCOORD1,
@@ -158,12 +160,13 @@ void main_ps(
 		if(data.albedoIndex != -1){
 			albedo *= Textures[data.albedoIndex].Sample(Samplers[data.albedoSamplerIndex], inTexcoord);
 		}
-		float4 RM = float4(data.roughness, data.metallic, 0, 0);
+		float4 RM = float4(1.f, data.roughness, data.metallic, 0);
 		if(data.roughnessMetallicIndex != -1){
 			RM = Textures[data.roughnessMetallicIndex].Sample(Samplers[data.roughnessMetallicSamplerIndex], inTexcoord);
 		}
-		float roughness = RM.r;
-		float metallic = RM.g;
+		float ao = 1.f;
+		float roughness = RM.g;
+		float metallic = RM.b;
 
 		// Sample normal map and transform to world space
 		float3 N = inNormal;
@@ -173,14 +176,23 @@ void main_ps(
 			N = normalize(mul(normalMapValue, TBN));
 		}
 
-		float3 diffuse = PBRLighting(albedo.rgb, N, cameraPosition - inFragPos.xyz, lightDirection, lightDiffuseColor.rgb * lightIntensity, metallic, roughness, 0.5f);
+		float3 diffuse = PBRLighting(albedo.rgb, N, cameraPosition - inFragPos.xyz, lightDirection, lightDiffuseColor.rgb * lightIntensity, metallic, roughness, ao);
+
+		float4 fragPosLightSpace = mul(inFragPos, LightViewProj);
+		float3 projCoord = fragPosLightSpace.xyz / fragPosLightSpace.w;
+		projCoord.xy = projCoord.xy * 0.5f + float2(0.5f, 0.5f);
+		projCoord.y = 1.f - projCoord.y;
+		float shadow = 0.f;
+		if(projCoord.z <= 1.f){
+			shadow = projCoord.z < ShadowMap.Sample(Samplers[0], projCoord.xy).r - 0.005f ? 1.f : 0.f; 
+		}
 
 		// Combine lighting contributions
 		float3 ambient = sceneAmbientColor.rgb * albedo.rgb;
-		float3 lighting = ambient + diffuse;
+		float3 lighting = ambient + diffuse * (1.f - shadow);
 
 		// Final color output
-		outColor = float4(lighting, albedo.a);
+		outColor = float4(lighting.rgb, albedo.a);
 	}
 	else
 	{

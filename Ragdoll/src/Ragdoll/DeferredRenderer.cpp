@@ -13,10 +13,15 @@
 #include "Scene.h"
 #include "GeometryBuilder.h"
 
-void DeferredRenderer::Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win)
+void DeferredRenderer::Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 {
 	DeviceRef = device;
 	PrimaryWindowRef = win;
+	//get the textures needed
+	AlbedoHandle = scene->GBufferAlbedo;
+	NormalHandle = scene->GBufferNormal;
+	AORoughnessMetallicHandle = scene->GBufferORM;
+	DepthHandle = scene->SceneDepthZ;
 	CreateResource();
 }
 
@@ -24,7 +29,7 @@ void DeferredRenderer::Shutdown()
 {
 	//release nvrhi stuff
 	CommandList = nullptr;
-	DepthBuffer = nullptr;
+	DepthHandle = nullptr;
 }
 
 void DeferredRenderer::BeginFrame()
@@ -37,12 +42,12 @@ void DeferredRenderer::BeginFrame()
 		nvrhi::Color col = nvrhi::Color(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
 		CommandList->open();
 		CommandList->beginMarker("ClearGBuffer");
-		CommandList->clearDepthStencilTexture(DepthBuffer, nvrhi::AllSubresources, true, 0.f, false, 0);
+		CommandList->clearDepthStencilTexture(DepthHandle, nvrhi::AllSubresources, true, 0.f, false, 0);
 		col = 0.f;
 		CommandList->clearTextureFloat(DeviceRef->GetCurrentBackbuffer(), nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(AlbedoHandle, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(NormalHandle, nvrhi::AllSubresources, col);
-		CommandList->clearTextureFloat(RoughnessMetallicHandle, nvrhi::AllSubresources, col);
+		CommandList->clearTextureFloat(AORoughnessMetallicHandle, nvrhi::AllSubresources, col);
 		
 		CommandList->endMarker();
 		CommandList->close();
@@ -67,7 +72,7 @@ void DeferredRenderer::Render(ragdoll::Scene* scene)
 
 	fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(DeviceRef->GetCurrentBackbuffer())
-		.setDepthAttachment(DepthBuffer);
+		.setDepthAttachment(DepthHandle);
 	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
 	DebugPass->SetRenderTarget(fb);
 	DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo);
@@ -79,75 +84,13 @@ void DeferredRenderer::Render(ragdoll::Scene* scene)
 void DeferredRenderer::CreateResource()
 {
 	CommandList = DeviceRef->m_NvrhiDevice->createCommandList();
-	//check if the depth buffer i want is already in the asset manager
-	if (!AssetManager::GetInstance()->RenderTargetTextures.contains("SceneDepthZ")) {
-		//create a depth buffer
-		nvrhi::TextureDesc depthBufferDesc;
-		depthBufferDesc.width = PrimaryWindowRef->GetBufferWidth();
-		depthBufferDesc.height = PrimaryWindowRef->GetBufferHeight();
-		depthBufferDesc.initialState = nvrhi::ResourceStates::DepthWrite;
-		depthBufferDesc.isRenderTarget = true;
-		depthBufferDesc.sampleCount = 1;
-		depthBufferDesc.dimension = nvrhi::TextureDimension::Texture2D;
-		depthBufferDesc.keepInitialState = true;
-		depthBufferDesc.mipLevels = 1;
-		depthBufferDesc.format = nvrhi::Format::D32;
-		depthBufferDesc.isTypeless = true;
-		depthBufferDesc.debugName = "SceneDepthZ";
-		DepthBuffer = DeviceRef->m_NvrhiDevice->createTexture(depthBufferDesc);
-		AssetManager::GetInstance()->RenderTargetTextures["SceneDepthZ"] = DepthBuffer;
-	}
-	else
-		DepthBuffer = AssetManager::GetInstance()->RenderTargetTextures.at("SceneDepthZ");
-
-	//create the gbuffer stuff
-	nvrhi::TextureDesc texDesc;
-	texDesc.width = PrimaryWindowRef->GetBufferWidth();
-	texDesc.height = PrimaryWindowRef->GetBufferHeight();
-	texDesc.initialState = nvrhi::ResourceStates::RenderTarget;
-	texDesc.clearValue = 0.f;
-	texDesc.useClearValue = true;
-	texDesc.isRenderTarget = true;
-	texDesc.sampleCount = 1;
-	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
-	texDesc.keepInitialState = true;
-	texDesc.mipLevels = 1;
-	texDesc.isTypeless = false;
-	//gbuffer albedo
-	std::string name = "GBufferAlbedo";
-	if (!AssetManager::GetInstance()->RenderTargetTextures.contains(name)) {
-		texDesc.format = nvrhi::Format::RGBA8_UNORM;
-		texDesc.debugName = name;
-		AlbedoHandle = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
-		AssetManager::GetInstance()->RenderTargetTextures[name] = AlbedoHandle;
-	}
-	else
-		AlbedoHandle = AssetManager::GetInstance()->RenderTargetTextures.at(name);
-	name = "GBufferNormal";
-	if (!AssetManager::GetInstance()->RenderTargetTextures.contains(name)) {
-		texDesc.format = nvrhi::Format::RG16_UNORM;
-		texDesc.debugName = name;
-		NormalHandle = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
-		AssetManager::GetInstance()->RenderTargetTextures[name] = NormalHandle;
-	}
-	else
-		NormalHandle = AssetManager::GetInstance()->RenderTargetTextures.at(name);
-	name = "GBufferRM";
-	if (!AssetManager::GetInstance()->RenderTargetTextures.contains(name)) {
-		texDesc.format = nvrhi::Format::RG8_UNORM;
-		texDesc.debugName = name;
-		RoughnessMetallicHandle = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
-		AssetManager::GetInstance()->RenderTargetTextures[name] = RoughnessMetallicHandle;
-	}
-	else
-		RoughnessMetallicHandle = AssetManager::GetInstance()->RenderTargetTextures.at(name);
 
 	//create the fb for the graphics pipeline to draw on
 	nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(AlbedoHandle)
 		.addColorAttachment(NormalHandle)
-		.addColorAttachment(RoughnessMetallicHandle)
-		.setDepthAttachment(DepthBuffer);
+		.addColorAttachment(AORoughnessMetallicHandle)
+		.setDepthAttachment(DepthHandle);
 	GBuffer = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
 
 	GBufferPass = std::make_shared<class GBufferPass>();
@@ -160,11 +103,12 @@ void DeferredRenderer::CreateResource()
 	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
 	DeferredLightPass = std::make_shared<class DeferredLightPass>();
 	DeferredLightPass->SetRenderTarget(fb);
+	DeferredLightPass->SetDependencies(AlbedoHandle, NormalHandle, AORoughnessMetallicHandle, DepthHandle);
 	DeferredLightPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(DeviceRef->GetCurrentBackbuffer())
-		.setDepthAttachment(DepthBuffer);;
+		.setDepthAttachment(DepthHandle);;
 	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
 	DebugPass = std::make_shared<class DebugPass>();
 	DebugPass->SetRenderTarget(fb);

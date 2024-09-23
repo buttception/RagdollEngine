@@ -9,6 +9,7 @@ class ForwardPass {
 	struct ConstantBuffer {
 		//constant buffer struct specific to the forward pass
 		Matrix ViewProj;
+		Matrix LightViewProj;
 		Vector4 LightDiffuseColor = { 1.f, 1.f, 1.f, 1.f };
 		Vector4 SceneAmbientColor = { 0.2f, 0.2f, 0.2f, 1.f };
 		Vector3 LightDirection = { 1.f, -1.f, 1.f };
@@ -21,6 +22,8 @@ class ForwardPass {
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
 	nvrhi::DeviceHandle NvrhiDeviceRef{ nullptr };
 
+	nvrhi::TextureHandle ShadowMap;
+
 	nvrhi::ShaderHandle ForwardVertexShader;
 	nvrhi::ShaderHandle ForwardPixelShader;
 	nvrhi::BindingLayoutHandle BindingLayoutHandle;
@@ -32,6 +35,7 @@ public:
 	void Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle cmdList);
 
 	void SetRenderTarget(nvrhi::FramebufferHandle renderTarget);
+	void SetDependencies(nvrhi::TextureHandle shadowMap);
 
 	void DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo);
 };

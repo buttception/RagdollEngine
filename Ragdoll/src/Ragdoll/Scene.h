@@ -95,6 +95,8 @@ namespace ragdoll {
 		nvrhi::TextureHandle GBufferAlbedo;
 		nvrhi::TextureHandle GBufferNormal;
 		nvrhi::TextureHandle GBufferORM;
+		//shadows
+		nvrhi::TextureHandle ShadowMap;
 
 		Scene(Application*);
 
@@ -103,6 +105,7 @@ namespace ragdoll {
 
 		void UpdateControls(float _dt);
 		void CreateCustomMeshes();
+		void CreateRenderTargets();
 
 		//Transforms
 		void UpdateTransforms();

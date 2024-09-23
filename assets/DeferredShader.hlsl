@@ -76,7 +76,7 @@ void gbuffer_ps(
 	in uint inInstanceId : TEXCOORD6,
 	out float4 outColor : SV_Target0,
 	out float2 outNormals: SV_Target1,
-	out float2 outRoughnessMetallic: SV_Target2
+	out float4 outAORoughnessMetallic: SV_Target2
 )
 {
 	InstanceData data = InstanceDatas[inInstanceId + instanceOffset];
@@ -86,10 +86,12 @@ void gbuffer_ps(
 		albedo *= Textures[data.albedoIndex].Sample(Samplers[data.albedoSamplerIndex], inTexcoord);
 	}
 	clip(albedo.a - 0.01f);
-	float4 RM = float4(0, data.roughness, data.metallic, 0);
+	float4 RM = float4(1.f, data.roughness, data.metallic, 0);
 	if(data.roughnessMetallicIndex != -1){
 		RM = Textures[data.roughnessMetallicIndex].Sample(Samplers[data.roughnessMetallicSamplerIndex], inTexcoord);
 	}
+	//ao is always 1 for now. need a way to know if this map provide ao
+	float ao = 1.f;
 	float roughness = RM.g;
 	float metallic = RM.b;
 
@@ -104,7 +106,7 @@ void gbuffer_ps(
 	//draw to the targets
 	outColor = albedo;
 	outNormals.xy = Encode(N);
-	outRoughnessMetallic = float2(roughness, metallic);
+	outAORoughnessMetallic = float4(ao, roughness, metallic, 0.f);
 }
 cbuffer g_LightConst : register(b1) {
 	float4x4 InvViewProjMatrix;
@@ -114,11 +116,6 @@ cbuffer g_LightConst : register(b1) {
 	float LightIntensity;
 	float3 CameraPosition;
 };
-
-Texture2D albedoTexture : register(t0);
-Texture2D normalTexture : register(t1);
-Texture2D RMTexture : register(t2);
-Texture2D DepthBuffer : register(t3);
 
 //numeric constants
 static const float PI = 3.14159265;
@@ -202,6 +199,11 @@ float3 PBRLighting(float3 albedo, float3 normal, float3 viewDir, float3 lightDir
     return color;
 }
 
+Texture2D albedoTexture : register(t0);
+Texture2D normalTexture : register(t1);
+Texture2D RMTexture : register(t2);
+Texture2D DepthBuffer : register(t3);
+
 void deferred_light_ps(
 	in float4 inPos : SV_Position,
 	in float2 inTexcoord : TEXCOORD1,
@@ -211,7 +213,7 @@ void deferred_light_ps(
 	//getting texture values
 	float4 albedo = albedoTexture.Sample(Samplers[5], inTexcoord);
 	float3 N = Decode(normalTexture.Sample(Samplers[5], inTexcoord).xy);
-	float2 RM = RMTexture.Sample(Samplers[5], inTexcoord).xy;
+	float3 RM = RMTexture.Sample(Samplers[5], inTexcoord).xyz;
 
 	//getting fragpos
 	float depth = DepthBuffer.Sample(Samplers[5], inTexcoord).r;
@@ -221,7 +223,7 @@ void deferred_light_ps(
 
 	//apply pbr lighting, AO is 1.f for now so it does nth
 	//float3 diffuse = max(dot(N, LightDirection), 0) * albedo.rgb;
-	float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.y, RM.x, 1.f);
+	float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.z, RM.y, RM.x);
 
 	float3 ambient = SceneAmbientColor.rgb * albedo.rgb;
 	float3 lighting = ambient + diffuse;

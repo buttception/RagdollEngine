@@ -13,10 +13,12 @@
 #include "Scene.h"
 #include "GeometryBuilder.h"
 
-void ForwardRenderer::Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win)
+void ForwardRenderer::Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 {
 	DeviceRef = device;
 	PrimaryWindowRef = win;
+	DepthHandle = scene->SceneDepthZ;
+	ShadowMap = scene->ShadowMap;
 	CreateResource();
 }
 
@@ -24,7 +26,7 @@ void ForwardRenderer::Shutdown()
 {
 	//release nvrhi stuff
 	CommandList = nullptr;
-	DepthBuffer = nullptr;
+	DepthHandle = nullptr;
 }
 
 void ForwardRenderer::BeginFrame()
@@ -40,7 +42,8 @@ void ForwardRenderer::BeginFrame()
 		CommandList->open();
 		CommandList->beginMarker("ClearBackBuffer");
 		CommandList->clearTextureFloat(tex, subSet, col);
-		CommandList->clearDepthStencilTexture(DepthBuffer, subSet, true, 0.f, false, 0);
+		CommandList->clearDepthStencilTexture(DepthHandle, subSet, true, 0.f, false, 0);
+		CommandList->clearDepthStencilTexture(ShadowMap, subSet, true, 0.f, false, 0);
 		CommandList->endMarker();
 		CommandList->close();
 		DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
@@ -54,12 +57,13 @@ void ForwardRenderer::Render(ragdoll::Scene* scene)
 	nvrhi::FramebufferHandle fb;
 	nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(DeviceRef->GetCurrentBackbuffer())
-		.setDepthAttachment(DepthBuffer);
+		.setDepthAttachment(DepthHandle);
 	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
 	ForwardPass->SetRenderTarget(fb);
 	DebugPass->SetRenderTarget(fb);
 
 	CommandList->open();
+	ShadowPass->DrawAllInstances(scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo);
 	ForwardPass->DrawAllInstances(scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo);
 	DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo);
 	CommandList->close();
@@ -70,41 +74,27 @@ void ForwardRenderer::Render(ragdoll::Scene* scene)
 void ForwardRenderer::CreateResource()
 {
 	CommandList = DeviceRef->m_NvrhiDevice->createCommandList();
-	//check if the depth buffer i want is already in the asset manager
-	if (!AssetManager::GetInstance()->RenderTargetTextures.contains("SceneDepthZ")) {
-		//create a depth buffer
-		nvrhi::TextureDesc depthBufferDesc;
-		depthBufferDesc.width = PrimaryWindowRef->GetBufferWidth();
-		depthBufferDesc.height = PrimaryWindowRef->GetBufferHeight();
-		depthBufferDesc.initialState = nvrhi::ResourceStates::DepthWrite;
-		depthBufferDesc.isRenderTarget = true;
-		depthBufferDesc.sampleCount = 1;
-		depthBufferDesc.dimension = nvrhi::TextureDimension::Texture2D;
-		depthBufferDesc.keepInitialState = true;
-		depthBufferDesc.mipLevels = 1;
-		depthBufferDesc.format = nvrhi::Format::D32;
-		depthBufferDesc.isTypeless = true;
-		depthBufferDesc.debugName = "Depth";
-		DepthBuffer = DeviceRef->m_NvrhiDevice->createTexture(depthBufferDesc);
-	}
-	else
-		DepthBuffer = AssetManager::GetInstance()->RenderTargetTextures.at("SceneDepthZ");
 
 	//create the fb for the graphics pipeline to draw on
 	nvrhi::FramebufferHandle fb;
-	nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(DeviceRef->GetCurrentBackbuffer())
-		.setDepthAttachment(DepthBuffer);
-	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
 
+		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
+		.setDepthAttachment(ShadowMap);
+	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
+	ShadowPass = std::make_shared<class ShadowPass>();
+	ShadowPass->SetRenderTarget(fb);
+	ShadowPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
+
+	fbDesc = nvrhi::FramebufferDesc()
+		.addColorAttachment(DeviceRef->GetCurrentBackbuffer())
+		.setDepthAttachment(DepthHandle);
+	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
 	ForwardPass = std::make_shared<class ForwardPass>();
 	ForwardPass->SetRenderTarget(fb);
+	ForwardPass->SetDependencies(ShadowMap);
 	ForwardPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
 
 	DebugPass = std::make_shared<class DebugPass>();
 	DebugPass->SetRenderTarget(fb);
 	DebugPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
-
-	const static int32_t seed = 42;
-	std::srand(seed);
 }

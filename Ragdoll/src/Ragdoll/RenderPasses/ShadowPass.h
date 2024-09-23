@@ -1,15 +1,13 @@
 #pragma once
-#pragma once
 #include <nvrhi/nvrhi.h>
 
 namespace ragdoll {
 	struct InstanceGroupInfo;
 	struct SceneInformation;
 }
-class DebugPass {
+class ShadowPass {
 	struct ConstantBuffer {
-		//constant buffer struct specific to the forward pass
-		Matrix ViewProj;
+		Matrix LightViewProj;
 		uint32_t InstanceOffset;
 	}CBuffer;
 
@@ -17,8 +15,9 @@ class DebugPass {
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
 	nvrhi::DeviceHandle NvrhiDeviceRef{ nullptr };
 
+	nvrhi::TextureHandle ShadowMap;
+
 	nvrhi::ShaderHandle VertexShader;
-	nvrhi::ShaderHandle PixelShader;
 	nvrhi::BindingLayoutHandle BindingLayoutHandle;
 	nvrhi::BindingSetHandle BindingSetHandle;
 	nvrhi::GraphicsPipelineHandle GraphicsPipeline;
@@ -29,5 +28,5 @@ public:
 
 	void SetRenderTarget(nvrhi::FramebufferHandle renderTarget);
 
-	void DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t instanceCount, const ragdoll::SceneInformation& sceneInfo);
+	void DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo);
 };

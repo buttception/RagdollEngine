@@ -22,12 +22,12 @@ public:
 
 	nvrhi::TextureHandle AlbedoHandle;
 	nvrhi::TextureHandle NormalHandle;
-	nvrhi::TextureHandle RoughnessMetallicHandle;
-	nvrhi::TextureHandle DepthBuffer;
+	nvrhi::TextureHandle AORoughnessMetallicHandle;
+	nvrhi::TextureHandle DepthHandle;
 	nvrhi::FramebufferHandle GBuffer;
 	nvrhi::CommandListHandle CommandList;
 
-	void Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win);
+	void Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene);
 	void Shutdown();
 
 	void BeginFrame();

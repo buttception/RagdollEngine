@@ -17,11 +17,12 @@ ragdoll::Scene::Scene(Application* app)
 	DeviceRef = app->Device;
 
 	CommandList = DeviceRef->m_NvrhiDevice->createCommandList();
+	CreateRenderTargets();
 	//TODO: create the cmd args renderer
 	ForwardRenderer = std::make_shared<class ForwardRenderer>();
-	ForwardRenderer->Init(DeviceRef, app->m_PrimaryWindow);
+	ForwardRenderer->Init(DeviceRef, app->m_PrimaryWindow, this);
 	DeferredRenderer = std::make_shared<class DeferredRenderer>();
-	DeferredRenderer->Init(DeviceRef, app->m_PrimaryWindow);
+	DeferredRenderer->Init(DeviceRef, app->m_PrimaryWindow, this);
 	if (app->Config.bCreateCustomMeshes)
 	{
 		Config.bIsThereCustomMeshes = true;
@@ -123,8 +124,8 @@ void ragdoll::Scene::Update(float _dt)
 		BuildStaticInstances(CameraProjection, CameraView);
 	}
 
-	//ForwardRenderer->Render(this);
-	DeferredRenderer->Render(this);
+	ForwardRenderer->Render(this);
+	//DeferredRenderer->Render(this);
 
 	ImguiInterface->Render();
 	DeviceRef->Present();
@@ -336,6 +337,63 @@ void ragdoll::Scene::CreateCustomMeshes()
 		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
 	AssetManager::GetInstance()->UpdateVBOIBO();
+}
+
+void ragdoll::Scene::CreateRenderTargets()
+{
+	//check if the depth buffer i want is already in the asset manager
+	nvrhi::TextureDesc depthBufferDesc;
+	depthBufferDesc.width = PrimaryWindowRef->GetBufferWidth();
+	depthBufferDesc.height = PrimaryWindowRef->GetBufferHeight();
+	depthBufferDesc.initialState = nvrhi::ResourceStates::DepthWrite;
+	depthBufferDesc.isRenderTarget = true;
+	depthBufferDesc.sampleCount = 1;
+	depthBufferDesc.dimension = nvrhi::TextureDimension::Texture2D;
+	depthBufferDesc.keepInitialState = true;
+	depthBufferDesc.mipLevels = 1;
+	depthBufferDesc.format = nvrhi::Format::D32;
+	depthBufferDesc.isTypeless = true;
+	if (!SceneDepthZ) {
+		//create a depth buffer
+		depthBufferDesc.debugName = "SceneDepthZ";
+		SceneDepthZ = DeviceRef->m_NvrhiDevice->createTexture(depthBufferDesc);
+	}
+	if (!ShadowMap) {
+		depthBufferDesc.width = 2000;
+		depthBufferDesc.height = 2000;
+		depthBufferDesc.debugName = "ShadowMap";
+		ShadowMap = DeviceRef->m_NvrhiDevice->createTexture(depthBufferDesc);
+	}
+
+	//create the gbuffer stuff
+	nvrhi::TextureDesc texDesc;
+	texDesc.width = PrimaryWindowRef->GetBufferWidth();
+	texDesc.height = PrimaryWindowRef->GetBufferHeight();
+	texDesc.initialState = nvrhi::ResourceStates::RenderTarget;
+	texDesc.clearValue = 0.f;
+	texDesc.useClearValue = true;
+	texDesc.isRenderTarget = true;
+	texDesc.sampleCount = 1;
+	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
+	texDesc.keepInitialState = true;
+	texDesc.mipLevels = 1;
+	texDesc.isTypeless = false;
+
+	if (!GBufferAlbedo) {
+		texDesc.format = nvrhi::Format::RGBA8_UNORM;
+		texDesc.debugName = "GBufferAlbedo";
+		GBufferAlbedo = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
+	}
+	if (!GBufferNormal) {
+		texDesc.format = nvrhi::Format::RG16_UNORM;
+		texDesc.debugName = "GBufferNormal";
+		GBufferNormal = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
+	}
+	if (!GBufferORM) {
+		texDesc.format = nvrhi::Format::RGBA8_UNORM;
+		texDesc.debugName = "GBufferORM";
+		GBufferORM = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
+	}
 }
 
 void ragdoll::Scene::UpdateTransforms()
