@@ -95,25 +95,24 @@ void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_pt
 	samplerDesc.minFilter = 0;
 	samplerDesc.magFilter = 0;
 	samplerDesc.mipFilter = 0;
-	samplerDesc.borderColor = 0.f;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Clamp;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Clamp;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Clamp;
-	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Point_Clamp] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
 	samplerDesc.minFilter = 0;
 	samplerDesc.magFilter = 0;
 	samplerDesc.mipFilter = 0;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Wrap;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Wrap;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Wrap;
-	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Wrap] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Point_Wrap] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
 	samplerDesc.minFilter = 0;
 	samplerDesc.magFilter = 0;
 	samplerDesc.mipFilter = 0;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
-	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Repeat] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Point_Repeat] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
 
 	samplerDesc.minFilter = 1;
 	samplerDesc.magFilter = 1;
@@ -121,21 +120,21 @@ void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_pt
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Clamp;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Clamp;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Clamp;
-	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Linear_Clamp] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
 	samplerDesc.minFilter = 1;
 	samplerDesc.magFilter = 1;
 	samplerDesc.mipFilter = 0;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Wrap;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Wrap;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Wrap;
-	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Wrap] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Linear_Wrap] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
 	samplerDesc.minFilter = 1;
 	samplerDesc.magFilter = 1;
 	samplerDesc.mipFilter = 0;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
-	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Repeat] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Linear_Repeat] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
 
 	samplerDesc.minFilter = 1;
 	samplerDesc.magFilter = 1;
@@ -143,21 +142,29 @@ void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_pt
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Clamp;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Clamp;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Clamp;
-	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Trilinear_Clamp] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Trilinear_Clamp] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
 	samplerDesc.minFilter = 1;
 	samplerDesc.magFilter = 1;
 	samplerDesc.mipFilter = 1;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Wrap;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Wrap;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Wrap;
-	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Trilinear_Wrap] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Trilinear_Wrap] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
 	samplerDesc.minFilter = 1;
 	samplerDesc.magFilter = 1;
 	samplerDesc.mipFilter = 1;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
-	AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Trilinear_Repeat] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Trilinear_Repeat] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	samplerDesc.minFilter = 1;
+	samplerDesc.magFilter = 1;
+	samplerDesc.mipFilter = 1;
+	samplerDesc.borderColor = 1.f;
+	samplerDesc.addressU = nvrhi::SamplerAddressMode::Border;
+	samplerDesc.addressV = nvrhi::SamplerAddressMode::Border;
+	samplerDesc.addressW = nvrhi::SamplerAddressMode::Border;
+	Samplers[(int)SamplerTypes::Shadow_Border] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
 #pragma endregion
 
 	//create the bindless descriptor table

@@ -63,7 +63,7 @@ void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std:
 	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
 	//create the light view proj
 	//hardcode for now, reversed z
-	Matrix proj = DirectX::XMMatrixOrthographicLH(50.f, 50.f, 50.f, -50.f);
+	Matrix proj = DirectX::XMMatrixOrthographicLH(40.f, 40.f, 30.f, -30.f);
 	Matrix view = DirectX::XMMatrixLookAtLH({ 0.f, 0.f, 0.f }, -sceneInfo.LightDirection, { 0.f, 1.f, 0.f });
 	CBuffer.LightViewProj = view * proj;
 

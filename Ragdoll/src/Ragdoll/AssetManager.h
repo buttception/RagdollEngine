@@ -67,6 +67,7 @@ enum class SamplerTypes
 	Trilinear_Clamp,
 	Trilinear_Wrap,
 	Trilinear_Repeat,
+	Shadow_Border,
 	COUNT
 };
 

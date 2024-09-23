@@ -32,6 +32,7 @@ void ForwardPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle
 		nvrhi::BindingLayoutItem::Sampler(6),
 		nvrhi::BindingLayoutItem::Sampler(7),
 		nvrhi::BindingLayoutItem::Sampler(8),
+		nvrhi::BindingLayoutItem::Sampler(9),
 	};
 	BindingLayoutHandle = NvrhiDeviceRef->createBindingLayout(layoutDesc);
 	//create a constant buffer here
@@ -79,7 +80,7 @@ void ForwardPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
 	CBuffer.CameraPosition = sceneInfo.MainCameraPosition;
 	CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
-	Matrix proj = DirectX::XMMatrixOrthographicLH(50.f, 50.f, 50.f, -50.f);
+	Matrix proj = DirectX::XMMatrixOrthographicLH(40.f, 40.f, 30.f, -30.f);
 	Matrix view = DirectX::XMMatrixLookAtLH({ 0.f, 0.f, 0.f }, -sceneInfo.LightDirection, { 0.f, 1.f, 0.f });
 	CBuffer.LightViewProj = view * proj;
 	CBuffer.LightDiffuseColor = sceneInfo.LightDiffuseColor;

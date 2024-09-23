@@ -30,6 +30,7 @@ void DeferredLightPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandList
 		nvrhi::BindingLayoutItem::Sampler(6),
 		nvrhi::BindingLayoutItem::Sampler(7),
 		nvrhi::BindingLayoutItem::Sampler(8),
+		nvrhi::BindingLayoutItem::Sampler(9),
 		nvrhi::BindingLayoutItem::Texture_SRV(0),
 		nvrhi::BindingLayoutItem::Texture_SRV(1),
 		nvrhi::BindingLayoutItem::Texture_SRV(2),

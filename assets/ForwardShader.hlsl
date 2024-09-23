@@ -184,8 +184,25 @@ void main_ps(
 		projCoord.y = 1.f - projCoord.y;
 		float shadow = 0.f;
 		if(projCoord.z <= 1.f){
-			shadow = projCoord.z < ShadowMap.Sample(Samplers[0], projCoord.xy).r - 0.005f ? 1.f : 0.f; 
+			// Get depths.
+			const float currentDepth = projCoord.z;
+
+			// Percentage-Closer Filtering (PCF) for smoother shadow edges.
+			float2 texelSize = float2(1.f, 1.f) / 2000.f;
+			// Sample all neighbouring texels.
+			for(int x = -1; x <= 1; ++x)
+			{
+				for(int y = -1; y <= 1; ++y)
+				{
+					float pcfDepth = ShadowMap.Sample(Samplers[8], projCoord.xy + float2(x, y) * texelSize).r - 0.005f;
+					shadow += currentDepth < pcfDepth ? 1.f : 0.f;
+				}
+			}
+			// Divide by number of samples (9)
+			shadow /= 9.f;
 		}
+		//float depth = ShadowMap.Sample(Samplers[8], projCoord.xy).r - 0.005f;
+		//shadow = projCoord.z < depth ? 1.f : 0.f;
 
 		// Combine lighting contributions
 		float3 ambient = sceneAmbientColor.rgb * albedo.rgb;
