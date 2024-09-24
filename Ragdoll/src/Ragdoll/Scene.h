@@ -45,11 +45,17 @@ namespace ragdoll {
 		bool bDrawBoxes{ false };
 	};
 
+	struct DebugCascadeInfo {
+		Vector3 center;
+		float width, height, depth;
+	};
+
 	struct SceneInformation {
 		Matrix MainCameraViewProj;
 		Matrix InfiniteReverseZProj;
 		Matrix MainCameraView;
 		Matrix LightViewProj[4];
+		DebugCascadeInfo CascadeInfo[4];
 		Vector3 MainCameraPosition;
 		Vector4 LightDiffuseColor = { 1.f, 1.f, 1.f, 1.f };
 		Vector4 SceneAmbientColor = { 0.2f, 0.2f, 0.2f, 1.f };
@@ -103,7 +109,7 @@ namespace ragdoll {
 		nvrhi::TextureHandle ShadowMap[4];
 		//distance where the subfrusta are seperated
 		//0 -> 5, 5 -> 10, 10 -> 20 and 20 -> 50
-		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 15.f, 30.f, 100.f };
+		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
 		//the cascades
 		Matrix DirectionalLightViewProjections[4];
 

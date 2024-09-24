@@ -161,7 +161,7 @@ void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_pt
 	samplerDesc.minFilter = 1;
 	samplerDesc.magFilter = 1;
 	samplerDesc.mipFilter = 0;
-	samplerDesc.borderColor = 1.f;
+	samplerDesc.borderColor = 0.f;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Border;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Border;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Border;
