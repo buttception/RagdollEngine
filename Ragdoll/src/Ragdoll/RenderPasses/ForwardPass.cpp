@@ -95,7 +95,7 @@ void ForwardPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 	CBuffer.LightDirection = sceneInfo.LightDirection;
 	CBuffer.SceneAmbientColor = sceneInfo.SceneAmbientColor;
 	CBuffer.LightIntensity = sceneInfo.LightIntensity;
-	CBuffer.EnableCascadeDebug = sceneInfo.EnableCascadeDebug;
+	CBuffer.EnableCascadeDebug = sceneInfo.bEnableCascadeDebug;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {

@@ -14,7 +14,7 @@ ragdoll::Scene::Scene(Application* app)
 {
 	EntityManagerRef = app->m_EntityManager;
 	PrimaryWindowRef = app->m_PrimaryWindow;
-	DeviceRef = app->Device;
+	DeviceRef = app->Graphic;
 
 	CommandList = DeviceRef->m_NvrhiDevice->createCommandList();
 	CreateRenderTargets();
@@ -109,11 +109,15 @@ void ragdoll::Scene::Update(float _dt)
 		bIsCameraDirty = true;
 	if (ImGui::Checkbox("Show Octree", &Config.bDrawOctree))
 		bIsCameraDirty = true;
+	if (Config.bDrawOctree) {
+		if (ImGui::DragIntRange2("Octree Level", &Config.DrawOctreeLevelMin, &Config.bDrawOctreeLevelMax, 0.1f, 0, Octree::MaxDepth))
+			BuildDebugInstances();
+	}
 	if (ImGui::Checkbox("Show Boxes", &Config.bDrawBoxes))
 		bIsCameraDirty = true;
-	ImGui::Checkbox("Show Cascades", &SceneInfo.EnableCascadeDebug);
+	if (ImGui::SliderInt("Show Cascades", &SceneInfo.bEnableCascadeDebug, 0, 4))
+		BuildDebugInstances();
 	ImGui::Text("%d entities count", EntityManagerRef->GetRegistry().view<entt::entity>().size_hint());
-	ImGui::Text("%d proxies to draw", StaticProxiesToDraw.size());
 	ImGui::Text("%d instance count", StaticInstanceDatas.size());
 	ImGui::Text("%d octants culled", DebugInfo.CulledObjectCount);
 	ImGui::Text("%d proxies in octree", Octree::TotalProxies);
@@ -123,7 +127,7 @@ void ragdoll::Scene::Update(float _dt)
 	{
 		DebugInfo.CulledObjectCount = 0;
 		UpdateShadowCascades();
-		BuildStaticInstances(CameraProjection, CameraView);
+		BuildStaticInstances(CameraProjection, CameraView, StaticInstanceDatas, StaticInstanceGroupInfos);
 	}
 
 	ForwardRenderer->Render(this);
@@ -176,8 +180,16 @@ void ragdoll::Scene::UpdateControls(float _dt)
 	ImGui::ColorEdit3("Light Diffuse", &data.dirLightColor.x);
 	ImGui::SliderFloat("Light Intensity", &data.lightIntensity, 0.1f, 10.f);
 	ImGui::ColorEdit3("Ambient Light Diffuse", &data.ambientLight.x);
-	if(ImGui::SliderFloat("Azimuth (Degrees)", &data.azimuthAndElevation.x, 0.f, 360.f)) BuildDebugInstances();
-	if(ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, -90.f, 90.f)) BuildDebugInstances();
+	if (ImGui::SliderFloat("Azimuth (Degrees)", &data.azimuthAndElevation.x, 0.f, 360.f))
+	{
+		UpdateShadowCascades();
+		BuildDebugInstances();
+	}
+	if(ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, -90.f, 90.f))
+	{
+		UpdateShadowCascades();
+		BuildDebugInstances();
+	}
 	ImGui::End();
 
 	SceneInfo.CameraFov = data.cameraFov;
@@ -439,6 +451,7 @@ void ragdoll::Scene::AddEntityAtRootLevel(Guid entityId)
 
 void ragdoll::Scene::PopulateStaticProxies()
 {
+	//assuming the world transform has already been updated
 	StaticOctree.Clear();
 	//iterate through all the transforms and renderable
 	auto EcsView = EntityManagerRef->GetRegistry().view<RenderableComp, TransformComp>();
@@ -448,101 +461,98 @@ void ragdoll::Scene::PopulateStaticProxies()
 		Mesh mesh = AssetManager::GetInstance()->Meshes[rComp->meshIndex];
 		for (const Submesh& submesh : mesh.Submeshes)
 		{
-			Proxy Proxy;
-			Proxy.EnttId = (ENTT_ID_TYPE)ent;
-			//temp only first submesh now
+			StaticProxies.emplace_back();
+			Proxy& Proxy = StaticProxies.back();
+			const Material& mat = AssetManager::GetInstance()->Materials[submesh.MaterialIndex];
+			if (mat.AlbedoTextureIndex != -1)
+			{
+				const Texture& tex = AssetManager::GetInstance()->Textures[mat.AlbedoTextureIndex];
+				Proxy.AlbedoIndex = tex.ImageIndex;
+				Proxy.AlbedoSamplerIndex = tex.SamplerIndex;
+			}
+			if (mat.NormalTextureIndex != -1)
+			{
+				const Texture& tex = AssetManager::GetInstance()->Textures[mat.NormalTextureIndex];
+				Proxy.NormalIndex = tex.ImageIndex;
+				Proxy.NormalSamplerIndex = tex.SamplerIndex;
+			}
+			if (mat.RoughnessMetallicTextureIndex != -1)
+			{
+				const Texture& tex = AssetManager::GetInstance()->Textures[mat.RoughnessMetallicTextureIndex];
+				Proxy.ORMIndex = tex.ImageIndex;
+				Proxy.ORMSamplerIndex = tex.SamplerIndex;
+			}
+			Proxy.Color = mat.Color;
+			Proxy.Metallic = mat.Metallic;
+			Proxy.Roughness = mat.Roughness;
+			Proxy.bIsLit = mat.bIsLit;
+			Proxy.ModelToWorld = tComp->m_ModelToWorld;
+			Proxy.InvModelToWorld = tComp->m_ModelToWorld.Invert();
 			Proxy.BufferIndex = submesh.VertexBufferIndex;
 			Proxy.MaterialIndex = submesh.MaterialIndex;
-			//bounding box will be empty for now
 			AssetManager::GetInstance()->VertexBufferInfos[Proxy.BufferIndex].BestFitBox.Transform(Proxy.BoundingBox, tComp->m_ModelToWorld);
-			StaticOctree.AddProxy(Proxy);
+			StaticOctree.AddProxy(Proxy.BoundingBox, StaticProxies.size() - 1);
 		}
 	}
 }
 
-void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const Matrix& cameraView)
+void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const Matrix& cameraView, std::vector<InstanceData>& instances, std::vector<InstanceGroupInfo>& instancesGrpInfo)
 {
 	MICROPROFILE_SCOPEI("Scene", "Build Static", MP_RED);
 	//clear the old information
-	StaticInstanceGroupInfos.clear();
-	StaticInstanceDatas.clear();
+	instances.clear();
+	instancesGrpInfo.clear();
 
+	//build the camera frustum
 	DirectX::BoundingFrustum frustum;
 	DirectX::BoundingFrustum::CreateFromMatrix(frustum, cameraProjection);
 	frustum.Transform(frustum, cameraView.Invert());
 
 	//cull the octree
-	StaticProxiesToDraw.clear();
+	std::vector<uint32_t> result;
 	{
 		MICROPROFILE_SCOPEI("Scene", "Culling Octree", MP_VIOLETRED1);
-		CullOctant(StaticOctree.Octant, frustum);
+		CullOctant(StaticOctree.Octant, frustum, result);
 	}
-	if (StaticProxiesToDraw.empty())	//if got nothing to draw just return
-		return;
-	//sort
-	std::sort(StaticProxiesToDraw.begin(), StaticProxiesToDraw.end(), [](const Proxy& lhs, const Proxy& rhs) {
-		return lhs.BufferIndex != rhs.BufferIndex ? lhs.BufferIndex < rhs.BufferIndex : lhs.MaterialIndex < rhs.MaterialIndex;
+	//sort the results
+	std::sort(result.begin(), result.end(), [&](const uint32_t& lhs, const uint32_t& rhs) {
+		return StaticProxies[lhs].BufferIndex != StaticProxies[rhs].BufferIndex ? StaticProxies[lhs].BufferIndex < StaticProxies[rhs].BufferIndex : StaticProxies[lhs].MaterialIndex < StaticProxies[rhs].MaterialIndex;
 		});
 	//build the structured buffer
 	int32_t CurrBufferIndex{ -1 };
-	CurrBufferIndex = StaticProxiesToDraw[0].BufferIndex;
+	CurrBufferIndex = StaticProxies[result[0]].BufferIndex;
 
 	InstanceGroupInfo info;
 	info.VertexBufferIndex = CurrBufferIndex;
 	info.InstanceCount = 0;
 	{
 		MICROPROFILE_SCOPEI("Scene", "Building instance buffer", MP_PALEVIOLETRED);
-		for (int i = 0; i < StaticProxiesToDraw.size(); ++i) {
+		for (int i = 0; i < result.size(); ++i) {
+			const Proxy& proxy = StaticProxies[result[i]];
 			//iterate till i get a different buffer id, meaning is a diff mesh
-			if (StaticProxiesToDraw[i].BufferIndex != CurrBufferIndex)
+			if (proxy.BufferIndex != CurrBufferIndex)
 			{
 				//add the current info
-				StaticInstanceGroupInfos.emplace_back(info);
+				instancesGrpInfo.emplace_back(info);
 				//reset count
 				info.InstanceCount = 0;
 				//set new buffer index
-				info.VertexBufferIndex = CurrBufferIndex = StaticProxiesToDraw[i].BufferIndex;
+				info.VertexBufferIndex = CurrBufferIndex = proxy.BufferIndex;
 			}
 			//since already sorted by mesh, just add everything in
 			//set the instance data
-			TransformComp* tComp = EntityManagerRef->GetComponent<TransformComp>((entt::entity)StaticProxiesToDraw[i].EnttId);
-			InstanceData Data;
-
-			const Material& mat = AssetManager::GetInstance()->Materials[StaticProxiesToDraw[i].MaterialIndex];
-			if (mat.AlbedoTextureIndex != -1)
-			{
-				const Texture& tex = AssetManager::GetInstance()->Textures[mat.AlbedoTextureIndex];
-				Data.AlbedoIndex = tex.ImageIndex;
-				Data.AlbedoSamplerIndex = tex.SamplerIndex;
-			}
-			if (mat.NormalTextureIndex != -1)
-			{
-				const Texture& tex = AssetManager::GetInstance()->Textures[mat.NormalTextureIndex];
-				Data.NormalIndex = tex.ImageIndex;
-				Data.NormalSamplerIndex = tex.SamplerIndex;
-			}
-			if (mat.RoughnessMetallicTextureIndex != -1)
-			{
-				const Texture& tex = AssetManager::GetInstance()->Textures[mat.RoughnessMetallicTextureIndex];
-				Data.RoughnessMetallicIndex = tex.ImageIndex;
-				Data.RoughnessMetallicSamplerIndex = tex.SamplerIndex;
-			}
-			Data.Color = mat.Color;
-			Data.Metallic = mat.Metallic;
-			Data.Roughness = mat.Roughness;
-			Data.bIsLit = mat.bIsLit;
-			Data.ModelToWorld = tComp->m_ModelToWorld;
-			Data.InvModelToWorld = tComp->m_ModelToWorld.Invert();
-			StaticInstanceDatas.emplace_back(Data);
+			instances.emplace_back();
+			instances.back() = proxy;
 			info.InstanceCount++;
 		}
 	}
 	//last info because i reached the end
-	StaticInstanceGroupInfos.emplace_back(info);
+	instancesGrpInfo.emplace_back(info);
 
-	if (StaticInstanceDatas.empty())
+	//if nothing was added because all instances failed the culling test
+	if (instances.empty())
 	{
-		StaticInstanceGroupInfos.clear();
+		instancesGrpInfo.clear();
 	}
 	else
 	{
@@ -550,7 +560,7 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 		CommandList->open();
 		//create the instance buffer handle
 		nvrhi::BufferDesc InstanceBufferDesc;
-		InstanceBufferDesc.byteSize = sizeof(InstanceData) * StaticInstanceDatas.size();
+		InstanceBufferDesc.byteSize = sizeof(InstanceData) * instances.size();
 		InstanceBufferDesc.debugName = "Global instance buffer";
 		InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
 		InstanceBufferDesc.structStride = sizeof(InstanceData);
@@ -558,7 +568,7 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 
 		//copy data over
 		CommandList->beginTrackingBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::CopyDest);
-		CommandList->writeBuffer(StaticInstanceBufferHandle, StaticInstanceDatas.data(), sizeof(InstanceData) * StaticInstanceDatas.size());
+		CommandList->writeBuffer(StaticInstanceBufferHandle, instances.data(), sizeof(InstanceData) * instances.size());
 		CommandList->setPermanentBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::ShaderResource);
 		CommandList->close();
 		DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
@@ -569,11 +579,11 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 void ragdoll::Scene::BuildDebugInstances()
 {
 	StaticDebugInstanceDatas.clear();
-	for (int i = 0; i < StaticProxiesToDraw.size(); ++i) {
+	for (int i = 0; i < StaticProxies.size(); ++i) {
 		if (Config.bDrawBoxes) {
 			InstanceData debugData;
-			Vector3 translate = StaticProxiesToDraw[i].BoundingBox.Center;
-			Vector3 scale = StaticProxiesToDraw[i].BoundingBox.Extents * 2;
+			Vector3 translate = StaticProxies[i].BoundingBox.Center;
+			Vector3 scale = StaticProxies[i].BoundingBox.Extents;
 			Matrix matrix = Matrix::CreateScale(scale);
 			matrix *= Matrix::CreateTranslation(translate);
 			debugData.ModelToWorld = matrix;
@@ -589,7 +599,7 @@ void ragdoll::Scene::BuildDebugInstances()
 		AddOctantDebug(StaticOctree.Octant, 0);
 	}
 
-	if (SceneInfo.EnableCascadeDebug) {
+	if (SceneInfo.bEnableCascadeDebug) {
 		//draw 4 boxes
 		static constexpr Vector4 colors[] = {
 			{1.f, 0.f, 0.f, 1.f},
@@ -597,18 +607,35 @@ void ragdoll::Scene::BuildDebugInstances()
 			{0.f, 1.f, 0.f, 1.f},
 			{1.f, 0.f, 1.f, 1.f}
 		};
-		for (int i = 0; i < 4; ++i)
-		{
-			InstanceData debugData;
-			Vector3 scale = { SceneInfo.CascadeInfo[i].width,SceneInfo.CascadeInfo[i].height,SceneInfo.CascadeInfo[i].depth };
-			Matrix matrix = Matrix::CreateScale(scale);
-			matrix *= DirectX::XMMatrixLookAtLH({ 0.f, 0.f, 0.f }, -SceneInfo.LightDirection, { 0.f, 1.f, 0.f });
-			matrix *= Matrix::CreateTranslation(SceneInfo.CascadeInfo[i].center);
-			debugData.ModelToWorld = matrix;
-			debugData.bIsLit = false;
-			debugData.Color = colors[i];
-			StaticDebugInstanceDatas.emplace_back(debugData);
-		}
+		InstanceData debugData;
+		Vector3 scale = { SceneInfo.CascadeInfo[SceneInfo.bEnableCascadeDebug - 1].width, SceneInfo.CascadeInfo[SceneInfo.bEnableCascadeDebug - 1].height,SceneInfo.CascadeInfo[SceneInfo.bEnableCascadeDebug - 1].depth };
+		Matrix matrix = Matrix::CreateScale(scale);
+		// Step 1: Normalize the forward vector
+		DirectX::XMVECTOR forward = DirectX::XMVector3Normalize(-SceneInfo.LightDirection);
+
+		// Step 2: Define an arbitrary up vector (world up, for example)
+		DirectX::XMVECTOR worldUp = DirectX::XMVectorSet(0.f, 1.f, 0.f, 0.f);
+
+		// Step 3: Calculate the right vector (cross product of up and forward)
+		DirectX::XMVECTOR right = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(worldUp, forward));
+
+		// Step 4: Recalculate the up vector (cross product of forward and right)
+		DirectX::XMVECTOR up = DirectX::XMVector3Cross(forward, right);
+
+		// Step 5: Construct the rotation matrix from the right, up, and forward vectors
+		DirectX::XMMATRIX rotationMatrix = DirectX::XMMATRIX(
+			right,         // Right vector (x-axis)
+			up,            // Up vector (y-axis)
+			forward,       // Forward vector (z-axis)
+			DirectX::XMVectorSet(0.f, 0.f, 0.f, 1.f) // Translation component (none for a rotation matrix)
+		);
+		matrix *= rotationMatrix;
+		//matrix *= DirectX::XMMatrixLookAtLH({ 0.f, 0.f, 0.f }, -SceneInfo.LightDirection, { 0.f, 1.f, 0.f });
+		matrix *= Matrix::CreateTranslation(SceneInfo.CascadeInfo[SceneInfo.bEnableCascadeDebug - 1].center);
+		debugData.ModelToWorld = matrix;
+		debugData.bIsLit = false;
+		debugData.Color = colors[SceneInfo.bEnableCascadeDebug - 1];
+		StaticDebugInstanceDatas.emplace_back(debugData);
 	}
 
 	if (!StaticDebugInstanceDatas.empty())
@@ -643,28 +670,30 @@ void ragdoll::Scene::BuildDebugInstances()
 	}
 }
 
-void ragdoll::Scene::CullOctant(const Octant& octant, const DirectX::BoundingFrustum& frustum)
+void ragdoll::Scene::CullOctant(Octant& octant, const DirectX::BoundingFrustum& frustum, std::vector<uint32_t>& result)
 {
 	if (frustum.Contains(octant.Box) != DirectX::ContainmentType::DISJOINT)	//so if contains or intersects
 	{
+		octant.bIsCulled = false;
 		//if no children, all proxies go into the instance buffer
 		if (octant.Octants.empty())
 		{
-			for (const Proxy& proxy : octant.Proxies) {
-				StaticProxiesToDraw.emplace_back(proxy);
+			for (const Octant::Node& proxy : octant.Nodes) {
+				result.emplace_back(proxy.Index);
 			}
 		}
 		else {
 			//add all its children first
-			for (const Proxy& proxy : octant.Proxies) {
-				StaticProxiesToDraw.emplace_back(proxy);
+			for (const Octant::Node& proxy : octant.Nodes) {
+				result.emplace_back(proxy.Index);
 			}
-			for (const Octant& itOctant : octant.Octants) {
-				CullOctant(itOctant, frustum);
+			for (Octant& itOctant : octant.Octants) {
+				CullOctant(itOctant, frustum, result);
 			}
 		}
 	}
 	else {
+		octant.bIsCulled = false;
 		DebugInfo.CulledObjectCount += 1;
 	}
 }
@@ -698,6 +727,7 @@ void ragdoll::Scene::UpdateShadowCascades()
 		Vector3 min = { FLT_MAX, FLT_MAX, FLT_MAX };
 		Vector3 max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
 		for (int j = 0; j < 8; ++j) {
+			//bring into lightspace
 			corners[j] = Vector3::Transform(corners[j], lightViewProj);
 			min.x = std::min(min.x, corners[j].x); max.x = std::max(max.x, corners[j].x);
 			min.y = std::min(min.y, corners[j].y); max.y = std::max(max.y, corners[j].y);
@@ -707,13 +737,15 @@ void ragdoll::Scene::UpdateShadowCascades()
 		float x = max.x - min.x;
 		float y = max.y - min.y;
 		float length = x < y ? y : x;
+		//get furthest octree position and use it as the far plane
+		float farplane = 100.f;
 		//create the new view proj matrix
-		lightProj = DirectX::XMMatrixOrthographicLH(length, length, 20.f, -20.f);
+		lightProj = DirectX::XMMatrixOrthographicLH(length, length, farplane, -farplane);
 		SceneInfo.LightViewProj[i - 1] = lightView * lightProj;
 		
 		SceneInfo.CascadeInfo[i - 1].center = center;
 		SceneInfo.CascadeInfo[i - 1].width = SceneInfo.CascadeInfo[i - 1].height = length;
-		SceneInfo.CascadeInfo[i - 1].depth = 20.f;
+		SceneInfo.CascadeInfo[i - 1].depth = farplane;
 	}
 }
 
@@ -828,8 +860,10 @@ void ragdoll::Scene::UpdateTransform(TransformComp& comp, const Guid& guid)
 		m_DirtyOnwards = false;
 }
 
-void ragdoll::Scene::AddOctantDebug(Octant octant, uint32_t level)
+void ragdoll::Scene::AddOctantDebug(const Octant& octant, uint32_t level)
 {
+	if (octant.bIsCulled)
+		return;
 	static constexpr Vector4 colors[] = {
 		 {1.0f, 0.0f, 0.0f, 1.0f},  // Red
 		{0.0f, 0.0f, 1.0f, 1.0f},  // Blue
@@ -863,12 +897,11 @@ void ragdoll::Scene::AddOctantDebug(Octant octant, uint32_t level)
 		{0.9f, 0.3f, 0.3f, 1.0f},  // Crimson
 		{0.3f, 0.9f, 0.6f, 1.0f}   // Aquamarine
 	};
-	if (octant.Octants.empty())
+	if (level >= Config.DrawOctreeLevelMin && level <= Config.bDrawOctreeLevelMax)
 	{
-		//draw only if no children
 		InstanceData debugData;
 		Vector3 translate = octant.Box.Center;
-		Vector3 scale = octant.Box.Extents * 2;
+		Vector3 scale = octant.Box.Extents;
 		Matrix matrix = Matrix::CreateScale(scale);
 		matrix *= Matrix::CreateTranslation(translate);
 		debugData.ModelToWorld = matrix;

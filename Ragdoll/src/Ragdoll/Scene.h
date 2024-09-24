@@ -13,6 +13,26 @@ namespace ragdoll {
 	class TransformSystem;
 	class Application;
 
+	struct Proxy {
+		Matrix ModelToWorld;
+		Matrix InvModelToWorld;
+		DirectX::BoundingBox BoundingBox;
+
+		Vector4 Color = Vector4::One;
+		float Roughness = 0.f;
+		float Metallic = 0.f;
+
+		int32_t BufferIndex;
+		int32_t MaterialIndex;
+		int32_t AlbedoIndex = -1;
+		int32_t AlbedoSamplerIndex = 0;
+		int32_t NormalIndex = -1;
+		int32_t NormalSamplerIndex = 0;
+		int32_t ORMIndex = -1;
+		int32_t ORMSamplerIndex = 0;
+		int32_t bIsLit = 1;
+	};
+
 	struct InstanceData {
 		Matrix ModelToWorld;
 		Matrix InvModelToWorld;
@@ -25,9 +45,27 @@ namespace ragdoll {
 		int AlbedoSamplerIndex = 0;
 		int NormalIndex = -1;
 		int NormalSamplerIndex = 0;
-		int RoughnessMetallicIndex = -1;
-		int RoughnessMetallicSamplerIndex = 0;
+		int ORMIndex = -1;
+		int ORMSamplerIndex = 0;
 		int bIsLit = 1;
+
+		InstanceData& operator=(const Proxy& proxy) {
+			ModelToWorld = proxy.ModelToWorld;
+			InvModelToWorld = proxy.InvModelToWorld;
+
+			Color = proxy.Color;
+			Roughness = proxy.Roughness;
+			Metallic = proxy.Metallic;
+			
+			AlbedoIndex = proxy.AlbedoIndex;
+			AlbedoSamplerIndex = proxy.AlbedoSamplerIndex;
+			NormalIndex = proxy.NormalIndex;
+			NormalSamplerIndex = proxy.NormalSamplerIndex;
+			ORMIndex = proxy.ORMIndex;
+			ORMSamplerIndex = proxy.ORMSamplerIndex;
+			bIsLit = proxy.bIsLit;
+			return *this;
+		}
 	};
 
 	struct InstanceGroupInfo {
@@ -42,6 +80,8 @@ namespace ragdoll {
 	struct SceneConfig {
 		bool bIsThereCustomMeshes{ false };
 		bool bDrawOctree{ false };
+		int32_t DrawOctreeLevelMin{ 0 };
+		int32_t bDrawOctreeLevelMax{ 0 };
 		bool bDrawBoxes{ false };
 	};
 
@@ -63,7 +103,7 @@ namespace ragdoll {
 		float LightIntensity = 1.f;
 		float CameraFov;
 		float CameraAspect;
-		bool EnableCascadeDebug{ false };
+		int bEnableCascadeDebug{ 0 };
 	};
 
 	class Scene {
@@ -87,7 +127,6 @@ namespace ragdoll {
 		bool bIsCameraDirty{ true };
 		bool bFreezeFrustumCulling{ false };
 		Octree StaticOctree;
-		std::vector<Proxy> StaticProxiesToDraw;
 
 	public:
 		std::shared_ptr<ForwardRenderer> ForwardRenderer;
@@ -129,16 +168,28 @@ namespace ragdoll {
 
 		//Renderable
 		SceneInformation SceneInfo;
-		std::vector<InstanceData> StaticInstanceDatas;
-		std::vector<InstanceData> StaticDebugInstanceDatas;
-		std::vector<InstanceGroupInfo> StaticInstanceGroupInfos;
+		std::vector<Proxy> StaticProxies;
+
+		std::vector<InstanceData> StaticInstanceDatas;	//all the instances to draw that was culled
+		std::vector<InstanceGroupInfo> StaticInstanceGroupInfos;	//info on how to draw the instances
+
+		std::vector<InstanceData> StaticCascadeInstanceDatas[4];	//all instances to draw for shadow map
+		std::vector<InstanceGroupInfo> StaticCascadeInstanceInfos[4];	//info on how to draw the instances
+
+		std::vector<InstanceData> StaticDebugInstanceDatas;	//all the debug cubes
+
 		nvrhi::BufferHandle StaticInstanceBufferHandle;
+		nvrhi::BufferHandle StaticCasecadeInstanceBufferHandles;	//all the cascade instance handles
 		nvrhi::BufferHandle StaticInstanceDebugBufferHandle;	//contains all the aabb boxes to draw
 
-		void PopulateStaticProxies();
-		void BuildStaticInstances(const Matrix& cameraProjection, const Matrix& cameraView);
+		void PopulateStaticProxies();	//add all proxies into the octree
+		void BuildStaticInstances(const Matrix& cameraProjection, const Matrix& cameraView, std::vector<InstanceData>& instances, std::vector<InstanceGroupInfo>& instancesGrpInfo);
+		void BuildStaticCascadeMapInstances();
 		void BuildDebugInstances();
-		void CullOctant(const Octant& octant, const DirectX::BoundingFrustum& frustum);
+
+		void CullOctant(Octant& octant, const DirectX::BoundingFrustum& frustum, std::vector<uint32_t>& result);																						
+		void CullOctant(const Octant& octant, const DirectX::BoundingOrientedBox& oob, std::vector<uint32_t>& result);
+
 		void UpdateShadowCascades();
 
 	private:
@@ -151,6 +202,6 @@ namespace ragdoll {
 		void UpdateTransform(TransformComp& comp, const Guid& id);
 
 		//Debug
-		void AddOctantDebug(Octant octant, uint32_t level);
+		void AddOctantDebug(const Octant& octant, uint32_t level);
 	};
 }

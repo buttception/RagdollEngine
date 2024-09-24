@@ -1,13 +1,6 @@
 #pragma once
 #include "entt/entt.hpp"
 
-struct Proxy {
-	ENTT_ID_TYPE EnttId;
-	int32_t BufferIndex = -1;
-	int32_t MaterialIndex = -1;
-	DirectX::BoundingBox BoundingBox;
-};
-
 struct Octant {
 	enum OctantPosition {
 		TOP_LEFT_FRONT,
@@ -40,26 +33,32 @@ struct Octant {
 		{0.f, 0.f, 1.f},
 		{1.f, 0.f, 1.f},
 	};
+	struct Node {
+		DirectX::BoundingBox Box;
+		uint32_t Index;
+	};
 
 	~Octant();
 
 	static constexpr uint32_t DivisionCriteria{ 20 };
-	std::vector<Proxy> Proxies;
+	std::vector<Node> Nodes;
 	std::vector<Octant> Octants;
 	Octant* Parent{ nullptr };
 	DirectX::BoundingBox Box;
+	bool bIsCulled{ false };
+	uint32_t Level{ 0 };
 
 	void CheckToSubdivide();
 	void Subdivide();
 };
 
 struct Octree {
-
 	static constexpr Vector3 Max{ 100.f, 100.f, 100.f };
 	static uint32_t TotalProxies;
+	static uint32_t MaxDepth;
 	Octant Octant;
 
 	void Init();
-	void AddProxy(Proxy proxy);
+	void AddProxy(const DirectX::BoundingBox& box, uint32_t index);
 	void Clear();
 };

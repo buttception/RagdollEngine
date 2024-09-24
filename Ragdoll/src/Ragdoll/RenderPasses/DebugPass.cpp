@@ -28,13 +28,9 @@ void DebugPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle c
 	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "DebugPass CBuffer", 1);
 	ConstantBufferHandle = NvrhiDeviceRef->createBuffer(cBufDesc);
 
-	const auto& attribs = AssetManager::GetInstance()->VertexAttributes;
-	nvrhi::InputLayoutHandle inputLayoutHandle = NvrhiDeviceRef->createInputLayout(attribs.data(), attribs.size(), VertexShader);
-
 	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
 
 	pipelineDesc.addBindingLayout(BindingLayoutHandle);
-	pipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
 	pipelineDesc.setVertexShader(VertexShader);
 	pipelineDesc.setFragmentShader(PixelShader);
 
@@ -42,10 +38,7 @@ void DebugPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle c
 	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
 	pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
 	pipelineDesc.renderState.depthStencilState.depthFunc = nvrhi::ComparisonFunc::Greater;
-	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::Back;
-	pipelineDesc.renderState.rasterState.fillMode = nvrhi::RasterFillMode::Wireframe;
-	pipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
-	pipelineDesc.inputLayout = inputLayoutHandle;
+	pipelineDesc.primType = nvrhi::PrimitiveType::LineList;
 
 	RD_ASSERT(RenderTarget == nullptr, "Render Target Framebuffer not set");
 	GraphicsPipeline = NvrhiDeviceRef->createGraphicsPipeline(pipelineDesc, RenderTarget);
@@ -75,25 +68,16 @@ void DebugPass::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t i
 	state.pipeline = GraphicsPipeline;
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
-	state.indexBuffer = { AssetManager::GetInstance()->IBO, nvrhi::Format::R32_UINT, 0 };
-	state.vertexBuffers = {
-		{ AssetManager::GetInstance()->VBO }
-	};
 	state.addBindingSet(BindingSetHandle);
-	state.addBindingSet(AssetManager::GetInstance()->DescriptorTable);
 
 	CommandListRef->beginMarker("Debug Draws");
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(CBuffer));
 	CommandListRef->setGraphicsState(state);
 
 	nvrhi::DrawArguments args;
-	args.vertexCount = 36;
-	args.startVertexLocation = 0;
-	args.startIndexLocation = 0;
+	args.vertexCount = 24;
 	args.instanceCount = instanceCount;
-	CBuffer.InstanceOffset = 0;
-	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(CBuffer));
-	CommandListRef->drawIndexed(args);
+	CommandListRef->draw(args);
 
 	CommandListRef->endMarker();
 }
