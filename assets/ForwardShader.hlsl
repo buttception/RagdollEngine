@@ -1,12 +1,14 @@
 cbuffer g_Const : register(b0) {
 	float4x4 viewProjMatrix;
-    float4x4 LightViewProj;
+	float4x4 viewMatrix;
+    float4x4 LightViewProj[4];
 	float4 lightDiffuseColor;
 	float4 sceneAmbientColor;
 	float3 lightDirection;
 	int instanceOffset;
 	float3 cameraPosition;
 	float lightIntensity;
+	int enableCascadeDebug;
 };
 
 struct InstanceData{
@@ -37,15 +39,17 @@ void main_vs(
 	in uint inInstanceId : SV_INSTANCEID,
 	out float4 outPos : SV_Position,
 	out float4 outFragPos : TEXCOORD1,
-	out float3 outNormal : TEXCOORD2,
-	out float3 outTangent : TEXCOORD3,
-	out float3 outBinormal : TEXCOORD4,
-	out float2 outTexcoord : TEXCOORD5,
-	out nointerpolation uint outInstanceId : TEXCOORD6
+	out float4 outViewPos : TEXCOORD2,
+	out float3 outNormal : TEXCOORD3,
+	out float3 outTangent : TEXCOORD4,
+	out float3 outBinormal : TEXCOORD5,
+	out float2 outTexcoord : TEXCOORD6,
+	out nointerpolation uint outInstanceId : TEXCOORD7
 )
 {
 	InstanceData data = InstanceDatas[inInstanceId + instanceOffset];
 	outFragPos = mul(float4(inPos, 1), data.worldMatrix); 
+	outViewPos = mul(outFragPos, viewMatrix);
 	outPos = mul(outFragPos, viewProjMatrix);
 
 	float binormalSign = inNormal.x > 0.0f ? -1.0f : 1.0f;
@@ -138,25 +142,57 @@ float3 PBRLighting(float3 albedo, float3 normal, float3 viewDir, float3 lightDir
     return color;
 }
 
-Texture2D ShadowMap : register(t1);
+Texture2D ShadowMaps[4] : register(t1);
 sampler Samplers[8] : register(s0);
 SamplerComparisonState ShadowSample : register(s9);
 
 void main_ps(
 	in float4 inPos : SV_Position,
 	in float4 inFragPos : TEXCOORD1,
-	in float3 inNormal : TEXCOORD2,
-	in float3 inTangent : TEXCOORD3,
-	in float3 inBinormal : TEXCOORD4,
-	in float2 inTexcoord : TEXCOORD5,
-	in uint inInstanceId : TEXCOORD6,
+	in float4 inViewPos : TEXCOORD2,
+	in float3 inNormal : TEXCOORD3,
+	in float3 inTangent : TEXCOORD4,
+	in float3 inBinormal : TEXCOORD5,
+	in float2 inTexcoord : TEXCOORD6,
+	in uint inInstanceId : TEXCOORD7,
 	out float4 outColor : SV_Target0
 )
 {
 	InstanceData data = InstanceDatas[inInstanceId + instanceOffset];
 	if(data.isLit)
 	{
+		Texture2D shadowMap;
+		float4x4 lightMatrix;
 		// Sample textures
+		if(abs(inViewPos.z) < 5.f)
+		{
+			if(enableCascadeDebug)
+				data.albedoFactor = float4(1.f, 0.f, 0.f, 1.f);
+			shadowMap = ShadowMaps[0];
+			lightMatrix = LightViewProj[0];
+		}
+		else if(abs(inViewPos.z) < 10.f)
+		{
+			if(enableCascadeDebug)
+				data.albedoFactor = float4(1.f, 1.f, 0.f, 1.f);
+			shadowMap = ShadowMaps[1];
+			lightMatrix = LightViewProj[1];
+		}
+		else if(abs(inViewPos.z) < 20.f)
+		{
+			if(enableCascadeDebug)
+				data.albedoFactor = float4(0.f, 1.f, 0.f, 1.f);
+			shadowMap = ShadowMaps[2];
+			lightMatrix = LightViewProj[2];
+		}
+		else
+		{
+			if(enableCascadeDebug)
+				data.albedoFactor = float4(1.f, 0.f, 1.f, 1.f);
+			shadowMap = ShadowMaps[3];
+			lightMatrix = LightViewProj[3];
+		}
+
 		float4 albedo = data.albedoFactor;
 		if(data.albedoIndex != -1){
 			albedo *= Textures[data.albedoIndex].Sample(Samplers[data.albedoSamplerIndex], inTexcoord);
@@ -180,7 +216,7 @@ void main_ps(
 
 		float3 diffuse = PBRLighting(albedo.rgb, N, cameraPosition - inFragPos.xyz, lightDirection, lightDiffuseColor.rgb * lightIntensity, metallic, roughness, ao);
 
-		float4 fragPosLightSpace = mul(inFragPos, LightViewProj);
+		float4 fragPosLightSpace = mul(inFragPos, lightMatrix);
 		float3 projCoord = fragPosLightSpace.xyz / fragPosLightSpace.w;
 		projCoord.xy = projCoord.xy * 0.5f + float2(0.5f, 0.5f);
 		projCoord.y = projCoord.y * -1.0f + 1.0f;
@@ -194,7 +230,7 @@ void main_ps(
 			for(int y = -1; y <= 1; ++y)
 			{
 				float2 offset = float2(x, y) * texelSize;
-				shadow += ShadowMap.SampleCmpLevelZero(ShadowSample, projCoord.xy + offset, projCoord.z);
+				shadow += shadowMap.SampleCmpLevelZero(ShadowSample, projCoord.xy + offset, projCoord.z);
 			}
 		}
 		// Divide by number of samples (9)

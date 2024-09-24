@@ -18,7 +18,10 @@ void ForwardRenderer::Init(std::shared_ptr<DirectXDevice> device, std::shared_pt
 	DeviceRef = device;
 	PrimaryWindowRef = win;
 	DepthHandle = scene->SceneDepthZ;
-	ShadowMap = scene->ShadowMap;
+	for (int i = 0; i < 4; ++i)
+	{
+		ShadowMap[i] = scene->ShadowMap[i];
+	}
 	CreateResource();
 }
 
@@ -43,7 +46,10 @@ void ForwardRenderer::BeginFrame()
 		CommandList->beginMarker("ClearBackBuffer");
 		CommandList->clearTextureFloat(tex, subSet, col);
 		CommandList->clearDepthStencilTexture(DepthHandle, subSet, true, 0.f, false, 0);
-		CommandList->clearDepthStencilTexture(ShadowMap, subSet, true, 0.f, false, 0);
+		for (int i = 0; i < 4; ++i)
+		{
+			CommandList->clearDepthStencilTexture(ShadowMap[i], subSet, true, 0.f, false, 0);
+		}
 		CommandList->endMarker();
 		CommandList->close();
 		DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
@@ -76,16 +82,19 @@ void ForwardRenderer::CreateResource()
 	CommandList = DeviceRef->m_NvrhiDevice->createCommandList();
 
 	//create the fb for the graphics pipeline to draw on
-	nvrhi::FramebufferHandle fb;
-
+	nvrhi::FramebufferHandle fbArr[4];
+	for (int i = 0; i < 4; ++i)
+	{
 		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
-		.setDepthAttachment(ShadowMap);
-	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
+			.setDepthAttachment(ShadowMap[i]);
+		fbArr[i] = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
+	}
 	ShadowPass = std::make_shared<class ShadowPass>();
-	ShadowPass->SetRenderTarget(fb);
+	ShadowPass->SetRenderTarget(fbArr);
 	ShadowPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
 
-	fbDesc = nvrhi::FramebufferDesc()
+	nvrhi::FramebufferHandle fb;
+	nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(DeviceRef->GetCurrentBackbuffer())
 		.setDepthAttachment(DepthHandle);
 	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);

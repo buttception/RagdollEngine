@@ -12,11 +12,9 @@ class ShadowPass {
 		uint32_t CascadeIndex;
 	}CBuffer;
 
-	nvrhi::FramebufferHandle RenderTarget{ nullptr };
+	nvrhi::FramebufferHandle RenderTarget[4]{ nullptr, };
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
 	nvrhi::DeviceHandle NvrhiDeviceRef{ nullptr };
-
-	nvrhi::TextureHandle ShadowMap;
 
 	nvrhi::ShaderHandle VertexShader;
 	nvrhi::BindingLayoutHandle BindingLayoutHandle;
@@ -27,7 +25,7 @@ class ShadowPass {
 public:
 	void Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle cmdList);
 
-	void SetRenderTarget(nvrhi::FramebufferHandle renderTarget);
+	void SetRenderTarget(nvrhi::FramebufferHandle renderTarget[4]);
 
 	void DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo);
 };

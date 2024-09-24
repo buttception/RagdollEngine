@@ -21,7 +21,7 @@ public:
 	std::shared_ptr<ShadowPass> ShadowPass;
 
 	nvrhi::TextureHandle DepthHandle;
-	nvrhi::TextureHandle ShadowMap;
+	nvrhi::TextureHandle ShadowMap[4];
 	nvrhi::CommandListHandle CommandList;
 
 	void Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene);

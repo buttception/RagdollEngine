@@ -45,47 +45,50 @@ void ShadowPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle 
 	pipelineDesc.inputLayout = inputLayoutHandle;
 
 	RD_ASSERT(RenderTarget == nullptr, "Render Target Framebuffer not set");
-	GraphicsPipeline = NvrhiDeviceRef->createGraphicsPipeline(pipelineDesc, RenderTarget);
+	GraphicsPipeline = NvrhiDeviceRef->createGraphicsPipeline(pipelineDesc, RenderTarget[0]);
 }
 
-void ShadowPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
+void ShadowPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget[4])
 {
-	RenderTarget = renderTarget;
+	for (int i = 0; i < 4; ++i)
+	{
+		RenderTarget[i] = renderTarget[i];
+	}
 }
 
 void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo)
 {
-
 	if (infos.empty())
 		return;
 	MICROPROFILE_SCOPEI("Render", "Directional Light Shadow Pass", MP_BLUEVIOLET);
-	//create and set the state
-	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
-	//create the light view proj
-
-	nvrhi::BindingSetDesc bindingSetDesc;
-	bindingSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, instanceBuffer),
-	};
-	BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
-
-	nvrhi::GraphicsState state;
-	state.pipeline = GraphicsPipeline;
-	state.framebuffer = pipelineFb;
-	state.viewport.addViewportAndScissorRect({ 2000.f, 2000.f });
-	state.indexBuffer = { AssetManager::GetInstance()->IBO, nvrhi::Format::R32_UINT, 0 };
-	state.vertexBuffers = {
-		{ AssetManager::GetInstance()->VBO }
-	};
-	state.addBindingSet(BindingSetHandle);
-	state.addBindingSet(AssetManager::GetInstance()->DescriptorTable);
-
-	CommandListRef->beginMarker("Directional Light Shadow Pass");
-	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
-	CommandListRef->setGraphicsState(state);
 
 	for (int i = 0; i < 4; ++i) {
+		//create and set the state
+		nvrhi::FramebufferHandle pipelineFb = RenderTarget[i];
+		//create the light view proj
+
+		nvrhi::BindingSetDesc bindingSetDesc;
+		bindingSetDesc.bindings = {
+			nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
+			nvrhi::BindingSetItem::StructuredBuffer_SRV(0, instanceBuffer),
+		};
+		BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+
+		nvrhi::GraphicsState state;
+		state.pipeline = GraphicsPipeline;
+		state.framebuffer = pipelineFb;
+		state.viewport.addViewportAndScissorRect({ 2000.f, 2000.f });
+		state.indexBuffer = { AssetManager::GetInstance()->IBO, nvrhi::Format::R32_UINT, 0 };
+		state.vertexBuffers = {
+			{ AssetManager::GetInstance()->VBO }
+		};
+		state.addBindingSet(BindingSetHandle);
+		state.addBindingSet(AssetManager::GetInstance()->DescriptorTable);
+
+		CommandListRef->beginMarker(("Directional Light Shadow Pass" + std::to_string(i)).c_str());
+		CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
+		CommandListRef->setGraphicsState(state);
+
 		CBuffer.CascadeIndex = i;
 		CBuffer.LightViewProj = sceneInfo.LightViewProj[i];
 
@@ -104,7 +107,6 @@ void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std:
 			CBuffer.InstanceOffset += info.InstanceCount;
 		}
 		CBuffer.InstanceOffset = 0;
+		CommandListRef->endMarker();
 	}
-
-	CommandListRef->endMarker();
 }

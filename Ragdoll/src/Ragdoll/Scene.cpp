@@ -111,6 +111,7 @@ void ragdoll::Scene::Update(float _dt)
 		bIsCameraDirty = true;
 	if (ImGui::Checkbox("Show Boxes", &Config.bDrawBoxes))
 		bIsCameraDirty = true;
+	ImGui::Checkbox("Show Cascades", &SceneInfo.EnableCascadeDebug);
 	ImGui::Text("%d entities count", EntityManagerRef->GetRegistry().view<entt::entity>().size_hint());
 	ImGui::Text("%d proxies to draw", StaticProxiesToDraw.size());
 	ImGui::Text("%d instance count", StaticInstanceDatas.size());
@@ -362,11 +363,14 @@ void ragdoll::Scene::CreateRenderTargets()
 		depthBufferDesc.debugName = "SceneDepthZ";
 		SceneDepthZ = DeviceRef->m_NvrhiDevice->createTexture(depthBufferDesc);
 	}
-	if (!ShadowMap) {
+	if (!ShadowMap[0]) {
 		depthBufferDesc.width = 2000;
 		depthBufferDesc.height = 2000;
-		depthBufferDesc.debugName = "ShadowMap";
-		ShadowMap = DeviceRef->m_NvrhiDevice->createTexture(depthBufferDesc);
+		for (int i = 0; i < 4; ++i)
+		{
+			depthBufferDesc.debugName = "ShadowMap" + std::to_string(i);
+			ShadowMap[i] = DeviceRef->m_NvrhiDevice->createTexture(depthBufferDesc);
+		}
 	}
 
 	//create the gbuffer stuff
@@ -678,8 +682,12 @@ void ragdoll::Scene::UpdateShadowCascades()
 			min.y = std::min(min.y, corners[j].y); max.y = std::max(max.y, corners[j].y);
 			min.z = std::min(min.z, corners[j].z); max.z = std::max(max.z, corners[j].z);
 		}
+		//get largest width or height to make ortho a square
+		float x = max.x - min.x;
+		float y = max.y - min.y;
+		float length = x < y ? y : x;
 		//create the new view proj matrix
-		lightProj = DirectX::XMMatrixOrthographicLH(max.x - min.x, max.y - min.y, 100.f, -100.f);
+		lightProj = DirectX::XMMatrixOrthographicLH(length, length, 100.f, -100.f);
 		SceneInfo.LightViewProj[i - 1] = lightView * lightProj;
 	}
 }

@@ -23,6 +23,9 @@ void ForwardPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle
 		nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
 		nvrhi::BindingLayoutItem::StructuredBuffer_SRV(0),
 		nvrhi::BindingLayoutItem::Texture_SRV(1),
+		nvrhi::BindingLayoutItem::Texture_SRV(2),
+		nvrhi::BindingLayoutItem::Texture_SRV(3),
+		nvrhi::BindingLayoutItem::Texture_SRV(4),
 		nvrhi::BindingLayoutItem::Sampler(0),
 		nvrhi::BindingLayoutItem::Sampler(1),
 		nvrhi::BindingLayoutItem::Sampler(2),
@@ -66,9 +69,12 @@ void ForwardPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
 	RenderTarget = renderTarget;
 }
 
-void ForwardPass::SetDependencies(nvrhi::TextureHandle shadowMap)
+void ForwardPass::SetDependencies(nvrhi::TextureHandle shadowMap[4])
 {
-	ShadowMap = shadowMap;
+	for (int i = 0; i < 4; ++i)
+	{
+		ShadowMap[i] = shadowMap[i];
+	}
 }
 
 void ForwardPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo)
@@ -80,19 +86,25 @@ void ForwardPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
 	CBuffer.CameraPosition = sceneInfo.MainCameraPosition;
 	CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
-	Matrix proj = DirectX::XMMatrixOrthographicLH(40.f, 40.f, 30.f, -30.f);
-	Matrix view = DirectX::XMMatrixLookAtLH({ 0.f, 0.f, 0.f }, -sceneInfo.LightDirection, { 0.f, 1.f, 0.f });
-	CBuffer.LightViewProj = view * proj;
+	CBuffer.View = sceneInfo.MainCameraView;
+	for (int i = 0; i < 4; ++i)
+	{
+		CBuffer.LightViewProj[i] = sceneInfo.LightViewProj[i];
+	}
 	CBuffer.LightDiffuseColor = sceneInfo.LightDiffuseColor;
 	CBuffer.LightDirection = sceneInfo.LightDirection;
 	CBuffer.SceneAmbientColor = sceneInfo.SceneAmbientColor;
 	CBuffer.LightIntensity = sceneInfo.LightIntensity;
+	CBuffer.EnableCascadeDebug = sceneInfo.EnableCascadeDebug;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, instanceBuffer),
-		nvrhi::BindingSetItem::Texture_SRV(1, ShadowMap),
+		nvrhi::BindingSetItem::Texture_SRV(1, ShadowMap[0]),
+		nvrhi::BindingSetItem::Texture_SRV(2, ShadowMap[1]),
+		nvrhi::BindingSetItem::Texture_SRV(3, ShadowMap[2]),
+		nvrhi::BindingSetItem::Texture_SRV(4, ShadowMap[3]),
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
 	{

@@ -57,6 +57,7 @@ namespace ragdoll {
 		float LightIntensity = 1.f;
 		float CameraFov;
 		float CameraAspect;
+		bool EnableCascadeDebug{ false };
 	};
 
 	class Scene {
@@ -99,10 +100,10 @@ namespace ragdoll {
 		nvrhi::TextureHandle GBufferNormal;
 		nvrhi::TextureHandle GBufferORM;
 		//shadows
-		nvrhi::TextureHandle ShadowMap;
+		nvrhi::TextureHandle ShadowMap[4];
 		//distance where the subfrusta are seperated
 		//0 -> 5, 5 -> 10, 10 -> 20 and 20 -> 50
-		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 20.f, 50.f };
+		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 15.f, 30.f, 100.f };
 		//the cascades
 		Matrix DirectionalLightViewProjections[4];
 
