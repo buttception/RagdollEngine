@@ -56,13 +56,12 @@ void ShadowPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget[4])
 	}
 }
 
-void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo)
+void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer[4], std::vector<ragdoll::InstanceGroupInfo>* infos, const ragdoll::SceneInformation& sceneInfo)
 {
-	if (infos.empty())
-		return;
 	MICROPROFILE_SCOPEI("Render", "Directional Light Shadow Pass", MP_BLUEVIOLET);
-
 	for (int i = 0; i < 4; ++i) {
+		if (infos[i].empty())
+			continue;
 		//create and set the state
 		nvrhi::FramebufferHandle pipelineFb = RenderTarget[i];
 		//create the light view proj
@@ -70,7 +69,7 @@ void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std:
 		nvrhi::BindingSetDesc bindingSetDesc;
 		bindingSetDesc.bindings = {
 			nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-			nvrhi::BindingSetItem::StructuredBuffer_SRV(0, instanceBuffer),
+			nvrhi::BindingSetItem::StructuredBuffer_SRV(0, instanceBuffer[i]),
 		};
 		BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
@@ -90,10 +89,10 @@ void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std:
 		CommandListRef->setGraphicsState(state);
 
 		CBuffer.CascadeIndex = i;
-		CBuffer.LightViewProj = sceneInfo.LightViewProj[i];
+		CBuffer.LightViewProj = sceneInfo.CascadeInfo[i].viewProj;
 
 		uint32_t instanceCount = 0;
-		for (const ragdoll::InstanceGroupInfo& info : infos)
+		for (const ragdoll::InstanceGroupInfo& info : infos[i])
 		{
 			MICROPROFILE_SCOPEI("Render", "Each instance", MP_CADETBLUE);
 			const VertexBufferInfo& buffer = AssetManager::GetInstance()->VertexBufferInfos[info.VertexBufferIndex];

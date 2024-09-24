@@ -89,13 +89,13 @@ void ForwardPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 	CBuffer.View = sceneInfo.MainCameraView;
 	for (int i = 0; i < 4; ++i)
 	{
-		CBuffer.LightViewProj[i] = sceneInfo.LightViewProj[i];
+		CBuffer.LightViewProj[i] = sceneInfo.CascadeInfo[i].viewProj;
 	}
 	CBuffer.LightDiffuseColor = sceneInfo.LightDiffuseColor;
 	CBuffer.LightDirection = sceneInfo.LightDirection;
 	CBuffer.SceneAmbientColor = sceneInfo.SceneAmbientColor;
 	CBuffer.LightIntensity = sceneInfo.LightIntensity;
-	CBuffer.EnableCascadeDebug = sceneInfo.bEnableCascadeDebug;
+	CBuffer.EnableCascadeDebug = sceneInfo.EnableCascadeDebug;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {

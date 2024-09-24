@@ -85,17 +85,17 @@ namespace ragdoll {
 		bool bDrawBoxes{ false };
 	};
 
-	struct DebugCascadeInfo {
+	struct CascadeInfo {
 		Vector3 center;
-		float width, height, depth;
+		Matrix view, proj, viewProj;
+		float width, height, nearZ, farZ;
 	};
 
 	struct SceneInformation {
 		Matrix MainCameraViewProj;
 		Matrix InfiniteReverseZProj;
 		Matrix MainCameraView;
-		Matrix LightViewProj[4];
-		DebugCascadeInfo CascadeInfo[4];
+		CascadeInfo CascadeInfo[4];
 		Vector3 MainCameraPosition;
 		Vector4 LightDiffuseColor = { 1.f, 1.f, 1.f, 1.f };
 		Vector4 SceneAmbientColor = { 0.2f, 0.2f, 0.2f, 1.f };
@@ -103,7 +103,7 @@ namespace ragdoll {
 		float LightIntensity = 1.f;
 		float CameraFov;
 		float CameraAspect;
-		int bEnableCascadeDebug{ 0 };
+		int32_t EnableCascadeDebug{ 0 };
 	};
 
 	class Scene {
@@ -147,10 +147,7 @@ namespace ragdoll {
 		//shadows
 		nvrhi::TextureHandle ShadowMap[4];
 		//distance where the subfrusta are seperated
-		//0 -> 5, 5 -> 10, 10 -> 20 and 20 -> 50
 		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
-		//the cascades
-		Matrix DirectionalLightViewProjections[4];
 
 		Scene(Application*);
 
@@ -179,18 +176,19 @@ namespace ragdoll {
 		std::vector<InstanceData> StaticDebugInstanceDatas;	//all the debug cubes
 
 		nvrhi::BufferHandle StaticInstanceBufferHandle;
-		nvrhi::BufferHandle StaticCasecadeInstanceBufferHandles;	//all the cascade instance handles
+		nvrhi::BufferHandle StaticCascadeInstanceBufferHandles[4];	//all the cascade instance handles
 		nvrhi::BufferHandle StaticInstanceDebugBufferHandle;	//contains all the aabb boxes to draw
 
 		void PopulateStaticProxies();	//add all proxies into the octree
 		void BuildStaticInstances(const Matrix& cameraProjection, const Matrix& cameraView, std::vector<InstanceData>& instances, std::vector<InstanceGroupInfo>& instancesGrpInfo);
 		void BuildStaticCascadeMapInstances();
-		void BuildDebugInstances();
+		void BuildDebugInstances(std::vector<InstanceData>& instances);
 
-		void CullOctant(Octant& octant, const DirectX::BoundingFrustum& frustum, std::vector<uint32_t>& result);																						
-		void CullOctant(const Octant& octant, const DirectX::BoundingOrientedBox& oob, std::vector<uint32_t>& result);
+		void CullOctant(Octant& octant, const DirectX::BoundingFrustum& frustum, std::vector<uint32_t>& result);
+		void CullOctantForCascade(const Octant& octant, const DirectX::BoundingOrientedBox& oob, std::vector<uint32_t>& result, const Vector3& center, const Vector3& normal, float& back, float& front);
 
-		void UpdateShadowCascades();
+		void UpdateShadowCascadesExtents();
+		void UpdateShadowLightMatrices();
 
 	private:
 		//Transforms

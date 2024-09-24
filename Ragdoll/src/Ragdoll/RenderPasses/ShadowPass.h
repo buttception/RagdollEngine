@@ -27,5 +27,5 @@ public:
 
 	void SetRenderTarget(nvrhi::FramebufferHandle renderTarget[4]);
 
-	void DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo);
+	void DrawAllInstances(nvrhi::BufferHandle instanceBuffer[4], std::vector<ragdoll::InstanceGroupInfo>* infos, const ragdoll::SceneInformation& sceneInfo);
 };
