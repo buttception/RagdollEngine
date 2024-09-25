@@ -239,7 +239,7 @@ void main_ps(
 		float3 lighting = ambient + diffuse * (1.f - shadow);
 
 		// Final color output
-		outColor = float4(lighting.rgb, albedo.a);
+		outColor = float4(lighting, albedo.a);
 	}
 	else
 	{

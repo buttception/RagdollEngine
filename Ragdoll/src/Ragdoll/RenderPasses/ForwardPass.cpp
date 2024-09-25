@@ -22,11 +22,11 @@ void ForwardPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle
 	layoutDesc.bindings = {
 		nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
 		nvrhi::BindingLayoutItem::StructuredBuffer_SRV(0),
-		nvrhi::BindingLayoutItem::Texture_SRV(1),
+		nvrhi::BindingLayoutItem::Texture_SRV(1),	//shadow maps
 		nvrhi::BindingLayoutItem::Texture_SRV(2),
 		nvrhi::BindingLayoutItem::Texture_SRV(3),
 		nvrhi::BindingLayoutItem::Texture_SRV(4),
-		nvrhi::BindingLayoutItem::Sampler(0),
+		nvrhi::BindingLayoutItem::Sampler(0),	//samplers
 		nvrhi::BindingLayoutItem::Sampler(1),
 		nvrhi::BindingLayoutItem::Sampler(2),
 		nvrhi::BindingLayoutItem::Sampler(3),
@@ -35,7 +35,7 @@ void ForwardPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle
 		nvrhi::BindingLayoutItem::Sampler(6),
 		nvrhi::BindingLayoutItem::Sampler(7),
 		nvrhi::BindingLayoutItem::Sampler(8),
-		nvrhi::BindingLayoutItem::Sampler(9),
+		nvrhi::BindingLayoutItem::Sampler(9),	//comparison sampler
 	};
 	BindingLayoutHandle = NvrhiDeviceRef->createBindingLayout(layoutDesc);
 	//create a constant buffer here

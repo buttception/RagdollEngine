@@ -83,6 +83,7 @@ namespace ragdoll {
 		int32_t DrawOctreeLevelMin{ 0 };
 		int32_t bDrawOctreeLevelMax{ 0 };
 		bool bDrawBoxes{ false };
+		bool bUseDeferred{ false };
 	};
 
 	struct CascadeInfo {
@@ -102,6 +103,7 @@ namespace ragdoll {
 		Vector3 LightDirection = { 1.f, -1.f, 1.f };
 		float LightIntensity = 1.f;
 		float CameraFov;
+		float CameraNear;
 		float CameraAspect;
 		int32_t EnableCascadeDebug{ 0 };
 	};
@@ -146,6 +148,7 @@ namespace ragdoll {
 		nvrhi::TextureHandle GBufferORM;
 		//shadows
 		nvrhi::TextureHandle ShadowMap[4];
+		nvrhi::TextureHandle ShadowMask;
 		//distance where the subfrusta are seperated
 		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
 

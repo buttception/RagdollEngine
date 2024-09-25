@@ -46,7 +46,7 @@ void gbuffer_vs(
 	outNormal = normalize(mul(inNormal, transpose((float3x3)data.invWorldMatrix)));
 	outTangent = normalize(mul(inTangent, transpose((float3x3)data.invWorldMatrix)));
 	//still need so we can sample the normal properly
-	outBinormal = normalize(cross(outTangent, outNormal));
+	outBinormal = normalize(cross(outTangent, outNormal)) * binormalSign;
 	outTexcoord = inTexcoord;
 	outInstanceId = inInstanceId;
 }
@@ -203,6 +203,7 @@ Texture2D albedoTexture : register(t0);
 Texture2D normalTexture : register(t1);
 Texture2D RMTexture : register(t2);
 Texture2D DepthBuffer : register(t3);
+Texture2D ShadowMask : register(t4);
 
 void deferred_light_ps(
 	in float4 inPos : SV_Position,
@@ -214,9 +215,11 @@ void deferred_light_ps(
 	float4 albedo = albedoTexture.Sample(Samplers[5], inTexcoord);
 	float3 N = Decode(normalTexture.Sample(Samplers[5], inTexcoord).xy);
 	float3 RM = RMTexture.Sample(Samplers[5], inTexcoord).xyz;
+	float4 shadowFactor = ShadowMask.Sample(Samplers[5], inTexcoord);
 
 	//getting fragpos
 	float depth = DepthBuffer.Sample(Samplers[5], inTexcoord).r;
+    inTexcoord.y = 1.f - inTexcoord.y;
 	float4 clipspacePos = float4(inTexcoord * 2.0 - 1.0, depth, 1.0);
 	float4 homogenousPos = mul(clipspacePos, InvViewProjMatrix);
 	float3 fragPos = homogenousPos.xyz / homogenousPos.w;
@@ -226,6 +229,6 @@ void deferred_light_ps(
 	float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.z, RM.y, RM.x);
 
 	float3 ambient = SceneAmbientColor.rgb * albedo.rgb;
-	float3 lighting = ambient + diffuse;
-	outColor = float4(lighting, 1.f);
+	float3 lighting = ambient + diffuse * (1.f - shadowFactor.a);
+	outColor = float4(lighting * shadowFactor.rgb, 1.f);
 }

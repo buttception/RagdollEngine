@@ -24,7 +24,7 @@ void ShadowPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle 
 	};
 	BindingLayoutHandle = NvrhiDeviceRef->createBindingLayout(layoutDesc);
 	//create a constant buffer here
-	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ForwardPass CBuffer", 1);
+	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ShadowPass CBuffer", 1);
 	ConstantBufferHandle = NvrhiDeviceRef->createBuffer(cBufDesc);
 
 	const auto& attribs = AssetManager::GetInstance()->VertexAttributes;
@@ -33,7 +33,6 @@ void ShadowPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle 
 	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
 
 	pipelineDesc.addBindingLayout(BindingLayoutHandle);
-	pipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
 	pipelineDesc.setVertexShader(VertexShader);
 
 	pipelineDesc.renderState.depthStencilState.depthTestEnable = true;
@@ -82,7 +81,6 @@ void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer[4], std::ve
 			{ AssetManager::GetInstance()->VBO }
 		};
 		state.addBindingSet(BindingSetHandle);
-		state.addBindingSet(AssetManager::GetInstance()->DescriptorTable);
 
 		CommandListRef->beginMarker(("Directional Light Shadow Pass" + std::to_string(i)).c_str());
 		CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));

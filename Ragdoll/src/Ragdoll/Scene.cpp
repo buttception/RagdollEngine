@@ -104,6 +104,7 @@ void ragdoll::Scene::Update(float _dt)
 	}
 
 	ImGui::Begin("Debug");
+	ImGui::Checkbox("Use Deferred", &Config.bUseDeferred);
 	if (ImGui::Checkbox("Freeze Culling Matrix", &bFreezeFrustumCulling))
 		bIsCameraDirty = true;
 	if (ImGui::Checkbox("Show Octree", &Config.bDrawOctree))
@@ -132,8 +133,10 @@ void ragdoll::Scene::Update(float _dt)
 		BuildDebugInstances(StaticDebugInstanceDatas);
 	}
 
-	ForwardRenderer->Render(this);
-	//DeferredRenderer->Render(this);
+	if(Config.bUseDeferred)
+		DeferredRenderer->Render(this);
+	else
+		ForwardRenderer->Render(this);
 
 	ImguiInterface->Render();
 	DeviceRef->Present();
@@ -200,6 +203,7 @@ void ragdoll::Scene::UpdateControls(float _dt)
 
 	SceneInfo.CameraFov = data.cameraFov;
 	SceneInfo.CameraAspect = data.cameraWidth / data.cameraHeight;
+	SceneInfo.CameraNear = data.cameraNear;
 
 	//make a infinite z inverse projection matrix
 	float e = 1 / tanf(DirectX::XMConvertToRadians(data.cameraFov) / 2.f);
@@ -419,6 +423,11 @@ void ragdoll::Scene::CreateRenderTargets()
 		texDesc.format = nvrhi::Format::RGBA8_UNORM;
 		texDesc.debugName = "GBufferORM";
 		GBufferORM = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
+	}
+	if (!ShadowMask) {
+		texDesc.format = nvrhi::Format::RGBA8_UNORM;
+		texDesc.debugName = "ShadowMask";
+		ShadowMask = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
 	}
 }
 

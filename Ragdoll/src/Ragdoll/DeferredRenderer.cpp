@@ -22,6 +22,11 @@ void DeferredRenderer::Init(std::shared_ptr<DirectXDevice> device, std::shared_p
 	NormalHandle = scene->GBufferNormal;
 	AORoughnessMetallicHandle = scene->GBufferORM;
 	DepthHandle = scene->SceneDepthZ;
+	ShadowMask = scene->ShadowMask;
+	for (int i = 0; i < 4; ++i)
+	{
+		ShadowMap[i] = scene->ShadowMap[i];
+	}
 	CreateResource();
 }
 
@@ -43,11 +48,16 @@ void DeferredRenderer::BeginFrame()
 		CommandList->open();
 		CommandList->beginMarker("ClearGBuffer");
 		CommandList->clearDepthStencilTexture(DepthHandle, nvrhi::AllSubresources, true, 0.f, false, 0);
+		for (int i = 0; i < 4; ++i)
+		{
+			CommandList->clearDepthStencilTexture(ShadowMap[i], nvrhi::AllSubresources, true, 0.f, false, 0);
+		}
 		col = 0.f;
 		CommandList->clearTextureFloat(DeviceRef->GetCurrentBackbuffer(), nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(AlbedoHandle, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(NormalHandle, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(AORoughnessMetallicHandle, nvrhi::AllSubresources, col);
+		CommandList->clearTextureFloat(ShadowMask, nvrhi::AllSubresources, col);
 		
 		CommandList->endMarker();
 		CommandList->close();
@@ -62,6 +72,8 @@ void DeferredRenderer::Render(ragdoll::Scene* scene)
 	CommandList->open();
 
 	GBufferPass->DrawAllInstances(scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo);
+	ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles, scene->StaticCascadeInstanceInfos, scene->SceneInfo);
+	ShadowMaskPass->DrawShadowMask(scene->SceneInfo);
 
 	nvrhi::FramebufferHandle fb;
 	nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
@@ -85,8 +97,28 @@ void DeferredRenderer::CreateResource()
 {
 	CommandList = DeviceRef->m_NvrhiDevice->createCommandList();
 
-	//create the fb for the graphics pipeline to draw on
+	nvrhi::FramebufferHandle fbArr[4];
+	for (int i = 0; i < 4; ++i)
+	{
+		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
+			.setDepthAttachment(ShadowMap[i]);
+		fbArr[i] = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
+	}
+	ShadowPass = std::make_shared<class ShadowPass>();
+	ShadowPass->SetRenderTarget(fbArr);
+	ShadowPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
+
 	nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
+		.addColorAttachment(ShadowMask);
+	nvrhi::FramebufferHandle fb;
+	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
+	ShadowMaskPass = std::make_shared<class ShadowMaskPass>();
+	ShadowMaskPass->SetRenderTarget(fb);
+	ShadowMaskPass->SetDependencies(ShadowMap, DepthHandle);
+	ShadowMaskPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
+
+	//create the fb for the graphics pipeline to draw on
+	fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(AlbedoHandle)
 		.addColorAttachment(NormalHandle)
 		.addColorAttachment(AORoughnessMetallicHandle)
@@ -97,13 +129,12 @@ void DeferredRenderer::CreateResource()
 	GBufferPass->SetRenderTarget(GBuffer);
 	GBufferPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
 
-	nvrhi::FramebufferHandle fb;
 	fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(DeviceRef->GetCurrentBackbuffer());
 	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
 	DeferredLightPass = std::make_shared<class DeferredLightPass>();
 	DeferredLightPass->SetRenderTarget(fb);
-	DeferredLightPass->SetDependencies(AlbedoHandle, NormalHandle, AORoughnessMetallicHandle, DepthHandle);
+	DeferredLightPass->SetDependencies(AlbedoHandle, NormalHandle, AORoughnessMetallicHandle, DepthHandle, ShadowMask);
 	DeferredLightPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()
