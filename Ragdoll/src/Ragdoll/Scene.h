@@ -126,13 +126,13 @@ namespace ragdoll {
 		nvrhi::CommandListHandle CommandList;
 		bool bIsCameraDirty{ true };
 		bool bFreezeFrustumCulling{ false };
-		Octree StaticOctree;
 
 	public:
 		std::shared_ptr<ForwardRenderer> ForwardRenderer;
 		std::shared_ptr<DeferredRenderer> DeferredRenderer;
 		SceneConfig Config;
 		DebugInfo DebugInfo;
+		Octree StaticOctree;
 
 		Matrix CameraViewProjection;
 		Matrix CameraProjection;

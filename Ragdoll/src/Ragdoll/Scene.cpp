@@ -32,7 +32,6 @@ ragdoll::Scene::Scene(Application* app)
 	Config.bDrawOctree = app->Config.bDrawDebugOctree;
 	ImguiInterface = std::make_shared<ImguiRenderer>();
 	ImguiInterface->Init(DeviceRef.get());
-	StaticOctree.Init();
 }
 
 void ragdoll::Scene::Update(float _dt)
@@ -128,6 +127,7 @@ void ragdoll::Scene::Update(float _dt)
 		DebugInfo.CulledObjectCount = 0;
 		UpdateShadowCascadesExtents();
 		BuildStaticCascadeMapInstances();
+		UpdateShadowLightMatrices();
 		BuildStaticInstances(CameraProjection, CameraView, StaticInstanceDatas, StaticInstanceGroupInfos);
 		BuildDebugInstances(StaticDebugInstanceDatas);
 	}
@@ -186,12 +186,14 @@ void ragdoll::Scene::UpdateControls(float _dt)
 	{
 		UpdateShadowCascadesExtents();
 		BuildStaticCascadeMapInstances();
+		UpdateShadowLightMatrices();
 		BuildDebugInstances(StaticDebugInstanceDatas);
 	}
 	if(ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, -90.f, 90.f))
 	{
 		UpdateShadowCascadesExtents();
 		BuildStaticCascadeMapInstances();
+		UpdateShadowLightMatrices();
 		BuildDebugInstances(StaticDebugInstanceDatas);
 	}
 	ImGui::End();
@@ -587,7 +589,7 @@ void ragdoll::Scene::BuildStaticCascadeMapInstances()
 		StaticCascadeInstanceInfos[cascadeIndex].clear();
 
 		std::vector<uint32_t> result;
-		float backSqred{ FLT_MAX }, frontSqred{ -FLT_MAX };
+		float back{ FLT_MAX }, front{ -FLT_MAX };
 		{
 			MICROPROFILE_SCOPEI("Scene", "Culling Octree Cascades", MP_VIOLETRED1);
 			DirectX::BoundingOrientedBox box;
@@ -606,10 +608,9 @@ void ragdoll::Scene::BuildStaticCascadeMapInstances()
 			matrix *= rotationMatrix;
 			matrix *= Matrix::CreateTranslation(SceneInfo.CascadeInfo[cascadeIndex].center);
 			box.Transform(box, matrix);
-			CullOctantForCascade(StaticOctree.Octant, box, result, SceneInfo.CascadeInfo[cascadeIndex].center, -SceneInfo.LightDirection, backSqred, frontSqred);
-			bool neg = backSqred < 0 ? true : false;
-			SceneInfo.CascadeInfo[cascadeIndex].nearZ = sqrtf(abs(backSqred)) * (neg ? -1.f : 1.f);
-			SceneInfo.CascadeInfo[cascadeIndex].farZ = sqrtf(frontSqred);
+			CullOctantForCascade(StaticOctree.Octant, box, result, SceneInfo.CascadeInfo[cascadeIndex].center, -SceneInfo.LightDirection, back, front);
+			SceneInfo.CascadeInfo[cascadeIndex].nearZ = back;
+			SceneInfo.CascadeInfo[cascadeIndex].farZ = front;
 		}
 		//sort the results
 		std::sort(result.begin(), result.end(), [&](const uint32_t& lhs, const uint32_t& rhs) {
@@ -671,8 +672,6 @@ void ragdoll::Scene::BuildStaticCascadeMapInstances()
 			DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
 		}
 	}
-	//update all the cascade viewproj with new near and far
-	UpdateShadowLightMatrices();
 }
 
 void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
@@ -789,7 +788,7 @@ void ragdoll::Scene::CullOctant(Octant& octant, const DirectX::BoundingFrustum& 
 	}
 }
 
-void ragdoll::Scene::CullOctantForCascade(const Octant& octant, const DirectX::BoundingOrientedBox& oob, std::vector<uint32_t>& result, const Vector3& center, const Vector3& normal, float& backSqred, float& frontSqred)
+void ragdoll::Scene::CullOctantForCascade(const Octant& octant, const DirectX::BoundingOrientedBox& oob, std::vector<uint32_t>& result, const Vector3& center, const Vector3& normal, float& back, float& front)
 {
 	if (oob.Contains(octant.Box) != DirectX::ContainmentType::DISJOINT)	//so if contains or intersects
 	{
@@ -800,12 +799,12 @@ void ragdoll::Scene::CullOctantForCascade(const Octant& octant, const DirectX::B
 			float d2 = (corners[i] - center).Dot(normal);
 			if (d2 > 0)
 			{
-				if (d2 > frontSqred)
-					frontSqred = d2;
+				if (d2 > front)
+					front = d2;
 			}
 			else {
-				if (d2 < backSqred)
-					backSqred = d2;
+				if (d2 < back)
+					back = d2;
 			}
 		}
 		//if no children, all proxies go into the result buffer
@@ -821,7 +820,7 @@ void ragdoll::Scene::CullOctantForCascade(const Octant& octant, const DirectX::B
 				result.emplace_back(proxy.Index);
 			}
 			for (const Octant& itOctant : octant.Octants) {
-				CullOctantForCascade(itOctant, oob, result, center, normal, backSqred, frontSqred);
+				CullOctantForCascade(itOctant, oob, result, center, normal, back, front);
 			}
 		}
 	}
