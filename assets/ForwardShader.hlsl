@@ -1,3 +1,6 @@
+#include "ShadingModel.hlsli"
+#include "Utils.hlsli"
+
 cbuffer g_Const : register(b0) {
 	float4x4 viewProjMatrix;
 	float4x4 viewMatrix;
@@ -58,88 +61,6 @@ void main_vs(
 	outInstanceId = inInstanceId;
 }
 
-//numeric constants
-static const float PI = 3.14159265;
-
-float3 Decode(float2 f)
-{
-    f = f * 2.0 - 1.0;
- 
-    // https://twitter.com/Stubbesaurus/status/937994790553227264
-    float3 n = float3(f.x, f.y, 1.0 - abs(f.x) - abs(f.y));
-    float t = saturate(-n.z);
-    n.xy += n.xy >= 0.0 ? -t : t;
-    return normalize(n);
-}
-
-// Utility Functions for PBR Lighting
-float3 FresnelSchlick(float cosTheta, float3 F0) {
-    return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
-}
-
-float DistributionGGX(float3 N, float3 H, float roughness) {
-    float a = roughness * roughness;
-    float a2 = a * a;
-    float NdotH = max(dot(N, H), 0.0);
-    float NdotH2 = NdotH * NdotH;
-
-    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
-    return a2 / (PI * denom * denom);
-}
-
-float GeometrySchlickGGX(float NdotV, float roughness) {
-    float r = (roughness + 1.0);
-    float k = (r * r) / 8.0;
-    return NdotV / (NdotV * (1.0 - k) + k);
-}
-
-float GeometrySmith(float3 N, float3 V, float3 L, float roughness) {
-    float NdotV = max(dot(N, V), 0.0);
-    float NdotL = max(dot(N, L), 0.0);
-    float ggx1 = GeometrySchlickGGX(NdotV, roughness);
-    float ggx2 = GeometrySchlickGGX(NdotL, roughness);
-    return ggx1 * ggx2;
-}
-
-// PBR Lighting Calculation
-float3 PBRLighting(float3 albedo, float3 normal, float3 viewDir, float3 lightDir, float3 lightColor, float metallic, float roughness, float ao) {
-    float3 N = normalize(normal);
-    float3 V = normalize(viewDir);
-    float3 L = normalize(lightDir);
-    float3 H = normalize(V + L); // Halfway vector
-
-    // Fresnel-Schlick approximation
-    float3 F0 = float3(0.1, 0.1, 0.1); // Base reflectivity
-    F0 = lerp(F0, albedo, metallic); // Mix with albedo for metallic surfaces
-    float3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
-
-    // GGX Normal Distribution Function (NDF)
-    float NDF = DistributionGGX(N, H, roughness);
-
-    // Smith's Geometry Function (Visibility)
-    float G = GeometrySmith(N, V, L, roughness);
-
-    // Specular BRDF
-    float3 numerator = NDF * G * F;
-    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.001; // Prevent divide by zero
-    float3 specular = numerator / denominator;
-
-    // Lambertian diffuse
-    float3 kS = F; // Fresnel reflectance
-    float3 kD = 1.0 - kS; // Diffuse reflection (1.0 - specular)
-    kD *= 1.0 - metallic; // Metallic surfaces don't have diffuse reflection
-
-    float3 diffuse = albedo * max(dot(N, L), 0.0);
-
-    // Combine the two contributions
-    float3 color = (kD * diffuse + specular) * lightColor * max(dot(N, L), 0.0);
-
-    // Apply ambient occlusion
-    color *= ao;
-
-    return color;
-}
-
 Texture2D ShadowMaps[4] : register(t1);
 sampler Samplers[8] : register(s0);
 SamplerComparisonState ShadowSample : register(s9);
@@ -161,6 +82,7 @@ void main_ps(
 		Texture2D shadowMap;
 		float4x4 lightMatrix;
 		float4 viewPos = mul(inFragPos, viewMatrix);
+		float bias;
 		// Sample textures
 		if(abs(viewPos.z) < 5.f)
 		{
@@ -168,6 +90,7 @@ void main_ps(
 				data.albedoFactor = float4(1.f, 0.5f, 0.5f, 1.f);
 			shadowMap = ShadowMaps[0];
 			lightMatrix = LightViewProj[0];
+        bias = 0.001f;
 		}
 		else if(abs(viewPos.z) < 10.f)
 		{
@@ -175,6 +98,7 @@ void main_ps(
 				data.albedoFactor = float4(1.f, 1.f, 0.5f, 1.f);
 			shadowMap = ShadowMaps[1];
 			lightMatrix = LightViewProj[1];
+        bias = 0.002f;
 		}
 		else if(abs(viewPos.z) < 15.f)
 		{
@@ -182,6 +106,7 @@ void main_ps(
 				data.albedoFactor = float4(0.5f, 1.f, 0.5f, 1.f);
 			shadowMap = ShadowMaps[2];
 			lightMatrix = LightViewProj[2];
+        	bias = 0.003f;
 		}
 		else
 		{
@@ -189,6 +114,7 @@ void main_ps(
 				data.albedoFactor = float4(1.f, 0.5f, 1.f, 1.f);
 			shadowMap = ShadowMaps[3];
 			lightMatrix = LightViewProj[3];
+        	bias = 0.005f;
 		}
 
 		float4 albedo = data.albedoFactor;
@@ -200,7 +126,7 @@ void main_ps(
 		if(data.roughnessMetallicIndex != -1){
 			RM = Textures[data.roughnessMetallicIndex].Sample(Samplers[data.roughnessMetallicSamplerIndex], inTexcoord);
 		}
-		float ao = 1.f;
+		float ao = 1.f - RM.r;
 		float roughness = RM.g;
 		float metallic = RM.b;
 
@@ -214,11 +140,7 @@ void main_ps(
 
 		float3 diffuse = PBRLighting(albedo.rgb, N, cameraPosition - inFragPos.xyz, lightDirection, lightDiffuseColor.rgb * lightIntensity, metallic, roughness, ao);
 
-		float4 fragPosLightSpace = mul(inFragPos, lightMatrix);
-		float3 projCoord = fragPosLightSpace.xyz / fragPosLightSpace.w;
-		projCoord.xy = projCoord.xy * 0.5f + float2(0.5f, 0.5f);
-		projCoord.y = projCoord.y * -1.0f + 1.0f;
-		projCoord.z += 0.005f;
+    	float3 projCoord = WorldToLight(inFragPos.xyz, lightMatrix, bias);
 		float shadow = 0.f;
 
 		// Percentage-Closer Filtering (PCF) for smoother shadow edges.

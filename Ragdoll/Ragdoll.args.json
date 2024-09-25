@@ -25,6 +25,14 @@
       "Command": "",
       "Items": [
         {
+          "Id": "9a512f54-05cf-4eb8-9c58-ec1f7b655ca7",
+          "Command": "--sample \"MetalRoughSpheresNoTextures\""
+        },
+        {
+          "Id": "344cad68-e3b8-4a6a-886e-3ba3c548789a",
+          "Command": "--sample \"MetalRoughSpheres\""
+        },
+        {
           "Id": "cf475ba1-1513-4a2d-bdd1-450d2047223f",
           "Command": "--sample \"Sponza\""
         },

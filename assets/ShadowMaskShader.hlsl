@@ -1,3 +1,5 @@
+#include "Utils.hlsli"
+
 cbuffer g_Const : register(b0){
     float4x4 LightViewProj[4];
     float4x4 InvViewProjMatrix;
@@ -12,28 +14,26 @@ SamplerComparisonState ShadowSample : register(s9);
 
 void main_ps(
     in float4 inPos : SV_Position,
-    in float2 inTexcoord : TEXCOORD1,
+    in float2 inTexcoord : TEXCOORD0,
     out float4 outColor : SV_Target0
 )
 {
     //get the frag pos
-	float depth = DepthBuffer.Sample(Samplers[5], inTexcoord).r;
-    inTexcoord.y = 1.f - inTexcoord.y;
-	float4 clipspacePos = float4(inTexcoord * 2.0 - 1.0, depth, 1.0);
-	float4 homogenousPos = mul(clipspacePos, InvViewProjMatrix);
-	float3 fragPos = homogenousPos.xyz / homogenousPos.w;
+	float3 fragPos = DepthToWorld(DepthBuffer.Sample(Samplers[5], inTexcoord).r, inTexcoord, InvViewProjMatrix);
     
     float distanceFromCam = mul(float4(fragPos, 1.f), View).z;
     //decide which matrix and texture to use
     Texture2D shadowMap;
     float4x4 lightMatrix;
     float4 color = float4(1.f, 1.f, 1.f, 1.f);
+    float bias;
     if(distanceFromCam < 5.f)
     {
         if(EnableCascadeDebug)
             color = float4(1.f, 0.5f, 0.5f, 1.f);
         shadowMap = ShadowMaps[0];
         lightMatrix = LightViewProj[0];
+        bias = 0.001f;
     }
     else if(distanceFromCam < 10.f)
     {
@@ -41,6 +41,7 @@ void main_ps(
             color = float4(1.f, 1.f, 0.5f, 1.f);
         shadowMap = ShadowMaps[1];
         lightMatrix = LightViewProj[1];
+        bias = 0.002f;
     }
     else if(distanceFromCam < 15.f)
     {
@@ -48,6 +49,7 @@ void main_ps(
             color = float4(0.5f, 1.f, 0.5f, 1.f);
         shadowMap = ShadowMaps[2];
         lightMatrix = LightViewProj[2];
+        bias = 0.003f;
     }
     else
     {
@@ -55,14 +57,11 @@ void main_ps(
             color = float4(1.f, 0.5f, 1.f, 1.f);
         shadowMap = ShadowMaps[3];
         lightMatrix = LightViewProj[3];
+        bias = 0.005f;
     }
 
     //get frag pos in light space
-    float4 fragPosLightSpace = mul(float4(fragPos, 1.f), lightMatrix);
-    float3 projCoord = fragPosLightSpace.xyz / fragPosLightSpace.w;
-    projCoord.xy = projCoord.xy * 0.5f + float2(0.5f, 0.5f);
-    projCoord.y = projCoord.y * -1.0f + 1.0f;
-    projCoord.z += 0.005f;
+    float3 projCoord = WorldToLight(fragPos, lightMatrix, bias);
     float shadow = 0.f;
 
     // Percentage-Closer Filtering (PCF) for smoother shadow edges.

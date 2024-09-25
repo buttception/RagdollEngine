@@ -83,19 +83,19 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndice
 	modelStack.push(mat);
 
 	//get max extents in world space
-	const tinygltf::Mesh& mesh = model.meshes[curr.mesh];
-	for (const tinygltf::Primitive& prim : mesh.primitives) {
-		if (prim.attributes.contains("POSITION")) {
-			const tinygltf::Accessor& accessor = model.accessors[prim.attributes.at("POSITION")];
-			Vector3 meshMin, meshMax;
-			if (!accessor.minValues.empty())
-				meshMin = { (float)accessor.minValues[0], (float)accessor.minValues[1], (float)accessor.minValues[2] };
-			if(!accessor.maxValues.empty())
-				meshMax = { (float)accessor.maxValues[0], (float)accessor.maxValues[1], (float)accessor.maxValues[2] };
-			Vector3 worldMin = meshMin.Transform(meshMin, transComp->m_ModelToWorld);
-			Vector3 worldMax = meshMax.Transform(meshMax, transComp->m_ModelToWorld);
-			min.x = std::min(worldMin.x, min.x); min.y = std::min(worldMin.y, min.y); min.z = std::min(worldMin.z, min.z);
-			max.x = std::max(worldMax.x, max.x); max.y = std::max(worldMax.y, max.y); max.z = std::max(worldMax.z, max.z);
+	if (curr.mesh >= 0)
+	{
+		for (const Submesh& submesh : AssetManager::GetInstance()->Meshes[curr.mesh + meshIndicesOffset].Submeshes)
+		{
+			const DirectX::BoundingBox box = AssetManager::GetInstance()->VertexBufferInfos[submesh.VertexBufferIndex].BestFitBox;
+			Vector3 worldMin = Vector3::Transform(box.Center - box.Extents, transComp->m_ModelToWorld);
+			Vector3 worldMax = Vector3::Transform(box.Center + box.Extents, transComp->m_ModelToWorld);
+			min.x = std::min({ worldMin.x, worldMax.x, min.x });
+			min.y = std::min({ worldMin.y, worldMax.y, min.y });
+			min.z = std::min({ worldMin.z, worldMax.z, min.z });
+			max.x = std::max({ worldMin.x, worldMax.x, max.x });
+			max.y = std::max({ worldMin.y, worldMax.y, max.y });
+			max.z = std::max({ worldMin.z, worldMax.z, max.z });
 		}
 	}
 

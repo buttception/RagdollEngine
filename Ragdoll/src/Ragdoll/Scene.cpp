@@ -528,6 +528,8 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 		frustum.Transform(frustum, cameraView.Invert());
 		CullOctant(StaticOctree.Octant, frustum, result);
 	}
+	if (result.empty())	//all culled
+		return;
 	//sort the results
 	std::sort(result.begin(), result.end(), [&](const uint32_t& lhs, const uint32_t& rhs) {
 		return StaticProxies[lhs].BufferIndex != StaticProxies[rhs].BufferIndex ? StaticProxies[lhs].BufferIndex < StaticProxies[rhs].BufferIndex : StaticProxies[lhs].MaterialIndex < StaticProxies[rhs].MaterialIndex;
@@ -621,6 +623,8 @@ void ragdoll::Scene::BuildStaticCascadeMapInstances()
 			SceneInfo.CascadeInfo[cascadeIndex].nearZ = back;
 			SceneInfo.CascadeInfo[cascadeIndex].farZ = front;
 		}
+		if (result.empty())	//all culled
+			return;
 		//sort the results
 		std::sort(result.begin(), result.end(), [&](const uint32_t& lhs, const uint32_t& rhs) {
 			return StaticProxies[lhs].BufferIndex != StaticProxies[rhs].BufferIndex ? StaticProxies[lhs].BufferIndex < StaticProxies[rhs].BufferIndex : StaticProxies[lhs].MaterialIndex < StaticProxies[rhs].MaterialIndex;
@@ -856,6 +860,9 @@ void ragdoll::Scene::UpdateShadowCascadesExtents()
 			center += corners[j];
 		}
 		center /= 8.f;
+		center.x = (int)center.x;
+		center.y = (int)center.y;
+		center.z = (int)center.z;
 		//move all corners into a 1x1x1 cube lightspace with the directional light
 		Matrix lightProj = DirectX::XMMatrixOrthographicLH(1.f, 1.f, -0.5f, 0.5f);	//should be a 1x1x1 cube?
 		SceneInfo.CascadeInfo[i - 1].view = DirectX::XMMatrixLookAtLH(center, center - SceneInfo.LightDirection, {0.f, 1.f, 0.f});
