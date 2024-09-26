@@ -87,15 +87,18 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndice
 	{
 		for (const Submesh& submesh : AssetManager::GetInstance()->Meshes[curr.mesh + meshIndicesOffset].Submeshes)
 		{
-			const DirectX::BoundingBox box = AssetManager::GetInstance()->VertexBufferInfos[submesh.VertexBufferIndex].BestFitBox;
-			Vector3 worldMin = Vector3::Transform(box.Center - box.Extents, transComp->m_ModelToWorld);
-			Vector3 worldMax = Vector3::Transform(box.Center + box.Extents, transComp->m_ModelToWorld);
-			min.x = std::min({ worldMin.x, worldMax.x, min.x });
-			min.y = std::min({ worldMin.y, worldMax.y, min.y });
-			min.z = std::min({ worldMin.z, worldMax.z, min.z });
-			max.x = std::max({ worldMin.x, worldMax.x, max.x });
-			max.y = std::max({ worldMin.y, worldMax.y, max.y });
-			max.z = std::max({ worldMin.z, worldMax.z, max.z });
+			DirectX::BoundingBox box = AssetManager::GetInstance()->VertexBufferInfos[submesh.VertexBufferIndex].BestFitBox;
+			box.Transform(box, transComp->m_ModelToWorld);
+			Vector3 corners[8];
+			box.GetCorners(corners);
+			for (int i = 0; i < 8; ++i) {
+				min.x = std::min({ corners[i].x, min.x });
+				min.y = std::min({ corners[i].y, min.y });
+				min.z = std::min({ corners[i].z, min.z });
+				max.x = std::max({ corners[i].x, max.x });
+				max.y = std::max({ corners[i].y, max.y });
+				max.z = std::max({ corners[i].z, max.z });
+			}
 		}
 	}
 
@@ -501,9 +504,9 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	for (const int& rootIndex : model.scenes[0].nodes) {	//iterating through the root nodes
 		TraverseNode(rootIndex, 0, meshIndicesOffset, model, EntityManagerRef, SceneRef, min, max);
 	}
-	float offset = 1.f;
-	Vector3 halfExtent{std::max(abs(min.x), abs(max.x)) + offset, std::max(abs(min.y), abs(max.y)) + offset, std::max(abs(min.z), abs(min.z)) + offset };
-	Octree::Max = halfExtent;
+	float offset = 1.01f;
+	Octree::Max = max * offset;
+	Octree::Min = min * offset;
 	SceneRef->StaticOctree.Clear();
 #if 0
 	TransformLayer->DebugPrintHierarchy();

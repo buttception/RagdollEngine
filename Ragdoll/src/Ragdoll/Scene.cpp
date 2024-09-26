@@ -105,6 +105,8 @@ void ragdoll::Scene::Update(float _dt)
 
 	ImGui::Begin("Debug");
 	ImGui::Checkbox("Use Deferred", &Config.bUseDeferred);
+	ImGui::SliderFloat("Gamma", &SceneInfo.Gamma, 0.5f, 3.f);
+	ImGui::SliderFloat("Exposure", &SceneInfo.Exposure, 0.1f, 2.f);
 	if (ImGui::Checkbox("Freeze Culling Matrix", &bFreezeFrustumCulling))
 		bIsCameraDirty = true;
 	if (ImGui::Checkbox("Show Octree", &Config.bDrawOctree))
@@ -409,6 +411,11 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.mipLevels = 1;
 	texDesc.isTypeless = false;
 
+	if (!SceneColor) {
+		texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
+		texDesc.debugName = "SceneColor";
+		SceneColor = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
+	}
 	if (!GBufferAlbedo) {
 		texDesc.format = nvrhi::Format::RGBA8_UNORM;
 		texDesc.debugName = "GBufferAlbedo";
@@ -620,11 +627,11 @@ void ragdoll::Scene::BuildStaticCascadeMapInstances()
 			matrix *= Matrix::CreateTranslation(SceneInfo.CascadeInfo[cascadeIndex].center);
 			box.Transform(box, matrix);
 			CullOctantForCascade(StaticOctree.Octant, box, result, SceneInfo.CascadeInfo[cascadeIndex].center, -SceneInfo.LightDirection, back, front);
-			SceneInfo.CascadeInfo[cascadeIndex].nearZ = back;
-			SceneInfo.CascadeInfo[cascadeIndex].farZ = front;
 		}
 		if (result.empty())	//all culled
 			return;
+		SceneInfo.CascadeInfo[cascadeIndex].nearZ = back;
+		SceneInfo.CascadeInfo[cascadeIndex].farZ = front;
 		//sort the results
 		std::sort(result.begin(), result.end(), [&](const uint32_t& lhs, const uint32_t& rhs) {
 			return StaticProxies[lhs].BufferIndex != StaticProxies[rhs].BufferIndex ? StaticProxies[lhs].BufferIndex < StaticProxies[rhs].BufferIndex : StaticProxies[lhs].MaterialIndex < StaticProxies[rhs].MaterialIndex;
@@ -721,7 +728,7 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 		InstanceData debugData;
 		Vector3 scale = { SceneInfo.CascadeInfo[SceneInfo.EnableCascadeDebug - 1].width,
 			SceneInfo.CascadeInfo[SceneInfo.EnableCascadeDebug - 1].height,
-			(abs(SceneInfo.CascadeInfo[SceneInfo.EnableCascadeDebug - 1].farZ) + abs(SceneInfo.CascadeInfo[SceneInfo.EnableCascadeDebug - 1].nearZ)) / 2.f };
+			abs(SceneInfo.CascadeInfo[SceneInfo.EnableCascadeDebug - 1].farZ - SceneInfo.CascadeInfo[SceneInfo.EnableCascadeDebug - 1].nearZ) };
 		Matrix matrix = Matrix::CreateScale(scale);
 		DirectX::XMVECTOR forward = DirectX::XMVector3Normalize(-SceneInfo.LightDirection);
 		DirectX::XMVECTOR worldUp = DirectX::XMVectorSet(0.f, 1.f, 0.f, 0.f);
@@ -734,7 +741,7 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 			DirectX::XMVectorSet(0.f, 0.f, 0.f, 1.f)
 		);
 		matrix *= rotationMatrix;
-		matrix *= Matrix::CreateTranslation(SceneInfo.CascadeInfo[SceneInfo.EnableCascadeDebug - 1].center + -SceneInfo.LightDirection * (SceneInfo.CascadeInfo[SceneInfo.EnableCascadeDebug - 1].farZ - SceneInfo.CascadeInfo[SceneInfo.EnableCascadeDebug - 1].nearZ) / 2.f);
+		matrix *= Matrix::CreateTranslation(SceneInfo.CascadeInfo[SceneInfo.EnableCascadeDebug - 1].center);
 		debugData.ModelToWorld = matrix;
 		debugData.bIsLit = false;
 		debugData.Color = colors[SceneInfo.EnableCascadeDebug - 1];

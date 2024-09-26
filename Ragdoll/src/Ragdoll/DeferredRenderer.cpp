@@ -18,6 +18,7 @@ void DeferredRenderer::Init(std::shared_ptr<DirectXDevice> device, std::shared_p
 	DeviceRef = device;
 	PrimaryWindowRef = win;
 	//get the textures needed
+	SceneColor = scene->SceneColor;
 	AlbedoHandle = scene->GBufferAlbedo;
 	NormalHandle = scene->GBufferNormal;
 	AORoughnessMetallicHandle = scene->GBufferORM;
@@ -54,6 +55,7 @@ void DeferredRenderer::BeginFrame()
 		}
 		col = 0.f;
 		CommandList->clearTextureFloat(DeviceRef->GetCurrentBackbuffer(), nvrhi::AllSubresources, col);
+		CommandList->clearTextureFloat(SceneColor, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(AlbedoHandle, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(NormalHandle, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(AORoughnessMetallicHandle, nvrhi::AllSubresources, col);
@@ -71,21 +73,22 @@ void DeferredRenderer::Render(ragdoll::Scene* scene)
 	
 	CommandList->open();
 
+	//gbuffer
 	GBufferPass->DrawAllInstances(scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo);
+	//directional light shadow
 	ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles, scene->StaticCascadeInstanceInfos, scene->SceneInfo);
+	//shadow mask pass
 	ShadowMaskPass->DrawShadowMask(scene->SceneInfo);
-
+	//light scene color
+	DeferredLightPass->LightPass(scene->SceneInfo);
 	nvrhi::FramebufferHandle fb;
 	nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(DeviceRef->GetCurrentBackbuffer());
 	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
-	DeferredLightPass->SetRenderTarget(fb);
-	DeferredLightPass->LightPass(scene->SceneInfo);
-
-	fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(DeviceRef->GetCurrentBackbuffer())
-		.setDepthAttachment(DepthHandle);
-	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
+	//tone map and gamma correct
+	ToneMapPass->SetRenderTarget(fb);
+	ToneMapPass->ToneMap(scene->SceneInfo);
+	//draw debug items
 	DebugPass->SetRenderTarget(fb);
 	DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo);
 
@@ -130,7 +133,7 @@ void DeferredRenderer::CreateResource()
 	GBufferPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(DeviceRef->GetCurrentBackbuffer());
+		.addColorAttachment(SceneColor);
 	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
 	DeferredLightPass = std::make_shared<class DeferredLightPass>();
 	DeferredLightPass->SetRenderTarget(fb);
@@ -144,4 +147,12 @@ void DeferredRenderer::CreateResource()
 	DebugPass = std::make_shared<class DebugPass>();
 	DebugPass->SetRenderTarget(fb);
 	DebugPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
+
+	fbDesc = nvrhi::FramebufferDesc()
+		.addColorAttachment(DeviceRef->GetCurrentBackbuffer());
+	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
+	ToneMapPass = std::make_shared<class ToneMapPass>();
+	ToneMapPass->SetRenderTarget(fb);
+	ToneMapPass->SetDependencies(SceneColor);
+	ToneMapPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
 }

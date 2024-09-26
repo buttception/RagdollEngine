@@ -6,6 +6,7 @@
 #include "RenderPasses/ShadowMaskPass.h"
 #include "RenderPasses/DeferredLightPass.h"
 #include "RenderPasses/DebugPass.h"
+#include "RenderPasses/ToneMapPass.h"
 
 namespace ragdoll {
 	class Window;
@@ -23,7 +24,9 @@ public:
 	std::shared_ptr<ShadowMaskPass> ShadowMaskPass;
 	std::shared_ptr<DeferredLightPass> DeferredLightPass;
 	std::shared_ptr<DebugPass> DebugPass;
+	std::shared_ptr<ToneMapPass> ToneMapPass;
 
+	nvrhi::TextureHandle SceneColor;
 	nvrhi::TextureHandle AlbedoHandle;
 	nvrhi::TextureHandle NormalHandle;
 	nvrhi::TextureHandle AORoughnessMetallicHandle;

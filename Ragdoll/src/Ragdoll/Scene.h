@@ -89,7 +89,7 @@ namespace ragdoll {
 	struct CascadeInfo {
 		Vector3 center;
 		Matrix view, proj, viewProj;
-		float width, height, nearZ, farZ;
+		float width, height, nearZ{ -10.f }, farZ{ 10.f };
 	};
 
 	struct SceneInformation {
@@ -106,6 +106,8 @@ namespace ragdoll {
 		float CameraNear;
 		float CameraAspect;
 		int32_t EnableCascadeDebug{ 0 };
+		float Gamma = 2.2f;
+		float Exposure = 1.f;
 	};
 
 	class Scene {
