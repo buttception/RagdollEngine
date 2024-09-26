@@ -106,7 +106,7 @@ namespace ragdoll {
 		float CameraNear;
 		float CameraAspect;
 		int32_t EnableCascadeDebug{ 0 };
-		float Gamma = 2.2f;
+		float Gamma = 1.f;
 		float Exposure = 1.f;
 	};
 

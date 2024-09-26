@@ -7,6 +7,7 @@ cbuffer g_Const : register(b0) {
 
 Texture2D SceneColor : register(t0);
 sampler Sampler : register(s0);
+RWBuffer<float> Target : register(u0);
 
 void tone_map_ps(
 	in float4 inPos : SV_Position,

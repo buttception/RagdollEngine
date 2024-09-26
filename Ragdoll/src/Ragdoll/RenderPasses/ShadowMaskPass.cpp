@@ -42,6 +42,22 @@ void ShadowMaskPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHan
 	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ShadowMask CBuffer", 1);
 	ConstantBufferHandle = NvrhiDeviceRef->createBuffer(cBufDesc);
 
+	nvrhi::BindingSetDesc bindingSetDesc;
+	bindingSetDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
+		nvrhi::BindingSetItem::Texture_SRV(0, ShadowMaps[0]),
+		nvrhi::BindingSetItem::Texture_SRV(1, ShadowMaps[1]),
+		nvrhi::BindingSetItem::Texture_SRV(2, ShadowMaps[2]),
+		nvrhi::BindingSetItem::Texture_SRV(3, ShadowMaps[3]),
+	};
+	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
+	{
+		bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler(i, AssetManager::GetInstance()->Samplers[i]));
+	}
+	bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler((int)SamplerTypes::COUNT, AssetManager::GetInstance()->ShadowSampler));
+	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(4, GBufferDepth));
+	BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+
 	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
 
 	pipelineDesc.addBindingLayout(BindingLayoutHandle);
@@ -82,22 +98,6 @@ void ShadowMaskPass::DrawShadowMask(const ragdoll::SceneInformation& sceneInfo)
 	CBuffer.InvViewProj = sceneInfo.MainCameraViewProj.Invert();
 	CBuffer.View = sceneInfo.MainCameraView;
 	CBuffer.EnableCascadeDebug = sceneInfo.EnableCascadeDebug;
-
-	nvrhi::BindingSetDesc bindingSetDesc;
-	bindingSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-		nvrhi::BindingSetItem::Texture_SRV(0, ShadowMaps[0]),
-		nvrhi::BindingSetItem::Texture_SRV(1, ShadowMaps[1]),
-		nvrhi::BindingSetItem::Texture_SRV(2, ShadowMaps[2]),
-		nvrhi::BindingSetItem::Texture_SRV(3, ShadowMaps[3]),
-	};
-	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
-	{
-		bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler(i, AssetManager::GetInstance()->Samplers[i]));
-	}
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler((int)SamplerTypes::COUNT, AssetManager::GetInstance()->ShadowSampler));
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(4, GBufferDepth));
-	BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
 	nvrhi::GraphicsState state;
 	state.pipeline = GraphicsPipeline;

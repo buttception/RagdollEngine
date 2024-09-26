@@ -23,6 +23,7 @@ void ToneMapPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle
 		nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
 		nvrhi::BindingLayoutItem::Sampler(0),	//samplers
 		nvrhi::BindingLayoutItem::Texture_SRV(0),	//scene color
+		nvrhi::BindingLayoutItem::TypedBuffer_UAV(0),	//exposure buffer
 	};
 	BindingLayoutHandle = NvrhiDeviceRef->createBindingLayout(layoutDesc);
 	//create a constant buffer here
@@ -54,7 +55,7 @@ void ToneMapPass::SetDependencies(nvrhi::TextureHandle sceneColor)
 	SceneColor = sceneColor;
 }
 
-void ToneMapPass::ToneMap(const ragdoll::SceneInformation& sceneInfo)
+void ToneMapPass::ToneMap(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle exposureHandle)
 {
 	MICROPROFILE_SCOPEI("Render", "Tone Map Pass", MP_BLUEVIOLET);
 	//create and set the state
@@ -66,7 +67,8 @@ void ToneMapPass::ToneMap(const ragdoll::SceneInformation& sceneInfo)
 	bindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[5]),
-		nvrhi::BindingSetItem::Texture_SRV(0, SceneColor)
+		nvrhi::BindingSetItem::Texture_SRV(0, SceneColor),
+		nvrhi::BindingSetItem::TypedBuffer_UAV(0, exposureHandle)
 	};
 	BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 

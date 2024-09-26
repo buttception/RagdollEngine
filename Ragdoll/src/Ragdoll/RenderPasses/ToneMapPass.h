@@ -29,5 +29,5 @@ public:
 	void SetRenderTarget(nvrhi::FramebufferHandle renderTarget);
 	void SetDependencies(nvrhi::TextureHandle sceneColor);
 
-	void ToneMap(const ragdoll::SceneInformation& sceneInfo);
+	void ToneMap(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle exposureHandle);
 };

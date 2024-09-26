@@ -106,7 +106,7 @@ void ragdoll::Scene::Update(float _dt)
 	ImGui::Begin("Debug");
 	ImGui::Checkbox("Use Deferred", &Config.bUseDeferred);
 	ImGui::SliderFloat("Gamma", &SceneInfo.Gamma, 0.5f, 3.f);
-	ImGui::SliderFloat("Exposure", &SceneInfo.Exposure, 0.1f, 2.f);
+	ImGui::SliderFloat("Exposure", &SceneInfo.Exposure, 0.f, 2.f);
 	if (ImGui::Checkbox("Freeze Culling Matrix", &bFreezeFrustumCulling))
 		bIsCameraDirty = true;
 	if (ImGui::Checkbox("Show Octree", &Config.bDrawOctree))
@@ -136,7 +136,7 @@ void ragdoll::Scene::Update(float _dt)
 	}
 
 	if(Config.bUseDeferred)
-		DeferredRenderer->Render(this);
+		DeferredRenderer->Render(this, _dt);
 	else
 		ForwardRenderer->Render(this);
 

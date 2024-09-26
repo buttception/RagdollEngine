@@ -253,6 +253,9 @@ nvrhi::ShaderHandle AssetManager::GetShader(const std::string& shaderFilename)
 	else if (shaderFilename.find(".ps.") != std::string::npos) {
 		type = nvrhi::ShaderType::Pixel;
 	}
+	else if (shaderFilename.find(".cs.") != std::string::npos) {
+		type = nvrhi::ShaderType::Compute;
+	}
 	uint32_t size{};
 	const uint8_t* data = FileManagerRef->ImmediateLoad(shaderFilename, size);
 	nvrhi::ShaderHandle shader = DeviceRef->m_NvrhiDevice->createShader(
