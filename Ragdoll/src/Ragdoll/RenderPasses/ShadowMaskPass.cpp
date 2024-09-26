@@ -1,5 +1,5 @@
 #include "ragdollpch.h"
-#include "DeferredLightPass.h"
+#include "ShadowMaskPass.h"
 
 #include <nvrhi/utils.h>
 #include <microprofile.h>
@@ -7,7 +7,7 @@
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
 
-void DeferredLightPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle cmdList)
+void ShadowMaskPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle cmdList)
 {
 	CommandListRef = cmdList;
 	NvrhiDeviceRef = nvrhiDevice;
@@ -15,12 +15,16 @@ void DeferredLightPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandList
 	//create the pipeline
 	//load outputted shaders objects
 	VertexShader = AssetManager::GetInstance()->GetShader("Fullscreen.vs.cso");
-	PixelShader = AssetManager::GetInstance()->GetShader("DeferredLight.ps.cso");
+	PixelShader = AssetManager::GetInstance()->GetShader("ShadowMask.ps.cso");
 	//TODO: move into draw call then create only if needed
 	nvrhi::BindingLayoutDesc layoutDesc = nvrhi::BindingLayoutDesc();
 	layoutDesc.visibility = nvrhi::ShaderType::All;
 	layoutDesc.bindings = {
-		nvrhi::BindingLayoutItem::VolatileConstantBuffer(1),
+		nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
+		nvrhi::BindingLayoutItem::Texture_SRV(0),	//shadow maps
+		nvrhi::BindingLayoutItem::Texture_SRV(1),
+		nvrhi::BindingLayoutItem::Texture_SRV(2),
+		nvrhi::BindingLayoutItem::Texture_SRV(3),
 		nvrhi::BindingLayoutItem::Sampler(0),	//samplers
 		nvrhi::BindingLayoutItem::Sampler(1),
 		nvrhi::BindingLayoutItem::Sampler(2),
@@ -30,22 +34,19 @@ void DeferredLightPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandList
 		nvrhi::BindingLayoutItem::Sampler(6),
 		nvrhi::BindingLayoutItem::Sampler(7),
 		nvrhi::BindingLayoutItem::Sampler(8),
-		nvrhi::BindingLayoutItem::Texture_SRV(0),	//albedo
-		nvrhi::BindingLayoutItem::Texture_SRV(1),	//normal
-		nvrhi::BindingLayoutItem::Texture_SRV(2),	//orm
-		nvrhi::BindingLayoutItem::Texture_SRV(3),	//depth
-		nvrhi::BindingLayoutItem::Texture_SRV(4),	//shadow mask
+		nvrhi::BindingLayoutItem::Sampler(9),	//comparison sampler
+		nvrhi::BindingLayoutItem::Texture_SRV(4),	//depth
 	};
 	BindingLayoutHandle = NvrhiDeviceRef->createBindingLayout(layoutDesc);
 	//create a constant buffer here
-	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "DeferredLight CBuffer", 1);
+	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ShadowMask CBuffer", 1);
 	ConstantBufferHandle = NvrhiDeviceRef->createBuffer(cBufDesc);
+
 	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
 
 	pipelineDesc.addBindingLayout(BindingLayoutHandle);
-	pipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
 	pipelineDesc.setVertexShader(VertexShader);
-	pipelineDesc.setFragmentShader(PixelShader);
+	pipelineDesc.setPixelShader(PixelShader);
 
 	pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
 	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
@@ -57,45 +58,45 @@ void DeferredLightPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandList
 	GraphicsPipeline = NvrhiDeviceRef->createGraphicsPipeline(pipelineDesc, RenderTarget);
 }
 
-void DeferredLightPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
+void ShadowMaskPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
 {
 	RenderTarget = renderTarget;
 }
 
-void DeferredLightPass::SetDependencies(nvrhi::TextureHandle albedo, nvrhi::TextureHandle normal, nvrhi::TextureHandle orm, nvrhi::TextureHandle depth, nvrhi::TextureHandle shadowMask)
+void ShadowMaskPass::SetDependencies(nvrhi::TextureHandle shadow[4], nvrhi::TextureHandle depth)
 {
-	AlbedoHandle = albedo;
-	NormalHandle = normal;
-	AORoughnessMetallicHandle = orm;
-	DepthHandle = depth;
-	ShadowMask = shadowMask;
+	for (int i = 0; i < 4; ++i) {
+		ShadowMaps[i] = shadow[i];
+	}
+	GBufferDepth = depth;
 }
 
-void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
+void ShadowMaskPass::DrawShadowMask(const ragdoll::SceneInformation& sceneInfo)
 {
-	MICROPROFILE_SCOPEI("Render", "Light Pass", MP_BLUEVIOLET);
+	MICROPROFILE_SCOPEI("Render", "Shadow Mask Pass", MP_BLUEVIOLET);
 	//create and set the state
 	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
+	for (int i = 0; i < 4; ++i) {
+		CBuffer.LightViewProj[i] = sceneInfo.CascadeInfo[i].viewProj;
+	}
 	CBuffer.InvViewProj = sceneInfo.MainCameraViewProj.Invert();
-	CBuffer.LightDiffuseColor = sceneInfo.LightDiffuseColor;
-	CBuffer.SceneAmbientColor = sceneInfo.SceneAmbientColor;
-	CBuffer.LightDirection = sceneInfo.LightDirection;
-	CBuffer.CameraPosition = sceneInfo.MainCameraPosition;
-	CBuffer.LightIntensity = sceneInfo.LightIntensity;
+	CBuffer.View = sceneInfo.MainCameraView;
+	CBuffer.EnableCascadeDebug = sceneInfo.EnableCascadeDebug;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(1, ConstantBufferHandle)
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
+		nvrhi::BindingSetItem::Texture_SRV(0, ShadowMaps[0]),
+		nvrhi::BindingSetItem::Texture_SRV(1, ShadowMaps[1]),
+		nvrhi::BindingSetItem::Texture_SRV(2, ShadowMaps[2]),
+		nvrhi::BindingSetItem::Texture_SRV(3, ShadowMaps[3]),
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
 	{
 		bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler(i, AssetManager::GetInstance()->Samplers[i]));
 	}
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(0, AlbedoHandle));
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(1, NormalHandle));
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(2, AORoughnessMetallicHandle));
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(3, DepthHandle));
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(4, ShadowMask));
+	bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler((int)SamplerTypes::COUNT, AssetManager::GetInstance()->ShadowSampler));
+	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(4, GBufferDepth));
 	BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
 	nvrhi::GraphicsState state;
@@ -103,12 +104,11 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 	state.addBindingSet(BindingSetHandle);
-	state.addBindingSet(AssetManager::GetInstance()->DescriptorTable);
 
-	CommandListRef->beginMarker("Light Pass");
+	CommandListRef->beginMarker("Shadow Mask Pass");
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
 	CommandListRef->setGraphicsState(state);
-	
+
 	nvrhi::DrawArguments args;
 	args.vertexCount = 3;
 	CommandListRef->draw(args);

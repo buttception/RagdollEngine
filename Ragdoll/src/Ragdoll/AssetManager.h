@@ -90,10 +90,9 @@ public:
 	nvrhi::TextureHandle DefaultTex;
 	nvrhi::TextureHandle ErrorTex;
 	std::vector<nvrhi::SamplerHandle> Samplers;
+	nvrhi::SamplerHandle ShadowSampler;
 
 	std::unordered_map<std::string, nvrhi::ShaderHandle> Shaders;
-
-	std::unordered_map<std::string, nvrhi::TextureHandle> RenderTargetTextures;
 
 	//no more vbo vectors, but instead is a vector of vb ib offsets
 	//hold onto 1 vbo and ibo here

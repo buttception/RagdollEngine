@@ -2,6 +2,7 @@
 #include "Octree.h"
 
 uint32_t Octree::TotalProxies = 0;
+uint32_t Octree::MaxDepth = 0;
 
 void Octree::Init()
 {
@@ -10,13 +11,13 @@ void Octree::Init()
 	Octant.Subdivide();
 }
 
-bool InsertProxy(Octant& octant, Proxy proxy) {
+bool InsertProxy(Octant& octant, const DirectX::BoundingBox& box, uint32_t index) {
 	//check if within this octant first
-	DirectX::ContainmentType result = octant.Box.Contains(proxy.BoundingBox);
+	DirectX::ContainmentType result = octant.Box.Contains(box);
 	if (result == DirectX::ContainmentType::INTERSECTS){
 		//intersecting with the current octant, add to parent
 		RD_ASSERT(octant.Parent == nullptr, "Bounding Box exceeds than origin octant, consider increasing octree size");
-		octant.Parent->Proxies.push_back(proxy);
+		octant.Parent->Nodes.emplace_back(box, index);
 		Octree::TotalProxies++;
 		return true;
 	}
@@ -27,14 +28,14 @@ bool InsertProxy(Octant& octant, Proxy proxy) {
 			//recursively call to children
 			for (int i = 0; i < 8; ++i)
 			{
-				if (InsertProxy(octant.Octants[i], proxy)) {
+				if (InsertProxy(octant.Octants[i], box, index)) {
 					//insertion is success, can just back out
 					return true;
 				}
 			}
 		}
 		else { //no children can just add in
-			octant.Proxies.push_back(proxy);
+			octant.Nodes.emplace_back(box, index);
 			Octree::TotalProxies++;
 			octant.CheckToSubdivide();
 			//return true because inserted
@@ -44,17 +45,18 @@ bool InsertProxy(Octant& octant, Proxy proxy) {
 	return false;
 }
 
-void Octree::AddProxy(Proxy proxy)
+void Octree::AddProxy(const DirectX::BoundingBox& box, uint32_t index)
 {
 	//add the proxy into the octree
-	InsertProxy(Octant, proxy);
+	InsertProxy(Octant, box, index);
 }
 
 void Octree::Clear()
 {
 	Octant.Octants.clear();
-	Octant.Proxies.clear();
+	Octant.Nodes.clear();
 	Octree::TotalProxies = 0;
+	Octree::MaxDepth = 0;
 	Init();
 }
 
@@ -62,12 +64,12 @@ Octant::~Octant()
 {
 	Octants.clear();
 	Parent = nullptr;
-	Proxies.clear();
+	Nodes.clear();
 }
 
 void Octant::CheckToSubdivide()
 {
-	if (Proxies.size() >= DivisionCriteria)
+	if (Nodes.size() >= DivisionCriteria)
 		Subdivide();
 }
 
@@ -78,16 +80,19 @@ void Octant::Subdivide()
 	{
 		Octant oct;
 		oct.Parent = this;
+		oct.Level = Level + 1;
+		if(Octree::MaxDepth < oct.Level)
+			Octree::MaxDepth = oct.Level;
 		DirectX::BoundingBox::CreateFromPoints(oct.Box, Box.Center + Box.Extents * OctantMinOffsetsScalars[i], Box.Center + Box.Extents * OctantMaxOffsetsScalars[i]);
 		Octants.push_back(oct);
 	}
 	//insert nodes into children
 	//copy the current proxies
-	std::vector<Proxy> copy = Proxies;
-	Octree::TotalProxies -= Proxies.size();
-	Proxies.clear();
-	for (const Proxy& proxy : copy)
+	std::vector<Node> copy = Nodes;
+	Octree::TotalProxies -= Nodes.size();
+	Nodes.clear();
+	for (const Node& node : copy)
 	{
-		InsertProxy(*this, proxy);
+		InsertProxy(*this, node.Box, node.Index);
 	}
 }

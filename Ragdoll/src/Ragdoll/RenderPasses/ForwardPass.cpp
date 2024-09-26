@@ -22,7 +22,11 @@ void ForwardPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle
 	layoutDesc.bindings = {
 		nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
 		nvrhi::BindingLayoutItem::StructuredBuffer_SRV(0),
-		nvrhi::BindingLayoutItem::Sampler(0),
+		nvrhi::BindingLayoutItem::Texture_SRV(1),	//shadow maps
+		nvrhi::BindingLayoutItem::Texture_SRV(2),
+		nvrhi::BindingLayoutItem::Texture_SRV(3),
+		nvrhi::BindingLayoutItem::Texture_SRV(4),
+		nvrhi::BindingLayoutItem::Sampler(0),	//samplers
 		nvrhi::BindingLayoutItem::Sampler(1),
 		nvrhi::BindingLayoutItem::Sampler(2),
 		nvrhi::BindingLayoutItem::Sampler(3),
@@ -31,6 +35,7 @@ void ForwardPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle
 		nvrhi::BindingLayoutItem::Sampler(6),
 		nvrhi::BindingLayoutItem::Sampler(7),
 		nvrhi::BindingLayoutItem::Sampler(8),
+		nvrhi::BindingLayoutItem::Sampler(9),	//comparison sampler
 	};
 	BindingLayoutHandle = NvrhiDeviceRef->createBindingLayout(layoutDesc);
 	//create a constant buffer here
@@ -41,9 +46,6 @@ void ForwardPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle
 	nvrhi::InputLayoutHandle inputLayoutHandle = NvrhiDeviceRef->createInputLayout(attribs.data(), attribs.size(), ForwardVertexShader);
 
 	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
-
-	const static int32_t seed = 42;
-	std::srand(seed);
 
 	pipelineDesc.addBindingLayout(BindingLayoutHandle);
 	pipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
@@ -67,6 +69,14 @@ void ForwardPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
 	RenderTarget = renderTarget;
 }
 
+void ForwardPass::SetDependencies(nvrhi::TextureHandle shadowMap[4])
+{
+	for (int i = 0; i < 4; ++i)
+	{
+		ShadowMap[i] = shadowMap[i];
+	}
+}
+
 void ForwardPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo)
 {
 	if (infos.empty())
@@ -76,20 +86,31 @@ void ForwardPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
 	CBuffer.CameraPosition = sceneInfo.MainCameraPosition;
 	CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
+	CBuffer.View = sceneInfo.MainCameraView;
+	for (int i = 0; i < 4; ++i)
+	{
+		CBuffer.LightViewProj[i] = sceneInfo.CascadeInfo[i].viewProj;
+	}
 	CBuffer.LightDiffuseColor = sceneInfo.LightDiffuseColor;
 	CBuffer.LightDirection = sceneInfo.LightDirection;
 	CBuffer.SceneAmbientColor = sceneInfo.SceneAmbientColor;
 	CBuffer.LightIntensity = sceneInfo.LightIntensity;
+	CBuffer.EnableCascadeDebug = sceneInfo.EnableCascadeDebug;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, instanceBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(1, ShadowMap[0]),
+		nvrhi::BindingSetItem::Texture_SRV(2, ShadowMap[1]),
+		nvrhi::BindingSetItem::Texture_SRV(3, ShadowMap[2]),
+		nvrhi::BindingSetItem::Texture_SRV(4, ShadowMap[3]),
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
 	{
 		bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler(i, AssetManager::GetInstance()->Samplers[i]));
 	}
+	bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler(9, AssetManager::GetInstance()->ShadowSampler));
 	BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
 	nvrhi::GraphicsState state;

@@ -12,7 +12,7 @@ static const float2 g_texcoord[] = {
 void main_vs(
 	in uint inVertexId : SV_VERTEXID,
 	out float4 outPos : SV_Position,
-	out float2 outTexcoord : TEXCOORD1
+	out float2 outTexcoord : TEXCOORD0
 )
 {
 	outPos = float4(g_positions[inVertexId], 1.f);
@@ -24,7 +24,7 @@ sampler sceneColorSampler : register(t1);
 
 void main_ps(
     in float4 inPos: SV_Position,
-    in float2 inTexcoord : TEXCOORD1,
+    in float2 inTexcoord : TEXCOORD0,
     out float4 outColor : SV_Target0
 )
 {

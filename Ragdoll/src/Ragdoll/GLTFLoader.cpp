@@ -35,8 +35,9 @@ void AddToFurthestSibling(ragdoll::Guid child, ragdoll::Guid newChild, std::shar
 		trans->m_Sibling = newChild;
 }
 
-ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndicesOffset, const tinygltf::Model& model, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> scene)
+ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndicesOffset, const tinygltf::Model& model, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> scene, Vector3& min, Vector3& max)
 {
+	static std::stack<Matrix> modelStack;
 	const tinygltf::Node& curr = model.nodes[currIndex];
 	//create the entity
 	entt::entity ent = em->CreateEntity();
@@ -53,27 +54,54 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndice
 	{
 		scene->AddEntityAtRootLevel(currId);
 	}
+
+	Matrix mat;
 	if (curr.matrix.size() > 0) {
 		const std::vector<double>& gltfMat = curr.matrix;
-		Matrix mat {
+		mat = {
 			(float)gltfMat[0], (float)gltfMat[1], (float)gltfMat[2], (float)gltfMat[3], 
 			(float)gltfMat[4], (float)gltfMat[5], (float)gltfMat[6], (float)gltfMat[7], 
 			(float)gltfMat[8], (float)gltfMat[9], (float)gltfMat[10], (float)gltfMat[11],
 			(float)gltfMat[12], (float)gltfMat[13], (float)gltfMat[14], (float)gltfMat[15]};
 		mat.Decompose(transComp->m_LocalScale, transComp->m_LocalRotation, transComp->m_LocalPosition);
 	}
-	if (curr.translation.size() > 0)
-		transComp->m_LocalPosition = { (float)curr.translation[0], (float)curr.translation[1], (float)curr.translation[2] };
-	if (curr.rotation.size() > 0)
-		transComp->m_LocalRotation = { (float)curr.rotation[0], (float)curr.rotation[1], (float)curr.rotation[2], (float)curr.rotation[3] };
-	if (curr.scale.size() > 0)
-		transComp->m_LocalScale = { (float)curr.scale[0], (float)curr.scale[1], (float)curr.scale[2] };
+	else {
+		if (curr.translation.size() > 0)
+			transComp->m_LocalPosition = { (float)curr.translation[0], (float)curr.translation[1], (float)curr.translation[2] };
+		if (curr.rotation.size() > 0)
+			transComp->m_LocalRotation = { (float)curr.rotation[0], (float)curr.rotation[1], (float)curr.rotation[2], (float)curr.rotation[3] };
+		if (curr.scale.size() > 0)
+			transComp->m_LocalScale = { (float)curr.scale[0], (float)curr.scale[1], (float)curr.scale[2] };
+		mat = Matrix::CreateScale(transComp->m_LocalScale) * Matrix::CreateFromQuaternion(transComp->m_LocalRotation) * Matrix::CreateTranslation(transComp->m_LocalPosition);
+	}
+	//since i need the modelstack already i no need transform system to update
+	//transComp->m_Dirty = true;
+	if (!modelStack.empty())
+		transComp->m_ModelToWorld = modelStack.top() * mat;
+	else
+		transComp->m_ModelToWorld = mat;
+	modelStack.push(mat);
 
-	transComp->m_Dirty = true;
+	//get max extents in world space
+	if (curr.mesh >= 0)
+	{
+		for (const Submesh& submesh : AssetManager::GetInstance()->Meshes[curr.mesh + meshIndicesOffset].Submeshes)
+		{
+			const DirectX::BoundingBox box = AssetManager::GetInstance()->VertexBufferInfos[submesh.VertexBufferIndex].BestFitBox;
+			Vector3 worldMin = Vector3::Transform(box.Center - box.Extents, transComp->m_ModelToWorld);
+			Vector3 worldMax = Vector3::Transform(box.Center + box.Extents, transComp->m_ModelToWorld);
+			min.x = std::min({ worldMin.x, worldMax.x, min.x });
+			min.y = std::min({ worldMin.y, worldMax.y, min.y });
+			min.z = std::min({ worldMin.z, worldMax.z, min.z });
+			max.x = std::max({ worldMin.x, worldMax.x, max.x });
+			max.y = std::max({ worldMin.y, worldMax.y, max.y });
+			max.z = std::max({ worldMin.z, worldMax.z, max.z });
+		}
+	}
 
 	const tinygltf::Node& parent = model.nodes[currIndex];
 	for (const int& childIndex : parent.children) {
-		ragdoll::Guid childId = TraverseNode(childIndex, level + 1, meshIndicesOffset, model, em, scene);
+		ragdoll::Guid childId = TraverseNode(childIndex, level + 1, meshIndicesOffset, model, em, scene, min, max);
 		if (transComp->m_Child.m_RawId == 0) {
 			transComp->m_Child = childId;
 		}
@@ -81,6 +109,8 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndice
 			AddToFurthestSibling(transComp->m_Child, childId, em);
 		}
 	}
+
+	modelStack.pop();
 
 	return currId;
 }
@@ -466,10 +496,15 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		AssetManager::GetInstance()->Materials.emplace_back(mat);
 	}
 
+	Vector3 min{ FLT_MAX, FLT_MAX, FLT_MAX }, max{ -FLT_MAX, -FLT_MAX, -FLT_MAX };
 	//create all the entities and their components
 	for (const int& rootIndex : model.scenes[0].nodes) {	//iterating through the root nodes
-		TraverseNode(rootIndex, 0, meshIndicesOffset, model, EntityManagerRef, SceneRef);
+		TraverseNode(rootIndex, 0, meshIndicesOffset, model, EntityManagerRef, SceneRef, min, max);
 	}
+	float offset = 1.f;
+	Vector3 halfExtent{std::max(abs(min.x), abs(max.x)) + offset, std::max(abs(min.y), abs(max.y)) + offset, std::max(abs(min.z), abs(min.z)) + offset };
+	Octree::Max = halfExtent;
+	SceneRef->StaticOctree.Clear();
 #if 0
 	TransformLayer->DebugPrintHierarchy();
 #endif
