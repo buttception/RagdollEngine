@@ -42,7 +42,7 @@ void ToneMapPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle
 	pipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 
 	RD_ASSERT(RenderTarget == nullptr, "Render Target Framebuffer not set");
-	GraphicsPipeline = NvrhiDeviceRef->createGraphicsPipeline(pipelineDesc, RenderTarget);
+	GraphicsPipeline = AssetManager::GetInstance()->GetGraphicsPipeline(pipelineDesc, RenderTarget);
 }
 
 void ToneMapPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)

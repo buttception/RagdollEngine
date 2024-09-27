@@ -59,7 +59,7 @@ void GBufferPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle
 	pipelineDesc.inputLayout = inputLayoutHandle;
 
 	RD_ASSERT(RenderTarget == nullptr, "Render Target Framebuffer not set");
-	GraphicsPipeline = NvrhiDeviceRef->createGraphicsPipeline(pipelineDesc, RenderTarget);
+	GraphicsPipeline = AssetManager::GetInstance()->GetGraphicsPipeline(pipelineDesc, RenderTarget);
 }
 
 void GBufferPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)

@@ -1,7 +1,6 @@
 #include "ragdollpch.h"
 
 #include "AssetManager.h"
-#include "ForwardRenderer.h"
 #include "DirectXDevice.h"
 
 AssetManager* AssetManager::GetInstance()
@@ -18,6 +17,22 @@ int32_t AssetManager::AddImage(Image img)
 	DeviceRef->m_NvrhiDevice->writeDescriptorTable(DescriptorTable, nvrhi::BindingSetItem::Texture_SRV(Images.size(), img.TextureHandle));
 	Images.emplace_back(img);
 	return Images.size() - 1;
+}
+
+nvrhi::GraphicsPipelineHandle AssetManager::GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb)
+{
+	uint32_t hash = HashBytes(&desc);
+	if (GPSOs.contains(hash))
+		return GPSOs.at(hash);
+	return GPSOs[hash] = DeviceRef->m_NvrhiDevice->createGraphicsPipeline(desc, fb);
+}
+
+nvrhi::ComputePipelineHandle AssetManager::GetComputePipeline(const nvrhi::ComputePipelineDesc& desc)
+{
+	uint32_t hash = HashBytes(&desc);
+	if (CPSOs.contains(hash))
+		return CPSOs.at(hash);
+	return CPSOs[hash] = DeviceRef->m_NvrhiDevice->createComputePipeline(desc);
 }
 
 void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_ptr<ragdoll::FileManager> fm)

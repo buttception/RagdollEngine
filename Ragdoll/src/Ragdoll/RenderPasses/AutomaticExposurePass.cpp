@@ -87,10 +87,10 @@ void AutomaticExposurePass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::Command
 
 	pipelineDesc.bindingLayouts = { LuminanceHistogramBindingLayoutHandle };
 	pipelineDesc.CS = LuminanceHistogramShader;
-	LuminanceHistogramPipeline = NvrhiDeviceRef->createComputePipeline(pipelineDesc);
+	LuminanceHistogramPipeline = AssetManager::GetInstance()->GetComputePipeline(pipelineDesc);
 	pipelineDesc.bindingLayouts = { LuminanceAverageBindingLayoutHandle };
 	pipelineDesc.CS = LuminanceAverageShader;
-	LuminanceAveragePipeline = NvrhiDeviceRef->createComputePipeline(pipelineDesc);
+	LuminanceAveragePipeline = AssetManager::GetInstance()->GetComputePipeline(pipelineDesc);
 }
 
 void AutomaticExposurePass::SetDependencies(nvrhi::TextureHandle sceneColor)
