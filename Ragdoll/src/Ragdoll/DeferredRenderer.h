@@ -18,8 +18,9 @@ namespace ragdoll {
 }
 class DirectXDevice;
 
-class DeferredRenderer {
+class Renderer {
 public:
+
 	std::shared_ptr<GBufferPass> GBufferPass;
 	std::shared_ptr<ShadowPass> ShadowPass;
 	std::shared_ptr<ShadowMaskPass> ShadowMaskPass;
@@ -37,6 +38,9 @@ public:
 	nvrhi::TextureHandle ShadowMap[4];
 	nvrhi::TextureHandle ShadowMask;
 	nvrhi::CommandListHandle CommandList;
+
+	//debug infos
+	float AdaptedLuminance;
 
 	void Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene);
 	void Shutdown();

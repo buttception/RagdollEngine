@@ -3,7 +3,6 @@
 #include <nvrhi/nvrhi.h>
 #include "Ragdoll/Math/RagdollMath.h"
 #include "AssetManager.h"
-#include "ForwardRenderer.h"
 
 class GeometryBuilder {
 public:

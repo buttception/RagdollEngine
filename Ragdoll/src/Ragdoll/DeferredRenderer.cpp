@@ -13,7 +13,7 @@
 #include "Scene.h"
 #include "GeometryBuilder.h"
 
-void DeferredRenderer::Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
+void Renderer::Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 {
 	DeviceRef = device;
 	PrimaryWindowRef = win;
@@ -31,14 +31,14 @@ void DeferredRenderer::Init(std::shared_ptr<DirectXDevice> device, std::shared_p
 	CreateResource();
 }
 
-void DeferredRenderer::Shutdown()
+void Renderer::Shutdown()
 {
 	//release nvrhi stuff
 	CommandList = nullptr;
 	DepthHandle = nullptr;
 }
 
-void DeferredRenderer::BeginFrame()
+void Renderer::BeginFrame()
 {
 	MICROPROFILE_SCOPEI("Render", "Begin Frame", MP_BLUE);
 	DeviceRef->BeginFrame();
@@ -67,7 +67,7 @@ void DeferredRenderer::BeginFrame()
 	}
 }
 
-void DeferredRenderer::Render(ragdoll::Scene* scene, float _dt)
+void Renderer::Render(ragdoll::Scene* scene, float _dt)
 {
 	BeginFrame();
 	
@@ -91,6 +91,9 @@ void DeferredRenderer::Render(ragdoll::Scene* scene, float _dt)
 	//tone map and gamma correct
 	ToneMapPass->SetRenderTarget(fb);
 	ToneMapPass->ToneMap(scene->SceneInfo, exposure);
+
+	fbDesc.setDepthAttachment(DepthHandle);
+	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
 	//draw debug items
 	DebugPass->SetRenderTarget(fb);
 	DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo);
@@ -98,15 +101,16 @@ void DeferredRenderer::Render(ragdoll::Scene* scene, float _dt)
 	CommandList->close();
 	DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
 
+	//readback all the debug infos needed
 	float* valPtr;
 	if (valPtr = (float*)DeviceRef->m_NvrhiDevice->mapBuffer(AutomaticExposurePass->ReadbackBuffer, nvrhi::CpuAccessMode::Read))
 	{
-		RD_CORE_INFO("{}", *valPtr);
+		AdaptedLuminance = *valPtr;
 		DeviceRef->m_NvrhiDevice->unmapBuffer(AutomaticExposurePass->ReadbackBuffer);
 	}
 }
 
-void DeferredRenderer::CreateResource()
+void Renderer::CreateResource()
 {
 	CommandList = DeviceRef->m_NvrhiDevice->createCommandList();
 
