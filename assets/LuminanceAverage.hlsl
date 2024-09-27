@@ -44,7 +44,7 @@ void main_cs(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, uint3 
     // Only a single thread needs to calculate the final result
     if (GIid == 0) {
         // Calculate weighted log average and divide by the number of pixels
-        float weightedLogAverage = (float(histogramShared[0]) / max(float(NumPixels) - float(countForThisBin), 1.0)) - 1.0;
+        float weightedLogAverage = (float(histogramShared[0]) / max(NumPixels - countForThisBin, 1)) - 1.0;
 
         // Map from histogram space to actual luminance
         float weightedAvgLum = exp2(((weightedLogAverage / 254.0) * LogLuminanceRange) + MinLogLuminance);

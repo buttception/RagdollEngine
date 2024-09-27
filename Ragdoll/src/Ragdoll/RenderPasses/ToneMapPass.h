@@ -8,6 +8,7 @@ class ToneMapPass {
 	struct ConstantBuffer {
 		float Gamma;
 		float Exposure;
+		int32_t UseFixedExposure{ 0 };
 	}CBuffer;
 
 	nvrhi::FramebufferHandle RenderTarget{ nullptr };

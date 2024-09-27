@@ -62,6 +62,7 @@ void ToneMapPass::ToneMap(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buf
 	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
 	CBuffer.Exposure = sceneInfo.Exposure;
 	CBuffer.Gamma = sceneInfo.Gamma;
+	CBuffer.UseFixedExposure = sceneInfo.UseFixedExposure;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {

@@ -100,22 +100,25 @@ void AutomaticExposurePass::SetDependencies(nvrhi::TextureHandle sceneColor)
 
 nvrhi::BufferHandle AutomaticExposurePass::GetAdaptedLuminance(float _dt)
 {
+	float minLuminance = -8.f;
+	float maxLuminance = 3.5;
+
 	CommandListRef->beginMarker("AutomaticExposure");
 	nvrhi::ComputeState state;
 	state.pipeline = LuminanceHistogramPipeline;
 	state.bindings = { LuminanceHistogramBindingSetHandle };
 	LuminanceHistogramCBuffer.Width = SceneColor->getDesc().width;
 	LuminanceHistogramCBuffer.Height = SceneColor->getDesc().height;
-	LuminanceHistogramCBuffer.MinLogLuminance = -10.f;
-	LuminanceHistogramCBuffer.InvLogLuminanceRange = 1.f / 12.f;
+	LuminanceHistogramCBuffer.MinLogLuminance = minLuminance;
+	LuminanceHistogramCBuffer.InvLogLuminanceRange = 1.f / (maxLuminance - minLuminance);
 	CommandListRef->writeBuffer(LuminanceHistogramCBufferHandle, &LuminanceHistogramCBuffer, sizeof(class LuminanceHistogramCBuffer));
 	CommandListRef->setComputeState(state);
 	CommandListRef->dispatch(SceneColor->getDesc().width / 16 + 1, SceneColor->getDesc().height / 16 + 1, 1);
 
 	state.pipeline = LuminanceAveragePipeline;
 	state.bindings = { LuminanceAverageBindingSetHandle };
-	LuminanceAverageCBuffer.MinLogLuminance = -10.f;
-	LuminanceAverageCBuffer.InvLogLuminanceRange = 1.f / 12.f;
+	LuminanceAverageCBuffer.MinLogLuminance = minLuminance;
+	LuminanceAverageCBuffer.LogLuminanceRange = maxLuminance - minLuminance;
 	LuminanceAverageCBuffer.NumPixels = SceneColor->getDesc().width * SceneColor->getDesc().height;
 	LuminanceAverageCBuffer.TimeCoeff = 1.f - exp(-_dt * 1.1f);
 	CommandListRef->writeBuffer(LuminanceAverageCBufferHandle, &LuminanceAverageCBuffer, sizeof(class LuminanceAverageCBuffer));

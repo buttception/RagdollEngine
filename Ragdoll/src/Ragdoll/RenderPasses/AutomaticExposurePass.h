@@ -15,7 +15,7 @@ class AutomaticExposurePass {
 	}LuminanceHistogramCBuffer;
 	struct LuminanceAverageCBuffer {
 		float MinLogLuminance;
-		float InvLogLuminanceRange;
+		float LogLuminanceRange;
 		float TimeCoeff;
 		float NumPixels;
 	}LuminanceAverageCBuffer;
