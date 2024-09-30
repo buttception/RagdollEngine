@@ -101,6 +101,10 @@ void ragdoll::Scene::Update(float _dt)
 	}
 
 	ImGui::Begin("Debug");
+	if (ImGui::Button("Reload Shaders")) {
+		//need to call bat file to recompile
+		AssetManager::GetInstance()->RecompileShaders();
+	}
 	ImGui::SliderFloat("Gamma", &SceneInfo.Gamma, 0.5f, 3.f);
 	ImGui::Checkbox("UseFixedExposure", &SceneInfo.UseFixedExposure);
 	if (SceneInfo.UseFixedExposure)

@@ -117,6 +117,15 @@ nvrhi::BindingLayoutHandle AssetManager::GetBindingLayout(const nvrhi::BindingSe
 	return BindingLayouts[hash] = DirectXDevice::GetNativeDevice()->createBindingLayout(layoutDesc);
 }
 
+void AssetManager::RecompileShaders()
+{
+	std::filesystem::path Path = FileManagerRef->GetRoot().parent_path() / "Tools";
+	system(("call " + Path.string() + "\\compileShader.bat < NUL").c_str());
+	Shaders.clear();
+	GPSOs.clear();
+	CPSOs.clear();
+}
+
 void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
 {
 	FileManagerRef = fm;

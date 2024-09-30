@@ -133,6 +133,7 @@ public:
 	nvrhi::GraphicsPipelineHandle GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb);
 	nvrhi::ComputePipelineHandle GetComputePipeline(const nvrhi::ComputePipelineDesc& desc);
 	nvrhi::BindingLayoutHandle GetBindingLayout(const nvrhi::BindingSetDesc& desc);
+	void RecompileShaders();
 
 	void Init(std::shared_ptr<ragdoll::FileManager> fm);
 	//this function will just add the vertices and indices, and populate the vector of objects
