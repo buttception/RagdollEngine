@@ -102,12 +102,12 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 	DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
 
 	//readback all the debug infos needed
-	float* valPtr;
+	/*float* valPtr;
 	if (valPtr = (float*)DeviceRef->m_NvrhiDevice->mapBuffer(AutomaticExposurePass->ReadbackBuffer, nvrhi::CpuAccessMode::Read))
 	{
 		AdaptedLuminance = *valPtr;
 	}
-	DeviceRef->m_NvrhiDevice->unmapBuffer(AutomaticExposurePass->ReadbackBuffer);
+	DeviceRef->m_NvrhiDevice->unmapBuffer(AutomaticExposurePass->ReadbackBuffer);*/
 }
 
 void Renderer::CreateResource()

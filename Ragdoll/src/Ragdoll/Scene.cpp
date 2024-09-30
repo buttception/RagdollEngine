@@ -624,11 +624,14 @@ void ragdoll::Scene::BuildStaticCascadeMapInstances()
 			DirectX::BoundingOrientedBox box;
 			Vector3 scale = { SceneInfo.CascadeInfo[cascadeIndex].width, SceneInfo.CascadeInfo[cascadeIndex].height, 1000.f };
 			Matrix matrix = Matrix::CreateScale(scale);
-			DirectX::XMVECTOR forward = DirectX::XMVector3Normalize(-SceneInfo.LightDirection);
-			DirectX::XMVECTOR worldUp = DirectX::XMVectorSet(0.f, 1.f, 0.f, 0.f);
-			DirectX::XMVECTOR right = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(worldUp, forward));
-			DirectX::XMVECTOR up = DirectX::XMVector3Cross(forward, right);
-			DirectX::XMMATRIX rotationMatrix = DirectX::XMMATRIX(
+			Vector3 forward = -SceneInfo.LightDirection;
+			Vector3 worldUp = { 0.f, 1.f, 0.f };
+			if (fabsf(forward.Dot(worldUp)) > 0.99f) {
+				worldUp = { 1.f, 0.f, 0.f };
+			}
+			Vector3 right = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(worldUp, forward));
+			Vector3 up = DirectX::XMVector3Cross(forward, right);
+			Matrix rotationMatrix = DirectX::XMMATRIX(
 				right,         // Right vector (x-axis)
 				up,            // Up vector (y-axis)
 				forward,       // Forward vector (z-axis)
@@ -876,7 +879,12 @@ void ragdoll::Scene::UpdateShadowCascadesExtents()
 		center.z = (int)center.z;
 		//move all corners into a 1x1x1 cube lightspace with the directional light
 		Matrix lightProj = DirectX::XMMatrixOrthographicLH(1.f, 1.f, -0.5f, 0.5f);	//should be a 1x1x1 cube?
-		SceneInfo.CascadeInfo[i - 1].view = DirectX::XMMatrixLookAtLH(center, center - SceneInfo.LightDirection, {0.f, 1.f, 0.f});
+		Vector3 lightDir = -SceneInfo.LightDirection;
+		Vector3 up = { 0.f, 1.f, 0.f };
+		if (fabsf(lightDir.Dot(up)) > 0.99f) {
+			up = { 1.f, 0.f, 0.f };
+		}
+		SceneInfo.CascadeInfo[i - 1].view = DirectX::XMMatrixLookAtLH(center, center + lightDir, up);
 		Matrix lightViewProj = SceneInfo.CascadeInfo[i - 1].view * lightProj;
 		//get the furthest extents of the corners for the left right top and bottom values
 		Vector3 min = { FLT_MAX, FLT_MAX, FLT_MAX };

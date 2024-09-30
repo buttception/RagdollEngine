@@ -121,6 +121,8 @@ nvrhi::BufferHandle AutomaticExposurePass::GetAdaptedLuminance(float _dt)
 	CommandListRef->writeBuffer(LuminanceAverageCBufferHandle, &LuminanceAverageCBuffer, sizeof(class LuminanceAverageCBuffer));
 	CommandListRef->setComputeState(state);
 	CommandListRef->dispatch(1, 1, 1);
+
+	//copy for the readback
 	CommandListRef->copyBuffer(ReadbackBuffer, 0, AdaptedLuminanceHandle, 0, sizeof(float));
 
 	CommandListRef->endMarker();
