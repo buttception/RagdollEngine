@@ -56,15 +56,30 @@ static bool IsNvDeviceID(UINT id)
 	return id == 0x10DE;
 }
 
-std::shared_ptr<DirectXDevice> DirectXDevice::Create(DeviceCreationParameters creationParam, std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm)
+DirectXDevice* DirectXDevice::GetInstance()
 {
-	std::shared_ptr<DirectXDevice> device = std::make_shared<DirectXDevice>();
-	device->m_DeviceParams = creationParam;
-	device->m_PrimaryWindow = win;
-	device->m_FileManager = fm;
-	device->CreateDevice();
-	device->CreateSwapChain();
-	return device;
+	if (!s_Instance)
+		s_Instance = std::make_unique<DirectXDevice>();
+	return s_Instance.get();
+}
+
+nvrhi::DeviceHandle DirectXDevice::GetNativeDevice()
+{
+	if (s_Instance && s_Instance->bIsCreated)
+		return s_Instance->m_NvrhiDevice;
+	RD_CORE_FATAL("Device has not been created!");
+	return nullptr;
+}
+
+void DirectXDevice::Create(DeviceCreationParameters creationParam, std::shared_ptr<ragdoll::Window> win, std::shared_ptr<ragdoll::FileManager> fm)
+{
+
+	m_DeviceParams = creationParam;
+	m_PrimaryWindow = win;
+	m_FileManager = fm;
+	CreateDevice();
+	CreateSwapChain();
+	bIsCreated = true;
 }
 
 void DirectXDevice::Shutdown()

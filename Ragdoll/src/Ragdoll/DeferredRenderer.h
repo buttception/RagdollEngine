@@ -42,14 +42,13 @@ public:
 	//debug infos
 	float AdaptedLuminance;
 
-	void Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene);
+	void Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene);
 	void Shutdown();
 
 	void BeginFrame();
 	void Render(ragdoll::Scene* scene, float _dt);
 private:
 	std::shared_ptr<ragdoll::Window> PrimaryWindowRef;
-	std::shared_ptr<DirectXDevice> DeviceRef;
 	//handled at renderer
 	void CreateResource();
 };

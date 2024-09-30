@@ -68,7 +68,6 @@ namespace ragdoll
 		std::shared_ptr<EntityManager> m_EntityManager;
 		std::shared_ptr<FileManager> m_FileManager;
 		std::shared_ptr<Scene> m_Scene;
-		std::shared_ptr<DirectXDevice> Graphic;
 		ApplicationConfig Config;
 
 		Application() = default;

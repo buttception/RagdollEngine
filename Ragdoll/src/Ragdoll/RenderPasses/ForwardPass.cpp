@@ -42,7 +42,7 @@ void ForwardPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle
 	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ForwardPass CBuffer", 1);
 	ConstantBufferHandle = NvrhiDeviceRef->createBuffer(cBufDesc);
 
-	const auto& attribs = AssetManager::GetInstance()->VertexAttributes;
+	const auto& attribs = AssetManager::GetInstance()->InstancedVertexAttributes;
 	nvrhi::InputLayoutHandle inputLayoutHandle = NvrhiDeviceRef->createInputLayout(attribs.data(), attribs.size(), ForwardVertexShader);
 
 	PipelineDesc.addBindingLayout(BindingLayoutHandle);

@@ -112,7 +112,6 @@ namespace ragdoll {
 	class Scene {
 		std::shared_ptr<EntityManager> EntityManagerRef;
 		std::shared_ptr<Window> PrimaryWindowRef;
-		std::shared_ptr<DirectXDevice> DeviceRef;
 
 		std::shared_ptr<ImguiRenderer> ImguiInterface;
 
