@@ -155,7 +155,7 @@ void Renderer::CreateResource()
 
 	AutomaticExposurePass = std::make_shared<class AutomaticExposurePass>();
 	AutomaticExposurePass->SetDependencies(SceneColor);
-	AutomaticExposurePass->Init(DirectXDevice::GetNativeDevice(), CommandList);
+	AutomaticExposurePass->Init(CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer());

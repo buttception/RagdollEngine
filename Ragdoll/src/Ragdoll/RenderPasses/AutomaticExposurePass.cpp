@@ -6,38 +6,11 @@
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
+#include "Ragdoll/DirectXDevice.h"
 
-void AutomaticExposurePass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle cmdList)
+void AutomaticExposurePass::Init(nvrhi::CommandListHandle cmdList)
 {
 	CommandListRef = cmdList;
-	NvrhiDeviceRef = nvrhiDevice;
-
-	//create the pipeline
-	//load outputted shaders objects
-	LuminanceHistogramShader = AssetManager::GetInstance()->GetShader("LuminanceHistogram.cs.cso");
-	LuminanceAverageShader = AssetManager::GetInstance()->GetShader("LuminanceAverage.cs.cso");
-
-	nvrhi::BindingLayoutDesc layoutDesc = nvrhi::BindingLayoutDesc();
-	layoutDesc.visibility = nvrhi::ShaderType::All;
-	layoutDesc.bindings = {
-		nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-		nvrhi::BindingLayoutItem::TypedBuffer_UAV(0),	//histo buffer
-		nvrhi::BindingLayoutItem::Texture_SRV(0),	//scene color
-	};
-	LuminanceHistogramBindingLayoutHandle = NvrhiDeviceRef->createBindingLayout(layoutDesc);
-	layoutDesc.bindings = {
-		nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-		nvrhi::BindingLayoutItem::TypedBuffer_UAV(0),	//histo buffer
-		nvrhi::BindingLayoutItem::TypedBuffer_UAV(1),	//result
-	};
-	LuminanceAverageBindingLayoutHandle = NvrhiDeviceRef->createBindingLayout(layoutDesc);
-
-	//create a constant buffer here
-	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(class LuminanceHistogramCBuffer), "Luminance Histo CBuffer", 1);
-	LuminanceHistogramCBufferHandle = NvrhiDeviceRef->createBuffer(cBufDesc);
-	//create a constant buffer here
-	cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(class LuminanceAverageCBuffer), "Luminance Avg CBuffer", 1);
-	LuminanceAverageCBufferHandle = NvrhiDeviceRef->createBuffer(cBufDesc);
 
 	nvrhi::BufferDesc histoDesc;
 	histoDesc.byteSize = 256 * sizeof(uint32_t);
@@ -47,7 +20,7 @@ void AutomaticExposurePass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::Command
 	histoDesc.canHaveUAVs = true;
 	histoDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	histoDesc.keepInitialState = true;
-	LuminanceHistogramHandle = NvrhiDeviceRef->createBuffer(histoDesc);
+	LuminanceHistogramHandle = DirectXDevice::GetNativeDevice()->createBuffer(histoDesc);
 
 	nvrhi::BufferDesc resultDesc;
 	resultDesc.byteSize = sizeof(float);
@@ -57,7 +30,7 @@ void AutomaticExposurePass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::Command
 	resultDesc.canHaveUAVs = true;
 	resultDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	resultDesc.keepInitialState = true;
-	AdaptedLuminanceHandle = NvrhiDeviceRef->createBuffer(resultDesc);
+	AdaptedLuminanceHandle = DirectXDevice::GetNativeDevice()->createBuffer(resultDesc);
 
 	nvrhi::BufferDesc readbackBufferDesc;
 	readbackBufferDesc.byteSize = sizeof(float); // Size should match the size of the UAV buffer
@@ -65,29 +38,8 @@ void AutomaticExposurePass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::Command
 	readbackBufferDesc.cpuAccess = nvrhi::CpuAccessMode::Read; // Enable CPU read access
 	readbackBufferDesc.debugName = "ReadbackBuffer";
 
-	ReadbackBuffer = NvrhiDeviceRef->createBuffer(readbackBufferDesc);
+	ReadbackBuffer = DirectXDevice::GetNativeDevice()->createBuffer(readbackBufferDesc);
 
-	nvrhi::BindingSetDesc histoSetDesc;
-	histoSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(0, LuminanceHistogramCBufferHandle),
-		nvrhi::BindingSetItem::TypedBuffer_UAV(0, LuminanceHistogramHandle),
-		nvrhi::BindingSetItem::Texture_SRV(0, SceneColor)
-	};
-	LuminanceHistogramBindingSetHandle = NvrhiDeviceRef->createBindingSet(histoSetDesc, LuminanceHistogramBindingLayoutHandle);
-
-	nvrhi::BindingSetDesc averageSetDesc;
-	averageSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(0, LuminanceAverageCBufferHandle),
-		nvrhi::BindingSetItem::TypedBuffer_UAV(0, AdaptedLuminanceHandle),
-		nvrhi::BindingSetItem::TypedBuffer_UAV(1, LuminanceHistogramHandle),
-	};
-	LuminanceAverageBindingSetHandle = NvrhiDeviceRef->createBindingSet(averageSetDesc, LuminanceAverageBindingLayoutHandle);
-
-	LuminanceHistogramPipelineDesc.bindingLayouts = { LuminanceHistogramBindingLayoutHandle };
-	LuminanceHistogramPipelineDesc.CS = LuminanceHistogramShader;
-
-	LuminanceAveragePipelineDesc.bindingLayouts = { LuminanceAverageBindingLayoutHandle };
-	LuminanceAveragePipelineDesc.CS = LuminanceAverageShader;
 }
 
 void AutomaticExposurePass::SetDependencies(nvrhi::TextureHandle sceneColor)
@@ -99,6 +51,42 @@ nvrhi::BufferHandle AutomaticExposurePass::GetAdaptedLuminance(float _dt)
 {
 	float minLuminance = -8.f;
 	float maxLuminance = 3.5;
+
+	//create a constant buffer here
+	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(class LuminanceHistogramCBuffer), "Luminance Histo CBuffer", 1);
+	nvrhi::BufferHandle LuminanceHistogramCBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(cBufDesc);
+	cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(class LuminanceAverageCBuffer), "Luminance Avg CBuffer", 1);
+	nvrhi::BufferHandle LuminanceAverageCBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(cBufDesc);
+
+	//binding layout and sets
+	nvrhi::BindingSetDesc histoSetDesc;
+	histoSetDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, LuminanceHistogramCBufferHandle),
+		nvrhi::BindingSetItem::TypedBuffer_UAV(0, LuminanceHistogramHandle),
+		nvrhi::BindingSetItem::Texture_SRV(0, SceneColor)
+	};
+	nvrhi::BindingLayoutHandle LuminanceHistogramBindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(histoSetDesc);
+	nvrhi::BindingSetHandle LuminanceHistogramBindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(histoSetDesc, LuminanceHistogramBindingLayoutHandle);
+
+	nvrhi::BindingSetDesc averageSetDesc;
+	averageSetDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, LuminanceAverageCBufferHandle),
+		nvrhi::BindingSetItem::TypedBuffer_UAV(0, AdaptedLuminanceHandle),
+		nvrhi::BindingSetItem::TypedBuffer_UAV(1, LuminanceHistogramHandle),
+	};
+	nvrhi::BindingLayoutHandle LuminanceAverageBindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(averageSetDesc);
+	nvrhi::BindingSetHandle LuminanceAverageBindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(averageSetDesc, LuminanceAverageBindingLayoutHandle);
+
+	//pipeline descs
+	nvrhi::ComputePipelineDesc LuminanceHistogramPipelineDesc;
+	LuminanceHistogramPipelineDesc.bindingLayouts = { LuminanceHistogramBindingLayoutHandle };
+	nvrhi::ShaderHandle LuminanceHistogramShader = AssetManager::GetInstance()->GetShader("LuminanceHistogram.cs.cso");
+	LuminanceHistogramPipelineDesc.CS = LuminanceHistogramShader;
+
+	nvrhi::ComputePipelineDesc LuminanceAveragePipelineDesc;
+	LuminanceAveragePipelineDesc.bindingLayouts = { LuminanceAverageBindingLayoutHandle };
+	nvrhi::ShaderHandle LuminanceAverageShader = AssetManager::GetInstance()->GetShader("LuminanceAverage.cs.cso");
+	LuminanceAveragePipelineDesc.CS = LuminanceAverageShader;
 
 	CommandListRef->beginMarker("AutomaticExposure");
 	nvrhi::ComputeState state;

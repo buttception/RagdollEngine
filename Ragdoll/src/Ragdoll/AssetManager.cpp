@@ -365,8 +365,11 @@ nvrhi::ShaderHandle AssetManager::GetShader(const std::string& shaderFilename)
 	}
 	uint32_t size{};
 	const uint8_t* data = FileManagerRef->ImmediateLoad(shaderFilename, size);
+	nvrhi::ShaderDesc desc;
+	desc.shaderType = type;
+	desc.debugName = shaderFilename;
 	nvrhi::ShaderHandle shader = DirectXDevice::GetInstance()->m_NvrhiDevice->createShader(
-		nvrhi::ShaderDesc(type),
+		desc,
 		data, size);
 	Shaders[shaderFilename] = shader;
 	return Shaders.at(shaderFilename);
