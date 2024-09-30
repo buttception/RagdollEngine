@@ -73,7 +73,6 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 	CommandList->open();
 
 	//gbuffer
-	GBufferPass->SetDependencies(AssetManager::GetInstance()->GetShader("GBufferShader.vs.cso"), AssetManager::GetInstance()->GetShader("GBufferShader.ps.cso"));
 	GBufferPass->DrawAllInstances(scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo);
 	//directional light shadow
 	ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles, scene->StaticCascadeInstanceInfos, scene->SceneInfo);
@@ -102,12 +101,12 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 
 	//readback all the debug infos needed
-	/*float* valPtr;
-	if (valPtr = (float*)DeviceRef->m_NvrhiDevice->mapBuffer(AutomaticExposurePass->ReadbackBuffer, nvrhi::CpuAccessMode::Read))
+	float* valPtr;
+	if (valPtr = (float*)DirectXDevice::GetNativeDevice()->mapBuffer(AutomaticExposurePass->ReadbackBuffer, nvrhi::CpuAccessMode::Read))
 	{
 		AdaptedLuminance = *valPtr;
 	}
-	DeviceRef->m_NvrhiDevice->unmapBuffer(AutomaticExposurePass->ReadbackBuffer);*/
+	DirectXDevice::GetNativeDevice()->unmapBuffer(AutomaticExposurePass->ReadbackBuffer);
 }
 
 void Renderer::CreateResource()
@@ -123,7 +122,7 @@ void Renderer::CreateResource()
 	}
 	ShadowPass = std::make_shared<class ShadowPass>();
 	ShadowPass->SetRenderTarget(fbArr);
-	ShadowPass->Init(DirectXDevice::GetNativeDevice(), CommandList);
+	ShadowPass->Init(CommandList);
 
 	nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(ShadowMask);
@@ -132,7 +131,7 @@ void Renderer::CreateResource()
 	ShadowMaskPass = std::make_shared<class ShadowMaskPass>();
 	ShadowMaskPass->SetRenderTarget(fb);
 	ShadowMaskPass->SetDependencies(ShadowMap, DepthHandle);
-	ShadowMaskPass->Init(DirectXDevice::GetNativeDevice(), CommandList);
+	ShadowMaskPass->Init(CommandList);
 
 	//create the fb for the graphics pipeline to draw on
 	fbDesc = nvrhi::FramebufferDesc()
@@ -152,7 +151,7 @@ void Renderer::CreateResource()
 	DeferredLightPass = std::make_shared<class DeferredLightPass>();
 	DeferredLightPass->SetRenderTarget(fb);
 	DeferredLightPass->SetDependencies(AlbedoHandle, NormalHandle, AORoughnessMetallicHandle, DepthHandle, ShadowMask);
-	DeferredLightPass->Init(DirectXDevice::GetNativeDevice(), CommandList);
+	DeferredLightPass->Init(CommandList);
 
 	AutomaticExposurePass = std::make_shared<class AutomaticExposurePass>();
 	AutomaticExposurePass->SetDependencies(SceneColor);
@@ -164,7 +163,7 @@ void Renderer::CreateResource()
 	ToneMapPass = std::make_shared<class ToneMapPass>();
 	ToneMapPass->SetRenderTarget(fb);
 	ToneMapPass->SetDependencies(SceneColor);
-	ToneMapPass->Init(DirectXDevice::GetNativeDevice(), CommandList);
+	ToneMapPass->Init(CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer())
@@ -172,5 +171,5 @@ void Renderer::CreateResource()
 	fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
 	DebugPass = std::make_shared<class DebugPass>();
 	DebugPass->SetRenderTarget(fb);
-	DebugPass->Init(DirectXDevice::GetNativeDevice(), CommandList);
+	DebugPass->Init(CommandList);
 }

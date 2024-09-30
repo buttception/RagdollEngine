@@ -6,40 +6,11 @@
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
+#include "Ragdoll/DirectXDevice.h"
 
-void ShadowPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle cmdList)
+void ShadowPass::Init(nvrhi::CommandListHandle cmdList)
 {
 	CommandListRef = cmdList;
-	NvrhiDeviceRef = nvrhiDevice;
-
-	//create the pipeline
-	//load outputted shaders objects
-	VertexShader = AssetManager::GetInstance()->GetShader("DirectionalShadow.vs.cso");
-	//TODO: move into draw call then create only if needed
-	nvrhi::BindingLayoutDesc layoutDesc = nvrhi::BindingLayoutDesc();
-	layoutDesc.visibility = nvrhi::ShaderType::All;
-	layoutDesc.bindings = {
-		nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-		nvrhi::BindingLayoutItem::StructuredBuffer_SRV(0),
-	};
-	BindingLayoutHandle = NvrhiDeviceRef->createBindingLayout(layoutDesc);
-	//create a constant buffer here
-	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ShadowPass CBuffer", 1);
-	ConstantBufferHandle = NvrhiDeviceRef->createBuffer(cBufDesc);
-
-	const auto& attribs = AssetManager::GetInstance()->InstancedVertexAttributes;
-	nvrhi::InputLayoutHandle inputLayoutHandle = NvrhiDeviceRef->createInputLayout(attribs.data(), attribs.size(), VertexShader);
-
-	PipelineDesc.addBindingLayout(BindingLayoutHandle);
-	PipelineDesc.setVertexShader(VertexShader);
-
-	PipelineDesc.renderState.depthStencilState.depthTestEnable = true;
-	PipelineDesc.renderState.depthStencilState.stencilEnable = false;
-	PipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
-	PipelineDesc.renderState.depthStencilState.depthFunc = nvrhi::ComparisonFunc::Greater;
-	PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
-	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
-	PipelineDesc.inputLayout = inputLayoutHandle;
 
 	RD_ASSERT(RenderTarget == nullptr, "Render Target Framebuffer not set");
 }
@@ -58,16 +29,31 @@ void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer[4], std::ve
 	for (int i = 0; i < 4; ++i) {
 		if (infos[i].empty())
 			continue;
-		//create and set the state
 		nvrhi::FramebufferHandle pipelineFb = RenderTarget[i];
-		//create the light view proj
 
-		nvrhi::BindingSetDesc bindingSetDesc;
-		bindingSetDesc.bindings = {
+		nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ShadowPass CBuffer", 1);
+		nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
+
+		nvrhi::BindingSetDesc BindingSetDesc;
+		BindingSetDesc.bindings = {
 			nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 			nvrhi::BindingSetItem::StructuredBuffer_SRV(0, instanceBuffer[i]),
 		};
-		BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+		nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
+		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(BindingSetDesc, BindingLayoutHandle);
+
+		nvrhi::GraphicsPipelineDesc PipelineDesc;
+		PipelineDesc.addBindingLayout(BindingLayoutHandle); 
+		nvrhi::ShaderHandle VertexShader = AssetManager::GetInstance()->GetShader("DirectionalShadow.vs.cso");
+		PipelineDesc.setVertexShader(VertexShader);
+
+		PipelineDesc.renderState.depthStencilState.depthTestEnable = true;
+		PipelineDesc.renderState.depthStencilState.stencilEnable = false;
+		PipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
+		PipelineDesc.renderState.depthStencilState.depthFunc = nvrhi::ComparisonFunc::Greater;
+		PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+		PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
+		PipelineDesc.inputLayout = AssetManager::GetInstance()->InstancedInputLayoutHandle;
 
 		nvrhi::GraphicsState state;
 		state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, RenderTarget[0]);

@@ -13,22 +13,14 @@ class ToneMapPass {
 
 	nvrhi::FramebufferHandle RenderTarget{ nullptr };
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
-	nvrhi::DeviceHandle NvrhiDeviceRef{ nullptr };
 
-	nvrhi::TextureHandle SceneColor;
-
-	nvrhi::ShaderHandle VertexShader;
-	nvrhi::ShaderHandle PixelShader;
-	nvrhi::BindingLayoutHandle BindingLayoutHandle;
-	nvrhi::BindingSetHandle BindingSetHandle;
-	nvrhi::BufferHandle ConstantBufferHandle;
-	nvrhi::GraphicsPipelineDesc PipelineDesc;
+	nvrhi::TextureHandle Target;
 
 public:
-	void Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle cmdList);
+	void Init(nvrhi::CommandListHandle cmdList);
 
 	void SetRenderTarget(nvrhi::FramebufferHandle renderTarget);
-	void SetDependencies(nvrhi::TextureHandle sceneColor);
+	void SetDependencies(nvrhi::TextureHandle SceneColor);
 
 	void ToneMap(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle exposureHandle);
 };

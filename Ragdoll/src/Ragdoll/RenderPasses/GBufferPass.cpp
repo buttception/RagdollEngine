@@ -18,12 +18,6 @@ void GBufferPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
 	RenderTarget = renderTarget;
 }
 
-void GBufferPass::SetDependencies(nvrhi::ShaderHandle VS, nvrhi::ShaderHandle PS)
-{
-	VertexShader = VS;
-	PixelShader = PS;
-}
-
 void GBufferPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo)
 {
 	if (infos.empty())
@@ -52,6 +46,8 @@ void GBufferPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 	nvrhi::GraphicsPipelineDesc PipelineDesc;
 	PipelineDesc.addBindingLayout(BindingLayoutHandle);
 	PipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
+	nvrhi::ShaderHandle VertexShader = AssetManager::GetInstance()->GetShader("GBufferShader.vs.cso");
+	nvrhi::ShaderHandle PixelShader = AssetManager::GetInstance()->GetShader("GBufferShader.ps.cso");
 	PipelineDesc.setVertexShader(VertexShader);
 	PipelineDesc.setFragmentShader(PixelShader);
 

@@ -827,13 +827,17 @@ void ragdoll::Scene::CullOctantForCascade(const Octant& octant, const DirectX::B
 {
 	if (oob.Contains(octant.Box) != DirectX::ContainmentType::DISJOINT)	//so if contains or intersects
 	{
-		//calculate the furthest
-		Vector3 corners[8];
-		octant.Box.GetCorners(corners);
-		for (int i = 0; i < 8; ++i) {
-			float d2 = (corners[i] - center).Dot(normal);
-			front = std::max(d2, front);
-			back = std::min(d2, back);
+		//only if this octant have nodes, then consider min max
+		if (!octant.Nodes.empty())
+		{
+			//calculate the furthest
+			Vector3 corners[8];
+			octant.Box.GetCorners(corners);
+			for (int i = 0; i < 8; ++i) {
+				float d2 = (corners[i] - center).Dot(normal);
+				front = std::max(d2, front);
+				back = std::min(d2, back);
+			}
 		}
 		//if no children, all proxies go into the result buffer
 		if (octant.Octants.empty())

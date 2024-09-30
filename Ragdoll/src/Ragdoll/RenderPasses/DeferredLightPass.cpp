@@ -6,51 +6,11 @@
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
+#include "Ragdoll/DirectXDevice.h"
 
-void DeferredLightPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle cmdList)
+void DeferredLightPass::Init(nvrhi::CommandListHandle cmdList)
 {
 	CommandListRef = cmdList;
-	NvrhiDeviceRef = nvrhiDevice;
-
-	//create the pipeline
-	//load outputted shaders objects
-	VertexShader = AssetManager::GetInstance()->GetShader("Fullscreen.vs.cso");
-	PixelShader = AssetManager::GetInstance()->GetShader("DeferredLight.ps.cso");
-	//TODO: move into draw call then create only if needed
-	nvrhi::BindingLayoutDesc layoutDesc = nvrhi::BindingLayoutDesc();
-	layoutDesc.visibility = nvrhi::ShaderType::All;
-	layoutDesc.bindings = {
-		nvrhi::BindingLayoutItem::VolatileConstantBuffer(1),
-		nvrhi::BindingLayoutItem::Sampler(0),	//samplers
-		nvrhi::BindingLayoutItem::Sampler(1),
-		nvrhi::BindingLayoutItem::Sampler(2),
-		nvrhi::BindingLayoutItem::Sampler(3),
-		nvrhi::BindingLayoutItem::Sampler(4),
-		nvrhi::BindingLayoutItem::Sampler(5),
-		nvrhi::BindingLayoutItem::Sampler(6),
-		nvrhi::BindingLayoutItem::Sampler(7),
-		nvrhi::BindingLayoutItem::Sampler(8),
-		nvrhi::BindingLayoutItem::Texture_SRV(0),	//albedo
-		nvrhi::BindingLayoutItem::Texture_SRV(1),	//normal
-		nvrhi::BindingLayoutItem::Texture_SRV(2),	//orm
-		nvrhi::BindingLayoutItem::Texture_SRV(3),	//depth
-		nvrhi::BindingLayoutItem::Texture_SRV(4),	//shadow mask
-	};
-	BindingLayoutHandle = NvrhiDeviceRef->createBindingLayout(layoutDesc);
-	//create a constant buffer here
-	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "DeferredLight CBuffer", 1);
-	ConstantBufferHandle = NvrhiDeviceRef->createBuffer(cBufDesc);
-
-	PipelineDesc.addBindingLayout(BindingLayoutHandle);
-	PipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
-	PipelineDesc.setVertexShader(VertexShader);
-	PipelineDesc.setFragmentShader(PixelShader);
-
-	PipelineDesc.renderState.depthStencilState.depthTestEnable = false;
-	PipelineDesc.renderState.depthStencilState.stencilEnable = false;
-	PipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
-	PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
-	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 
 	RD_ASSERT(RenderTarget == nullptr, "Render Target Framebuffer not set");
 }
@@ -72,7 +32,10 @@ void DeferredLightPass::SetDependencies(nvrhi::TextureHandle albedo, nvrhi::Text
 void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
 {
 	MICROPROFILE_SCOPEI("Render", "Light Pass", MP_BLUEVIOLET);
-	//create and set the state
+	//create a constant buffer here
+	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "DeferredLight CBuffer", 1);
+	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
+
 	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
 	CBuffer.InvViewProj = sceneInfo.MainCameraViewProj.Invert();
 	CBuffer.LightDiffuseColor = sceneInfo.LightDiffuseColor;
@@ -83,18 +46,33 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(1, ConstantBufferHandle)
+		nvrhi::BindingSetItem::ConstantBuffer(1, ConstantBufferHandle),
+		nvrhi::BindingSetItem::Texture_SRV(0, AlbedoHandle),
+		nvrhi::BindingSetItem::Texture_SRV(1, NormalHandle),
+		nvrhi::BindingSetItem::Texture_SRV(2, AORoughnessMetallicHandle),
+		nvrhi::BindingSetItem::Texture_SRV(3, DepthHandle),
+		nvrhi::BindingSetItem::Texture_SRV(4, ShadowMask)
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
 	{
 		bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler(i, AssetManager::GetInstance()->Samplers[i]));
 	}
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(0, AlbedoHandle));
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(1, NormalHandle));
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(2, AORoughnessMetallicHandle));
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(3, DepthHandle));
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(4, ShadowMask));
-	BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
+	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+
+	nvrhi::GraphicsPipelineDesc PipelineDesc;
+	PipelineDesc.addBindingLayout(BindingLayoutHandle);
+	PipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
+	nvrhi::ShaderHandle VertexShader = AssetManager::GetInstance()->GetShader("Fullscreen.vs.cso");
+	nvrhi::ShaderHandle PixelShader = AssetManager::GetInstance()->GetShader("DeferredLight.ps.cso");
+	PipelineDesc.setVertexShader(VertexShader);
+	PipelineDesc.setFragmentShader(PixelShader);
+
+	PipelineDesc.renderState.depthStencilState.depthTestEnable = false;
+	PipelineDesc.renderState.depthStencilState.stencilEnable = false;
+	PipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+	PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 
 	nvrhi::GraphicsState state;
 	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, RenderTarget);

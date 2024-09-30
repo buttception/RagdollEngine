@@ -14,15 +14,11 @@ class GBufferPass {
 
 	nvrhi::FramebufferHandle RenderTarget{ nullptr };
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
-	
-	nvrhi::ShaderHandle VertexShader;
-	nvrhi::ShaderHandle PixelShader;
 
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
 
 	void SetRenderTarget(nvrhi::FramebufferHandle renderTarget);
-	void SetDependencies(nvrhi::ShaderHandle VS, nvrhi::ShaderHandle PS);
 
 	void DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo);
 };

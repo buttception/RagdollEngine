@@ -6,67 +6,12 @@
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
+#include "Ragdoll/DirectXDevice.h"
 
-void ShadowMaskPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle cmdList)
+void ShadowMaskPass::Init(nvrhi::CommandListHandle cmdList)
 {
 	CommandListRef = cmdList;
-	NvrhiDeviceRef = nvrhiDevice;
 
-	//create the pipeline
-	//load outputted shaders objects
-	VertexShader = AssetManager::GetInstance()->GetShader("Fullscreen.vs.cso");
-	PixelShader = AssetManager::GetInstance()->GetShader("ShadowMask.ps.cso");
-	//TODO: move into draw call then create only if needed
-	nvrhi::BindingLayoutDesc layoutDesc = nvrhi::BindingLayoutDesc();
-	layoutDesc.visibility = nvrhi::ShaderType::All;
-	layoutDesc.bindings = {
-		nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-		nvrhi::BindingLayoutItem::Texture_SRV(0),	//shadow maps
-		nvrhi::BindingLayoutItem::Texture_SRV(1),
-		nvrhi::BindingLayoutItem::Texture_SRV(2),
-		nvrhi::BindingLayoutItem::Texture_SRV(3),
-		nvrhi::BindingLayoutItem::Sampler(0),	//samplers
-		nvrhi::BindingLayoutItem::Sampler(1),
-		nvrhi::BindingLayoutItem::Sampler(2),
-		nvrhi::BindingLayoutItem::Sampler(3),
-		nvrhi::BindingLayoutItem::Sampler(4),
-		nvrhi::BindingLayoutItem::Sampler(5),
-		nvrhi::BindingLayoutItem::Sampler(6),
-		nvrhi::BindingLayoutItem::Sampler(7),
-		nvrhi::BindingLayoutItem::Sampler(8),
-		nvrhi::BindingLayoutItem::Sampler(9),	//comparison sampler
-		nvrhi::BindingLayoutItem::Texture_SRV(4),	//depth
-	};
-	BindingLayoutHandle = NvrhiDeviceRef->createBindingLayout(layoutDesc);
-	//create a constant buffer here
-	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ShadowMask CBuffer", 1);
-	ConstantBufferHandle = NvrhiDeviceRef->createBuffer(cBufDesc);
-
-	nvrhi::BindingSetDesc bindingSetDesc;
-	bindingSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-		nvrhi::BindingSetItem::Texture_SRV(0, ShadowMaps[0]),
-		nvrhi::BindingSetItem::Texture_SRV(1, ShadowMaps[1]),
-		nvrhi::BindingSetItem::Texture_SRV(2, ShadowMaps[2]),
-		nvrhi::BindingSetItem::Texture_SRV(3, ShadowMaps[3]),
-	};
-	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
-	{
-		bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler(i, AssetManager::GetInstance()->Samplers[i]));
-	}
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler((int)SamplerTypes::COUNT, AssetManager::GetInstance()->ShadowSampler));
-	bindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(4, GBufferDepth));
-	BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
-
-	PipelineDesc.addBindingLayout(BindingLayoutHandle);
-	PipelineDesc.setVertexShader(VertexShader);
-	PipelineDesc.setPixelShader(PixelShader);
-
-	PipelineDesc.renderState.depthStencilState.depthTestEnable = false;
-	PipelineDesc.renderState.depthStencilState.stencilEnable = false;
-	PipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
-	PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
-	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 
 	RD_ASSERT(RenderTarget == nullptr, "Render Target Framebuffer not set");
 }
@@ -87,14 +32,45 @@ void ShadowMaskPass::SetDependencies(nvrhi::TextureHandle shadow[4], nvrhi::Text
 void ShadowMaskPass::DrawShadowMask(const ragdoll::SceneInformation& sceneInfo)
 {
 	MICROPROFILE_SCOPEI("Render", "Shadow Mask Pass", MP_BLUEVIOLET);
-	//create and set the state
+
 	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
+	//create a constant buffer here
+	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ShadowMask CBuffer", 1);
+	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 	for (int i = 0; i < 4; ++i) {
 		CBuffer.LightViewProj[i] = sceneInfo.CascadeInfo[i].viewProj;
 	}
 	CBuffer.InvViewProj = sceneInfo.MainCameraViewProj.Invert();
 	CBuffer.View = sceneInfo.MainCameraView;
 	CBuffer.EnableCascadeDebug = sceneInfo.EnableCascadeDebug;
+
+	nvrhi::BindingSetDesc bindingSetDesc;
+	bindingSetDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
+		nvrhi::BindingSetItem::Texture_SRV(0, ShadowMaps[0]),
+		nvrhi::BindingSetItem::Texture_SRV(1, ShadowMaps[1]),
+		nvrhi::BindingSetItem::Texture_SRV(2, ShadowMaps[2]),
+		nvrhi::BindingSetItem::Texture_SRV(3, ShadowMaps[3]),
+		nvrhi::BindingSetItem::Texture_SRV(4, GBufferDepth),
+		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[5]),
+		nvrhi::BindingSetItem::Sampler(1, AssetManager::GetInstance()->ShadowSampler)
+		
+	};
+	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
+	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+
+	nvrhi::GraphicsPipelineDesc PipelineDesc;
+	PipelineDesc.addBindingLayout(BindingLayoutHandle);
+	nvrhi::ShaderHandle VertexShader = AssetManager::GetInstance()->GetShader("Fullscreen.vs.cso");
+	nvrhi::ShaderHandle PixelShader = AssetManager::GetInstance()->GetShader("ShadowMask.ps.cso");
+	PipelineDesc.setVertexShader(VertexShader);
+	PipelineDesc.setPixelShader(PixelShader);
+
+	PipelineDesc.renderState.depthStencilState.depthTestEnable = false;
+	PipelineDesc.renderState.depthStencilState.stencilEnable = false;
+	PipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+	PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 
 	nvrhi::GraphicsState state;
 	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, RenderTarget);
