@@ -28,20 +28,17 @@ void DebugPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle c
 	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "DebugPass CBuffer", 1);
 	ConstantBufferHandle = NvrhiDeviceRef->createBuffer(cBufDesc);
 
-	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
+	PipelineDesc.addBindingLayout(BindingLayoutHandle);
+	PipelineDesc.setVertexShader(VertexShader);
+	PipelineDesc.setFragmentShader(PixelShader);
 
-	pipelineDesc.addBindingLayout(BindingLayoutHandle);
-	pipelineDesc.setVertexShader(VertexShader);
-	pipelineDesc.setFragmentShader(PixelShader);
-
-	pipelineDesc.renderState.depthStencilState.depthTestEnable = true;
-	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
-	pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
-	pipelineDesc.renderState.depthStencilState.depthFunc = nvrhi::ComparisonFunc::Greater;
-	pipelineDesc.primType = nvrhi::PrimitiveType::LineList;
+	PipelineDesc.renderState.depthStencilState.depthTestEnable = true;
+	PipelineDesc.renderState.depthStencilState.stencilEnable = false;
+	PipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+	PipelineDesc.renderState.depthStencilState.depthFunc = nvrhi::ComparisonFunc::Greater;
+	PipelineDesc.primType = nvrhi::PrimitiveType::LineList;
 
 	RD_ASSERT(RenderTarget == nullptr, "Render Target Framebuffer not set");
-	GraphicsPipeline = AssetManager::GetInstance()->GetGraphicsPipeline(pipelineDesc, RenderTarget);
 }
 
 void DebugPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
@@ -65,7 +62,7 @@ void DebugPass::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t i
 	BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
 	nvrhi::GraphicsState state;
-	state.pipeline = GraphicsPipeline;
+	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, RenderTarget);
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 	state.addBindingSet(BindingSetHandle);

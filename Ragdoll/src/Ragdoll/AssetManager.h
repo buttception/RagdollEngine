@@ -71,14 +71,21 @@ enum class SamplerTypes
 };
 
 
-using DescriptorBytes = std::pair<const void*, uint32_t>;
+using Bytes = std::pair<const void*, uint32_t>;
 template<>
-struct std::hash<DescriptorBytes> {
-	std::size_t operator()(const DescriptorBytes& bytes) const noexcept
+struct std::hash<Bytes> {
+	std::size_t operator()(const Bytes& bytes) const noexcept
 	{
 		return std::hash<std::string_view>{}({ reinterpret_cast<const char*>(bytes.first), bytes.second });
 	}
 };
+
+static auto hash = std::hash<Bytes>();
+
+template<typename T>
+uint32_t HashBytes(T* ptr) {
+	return hash(std::make_pair(ptr, sizeof(T)));
+}
 
 class ForwardRenderer;
 class DirectXDevice;
@@ -119,13 +126,8 @@ public:
 	//descriptor table for all the bindless stuff
 	nvrhi::DescriptorTableHandle DescriptorTable;
 	nvrhi::BindingLayoutHandle BindlessLayoutHandle;
-	int32_t AddImage(Image img);
 
-	template<typename T>
-	uint32_t HashBytes(T* ptr) {
-		static auto hash = std::hash<DescriptorBytes>();
-		return hash(std::make_pair(ptr, sizeof(T)));
-	}
+	int32_t AddImage(Image img);
 	nvrhi::GraphicsPipelineHandle GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb);
 	nvrhi::ComputePipelineHandle GetComputePipeline(const nvrhi::ComputePipelineDesc& desc);
 

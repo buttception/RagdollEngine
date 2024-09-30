@@ -40,21 +40,19 @@ void DeferredLightPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandList
 	//create a constant buffer here
 	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "DeferredLight CBuffer", 1);
 	ConstantBufferHandle = NvrhiDeviceRef->createBuffer(cBufDesc);
-	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
 
-	pipelineDesc.addBindingLayout(BindingLayoutHandle);
-	pipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
-	pipelineDesc.setVertexShader(VertexShader);
-	pipelineDesc.setFragmentShader(PixelShader);
+	PipelineDesc.addBindingLayout(BindingLayoutHandle);
+	PipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
+	PipelineDesc.setVertexShader(VertexShader);
+	PipelineDesc.setFragmentShader(PixelShader);
 
-	pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
-	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
-	pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
-	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
-	pipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
+	PipelineDesc.renderState.depthStencilState.depthTestEnable = false;
+	PipelineDesc.renderState.depthStencilState.stencilEnable = false;
+	PipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+	PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 
 	RD_ASSERT(RenderTarget == nullptr, "Render Target Framebuffer not set");
-	GraphicsPipeline = AssetManager::GetInstance()->GetGraphicsPipeline(pipelineDesc, RenderTarget);
 }
 
 void DeferredLightPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
@@ -99,7 +97,7 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
 	BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
 	nvrhi::GraphicsState state;
-	state.pipeline = GraphicsPipeline;
+	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, RenderTarget);
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 	state.addBindingSet(BindingSetHandle);

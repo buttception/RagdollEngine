@@ -32,8 +32,8 @@ class AutomaticExposurePass {
 	nvrhi::BindingSetHandle LuminanceHistogramBindingSetHandle;
 	nvrhi::BindingSetHandle LuminanceAverageBindingSetHandle;
 
-	nvrhi::ComputePipelineHandle LuminanceHistogramPipeline;
-	nvrhi::ComputePipelineHandle LuminanceAveragePipeline;
+	nvrhi::ComputePipelineDesc LuminanceHistogramPipelineDesc;
+	nvrhi::ComputePipelineDesc LuminanceAveragePipelineDesc;
 
 	nvrhi::BufferHandle LuminanceHistogramCBufferHandle;
 	nvrhi::BufferHandle LuminanceAverageCBufferHandle;

@@ -29,20 +29,18 @@ void ToneMapPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle
 	//create a constant buffer here
 	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ToneMap CBuffer", 1);
 	ConstantBufferHandle = NvrhiDeviceRef->createBuffer(cBufDesc);
-	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
 
-	pipelineDesc.addBindingLayout(BindingLayoutHandle);
-	pipelineDesc.setVertexShader(VertexShader);
-	pipelineDesc.setFragmentShader(PixelShader);
+	PipelineDesc.addBindingLayout(BindingLayoutHandle);
+	PipelineDesc.setVertexShader(VertexShader);
+	PipelineDesc.setFragmentShader(PixelShader);
 
-	pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
-	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
-	pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
-	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
-	pipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
+	PipelineDesc.renderState.depthStencilState.depthTestEnable = false;
+	PipelineDesc.renderState.depthStencilState.stencilEnable = false;
+	PipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+	PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 
 	RD_ASSERT(RenderTarget == nullptr, "Render Target Framebuffer not set");
-	GraphicsPipeline = AssetManager::GetInstance()->GetGraphicsPipeline(pipelineDesc, RenderTarget);
 }
 
 void ToneMapPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
@@ -74,7 +72,7 @@ void ToneMapPass::ToneMap(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buf
 	BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
 	nvrhi::GraphicsState state;
-	state.pipeline = GraphicsPipeline;
+	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, RenderTarget);
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 	state.addBindingSet(BindingSetHandle);

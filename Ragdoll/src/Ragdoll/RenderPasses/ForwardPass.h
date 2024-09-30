@@ -30,8 +30,8 @@ class ForwardPass {
 	nvrhi::ShaderHandle ForwardPixelShader;
 	nvrhi::BindingLayoutHandle BindingLayoutHandle;
 	nvrhi::BindingSetHandle BindingSetHandle;
-	nvrhi::GraphicsPipelineHandle GraphicsPipeline;
 	nvrhi::BufferHandle ConstantBufferHandle;
+	nvrhi::GraphicsPipelineDesc PipelineDesc;
 
 public:
 	void Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle cmdList);

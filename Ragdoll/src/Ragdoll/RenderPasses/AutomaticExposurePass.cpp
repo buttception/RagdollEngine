@@ -83,14 +83,11 @@ void AutomaticExposurePass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::Command
 	};
 	LuminanceAverageBindingSetHandle = NvrhiDeviceRef->createBindingSet(averageSetDesc, LuminanceAverageBindingLayoutHandle);
 
-	auto pipelineDesc = nvrhi::ComputePipelineDesc();
+	LuminanceHistogramPipelineDesc.bindingLayouts = { LuminanceHistogramBindingLayoutHandle };
+	LuminanceHistogramPipelineDesc.CS = LuminanceHistogramShader;
 
-	pipelineDesc.bindingLayouts = { LuminanceHistogramBindingLayoutHandle };
-	pipelineDesc.CS = LuminanceHistogramShader;
-	LuminanceHistogramPipeline = AssetManager::GetInstance()->GetComputePipeline(pipelineDesc);
-	pipelineDesc.bindingLayouts = { LuminanceAverageBindingLayoutHandle };
-	pipelineDesc.CS = LuminanceAverageShader;
-	LuminanceAveragePipeline = AssetManager::GetInstance()->GetComputePipeline(pipelineDesc);
+	LuminanceAveragePipelineDesc.bindingLayouts = { LuminanceAverageBindingLayoutHandle };
+	LuminanceAveragePipelineDesc.CS = LuminanceAverageShader;
 }
 
 void AutomaticExposurePass::SetDependencies(nvrhi::TextureHandle sceneColor)
@@ -105,7 +102,7 @@ nvrhi::BufferHandle AutomaticExposurePass::GetAdaptedLuminance(float _dt)
 
 	CommandListRef->beginMarker("AutomaticExposure");
 	nvrhi::ComputeState state;
-	state.pipeline = LuminanceHistogramPipeline;
+	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(LuminanceHistogramPipelineDesc);
 	state.bindings = { LuminanceHistogramBindingSetHandle };
 	LuminanceHistogramCBuffer.Width = SceneColor->getDesc().width;
 	LuminanceHistogramCBuffer.Height = SceneColor->getDesc().height;
@@ -115,7 +112,7 @@ nvrhi::BufferHandle AutomaticExposurePass::GetAdaptedLuminance(float _dt)
 	CommandListRef->setComputeState(state);
 	CommandListRef->dispatch(SceneColor->getDesc().width / 16 + 1, SceneColor->getDesc().height / 16 + 1, 1);
 
-	state.pipeline = LuminanceAveragePipeline;
+	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(LuminanceAveragePipelineDesc);
 	state.bindings = { LuminanceAverageBindingSetHandle };
 	LuminanceAverageCBuffer.MinLogLuminance = minLuminance;
 	LuminanceAverageCBuffer.LogLuminanceRange = maxLuminance - minLuminance;
