@@ -1,6 +1,5 @@
 #pragma once
 #include "ImGuiRenderer.h"
-#include "ForwardRenderer.h"
 #include "DeferredRenderer.h"
 
 #include "Components/TransformComp.h"
@@ -74,22 +73,21 @@ namespace ragdoll {
 	};
 
 	struct DebugInfo {
-		uint32_t CulledObjectCount{};
+		uint32_t CulledOctantsCount{};
 	};
 
 	struct SceneConfig {
 		bool bIsThereCustomMeshes{ false };
 		bool bDrawOctree{ false };
-		int32_t DrawOctreeLevelMin{ 0 };
-		int32_t bDrawOctreeLevelMax{ 0 };
 		bool bDrawBoxes{ false };
-		bool bUseDeferred{ false };
+		int32_t DrawOctreeLevelMin{ 0 };
+		int32_t DrawOctreeLevelMax{ 0 };
 	};
 
 	struct CascadeInfo {
 		Vector3 center;
 		Matrix view, proj, viewProj;
-		float width, height, nearZ, farZ;
+		float width, height, nearZ{ -10.f }, farZ{ 10.f };
 	};
 
 	struct SceneInformation {
@@ -106,6 +104,9 @@ namespace ragdoll {
 		float CameraNear;
 		float CameraAspect;
 		int32_t EnableCascadeDebug{ 0 };
+		float Gamma = 1.f;
+		float Exposure = 1.f;
+		bool UseFixedExposure = 0.f;
 	};
 
 	class Scene {
@@ -130,8 +131,7 @@ namespace ragdoll {
 		bool bFreezeFrustumCulling{ false };
 
 	public:
-		std::shared_ptr<ForwardRenderer> ForwardRenderer;
-		std::shared_ptr<DeferredRenderer> DeferredRenderer;
+		std::shared_ptr<Renderer> DeferredRenderer;
 		SceneConfig Config;
 		DebugInfo DebugInfo;
 		Octree StaticOctree;

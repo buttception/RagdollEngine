@@ -1,7 +1,6 @@
 #include "ragdollpch.h"
 
 #include "AssetManager.h"
-#include "ForwardRenderer.h"
 #include "DirectXDevice.h"
 
 AssetManager* AssetManager::GetInstance()
@@ -18,6 +17,78 @@ int32_t AssetManager::AddImage(Image img)
 	DeviceRef->m_NvrhiDevice->writeDescriptorTable(DescriptorTable, nvrhi::BindingSetItem::Texture_SRV(Images.size(), img.TextureHandle));
 	Images.emplace_back(img);
 	return Images.size() - 1;
+}
+
+uint32_t HashString(const std::string& str) {
+	return hash(std::make_pair(str.c_str(), str.length()));
+}
+
+uint32_t Hash(const nvrhi::GraphicsPipelineDesc& desc) {
+	struct GraphicsPipelineAbstraction
+	{
+		//5 shaders debug name hashes
+		uint32_t VSHash{}, HSHash{}, DSHash{}, GSHash{}, PSHash{};
+		//hash the states
+		uint32_t RenderStateHash{};
+		uint32_t PrimTypeHash{};
+		uint32_t ShadingRateStateHash{};
+		//hash the bindings
+		uint32_t BindingsHash[nvrhi::c_MaxBindingLayouts]{ {}, };
+		//no need for the input layout as everyone uses the same due to the instance pass
+	}obj;
+	//hashing all the shaders debug name
+	if (desc.VS)
+		obj.VSHash = HashString(desc.VS->getDesc().debugName);
+	if (desc.HS)
+		obj.HSHash = HashString(desc.HS->getDesc().debugName);
+	if (desc.DS)
+		obj.DSHash = HashString(desc.DS->getDesc().debugName);
+	if (desc.GS)
+		obj.GSHash = HashString(desc.GS->getDesc().debugName);
+	if (desc.PS)
+		obj.PSHash = HashString(desc.PS->getDesc().debugName);
+	//hash the states
+	obj.RenderStateHash = HashBytes(&desc.renderState);
+	obj.PrimTypeHash = HashBytes(&desc.primType);
+	obj.ShadingRateStateHash = HashBytes(&desc.shadingRateState);
+	//hash the bindings
+	for (int i = 0; i < nvrhi::c_MaxBindingLayouts; ++i) {
+		obj.BindingsHash[i] = HashBytes(&desc.bindingLayouts);
+	}
+	return HashBytes(&obj);
+}
+
+uint32_t Hash(const nvrhi::ComputePipelineDesc& desc) {
+	struct ComputePipelineAbstraction {
+		//shader
+		uint32_t CSHash{};
+		//binding hash
+		uint32_t BindingsHash[nvrhi::c_MaxBindingLayouts]{ {}, };
+	}obj;
+	if (desc.CS)
+		obj.CSHash = HashString(desc.CS->getDesc().debugName);
+	for (int i = 0; i < nvrhi::c_MaxBindingLayouts; ++i) {
+		obj.BindingsHash[i] = HashBytes(&desc.bindingLayouts);
+	}
+	return HashBytes(&obj);
+}
+
+nvrhi::GraphicsPipelineHandle AssetManager::GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb)
+{
+	uint32_t hash = Hash(desc);
+	if (GPSOs.contains(hash))
+		return GPSOs.at(hash);
+	RD_CORE_INFO("GPSO created");
+	return GPSOs[hash] = DeviceRef->m_NvrhiDevice->createGraphicsPipeline(desc, fb);
+}
+
+nvrhi::ComputePipelineHandle AssetManager::GetComputePipeline(const nvrhi::ComputePipelineDesc& desc)
+{
+	uint32_t hash = Hash(desc);
+	if (CPSOs.contains(hash))
+		return CPSOs.at(hash);
+	RD_CORE_INFO("CPSO created");
+	return CPSOs[hash] = DeviceRef->m_NvrhiDevice->createComputePipeline(desc);
 }
 
 void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_ptr<ragdoll::FileManager> fm)
@@ -252,6 +323,9 @@ nvrhi::ShaderHandle AssetManager::GetShader(const std::string& shaderFilename)
 	}
 	else if (shaderFilename.find(".ps.") != std::string::npos) {
 		type = nvrhi::ShaderType::Pixel;
+	}
+	else if (shaderFilename.find(".cs.") != std::string::npos) {
+		type = nvrhi::ShaderType::Compute;
 	}
 	uint32_t size{};
 	const uint8_t* data = FileManagerRef->ImmediateLoad(shaderFilename, size);

@@ -90,7 +90,7 @@ void main_ps(
 				data.albedoFactor = float4(1.f, 0.5f, 0.5f, 1.f);
 			shadowMap = ShadowMaps[0];
 			lightMatrix = LightViewProj[0];
-        bias = 0.001f;
+        bias = 0.002f;
 		}
 		else if(abs(viewPos.z) < 10.f)
 		{
@@ -98,7 +98,7 @@ void main_ps(
 				data.albedoFactor = float4(1.f, 1.f, 0.5f, 1.f);
 			shadowMap = ShadowMaps[1];
 			lightMatrix = LightViewProj[1];
-        bias = 0.002f;
+        bias = 0.003f;
 		}
 		else if(abs(viewPos.z) < 15.f)
 		{
@@ -106,7 +106,7 @@ void main_ps(
 				data.albedoFactor = float4(0.5f, 1.f, 0.5f, 1.f);
 			shadowMap = ShadowMaps[2];
 			lightMatrix = LightViewProj[2];
-        	bias = 0.003f;
+        	bias = 0.005f;
 		}
 		else
 		{
@@ -114,7 +114,7 @@ void main_ps(
 				data.albedoFactor = float4(1.f, 0.5f, 1.f, 1.f);
 			shadowMap = ShadowMaps[3];
 			lightMatrix = LightViewProj[3];
-        	bias = 0.005f;
+        	bias = 0.007f;
 		}
 
 		float4 albedo = data.albedoFactor;
@@ -126,7 +126,7 @@ void main_ps(
 		if(data.roughnessMetallicIndex != -1){
 			RM = Textures[data.roughnessMetallicIndex].Sample(Samplers[data.roughnessMetallicSamplerIndex], inTexcoord);
 		}
-		float ao = 1.f - RM.r;
+		float ao = 1.f;
 		float roughness = RM.g;
 		float metallic = RM.b;
 

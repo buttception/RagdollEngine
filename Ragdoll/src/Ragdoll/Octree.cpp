@@ -6,7 +6,7 @@ uint32_t Octree::MaxDepth = 0;
 
 void Octree::Init()
 {
-	DirectX::BoundingBox::CreateFromPoints(Octant.Box, -Max, Max);
+	DirectX::BoundingBox::CreateFromPoints(Octant.Box, Min, Max);
 	//create the first 8 octants
 	Octant.Subdivide();
 }

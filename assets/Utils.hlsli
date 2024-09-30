@@ -49,3 +49,18 @@ float3 WorldToLight(float3 fragPos, float4x4 lightMatrix, float bias)
     projCoord.z += bias;
     return projCoord;
 }
+
+float3 ACESFilm(float3 x)
+{
+    float a = 2.51f;
+    float b = 0.03f;
+    float c = 2.43f;
+    float d = 0.59f;
+    float e = 0.14f;
+    return saturate((x*(a*x+b))/(x*(c*x+d)+e));
+}
+
+float3 GammaCorrect(float3 color, float gamma)
+{
+    return pow(color, float3(1.f / gamma, 1.f / gamma, 1.f / gamma));
+}

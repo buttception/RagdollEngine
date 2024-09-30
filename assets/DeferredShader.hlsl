@@ -115,7 +115,7 @@ Texture2D ShadowMask : register(t4);
 void deferred_light_ps(
 	in float4 inPos : SV_Position,
 	in float2 inTexcoord : TEXCOORD0,
-	out float4 outColor : SV_Target0
+	out float3 outColor : SV_Target0
 )
 {
 	//getting texture values
@@ -129,9 +129,9 @@ void deferred_light_ps(
 
 	//apply pbr lighting, AO is 1.f for now so it does nth
 	//float3 diffuse = max(dot(N, LightDirection), 0) * albedo.rgb;
-	float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.z, RM.y, RM.x);
+	float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.z, RM.y, 1.f);
 
 	float3 ambient = SceneAmbientColor.rgb * albedo.rgb;
 	float3 lighting = ambient + diffuse * (1.f - shadowFactor.a);
-	outColor = float4(lighting * shadowFactor.rgb, 1.f);
+	outColor = lighting * shadowFactor.rgb;
 }

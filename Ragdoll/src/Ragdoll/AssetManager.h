@@ -70,6 +70,23 @@ enum class SamplerTypes
 	COUNT
 };
 
+
+using Bytes = std::pair<const void*, uint32_t>;
+template<>
+struct std::hash<Bytes> {
+	std::size_t operator()(const Bytes& bytes) const noexcept
+	{
+		return std::hash<std::string_view>{}({ reinterpret_cast<const char*>(bytes.first), bytes.second });
+	}
+};
+
+static auto hash = std::hash<Bytes>();
+
+template<typename T>
+uint32_t HashBytes(T* ptr) {
+	return hash(std::make_pair(ptr, sizeof(T)));
+}
+
 class ForwardRenderer;
 class DirectXDevice;
 namespace ragdoll {
@@ -92,6 +109,9 @@ public:
 	std::vector<nvrhi::SamplerHandle> Samplers;
 	nvrhi::SamplerHandle ShadowSampler;
 
+	std::unordered_map<uint32_t, nvrhi::GraphicsPipelineHandle> GPSOs;
+	std::unordered_map<uint32_t, nvrhi::ComputePipelineHandle> CPSOs;
+
 	std::unordered_map<std::string, nvrhi::ShaderHandle> Shaders;
 
 	//no more vbo vectors, but instead is a vector of vb ib offsets
@@ -106,7 +126,10 @@ public:
 	//descriptor table for all the bindless stuff
 	nvrhi::DescriptorTableHandle DescriptorTable;
 	nvrhi::BindingLayoutHandle BindlessLayoutHandle;
+
 	int32_t AddImage(Image img);
+	nvrhi::GraphicsPipelineHandle GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb);
+	nvrhi::ComputePipelineHandle GetComputePipeline(const nvrhi::ComputePipelineDesc& desc);
 
 	void Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::FileManager> fm);
 	//this function will just add the vertices and indices, and populate the vector of objects

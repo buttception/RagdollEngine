@@ -25,6 +25,10 @@
       "Command": "",
       "Items": [
         {
+          "Id": "6ca20a97-1734-47c1-a46c-3455dedddbf0",
+          "Command": "--scene \"other_gltf\\San Miguel\\SanMiguel.gltf\""
+        },
+        {
           "Id": "9a512f54-05cf-4eb8-9c58-ec1f7b655ca7",
           "Command": "--sample \"MetalRoughSpheresNoTextures\""
         },
@@ -38,7 +42,7 @@
         },
         {
           "Id": "395cbeaa-ee05-47d8-8240-23067e17d7e7",
-          "Command": "--scene \"Instancing Test/Bistro/Bistro.gltf\""
+          "Command": "--scene \"other_gltf/Bistro/Bistro.gltf\""
         }
       ]
     }

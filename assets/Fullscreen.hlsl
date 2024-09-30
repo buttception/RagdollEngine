@@ -1,3 +1,5 @@
+#include "Utils.hlsli"
+
 static const float3 g_positions[] = {
 	{-1.f, -1.f, 1.f},
 	{3.f, -1.f, 1.f},

@@ -45,23 +45,20 @@ void ForwardPass::Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle
 	const auto& attribs = AssetManager::GetInstance()->VertexAttributes;
 	nvrhi::InputLayoutHandle inputLayoutHandle = NvrhiDeviceRef->createInputLayout(attribs.data(), attribs.size(), ForwardVertexShader);
 
-	auto pipelineDesc = nvrhi::GraphicsPipelineDesc();
+	PipelineDesc.addBindingLayout(BindingLayoutHandle);
+	PipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
+	PipelineDesc.setVertexShader(ForwardVertexShader);
+	PipelineDesc.setFragmentShader(ForwardPixelShader);
 
-	pipelineDesc.addBindingLayout(BindingLayoutHandle);
-	pipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
-	pipelineDesc.setVertexShader(ForwardVertexShader);
-	pipelineDesc.setFragmentShader(ForwardPixelShader);
-
-	pipelineDesc.renderState.depthStencilState.depthTestEnable = true;
-	pipelineDesc.renderState.depthStencilState.stencilEnable = false;
-	pipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
-	pipelineDesc.renderState.depthStencilState.depthFunc = nvrhi::ComparisonFunc::Greater;
-	pipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::Back;
-	pipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
-	pipelineDesc.inputLayout = inputLayoutHandle;
+	PipelineDesc.renderState.depthStencilState.depthTestEnable = true;
+	PipelineDesc.renderState.depthStencilState.stencilEnable = false;
+	PipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
+	PipelineDesc.renderState.depthStencilState.depthFunc = nvrhi::ComparisonFunc::Greater;
+	PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::Back;
+	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
+	PipelineDesc.inputLayout = inputLayoutHandle;
 
 	RD_ASSERT(RenderTarget == nullptr, "Render Target Framebuffer not set");
-	GraphicsPipeline = NvrhiDeviceRef->createGraphicsPipeline(pipelineDesc, RenderTarget);
 }
 
 void ForwardPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
@@ -114,7 +111,7 @@ void ForwardPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 	BindingSetHandle = NvrhiDeviceRef->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
 	nvrhi::GraphicsState state;
-	state.pipeline = GraphicsPipeline;
+	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, RenderTarget);
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 	state.indexBuffer = { AssetManager::GetInstance()->IBO, nvrhi::Format::R32_UINT, 0 };

@@ -54,11 +54,9 @@ float3 PBRLighting(float3 albedo, float3 normal, float3 viewDir, float3 lightDir
     float3 specular = numerator / denominator;
 
     // Lambertian diffuse
-    float3 kS = F; // Fresnel reflectance
-    float3 kD = 1.0 - kS; // Diffuse reflection (1.0 - specular)
-    kD *= 1.0 - metallic; // Metallic surfaces don't have diffuse reflection
+    float3 kD = 1.0 - metallic; // Diffuse reflection (1.0 - metallic)
 
-    float3 diffuse = albedo / PI * max(dot(N, L), 0.0);
+    float3 diffuse = albedo / PI;
 
     // Combine the two contributions
     float3 color = (kD * diffuse + specular) * lightColor * max(dot(N, L), 0.0);

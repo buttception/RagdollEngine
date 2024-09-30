@@ -13,11 +13,12 @@
 #include "Scene.h"
 #include "GeometryBuilder.h"
 
-void DeferredRenderer::Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
+void Renderer::Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 {
 	DeviceRef = device;
 	PrimaryWindowRef = win;
 	//get the textures needed
+	SceneColor = scene->SceneColor;
 	AlbedoHandle = scene->GBufferAlbedo;
 	NormalHandle = scene->GBufferNormal;
 	AORoughnessMetallicHandle = scene->GBufferORM;
@@ -30,14 +31,14 @@ void DeferredRenderer::Init(std::shared_ptr<DirectXDevice> device, std::shared_p
 	CreateResource();
 }
 
-void DeferredRenderer::Shutdown()
+void Renderer::Shutdown()
 {
 	//release nvrhi stuff
 	CommandList = nullptr;
 	DepthHandle = nullptr;
 }
 
-void DeferredRenderer::BeginFrame()
+void Renderer::BeginFrame()
 {
 	MICROPROFILE_SCOPEI("Render", "Begin Frame", MP_BLUE);
 	DeviceRef->BeginFrame();
@@ -54,6 +55,7 @@ void DeferredRenderer::BeginFrame()
 		}
 		col = 0.f;
 		CommandList->clearTextureFloat(DeviceRef->GetCurrentBackbuffer(), nvrhi::AllSubresources, col);
+		CommandList->clearTextureFloat(SceneColor, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(AlbedoHandle, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(NormalHandle, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(AORoughnessMetallicHandle, nvrhi::AllSubresources, col);
@@ -65,35 +67,50 @@ void DeferredRenderer::BeginFrame()
 	}
 }
 
-void DeferredRenderer::Render(ragdoll::Scene* scene)
+void Renderer::Render(ragdoll::Scene* scene, float _dt)
 {
 	BeginFrame();
 	
 	CommandList->open();
 
+	//gbuffer
 	GBufferPass->DrawAllInstances(scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo);
+	//directional light shadow
 	ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles, scene->StaticCascadeInstanceInfos, scene->SceneInfo);
+	//shadow mask pass
 	ShadowMaskPass->DrawShadowMask(scene->SceneInfo);
+	//light scene color
+	DeferredLightPass->LightPass(scene->SceneInfo);
+	//get the exposure needed
+	nvrhi::BufferHandle exposure = AutomaticExposurePass->GetAdaptedLuminance(_dt);
 
 	nvrhi::FramebufferHandle fb;
 	nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(DeviceRef->GetCurrentBackbuffer());
 	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
-	DeferredLightPass->SetRenderTarget(fb);
-	DeferredLightPass->LightPass(scene->SceneInfo);
+	//tone map and gamma correct
+	ToneMapPass->SetRenderTarget(fb);
+	ToneMapPass->ToneMap(scene->SceneInfo, exposure);
 
-	fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(DeviceRef->GetCurrentBackbuffer())
-		.setDepthAttachment(DepthHandle);
+	fbDesc.setDepthAttachment(DepthHandle);
 	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
+	//draw debug items
 	DebugPass->SetRenderTarget(fb);
 	DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo);
 
 	CommandList->close();
 	DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
+
+	//readback all the debug infos needed
+	/*float* valPtr;
+	if (valPtr = (float*)DeviceRef->m_NvrhiDevice->mapBuffer(AutomaticExposurePass->ReadbackBuffer, nvrhi::CpuAccessMode::Read))
+	{
+		AdaptedLuminance = *valPtr;
+	}
+	DeviceRef->m_NvrhiDevice->unmapBuffer(AutomaticExposurePass->ReadbackBuffer);*/
 }
 
-void DeferredRenderer::CreateResource()
+void Renderer::CreateResource()
 {
 	CommandList = DeviceRef->m_NvrhiDevice->createCommandList();
 
@@ -130,12 +147,24 @@ void DeferredRenderer::CreateResource()
 	GBufferPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(DeviceRef->GetCurrentBackbuffer());
+		.addColorAttachment(SceneColor);
 	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
 	DeferredLightPass = std::make_shared<class DeferredLightPass>();
 	DeferredLightPass->SetRenderTarget(fb);
 	DeferredLightPass->SetDependencies(AlbedoHandle, NormalHandle, AORoughnessMetallicHandle, DepthHandle, ShadowMask);
 	DeferredLightPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
+
+	AutomaticExposurePass = std::make_shared<class AutomaticExposurePass>();
+	AutomaticExposurePass->SetDependencies(SceneColor);
+	AutomaticExposurePass->Init(DeviceRef->m_NvrhiDevice, CommandList);
+
+	fbDesc = nvrhi::FramebufferDesc()
+		.addColorAttachment(DeviceRef->GetCurrentBackbuffer());
+	fb = DeviceRef->m_NvrhiDevice->createFramebuffer(fbDesc);
+	ToneMapPass = std::make_shared<class ToneMapPass>();
+	ToneMapPass->SetRenderTarget(fb);
+	ToneMapPass->SetDependencies(SceneColor);
+	ToneMapPass->Init(DeviceRef->m_NvrhiDevice, CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(DeviceRef->GetCurrentBackbuffer())

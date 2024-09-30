@@ -54,6 +54,7 @@ struct Octant {
 
 struct Octree {
 	inline static Vector3 Max{ 100.f, 100.f, 100.f };
+	inline static Vector3 Min{ -100.f, -100.f, -100.f };
 	static uint32_t TotalProxies;
 	static uint32_t MaxDepth;
 	Octant Octant;

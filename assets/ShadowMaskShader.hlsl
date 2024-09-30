@@ -33,7 +33,7 @@ void main_ps(
             color = float4(1.f, 0.5f, 0.5f, 1.f);
         shadowMap = ShadowMaps[0];
         lightMatrix = LightViewProj[0];
-        bias = 0.001f;
+        bias = 0.002f;
     }
     else if(distanceFromCam < 10.f)
     {
@@ -41,7 +41,7 @@ void main_ps(
             color = float4(1.f, 1.f, 0.5f, 1.f);
         shadowMap = ShadowMaps[1];
         lightMatrix = LightViewProj[1];
-        bias = 0.002f;
+        bias = 0.003f;
     }
     else if(distanceFromCam < 15.f)
     {
@@ -49,7 +49,7 @@ void main_ps(
             color = float4(0.5f, 1.f, 0.5f, 1.f);
         shadowMap = ShadowMaps[2];
         lightMatrix = LightViewProj[2];
-        bias = 0.003f;
+        bias = 0.004f;
     }
     else
     {
@@ -57,7 +57,7 @@ void main_ps(
             color = float4(1.f, 0.5f, 1.f, 1.f);
         shadowMap = ShadowMaps[3];
         lightMatrix = LightViewProj[3];
-        bias = 0.005f;
+        bias = 0.007f;
     }
 
     //get frag pos in light space
