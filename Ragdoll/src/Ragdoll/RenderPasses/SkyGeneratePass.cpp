@@ -25,7 +25,7 @@ void SkyGeneratePass::SetDependencies(nvrhi::TextureHandle sky, nvrhi::TextureHa
 void SkyGeneratePass::GenerateSky(const ragdoll::SceneInformation& sceneInfo)
 {
 	//update the sun sky and tables according to scene info
-	Vector3 lightDir = -sceneInfo.LightDirection;
+	Vector3 lightDir = Vector3(sceneInfo.LightDirection.x, sceneInfo.LightDirection.z, sceneInfo.LightDirection.y);
 	SunSky->Update(lightDir, 2.5f, 0.f, 0.f);
 	Table->FindThetaGammaTables(*SunSky);
 	//write to the table textures

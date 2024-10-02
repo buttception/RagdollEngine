@@ -23,14 +23,6 @@ float MapGamma(float g)
 {
     return sqrt(0.5f * (1.0f - g));
 }
-int HemiInset(float y2, int width)
-{
-    float maxX2 = 1.0f - y2;
-    float maxX = sqrt(maxX2);
-
-    return (int)(ceil((1.0f - maxX) * width / 2.0f + 0.5f));
-}
-
 float4 LerpArray(float s, int index)
 {
     s = clamp(s, 0.f, 1.f - 1e-6f);
@@ -44,7 +36,6 @@ float4 LerpArray(float s, int index)
     return ThetaGammaTable[int2(si0, index)] * (1 - sf)
             + ThetaGammaTable[int2(si1, index)] *    sf   ;
 }
-
 float3 SkyRGB(float3 v)  // Use precalculated table to return fast sky colour on CPU
 {
     float cosTheta = v.z;
@@ -64,6 +55,13 @@ float3 SkyRGB(float3 v)  // Use precalculated table to return fast sky colour on
     xyY *= PerezInvDen;
 
     return convertxyYToRGB(xyY);
+}
+int HemiInset(float y2, int width)
+{
+    float maxX2 = 1.0f - y2;
+    float maxX = sqrt(maxX2);
+
+    return (int)(ceil((1.0f - maxX) * width / 2.0f + 0.5f));
 }
 
 [numthreads(THREADS_X, THREADS_Y, 1)]
@@ -89,11 +87,8 @@ void main_cs(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, uint3 
     float x2 = x * x;
     float h2 = x2 + y2; // h^2 = x^2 + y^2
 
-    // Compute the direction vector based on fisheye or not
-    float3 v;
-    float theta = vl_halfPi - vl_halfPi * sqrt(h2);
-    float phi = atan2(y, x);
-    v = float3(cos(phi) * cos(theta), sin(phi) * cos(theta), sin(theta));
+    // Compute the direction vector
+    float3 v = float3(x, y, sqrt(1.0f - h2));
 
     // Get the color from the sky based on the computed vector
     float3 c = SkyRGB(v); 
