@@ -148,6 +148,9 @@ namespace ragdoll {
 		//shadows
 		nvrhi::TextureHandle ShadowMap[4];
 		nvrhi::TextureHandle ShadowMask;
+		//sky texture
+		nvrhi::TextureHandle SkyTexture;
+		nvrhi::TextureHandle SkyThetaGammaTable;
 		//distance where the subfrusta are seperated
 		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
 

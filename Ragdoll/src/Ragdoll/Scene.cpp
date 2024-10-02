@@ -187,7 +187,7 @@ void ragdoll::Scene::UpdateControls(float _dt)
 		Color dirLightColor = { 1.f,1.f,1.f,1.f };
 		Color ambientLight = { 0.2f, 0.2f, 0.2f, 1.f };
 		float lightIntensity = 1.f;
-		Vector2 azimuthAndElevation = { 90.f, 45.f };
+		Vector2 azimuthAndElevation = { 0.f, 90.f };
 	};
 	static Data data;
 	ImGui::Begin("Camera Manipulate");
@@ -451,6 +451,21 @@ void ragdoll::Scene::CreateRenderTargets()
 		texDesc.format = nvrhi::Format::RGBA8_UNORM;
 		texDesc.debugName = "ShadowMask";
 		ShadowMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	}
+	if (!SkyThetaGammaTable) {
+		texDesc.width = 64;
+		texDesc.height = 2;
+		texDesc.format = nvrhi::Format::RGBA8_UNORM;
+		texDesc.debugName = "SkyThetaGammaTable";
+		SkyThetaGammaTable = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	}
+	if (!SkyTexture) {
+		texDesc.width = texDesc.height = 2000;
+		texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+		texDesc.isUAV = true;
+		texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
+		texDesc.debugName = "SkyTexture";
+		SkyTexture = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	}
 }
 

@@ -1,9 +1,9 @@
 #include "Utils.hlsli"
 
 static const float3 g_positions[] = {
-	{-1.f, -1.f, 1.f},
-	{3.f, -1.f, 1.f},
-	{-1.f, 3.f, 1.f}
+	{-1.f, -1.f, 0.f},
+	{3.f, -1.f, 0.f},
+	{-1.f, 3.f, 0.f}
 };
 static const float2 g_texcoord[] = {
 	{0.f, 1.f},

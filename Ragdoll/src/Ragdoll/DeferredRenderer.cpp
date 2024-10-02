@@ -23,6 +23,8 @@ void Renderer::Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 	AORoughnessMetallicHandle = scene->GBufferORM;
 	DepthHandle = scene->SceneDepthZ;
 	ShadowMask = scene->ShadowMask;
+	SkyTexture = scene->SkyTexture;
+	SkyThetaGammaTable = scene->SkyThetaGammaTable;
 	for (int i = 0; i < 4; ++i)
 	{
 		ShadowMap[i] = scene->ShadowMap[i];
@@ -72,6 +74,8 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 	
 	CommandList->open();
 
+	SkyGeneratePass->GenerateSky(scene->SceneInfo);
+
 	//gbuffer
 	GBufferPass->DrawAllInstances(scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo);
 	//directional light shadow
@@ -80,6 +84,8 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 	ShadowMaskPass->DrawShadowMask(scene->SceneInfo);
 	//light scene color
 	DeferredLightPass->LightPass(scene->SceneInfo);
+	//sky
+	SkyPass->DrawSky(scene->SceneInfo);
 	//get the exposure needed
 	nvrhi::BufferHandle exposure = AutomaticExposurePass->GetAdaptedLuminance(_dt);
 
@@ -91,7 +97,9 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 	ToneMapPass->SetRenderTarget(fb);
 	ToneMapPass->ToneMap(scene->SceneInfo, exposure);
 
-	fbDesc.setDepthAttachment(DepthHandle);
+	fbDesc = nvrhi::FramebufferDesc()
+		.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer())
+		.setDepthAttachment(DepthHandle);
 	fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
 	//draw debug items
 	DebugPass->SetRenderTarget(fb);
@@ -112,6 +120,10 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 void Renderer::CreateResource()
 {
 	CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
+
+	SkyGeneratePass = std::make_shared<class SkyGeneratePass>();
+	SkyGeneratePass->SetDependencies(SkyTexture, SkyThetaGammaTable);
+	SkyGeneratePass->Init(CommandList);
 
 	nvrhi::FramebufferHandle fbArr[4];
 	for (int i = 0; i < 4; ++i)
@@ -152,6 +164,14 @@ void Renderer::CreateResource()
 	DeferredLightPass->SetRenderTarget(fb);
 	DeferredLightPass->SetDependencies(AlbedoHandle, NormalHandle, AORoughnessMetallicHandle, DepthHandle, ShadowMask);
 	DeferredLightPass->Init(CommandList);
+
+	fbDesc = nvrhi::FramebufferDesc()
+		.addColorAttachment(SceneColor);
+	fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
+	SkyPass = std::make_shared<class SkyPass>();
+	SkyPass->SetRenderTarget(fb);
+	SkyPass->SetDependencies(SkyTexture, DepthHandle);
+	SkyPass->Init(CommandList);
 
 	AutomaticExposurePass = std::make_shared<class AutomaticExposurePass>();
 	AutomaticExposurePass->SetDependencies(SceneColor);
