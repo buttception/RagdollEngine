@@ -99,7 +99,6 @@ void main_cs(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, uint3 
         // Get the color from the sky based on the computed vector
         float3 c = SkyRGB(v); 
         c *= scalar;
-        c = ACESFilm(c);
 
         // Write the final color to the target texture, is in hdr
         Target[DTid.xy] = c;

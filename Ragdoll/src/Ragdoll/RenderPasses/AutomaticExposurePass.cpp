@@ -50,7 +50,7 @@ void AutomaticExposurePass::SetDependencies(nvrhi::TextureHandle sceneColor)
 nvrhi::BufferHandle AutomaticExposurePass::GetAdaptedLuminance(float _dt)
 {
 	float minLuminance = -8.f;
-	float maxLuminance = 3.5;
+	float maxLuminance = 8.5;
 
 	//create a constant buffer here
 	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(class LuminanceHistogramCBuffer), "Luminance Histo CBuffer", 1);
