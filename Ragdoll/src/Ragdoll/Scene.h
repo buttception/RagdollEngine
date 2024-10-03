@@ -106,6 +106,7 @@ namespace ragdoll {
 		int32_t EnableCascadeDebug{ 0 };
 		float Gamma = 1.f;
 		float Exposure = 1.f;
+		float SkyDimmer = 0.f;
 		bool UseFixedExposure = 0.f;
 	};
 

@@ -84,8 +84,6 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 	ShadowMaskPass->DrawShadowMask(scene->SceneInfo);
 	//light scene color
 	DeferredLightPass->LightPass(scene->SceneInfo);
-	//sky
-	SkyPass->DrawSky(scene->SceneInfo);
 	//get the exposure needed
 	nvrhi::BufferHandle exposure = AutomaticExposurePass->GetAdaptedLuminance(_dt);
 
@@ -101,6 +99,11 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 		.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer())
 		.setDepthAttachment(DepthHandle);
 	fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
+
+	//after tone map for now since need its own tonemap and gamma correct
+	//sky
+	SkyPass->SetRenderTarget(fb);
+	SkyPass->DrawSky(scene->SceneInfo);
 	//draw debug items
 	DebugPass->SetRenderTarget(fb);
 	DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo);
@@ -166,13 +169,17 @@ void Renderer::CreateResource()
 	DeferredLightPass->Init(CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(SceneColor);
+		.addColorAttachment(SceneColor)
+		.setDepthAttachment(DepthHandle);
 	fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
 	SkyPass = std::make_shared<class SkyPass>();
 	SkyPass->SetRenderTarget(fb);
-	SkyPass->SetDependencies(SkyTexture, DepthHandle);
+	SkyPass->SetDependencies(SkyTexture);
 	SkyPass->Init(CommandList);
 
+	fbDesc = nvrhi::FramebufferDesc()
+		.addColorAttachment(SceneColor);
+	fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
 	AutomaticExposurePass = std::make_shared<class AutomaticExposurePass>();
 	AutomaticExposurePass->SetDependencies(SceneColor);
 	AutomaticExposurePass->Init(CommandList);

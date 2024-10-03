@@ -111,6 +111,7 @@ void ragdoll::Scene::Update(float _dt)
 		ImGui::SliderFloat("Exposure", &SceneInfo.Exposure, 0.f, 2.f);
 	else
 		ImGui::Text("Adapted Luminance: %f", DeferredRenderer->AdaptedLuminance);
+	ImGui::SliderFloat("Sky Dimmer e-6", &SceneInfo.SkyDimmer, 0.f, 1.f);
 	if (ImGui::Checkbox("Freeze Culling Matrix", &bFreezeFrustumCulling))
 		bIsCameraDirty = true;
 	if (ImGui::Checkbox("Show Octree", &Config.bDrawOctree))
@@ -208,7 +209,7 @@ void ragdoll::Scene::UpdateControls(float _dt)
 		UpdateShadowLightMatrices();
 		BuildDebugInstances(StaticDebugInstanceDatas);
 	}
-	if(ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, -90.f, 90.f))
+	if(ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, 0.01f, 90.f))
 	{
 		UpdateShadowCascadesExtents();
 		BuildStaticCascadeMapInstances();
@@ -460,7 +461,7 @@ void ragdoll::Scene::CreateRenderTargets()
 		SkyThetaGammaTable = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	}
 	if (!SkyTexture) {
-		texDesc.width = texDesc.height = 256;
+		texDesc.width = texDesc.height = 2000;
 		texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 		texDesc.isUAV = true;
 		texDesc.format = nvrhi::Format::R11G11B10_FLOAT;

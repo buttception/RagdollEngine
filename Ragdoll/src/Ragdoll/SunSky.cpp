@@ -195,6 +195,8 @@ void FSunSkyTable::FindThetaGammaTables(const FSunSkyPreetham& pt)
     {
         Vector3 c = Tables.mThetaTable[i];
 
+        c.z /= mMaxTheta;
+
         Data[0][i][0] = ToU8(c.x);
         Data[0][i][1] = ToU8(c.y);
         Data[0][i][2] = ToU8(c.z);
@@ -204,6 +206,8 @@ void FSunSkyTable::FindThetaGammaTables(const FSunSkyPreetham& pt)
     for (int i = 0; i < kTableSize; i++)
     {
         Vector3 c = Tables.mGammaTable[i];
+
+        c.z /= mMaxGamma;
 
         Data[1][i][0] = ToU8(c.x);
         Data[1][i][1] = ToU8(c.y);

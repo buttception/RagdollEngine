@@ -18,10 +18,9 @@ void SkyPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
 	RenderTarget = renderTarget;
 }
 
-void SkyPass::SetDependencies(nvrhi::TextureHandle sky, nvrhi::TextureHandle depth)
+void SkyPass::SetDependencies(nvrhi::TextureHandle sky)
 {
 	SkyTexture = sky;
-	DepthBuffer = depth;
 }
 
 void SkyPass::DrawSky(const ragdoll::SceneInformation& sceneInfo)
@@ -39,8 +38,7 @@ void SkyPass::DrawSky(const ragdoll::SceneInformation& sceneInfo)
 	bindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 		nvrhi::BindingSetItem::Texture_SRV(0, SkyTexture),
-		nvrhi::BindingSetItem::Texture_SRV(1, DepthBuffer),
-		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[5])
+		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[6])
 	};
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
 	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(bindingSetDesc, BindingLayoutHandle);
@@ -53,9 +51,10 @@ void SkyPass::DrawSky(const ragdoll::SceneInformation& sceneInfo)
 	PipelineDesc.setVertexShader(VertexShader);
 	PipelineDesc.setFragmentShader(PixelShader);
 
-	PipelineDesc.renderState.depthStencilState.depthTestEnable = false;
+	PipelineDesc.renderState.depthStencilState.depthTestEnable = true;
 	PipelineDesc.renderState.depthStencilState.stencilEnable = false;
 	PipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+	PipelineDesc.renderState.depthStencilState.depthFunc = nvrhi::ComparisonFunc::GreaterOrEqual;
 	PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
 	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 

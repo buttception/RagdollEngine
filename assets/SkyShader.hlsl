@@ -8,7 +8,6 @@ cbuffer g_Const : register(b0) {
 };
 
 Texture2D SkyTexture : register(t0);
-Texture2D DepthBuffer : register(t1);
 sampler Sampler : register(s0);
 
 void main_ps(
@@ -17,22 +16,15 @@ void main_ps(
 	out float3 outColor : SV_Target0
 )
 {
-    float Depth = DepthBuffer.Sample(Sampler, inTexcoord).r;
-    if(Depth > 0.0001f)
-        discard;
-    //otherwise presume depth is at some funny value
-    Depth = 0.001f;
+    //get whr the pixel is in the sky
+    float Depth = 0.5f;
+    //this frag pos is relative the camera but in world coordinate
 	float3 fragPos = DepthToWorld(Depth, inTexcoord, InvViewProjMatrix);
-    float3 dir = fragPos - CameraPosition;
-    dir = normalize(dir);
-    // Convert direction vector to spherical coordinates
-    float theta = abs(asin(dir.y));
-    float phi = atan2(dir.x, dir.z);
+    //get the direction of the fragment from the camera
+    float3 dir = normalize(fragPos - CameraPosition);
 
-    // Map spherical coordinates to texture coordinates
-    float mag = 1.f - theta / (vl_pi / 2.f);
     // Create texture coordinate
-    float2 texCoord = float2(0.5f, 0.5f) * normalize(dir.xz) * mag * 0.5f + 0.5f;
+    float2 texCoord = float2(0.5f, 0.5f) + dir.xz * 0.5f;
 
     // Sample the sky texture using the computed texture coordinates
     float3 skyColor = SkyTexture.Sample(Sampler, texCoord).rgb;
@@ -40,4 +32,3 @@ void main_ps(
     // Assign the sampled color to the output
     outColor = skyColor;
 }
-

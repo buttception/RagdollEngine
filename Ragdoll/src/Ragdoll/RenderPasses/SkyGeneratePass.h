@@ -13,6 +13,9 @@ class SkyGeneratePass {
         uint32_t width;
 		Vector3 PerezInvDen;
         uint32_t height;
+		float maxTheta;
+		float maxGamma;
+		float scalar;
 	}CBuffer;
 
 	nvrhi::CommandListHandle CommandListRef{ nullptr };

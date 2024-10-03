@@ -15,12 +15,11 @@ class SkyPass {
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
 
 	nvrhi::TextureHandle SkyTexture;
-	nvrhi::TextureHandle DepthBuffer;
 
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
 
 	void SetRenderTarget(nvrhi::FramebufferHandle renderTarget);
-	void SetDependencies(nvrhi::TextureHandle sky, nvrhi::TextureHandle depth);
+	void SetDependencies(nvrhi::TextureHandle sky);
 	void DrawSky(const ragdoll::SceneInformation& sceneInfo);
 };

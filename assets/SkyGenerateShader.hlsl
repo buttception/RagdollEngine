@@ -14,6 +14,9 @@ cbuffer g_Const : register(b0)
     uint width;
     float3 PerezInvDen;
     uint height;
+    float maxTheta;
+    float maxGamma;
+    float scalar;
 };
 
 Texture2D<float4> ThetaGammaTable : register(t0);
@@ -50,6 +53,9 @@ float3 SkyRGB(float3 v)  // Use precalculated table to return fast sky colour on
     float3 F = LerpArray(t, 0).xyz;
     float3 G = LerpArray(g, 1).xyz;
 
+    F.z *= maxTheta;
+    G.z *= maxGamma;
+
     float3 xyY = (float3(1.f, 1.f, 1.f) - F) * (float3(1.f, 1.f, 1.f) + G);
 
     xyY *= PerezInvDen;
@@ -80,22 +86,29 @@ void main_cs(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, uint3 
     if (DTid.x < sw || DTid.x >= width - sw)
     {
         Target[DTid.xy] = float3(0.0f, 0.0f, 0.0f); // Fill with black or transparent
-        return;
+    }
+    else
+    {
+        // Compute the x and y coordinates in the hemisphere
+        float x2 = x * x;
+        float h2 = x2 + y2; // h^2 = x^2 + y^2
+
+        // Compute the direction vector
+        float3 v = float3(x, y, sqrt(1.0f - h2));
+
+        // Get the color from the sky based on the computed vector
+        float3 c = SkyRGB(v); 
+        c *= scalar;
+        c = ACESFilm(c);
+
+        // Write the final color to the target texture, is in hdr
+        Target[DTid.xy] = c;
     }
 
-    // Compute the x and y coordinates in the hemisphere
-    float x2 = x * x;
-    float h2 = x2 + y2; // h^2 = x^2 + y^2
-
-    // Compute the direction vector
-    float3 v = float3(x, y, sqrt(1.0f - h2));
-
-    // Get the color from the sky based on the computed vector
-    float3 c = SkyRGB(v); 
-    c *= 4.99999987e-05;
-
-    // Write the final color to the target texture, is in hdr
-    Target[DTid.xy] = c;
-
     GroupMemoryBarrierWithGroupSync();
+
+    if(DTid.x < sw)
+        Target[DTid.xy] = Target[int2(sw, DTid.y)];
+    if(DTid.x >= width - sw)
+        Target[DTid.xy] = Target[int2(width -sw - 1, DTid.y)];
 }

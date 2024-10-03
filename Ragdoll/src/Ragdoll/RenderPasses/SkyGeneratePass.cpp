@@ -57,6 +57,12 @@ void SkyGeneratePass::GenerateSky(const ragdoll::SceneInformation& sceneInfo)
 	CBuffer.height = SkyTexture->getDesc().height;
 	CBuffer.sun = lightDir;
 	CBuffer.PerezInvDen = SunSky->mPerezInvDen;
+	CBuffer.maxTheta = Table->mMaxTheta;
+	CBuffer.maxGamma = Table->mMaxGamma;
+	if (sceneInfo.SkyDimmer == 0.f)
+		CBuffer.scalar = 0.499999987e-04;
+	else
+		CBuffer.scalar = sceneInfo.SkyDimmer * 1e-04;
 	CommandListRef->writeBuffer(cBufHandle, &CBuffer, sizeof(ConstantBuffer));
 	CommandListRef->setComputeState(state);
 	CommandListRef->dispatch(SkyTexture->getDesc().width / 16 + 1, SkyTexture->getDesc().height / 16 + 1, 1);
