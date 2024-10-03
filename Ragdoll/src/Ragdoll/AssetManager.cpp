@@ -1,5 +1,7 @@
 #include "ragdollpch.h"
 
+#include "nvrhi/utils.h"
+
 #include "AssetManager.h"
 #include "DirectXDevice.h"
 
@@ -14,7 +16,7 @@ AssetManager* AssetManager::GetInstance()
 
 int32_t AssetManager::AddImage(Image img)
 {
-	DeviceRef->m_NvrhiDevice->writeDescriptorTable(DescriptorTable, nvrhi::BindingSetItem::Texture_SRV(Images.size(), img.TextureHandle));
+	DirectXDevice::GetInstance()->m_NvrhiDevice->writeDescriptorTable(DescriptorTable, nvrhi::BindingSetItem::Texture_SRV(Images.size(), img.TextureHandle));
 	Images.emplace_back(img);
 	return Images.size() - 1;
 }
@@ -79,7 +81,7 @@ nvrhi::GraphicsPipelineHandle AssetManager::GetGraphicsPipeline(const nvrhi::Gra
 	if (GPSOs.contains(hash))
 		return GPSOs.at(hash);
 	RD_CORE_INFO("GPSO created");
-	return GPSOs[hash] = DeviceRef->m_NvrhiDevice->createGraphicsPipeline(desc, fb);
+	return GPSOs[hash] = DirectXDevice::GetNativeDevice()->createGraphicsPipeline(desc, fb);
 }
 
 nvrhi::ComputePipelineHandle AssetManager::GetComputePipeline(const nvrhi::ComputePipelineDesc& desc)
@@ -88,15 +90,48 @@ nvrhi::ComputePipelineHandle AssetManager::GetComputePipeline(const nvrhi::Compu
 	if (CPSOs.contains(hash))
 		return CPSOs.at(hash);
 	RD_CORE_INFO("CPSO created");
-	return CPSOs[hash] = DeviceRef->m_NvrhiDevice->createComputePipeline(desc);
+	return CPSOs[hash] = DirectXDevice::GetNativeDevice()->createComputePipeline(desc);
 }
 
-void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_ptr<ragdoll::FileManager> fm)
+nvrhi::BindingLayoutHandle AssetManager::GetBindingLayout(const nvrhi::BindingSetDesc& desc)
 {
-	DeviceRef = deviceRef;
+	static auto ConvertSetToLayout = [](const nvrhi::BindingSetItemArray& setDesc, nvrhi::BindingLayoutItemArray& layoutDesc)
+		{
+			for (auto& item : setDesc)
+			{
+				nvrhi::BindingLayoutItem layoutItem{};
+				layoutItem.slot = item.slot;
+				layoutItem.type = item.type;
+				if (item.type == nvrhi::ResourceType::PushConstants)
+					layoutItem.size = uint32_t(item.range.byteSize);
+				layoutDesc.push_back(layoutItem);
+			}
+		};
+	nvrhi::BindingLayoutDesc layoutDesc;
+	layoutDesc.visibility = nvrhi::ShaderType::All;
+	ConvertSetToLayout(desc.bindings, layoutDesc.bindings);
+	uint32_t hash = HashBytes(&layoutDesc);
+	if (BindingLayouts.contains(hash))
+		return BindingLayouts.at(hash);
+	RD_CORE_INFO("Binding Layout created");
+	return BindingLayouts[hash] = DirectXDevice::GetNativeDevice()->createBindingLayout(layoutDesc);
+}
+
+void AssetManager::RecompileShaders()
+{
+	std::filesystem::path Path = FileManagerRef->GetRoot().parent_path() / "Tools";
+	system(("call " + Path.string() + "\\compileShader.bat < NUL").c_str());
+	Shaders.clear();
+	GPSOs.clear();
+	CPSOs.clear();
+}
+
+void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
+{
 	FileManagerRef = fm;
+	nvrhi::DeviceHandle Device = DirectXDevice::GetNativeDevice();
 	//set up the command list
-	CommandList = DeviceRef->m_NvrhiDevice->createCommandList();
+	CommandList = Device->createCommandList();
 	//setup the global buffer details
 	//create the vertex layout and index used by the shader
 	nvrhi::VertexAttributeDesc vPositionAttrib;
@@ -119,12 +154,13 @@ void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_pt
 	vTexcoordAttrib.offset = offsetof(Vertex, texcoord);
 	vTexcoordAttrib.elementStride = sizeof(Vertex);
 	vTexcoordAttrib.format = nvrhi::Format::RG32_FLOAT;
-	VertexAttributes = {
+	InstancedVertexAttributes = {
 		vPositionAttrib,
 		vNormalAttrib,
 		vTangentAttrib,
 		vTexcoordAttrib,
 	};
+	InstancedInputLayoutHandle = Device->createInputLayout(InstancedVertexAttributes.data(), InstancedVertexAttributes.size(), nullptr);
 
 	//create a default texture
 	CommandList->open();
@@ -139,7 +175,7 @@ void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_pt
 	textureDesc.keepInitialState = true;
 
 	textureDesc.debugName = "Default Texture";
-	AssetManager::GetInstance()->DefaultTex = DeviceRef->m_NvrhiDevice->createTexture(textureDesc);
+	AssetManager::GetInstance()->DefaultTex = Device->createTexture(textureDesc);
 	uint8_t color[4][4] = { 
 		{255, 255, 255, 255},
 		{255, 255, 255, 255},
@@ -149,7 +185,7 @@ void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_pt
 	CommandList->writeTexture(AssetManager::GetInstance()->DefaultTex, 0, 0, &color, 8);
 
 	textureDesc.debugName = "Error Texture";
-	AssetManager::GetInstance()->ErrorTex = DeviceRef->m_NvrhiDevice->createTexture(textureDesc);
+	AssetManager::GetInstance()->ErrorTex = Device->createTexture(textureDesc);
 	uint8_t errorColor[4][4] = {
 		{255, 105, 180, 255},
 		{0, 0, 0, 255},
@@ -169,21 +205,21 @@ void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_pt
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Clamp;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Clamp;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Clamp;
-	Samplers[(int)SamplerTypes::Point_Clamp] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Point_Clamp] = Device->createSampler(samplerDesc);
 	samplerDesc.minFilter = 0;
 	samplerDesc.magFilter = 0;
 	samplerDesc.mipFilter = 0;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Wrap;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Wrap;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Wrap;
-	Samplers[(int)SamplerTypes::Point_Wrap] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Point_Wrap] = Device->createSampler(samplerDesc);
 	samplerDesc.minFilter = 0;
 	samplerDesc.magFilter = 0;
 	samplerDesc.mipFilter = 0;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
-	Samplers[(int)SamplerTypes::Point_Repeat] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Point_Repeat] = Device->createSampler(samplerDesc);
 
 	samplerDesc.minFilter = 1;
 	samplerDesc.magFilter = 1;
@@ -191,21 +227,21 @@ void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_pt
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Clamp;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Clamp;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Clamp;
-	Samplers[(int)SamplerTypes::Linear_Clamp] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Linear_Clamp] = Device->createSampler(samplerDesc);
 	samplerDesc.minFilter = 1;
 	samplerDesc.magFilter = 1;
 	samplerDesc.mipFilter = 0;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Wrap;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Wrap;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Wrap;
-	Samplers[(int)SamplerTypes::Linear_Wrap] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Linear_Wrap] = Device->createSampler(samplerDesc);
 	samplerDesc.minFilter = 1;
 	samplerDesc.magFilter = 1;
 	samplerDesc.mipFilter = 0;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
-	Samplers[(int)SamplerTypes::Linear_Repeat] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Linear_Repeat] = Device->createSampler(samplerDesc);
 
 	samplerDesc.minFilter = 1;
 	samplerDesc.magFilter = 1;
@@ -213,21 +249,21 @@ void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_pt
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Clamp;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Clamp;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Clamp;
-	Samplers[(int)SamplerTypes::Trilinear_Clamp] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Trilinear_Clamp] = Device->createSampler(samplerDesc);
 	samplerDesc.minFilter = 1;
 	samplerDesc.magFilter = 1;
 	samplerDesc.mipFilter = 1;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Wrap;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Wrap;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Wrap;
-	Samplers[(int)SamplerTypes::Trilinear_Wrap] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Trilinear_Wrap] = Device->createSampler(samplerDesc);
 	samplerDesc.minFilter = 1;
 	samplerDesc.magFilter = 1;
 	samplerDesc.mipFilter = 1;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
-	Samplers[(int)SamplerTypes::Trilinear_Repeat] = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	Samplers[(int)SamplerTypes::Trilinear_Repeat] = Device->createSampler(samplerDesc);
 
 	samplerDesc.minFilter = 1;
 	samplerDesc.magFilter = 1;
@@ -237,7 +273,7 @@ void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_pt
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Border;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Border;
 	samplerDesc.reductionType = nvrhi::SamplerReductionType::Comparison;
-	ShadowSampler = DeviceRef->m_NvrhiDevice->createSampler(samplerDesc);
+	ShadowSampler = Device->createSampler(samplerDesc);
 #pragma endregion
 
 	//create the bindless descriptor table
@@ -250,13 +286,13 @@ void AssetManager::Init(std::shared_ptr<DirectXDevice> deviceRef, std::shared_pt
 		nvrhi::BindingLayoutItem::Texture_SRV(1)
 	};
 
-	BindlessLayoutHandle = DeviceRef->m_NvrhiDevice->createBindlessLayout(bindlessDesc);
-	DescriptorTable = DeviceRef->m_NvrhiDevice->createDescriptorTable(BindlessLayoutHandle);
+	BindlessLayoutHandle = Device->createBindlessLayout(bindlessDesc);
+	DescriptorTable = Device->createDescriptorTable(BindlessLayoutHandle);
 	//TODO: not sure why i am forced to resize
-	DeviceRef->m_NvrhiDevice->resizeDescriptorTable(DescriptorTable, bindlessDesc.maxCapacity, true);
+	Device->resizeDescriptorTable(DescriptorTable, bindlessDesc.maxCapacity, true);
 
 	CommandList->close();
-	DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
+	Device->executeCommandList(CommandList);
 }
 
 uint32_t AssetManager::AddVertices(const std::vector<Vertex>& newVertices, const std::vector<uint32_t>& newIndices)
@@ -289,7 +325,7 @@ void AssetManager::UpdateVBOIBO()
 	vertexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;	//set as copy dest to copy over data
 	//smth smth syncrhonization need to be this state to be written
 
-	VBO = DeviceRef->m_NvrhiDevice->createBuffer(vertexBufDesc);
+	VBO = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(vertexBufDesc);
 	//copy data over
 	CommandList->beginTrackingBufferState(VBO, nvrhi::ResourceStates::CopyDest);	//i tink this is to update nvrhi resource manager state tracker
 	CommandList->writeBuffer(VBO, Vertices.data(), vertexBufDesc.byteSize);
@@ -301,14 +337,14 @@ void AssetManager::UpdateVBOIBO()
 	indexBufDesc.debugName = "Global index buffer";
 	indexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;
 
-	IBO = DeviceRef->m_NvrhiDevice->createBuffer(indexBufDesc);
+	IBO = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(indexBufDesc);
 	CommandList->beginTrackingBufferState(IBO, nvrhi::ResourceStates::CopyDest);
 	CommandList->writeBuffer(IBO, Indices.data(), indexBufDesc.byteSize);
 	CommandList->setPermanentBufferState(IBO, nvrhi::ResourceStates::IndexBuffer);
 
 	CommandList->endMarker();
 	CommandList->close();
-	DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
+	DirectXDevice::GetInstance()->m_NvrhiDevice->executeCommandList(CommandList);
 }
 
 nvrhi::ShaderHandle AssetManager::GetShader(const std::string& shaderFilename)
@@ -329,8 +365,11 @@ nvrhi::ShaderHandle AssetManager::GetShader(const std::string& shaderFilename)
 	}
 	uint32_t size{};
 	const uint8_t* data = FileManagerRef->ImmediateLoad(shaderFilename, size);
-	nvrhi::ShaderHandle shader = DeviceRef->m_NvrhiDevice->createShader(
-		nvrhi::ShaderDesc(type),
+	nvrhi::ShaderDesc desc;
+	desc.shaderType = type;
+	desc.debugName = shaderFilename;
+	nvrhi::ShaderHandle shader = DirectXDevice::GetInstance()->m_NvrhiDevice->createShader(
+		desc,
 		data, size);
 	Shaders[shaderFilename] = shader;
 	return Shaders.at(shaderFilename);

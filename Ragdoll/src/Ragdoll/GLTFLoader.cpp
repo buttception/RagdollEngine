@@ -16,10 +16,9 @@
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 #include <tiny_gltf.h>
 
-void GLTFLoader::Init(std::filesystem::path root, std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> scene)
+void GLTFLoader::Init(std::filesystem::path root, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> scene)
 {
 	Root = root;
-	DeviceRef = device;
 	FileManagerRef = fm;
 	EntityManagerRef = em;
 	SceneRef = scene;
@@ -218,7 +217,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 					const tinygltf::Accessor& accessor = it.second;
 					const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
 					AttributeType type;
-					for (const nvrhi::VertexAttributeDesc& itDesc : AssetManager::GetInstance()->VertexAttributes) {
+					for (const nvrhi::VertexAttributeDesc& itDesc : AssetManager::GetInstance()->InstancedVertexAttributes) {
 						if (it.first.find(itDesc.name) != std::string::npos)
 						{
 							if (itDesc.name == "POSITION")
@@ -335,7 +334,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	//create the buffers
 	AssetManager::GetInstance()->UpdateVBOIBO();
 
-	CommandList = DeviceRef->m_NvrhiDevice->createCommandList();
+	CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
 	CommandList->open();
 	//load the images
 	std::unordered_map<int32_t, int32_t> gltfSourceToImageIndex{};
@@ -369,7 +368,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		texDesc.keepInitialState = true;
 
 		Image img;
-		img.TextureHandle = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
+		img.TextureHandle = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 		RD_ASSERT(img.TextureHandle == nullptr, "Issue creating texture handle: {}", itImg.uri);
 
 		//upload the texture data
@@ -475,7 +474,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		TINYGLTF_MODE_POINTS;
 	}
 	CommandList->close();
-	DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
+	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 
 	//load all of the materials
 	for (const tinygltf::Material& gltfMat : model.materials) 

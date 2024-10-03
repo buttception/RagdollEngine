@@ -14,13 +14,12 @@ ragdoll::Scene::Scene(Application* app)
 {
 	EntityManagerRef = app->m_EntityManager;
 	PrimaryWindowRef = app->m_PrimaryWindow;
-	DeviceRef = app->Graphic;
 
-	CommandList = DeviceRef->m_NvrhiDevice->createCommandList();
+	CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
 	CreateRenderTargets();
 
 	DeferredRenderer = std::make_shared<class Renderer>();
-	DeferredRenderer->Init(DeviceRef, app->m_PrimaryWindow, this);
+	DeferredRenderer->Init(app->m_PrimaryWindow, this);
 	if (app->Config.bCreateCustomMeshes)
 	{
 		Config.bIsThereCustomMeshes = true;
@@ -29,7 +28,7 @@ ragdoll::Scene::Scene(Application* app)
 	Config.bDrawBoxes = app->Config.bDrawDebugBoundingBoxes;
 	Config.bDrawOctree = app->Config.bDrawDebugOctree;
 	ImguiInterface = std::make_shared<ImguiRenderer>();
-	ImguiInterface->Init(DeviceRef.get());
+	ImguiInterface->Init(DirectXDevice::GetInstance());
 }
 
 void ragdoll::Scene::Update(float _dt)
@@ -102,12 +101,17 @@ void ragdoll::Scene::Update(float _dt)
 	}
 
 	ImGui::Begin("Debug");
+	if (ImGui::Button("Reload Shaders")) {
+		//need to call bat file to recompile
+		AssetManager::GetInstance()->RecompileShaders();
+	}
 	ImGui::SliderFloat("Gamma", &SceneInfo.Gamma, 0.5f, 3.f);
 	ImGui::Checkbox("UseFixedExposure", &SceneInfo.UseFixedExposure);
 	if (SceneInfo.UseFixedExposure)
 		ImGui::SliderFloat("Exposure", &SceneInfo.Exposure, 0.f, 2.f);
 	else
 		ImGui::Text("Adapted Luminance: %f", DeferredRenderer->AdaptedLuminance);
+	ImGui::SliderFloat("Sky Dimmer e-6", &SceneInfo.SkyDimmer, 0.f, 1.f);
 	if (ImGui::Checkbox("Freeze Culling Matrix", &bFreezeFrustumCulling))
 		bIsCameraDirty = true;
 	if (ImGui::Checkbox("Show Octree", &Config.bDrawOctree))
@@ -154,7 +158,7 @@ void ragdoll::Scene::Update(float _dt)
 	DeferredRenderer->Render(this, _dt);
 
 	ImguiInterface->Render();
-	DeviceRef->Present();
+	DirectXDevice::GetInstance()->Present();
 
 	bIsCameraDirty = false;
 }
@@ -184,7 +188,7 @@ void ragdoll::Scene::UpdateControls(float _dt)
 		Color dirLightColor = { 1.f,1.f,1.f,1.f };
 		Color ambientLight = { 0.2f, 0.2f, 0.2f, 1.f };
 		float lightIntensity = 1.f;
-		Vector2 azimuthAndElevation = { 0.f, 45.f };
+		Vector2 azimuthAndElevation = { 0.f, 90.f };
 	};
 	static Data data;
 	ImGui::Begin("Camera Manipulate");
@@ -205,7 +209,7 @@ void ragdoll::Scene::UpdateControls(float _dt)
 		UpdateShadowLightMatrices();
 		BuildDebugInstances(StaticDebugInstanceDatas);
 	}
-	if(ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, -90.f, 90.f))
+	if(ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, 0.01f, 90.f))
 	{
 		UpdateShadowCascadesExtents();
 		BuildStaticCascadeMapInstances();
@@ -278,9 +282,11 @@ void ragdoll::Scene::UpdateControls(float _dt)
 		DirectX::XMConvertToRadians(data.azimuthAndElevation.x),
 		DirectX::XMConvertToRadians(data.azimuthAndElevation.y) };
 	SceneInfo.LightDirection = Vector3(
-		sinf(azimuthElevationRad.y) * cosf(azimuthElevationRad.x),
-		cosf(azimuthElevationRad.y) * cosf(azimuthElevationRad.x),
-		sinf(azimuthElevationRad.x));
+		cosf(azimuthElevationRad.y) * sinf(azimuthElevationRad.x),
+		sinf(azimuthElevationRad.y),
+		cosf(azimuthElevationRad.y) * cosf(azimuthElevationRad.x)
+	);
+	SceneInfo.LightDirection.Normalize();
 	SceneInfo.MainCameraPosition = data.cameraPos;
 }
 
@@ -315,7 +321,7 @@ void ragdoll::Scene::CreateCustomMeshes()
 		textureDesc.initialState = nvrhi::ResourceStates::ShaderResource;
 		textureDesc.keepInitialState = true;
 		textureDesc.debugName = debugNames[i];
-		nvrhi::TextureHandle texHandle = DeviceRef->m_NvrhiDevice->createTexture(textureDesc);
+		nvrhi::TextureHandle texHandle = DirectXDevice::GetNativeDevice()->createTexture(textureDesc);
 		CommandList->writeTexture(texHandle, 0, 0, &colors[i], 4);
 		img.TextureHandle = texHandle;
 		AssetManager::GetInstance()->AddImage(img);
@@ -327,7 +333,7 @@ void ragdoll::Scene::CreateCustomMeshes()
 
 	}
 	CommandList->close();
-	DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
+	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 
 	Material mat;
 	mat.bIsLit = true;
@@ -345,7 +351,7 @@ void ragdoll::Scene::CreateCustomMeshes()
 
 	//build primitives
 	GeometryBuilder geomBuilder;
-	geomBuilder.Init(DeviceRef->m_NvrhiDevice);
+	geomBuilder.Init(DirectXDevice::GetNativeDevice());
 	int32_t id = geomBuilder.BuildCube(1.f);
 	for (int i = 0; i < 5; ++i) {
 		Mesh mesh;
@@ -396,7 +402,7 @@ void ragdoll::Scene::CreateRenderTargets()
 	if (!SceneDepthZ) {
 		//create a depth buffer
 		depthBufferDesc.debugName = "SceneDepthZ";
-		SceneDepthZ = DeviceRef->m_NvrhiDevice->createTexture(depthBufferDesc);
+		SceneDepthZ = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
 	}
 	if (!ShadowMap[0]) {
 		depthBufferDesc.width = 2000;
@@ -404,7 +410,7 @@ void ragdoll::Scene::CreateRenderTargets()
 		for (int i = 0; i < 4; ++i)
 		{
 			depthBufferDesc.debugName = "ShadowMap" + std::to_string(i);
-			ShadowMap[i] = DeviceRef->m_NvrhiDevice->createTexture(depthBufferDesc);
+			ShadowMap[i] = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
 		}
 	}
 
@@ -425,27 +431,42 @@ void ragdoll::Scene::CreateRenderTargets()
 	if (!SceneColor) {
 		texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
 		texDesc.debugName = "SceneColor";
-		SceneColor = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
+		SceneColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	}
 	if (!GBufferAlbedo) {
 		texDesc.format = nvrhi::Format::RGBA8_UNORM;
 		texDesc.debugName = "GBufferAlbedo";
-		GBufferAlbedo = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
+		GBufferAlbedo = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	}
 	if (!GBufferNormal) {
 		texDesc.format = nvrhi::Format::RG16_UNORM;
 		texDesc.debugName = "GBufferNormal";
-		GBufferNormal = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
+		GBufferNormal = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	}
 	if (!GBufferORM) {
 		texDesc.format = nvrhi::Format::RGBA8_UNORM;
 		texDesc.debugName = "GBufferORM";
-		GBufferORM = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
+		GBufferORM = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	}
 	if (!ShadowMask) {
 		texDesc.format = nvrhi::Format::RGBA8_UNORM;
 		texDesc.debugName = "ShadowMask";
-		ShadowMask = DeviceRef->m_NvrhiDevice->createTexture(texDesc);
+		ShadowMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	}
+	if (!SkyThetaGammaTable) {
+		texDesc.width = 64;
+		texDesc.height = 2;
+		texDesc.format = nvrhi::Format::RGBA8_UNORM;
+		texDesc.debugName = "SkyThetaGammaTable";
+		SkyThetaGammaTable = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	}
+	if (!SkyTexture) {
+		texDesc.width = texDesc.height = 2000;
+		texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+		texDesc.isUAV = true;
+		texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
+		texDesc.debugName = "SkyTexture";
+		SkyTexture = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	}
 }
 
@@ -598,14 +619,14 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 		InstanceBufferDesc.debugName = "Global instance buffer";
 		InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
 		InstanceBufferDesc.structStride = sizeof(InstanceData);
-		StaticInstanceBufferHandle = DeviceRef->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
+		StaticInstanceBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(InstanceBufferDesc);
 
 		//copy data over
 		CommandList->beginTrackingBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::CopyDest);
 		CommandList->writeBuffer(StaticInstanceBufferHandle, instances.data(), sizeof(InstanceData) * instances.size());
 		CommandList->setPermanentBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::ShaderResource);
 		CommandList->close();
-		DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
+		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 	}
 }
 
@@ -696,14 +717,14 @@ void ragdoll::Scene::BuildStaticCascadeMapInstances()
 			InstanceBufferDesc.debugName = "Global instance buffer";
 			InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
 			InstanceBufferDesc.structStride = sizeof(InstanceData);
-			StaticCascadeInstanceBufferHandles[cascadeIndex] = DeviceRef->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
+			StaticCascadeInstanceBufferHandles[cascadeIndex] = DirectXDevice::GetNativeDevice()->createBuffer(InstanceBufferDesc);
 
 			//copy data over
 			CommandList->beginTrackingBufferState(StaticCascadeInstanceBufferHandles[cascadeIndex], nvrhi::ResourceStates::CopyDest);
 			CommandList->writeBuffer(StaticCascadeInstanceBufferHandles[cascadeIndex], StaticCascadeInstanceDatas[cascadeIndex].data(), sizeof(InstanceData) * StaticCascadeInstanceDatas[cascadeIndex].size());
 			CommandList->setPermanentBufferState(StaticCascadeInstanceBufferHandles[cascadeIndex], nvrhi::ResourceStates::ShaderResource);
 			CommandList->close();
-			DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
+			DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 		}
 	}
 }
@@ -782,7 +803,7 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 		InstanceBufferDesc.debugName = "Debug instance buffer";
 		InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
 		InstanceBufferDesc.structStride = sizeof(InstanceData);
-		StaticInstanceDebugBufferHandle = DeviceRef->m_NvrhiDevice->createBuffer(InstanceBufferDesc);
+		StaticInstanceDebugBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(InstanceBufferDesc);
 
 		//copy data over
 		CommandList->open();
@@ -790,7 +811,7 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 		CommandList->writeBuffer(StaticInstanceDebugBufferHandle, instances.data(), sizeof(InstanceData) * instances.size());
 		CommandList->setPermanentBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::ShaderResource);
 		CommandList->close();
-		DeviceRef->m_NvrhiDevice->executeCommandList(CommandList);
+		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 	}
 }
 
@@ -826,13 +847,17 @@ void ragdoll::Scene::CullOctantForCascade(const Octant& octant, const DirectX::B
 {
 	if (oob.Contains(octant.Box) != DirectX::ContainmentType::DISJOINT)	//so if contains or intersects
 	{
-		//calculate the furthest
-		Vector3 corners[8];
-		octant.Box.GetCorners(corners);
-		for (int i = 0; i < 8; ++i) {
-			float d2 = (corners[i] - center).Dot(normal);
-			front = std::max(d2, front);
-			back = std::min(d2, back);
+		//only if this octant have nodes, then consider min max
+		if (!octant.Nodes.empty())
+		{
+			//calculate the furthest
+			Vector3 corners[8];
+			octant.Box.GetCorners(corners);
+			for (int i = 0; i < 8; ++i) {
+				float d2 = (corners[i] - center).Dot(normal);
+				front = std::max(d2, front);
+				back = std::min(d2, back);
+			}
 		}
 		//if no children, all proxies go into the result buffer
 		if (octant.Octants.empty())

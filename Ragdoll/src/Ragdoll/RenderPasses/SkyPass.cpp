@@ -1,5 +1,5 @@
 #include "ragdollpch.h"
-#include "DeferredLightPass.h"
+#include "SkyPass.h"
 
 #include <nvrhi/utils.h>
 #include <microprofile.h>
@@ -8,55 +8,38 @@
 #include "Ragdoll/Scene.h"
 #include "Ragdoll/DirectXDevice.h"
 
-void DeferredLightPass::Init(nvrhi::CommandListHandle cmdList)
+void SkyPass::Init(nvrhi::CommandListHandle cmdList)
 {
 	CommandListRef = cmdList;
-
-	RD_ASSERT(RenderTarget == nullptr, "Render Target Framebuffer not set");
 }
 
-void DeferredLightPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
+void SkyPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
 {
 	RenderTarget = renderTarget;
 }
 
-void DeferredLightPass::SetDependencies(nvrhi::TextureHandle albedo, nvrhi::TextureHandle normal, nvrhi::TextureHandle orm, nvrhi::TextureHandle depth, nvrhi::TextureHandle shadowMask)
+void SkyPass::SetDependencies(nvrhi::TextureHandle sky)
 {
-	AlbedoHandle = albedo;
-	NormalHandle = normal;
-	AORoughnessMetallicHandle = orm;
-	DepthHandle = depth;
-	ShadowMask = shadowMask;
+	SkyTexture = sky;
 }
 
-void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
+void SkyPass::DrawSky(const ragdoll::SceneInformation& sceneInfo)
 {
 	MICROPROFILE_SCOPEI("Render", "Light Pass", MP_BLUEVIOLET);
 	//create a constant buffer here
-	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "DeferredLight CBuffer", 1);
+	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "Sky CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 
 	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
 	CBuffer.InvViewProj = sceneInfo.MainCameraViewProj.Invert();
-	CBuffer.LightDiffuseColor = sceneInfo.LightDiffuseColor;
-	CBuffer.SceneAmbientColor = sceneInfo.SceneAmbientColor;
-	CBuffer.LightDirection = sceneInfo.LightDirection;
 	CBuffer.CameraPosition = sceneInfo.MainCameraPosition;
-	CBuffer.LightIntensity = sceneInfo.LightIntensity;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(1, ConstantBufferHandle),
-		nvrhi::BindingSetItem::Texture_SRV(0, AlbedoHandle),
-		nvrhi::BindingSetItem::Texture_SRV(1, NormalHandle),
-		nvrhi::BindingSetItem::Texture_SRV(2, AORoughnessMetallicHandle),
-		nvrhi::BindingSetItem::Texture_SRV(3, DepthHandle),
-		nvrhi::BindingSetItem::Texture_SRV(4, ShadowMask)
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
+		nvrhi::BindingSetItem::Texture_SRV(0, SkyTexture),
+		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[6])
 	};
-	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
-	{
-		bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler(i, AssetManager::GetInstance()->Samplers[i]));
-	}
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
 	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(bindingSetDesc, BindingLayoutHandle);
 
@@ -64,13 +47,14 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
 	PipelineDesc.addBindingLayout(BindingLayoutHandle);
 	PipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
 	nvrhi::ShaderHandle VertexShader = AssetManager::GetInstance()->GetShader("Fullscreen.vs.cso");
-	nvrhi::ShaderHandle PixelShader = AssetManager::GetInstance()->GetShader("DeferredLight.ps.cso");
+	nvrhi::ShaderHandle PixelShader = AssetManager::GetInstance()->GetShader("Sky.ps.cso");
 	PipelineDesc.setVertexShader(VertexShader);
 	PipelineDesc.setFragmentShader(PixelShader);
 
-	PipelineDesc.renderState.depthStencilState.depthTestEnable = false;
+	PipelineDesc.renderState.depthStencilState.depthTestEnable = true;
 	PipelineDesc.renderState.depthStencilState.stencilEnable = false;
 	PipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+	PipelineDesc.renderState.depthStencilState.depthFunc = nvrhi::ComparisonFunc::GreaterOrEqual;
 	PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
 	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 
@@ -81,10 +65,10 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
 	state.addBindingSet(BindingSetHandle);
 	state.addBindingSet(AssetManager::GetInstance()->DescriptorTable);
 
-	CommandListRef->beginMarker("Light Pass");
+	CommandListRef->beginMarker("Sky Pass");
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
 	CommandListRef->setGraphicsState(state);
-	
+
 	nvrhi::DrawArguments args;
 	args.vertexCount = 3;
 	CommandListRef->draw(args);

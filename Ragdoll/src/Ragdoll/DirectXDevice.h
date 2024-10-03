@@ -103,7 +103,9 @@ struct DeviceCreationParameters : public InstanceParameters
 };
 
 class DirectXDevice {
-	bool bIsShutdown = false;
+	inline static std::unique_ptr<DirectXDevice> s_Instance;
+	bool bIsShutdown{ false };
+	bool bIsCreated{ false };
 public:
 	DeviceCreationParameters					m_DeviceParams;
 	RefCountPtr<IDXGIFactory2>					m_DxgiFactory2;
@@ -127,7 +129,11 @@ public:
 	std::shared_ptr<ragdoll::Window> m_PrimaryWindow;
 	std::shared_ptr<ragdoll::FileManager> m_FileManager;
 
-	static std::shared_ptr<DirectXDevice> Create(DeviceCreationParameters creationParam, std::shared_ptr<ragdoll::Window> win, std::shared_ptr <ragdoll::FileManager> fm);
+	static DirectXDevice* GetInstance();
+	static nvrhi::DeviceHandle GetNativeDevice();
+	static void Release() { s_Instance.reset(); s_Instance = nullptr; }
+
+	void Create(DeviceCreationParameters creationParam, std::shared_ptr<ragdoll::Window> win, std::shared_ptr <ragdoll::FileManager> fm);
 	bool BeginFrame();
 	void Present();
 	void Shutdown();

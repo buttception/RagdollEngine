@@ -1,25 +1,25 @@
 #pragma once
-#pragma once
 #include <nvrhi/nvrhi.h>
 
 namespace ragdoll {
 	struct InstanceGroupInfo;
 	struct SceneInformation;
 }
-class DebugPass {
+class SkyPass {
 	struct ConstantBuffer {
-		//constant buffer struct specific to the forward pass
-		Matrix ViewProj;
-		uint32_t InstanceOffset;
+		Matrix InvViewProj;
+		Vector3 CameraPosition;
 	}CBuffer;
 
-	nvrhi::FramebufferHandle RenderTarget{ nullptr };
+	nvrhi::FramebufferHandle RenderTarget;
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
+
+	nvrhi::TextureHandle SkyTexture;
 
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
 
 	void SetRenderTarget(nvrhi::FramebufferHandle renderTarget);
-
-	void DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t instanceCount, const ragdoll::SceneInformation& sceneInfo);
+	void SetDependencies(nvrhi::TextureHandle sky);
+	void DrawSky(const ragdoll::SceneInformation& sceneInfo);
 };

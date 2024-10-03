@@ -106,13 +106,13 @@ namespace ragdoll {
 		int32_t EnableCascadeDebug{ 0 };
 		float Gamma = 1.f;
 		float Exposure = 1.f;
+		float SkyDimmer = 0.f;
 		bool UseFixedExposure = 0.f;
 	};
 
 	class Scene {
 		std::shared_ptr<EntityManager> EntityManagerRef;
 		std::shared_ptr<Window> PrimaryWindowRef;
-		std::shared_ptr<DirectXDevice> DeviceRef;
 
 		std::shared_ptr<ImguiRenderer> ImguiInterface;
 
@@ -149,6 +149,9 @@ namespace ragdoll {
 		//shadows
 		nvrhi::TextureHandle ShadowMap[4];
 		nvrhi::TextureHandle ShadowMask;
+		//sky texture
+		nvrhi::TextureHandle SkyTexture;
+		nvrhi::TextureHandle SkyThetaGammaTable;
 		//distance where the subfrusta are seperated
 		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
 

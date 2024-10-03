@@ -76,7 +76,7 @@ void gbuffer_ps(
 		albedo *= Textures[data.albedoIndex].Sample(Samplers[data.albedoSamplerIndex], inTexcoord);
 	}
 	clip(albedo.a - 0.01f);
-	float4 RM = float4(1.f, data.roughness, data.metallic, 0);
+	float4 RM = float4(0.f, data.roughness, data.metallic, 0);
 	if(data.roughnessMetallicIndex != -1){
 		RM = Textures[data.roughnessMetallicIndex].Sample(Samplers[data.roughnessMetallicSamplerIndex], inTexcoord);
 	}
@@ -129,7 +129,7 @@ void deferred_light_ps(
 
 	//apply pbr lighting, AO is 1.f for now so it does nth
 	//float3 diffuse = max(dot(N, LightDirection), 0) * albedo.rgb;
-	float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.z, RM.y, 1.f);
+	float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.z, RM.y, RM.x);
 
 	float3 ambient = SceneAmbientColor.rgb * albedo.rgb;
 	float3 lighting = ambient + diffuse * (1.f - shadowFactor.a);

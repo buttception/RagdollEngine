@@ -95,9 +95,9 @@ namespace ragdoll
 			params.backBufferWidth = m_PrimaryWindow->GetBufferWidth();
 			params.backBufferHeight = m_PrimaryWindow->GetBufferHeight();
 			params.vsyncEnabled = true;
-			Graphic = DirectXDevice::Create(params, m_PrimaryWindow, m_FileManager);
+			DirectXDevice::GetInstance()->Create(params, m_PrimaryWindow, m_FileManager);
 
-			AssetManager::GetInstance()->Init(Graphic, m_FileManager);
+			AssetManager::GetInstance()->Init(m_FileManager);
 
 			m_Scene = std::make_shared<Scene>(this);
 		}
@@ -107,7 +107,7 @@ namespace ragdoll
 		MICROPROFILE_TIMELINE_ENTER_STATIC(MP_DARKGOLDENROD, "GLTF Load");
 		{
 			GLTFLoader loader;
-			loader.Init(m_FileManager->GetRoot(), Graphic, m_FileManager, m_EntityManager, m_Scene);
+			loader.Init(m_FileManager->GetRoot(), m_FileManager, m_EntityManager, m_Scene);
 			if (!Config.glTfSampleSceneToLoad.empty())
 			{
 				std::string sceneName = Config.glTfSampleSceneToLoad;
@@ -159,8 +159,7 @@ namespace ragdoll
 	{
 		AssetManager::GetInstance()->Release();
 		m_Scene->Shutdown();
-		Graphic->Shutdown();
-		Graphic = nullptr;
+		DirectXDevice::GetInstance()->Release();
 		m_FileManager->Shutdown();
 		m_PrimaryWindow->Shutdown();
 #ifdef _DEBUG

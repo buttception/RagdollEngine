@@ -21,29 +21,16 @@ class AutomaticExposurePass {
 	}LuminanceAverageCBuffer;
 
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
-	nvrhi::DeviceHandle NvrhiDeviceRef{ nullptr };
 
 	nvrhi::TextureHandle SceneColor;
 
-	nvrhi::ShaderHandle LuminanceHistogramShader;
-	nvrhi::ShaderHandle LuminanceAverageShader;
-	nvrhi::BindingLayoutHandle LuminanceHistogramBindingLayoutHandle;
-	nvrhi::BindingLayoutHandle LuminanceAverageBindingLayoutHandle;
-	nvrhi::BindingSetHandle LuminanceHistogramBindingSetHandle;
-	nvrhi::BindingSetHandle LuminanceAverageBindingSetHandle;
-
-	nvrhi::ComputePipelineDesc LuminanceHistogramPipelineDesc;
-	nvrhi::ComputePipelineDesc LuminanceAveragePipelineDesc;
-
-	nvrhi::BufferHandle LuminanceHistogramCBufferHandle;
-	nvrhi::BufferHandle LuminanceAverageCBufferHandle;
 	nvrhi::BufferHandle LuminanceHistogramHandle;
 	nvrhi::BufferHandle AdaptedLuminanceHandle;
 
 public:
 	nvrhi::BufferHandle ReadbackBuffer;
 
-	void Init(nvrhi::DeviceHandle nvrhiDevice, nvrhi::CommandListHandle cmdList);
+	void Init(nvrhi::CommandListHandle cmdList);
 	void SetDependencies(nvrhi::TextureHandle sceneColor);
 	nvrhi::BufferHandle GetAdaptedLuminance(float _dt);
 };

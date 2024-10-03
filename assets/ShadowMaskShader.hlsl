@@ -9,8 +9,8 @@ cbuffer g_Const : register(b0){
 
 Texture2D ShadowMaps[4] : register(t0);
 Texture2D DepthBuffer : register(t4);
-sampler Samplers[8] : register(s0);
-SamplerComparisonState ShadowSample : register(s9);
+sampler Sampler : register(s0);
+SamplerComparisonState ShadowSample : register(s1);
 
 void main_ps(
     in float4 inPos : SV_Position,
@@ -19,7 +19,7 @@ void main_ps(
 )
 {
     //get the frag pos
-	float3 fragPos = DepthToWorld(DepthBuffer.Sample(Samplers[5], inTexcoord).r, inTexcoord, InvViewProjMatrix);
+	float3 fragPos = DepthToWorld(DepthBuffer.Sample(Sampler, inTexcoord).r, inTexcoord, InvViewProjMatrix);
     
     float distanceFromCam = mul(float4(fragPos, 1.f), View).z;
     //decide which matrix and texture to use

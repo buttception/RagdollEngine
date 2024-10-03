@@ -111,6 +111,7 @@ public:
 
 	std::unordered_map<uint32_t, nvrhi::GraphicsPipelineHandle> GPSOs;
 	std::unordered_map<uint32_t, nvrhi::ComputePipelineHandle> CPSOs;
+	std::unordered_map<uint32_t, nvrhi::BindingLayoutHandle> BindingLayouts;
 
 	std::unordered_map<std::string, nvrhi::ShaderHandle> Shaders;
 
@@ -121,7 +122,8 @@ public:
 	std::vector<Vertex> Vertices;
 	std::vector<uint32_t> Indices;
 	//the information on how to use the global buffer
-	std::vector<nvrhi::VertexAttributeDesc> VertexAttributes;
+	std::vector<nvrhi::VertexAttributeDesc> InstancedVertexAttributes;
+	nvrhi::InputLayoutHandle InstancedInputLayoutHandle;
 
 	//descriptor table for all the bindless stuff
 	nvrhi::DescriptorTableHandle DescriptorTable;
@@ -130,8 +132,10 @@ public:
 	int32_t AddImage(Image img);
 	nvrhi::GraphicsPipelineHandle GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb);
 	nvrhi::ComputePipelineHandle GetComputePipeline(const nvrhi::ComputePipelineDesc& desc);
+	nvrhi::BindingLayoutHandle GetBindingLayout(const nvrhi::BindingSetDesc& desc);
+	void RecompileShaders();
 
-	void Init(std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::FileManager> fm);
+	void Init(std::shared_ptr<ragdoll::FileManager> fm);
 	//this function will just add the vertices and indices, and populate the vector of objects
 	uint32_t AddVertices(const std::vector<Vertex>& newVertices, const std::vector<uint32_t>& newIndices);
 	//this function will create the buffer handles and copy the data over
@@ -140,7 +144,6 @@ public:
 	nvrhi::ShaderHandle GetShader(const std::string& shaderFilename);
 private:
 	nvrhi::CommandListHandle CommandList;	//asset manager commandlist
-	std::shared_ptr<DirectXDevice> DeviceRef;
 	std::shared_ptr<ragdoll::FileManager> FileManagerRef;
 	inline static std::unique_ptr<AssetManager> s_Instance;
 };

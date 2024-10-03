@@ -12,7 +12,6 @@ namespace ragdoll {
 
 class GLTFLoader {
 	std::filesystem::path Root;
-	std::shared_ptr<DirectXDevice> DeviceRef;
 	std::shared_ptr<ragdoll::FileManager> FileManagerRef;
 	std::shared_ptr<ragdoll::EntityManager> EntityManagerRef;
 	std::shared_ptr<ragdoll::Scene> SceneRef;
@@ -22,7 +21,7 @@ class GLTFLoader {
 
 	nvrhi::CommandListHandle CommandList;
 public:
-	void Init(std::filesystem::path root, std::shared_ptr<DirectXDevice> device, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> tl);
+	void Init(std::filesystem::path root, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> tl);
 	void LoadAndCreateModel(const std::string& fileName);
 private:
 };
