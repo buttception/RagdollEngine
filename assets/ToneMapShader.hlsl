@@ -3,7 +3,7 @@
 cbuffer g_Const : register(b0) {
     float Gamma;
     float Exposure;
-    int32_t UseFixedExposure;
+    int UseFixedExposure;
 };
 
 Texture2D SceneColor : register(t0);

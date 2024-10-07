@@ -29,6 +29,7 @@ void Renderer::Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 	{
 		ShadowMap[i] = scene->ShadowMap[i];
 	}
+	Mips = &scene->DownsampledImages;
 	CreateResource();
 }
 
@@ -86,6 +87,8 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 	DeferredLightPass->LightPass(scene->SceneInfo);
 	//sky
 	SkyPass->DrawSky(scene->SceneInfo);
+	//bloom
+	BloomPass->Bloom(scene->SceneInfo);
 	//get the exposure needed
 	nvrhi::BufferHandle exposure = AutomaticExposurePass->GetAdaptedLuminance(_dt);
 
@@ -175,6 +178,10 @@ void Renderer::CreateResource()
 	SkyPass->SetRenderTarget(fb);
 	SkyPass->SetDependencies(SkyTexture);
 	SkyPass->Init(CommandList);
+	
+	BloomPass = std::make_shared<class BloomPass>();
+	BloomPass->SetDependencies(SceneColor, Mips);
+	BloomPass->Init(CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(SceneColor);

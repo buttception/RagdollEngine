@@ -105,6 +105,8 @@ void ragdoll::Scene::Update(float _dt)
 		//need to call bat file to recompile
 		AssetManager::GetInstance()->RecompileShaders();
 	}
+	ImGui::SliderFloat("Filter Radius", &SceneInfo.FilterRadius, 0.001f, 1.f);
+	ImGui::SliderFloat("Bloom Intensity", &SceneInfo.BloomIntensity, 0.f, 1.f);
 	ImGui::SliderFloat("Gamma", &SceneInfo.Gamma, 0.5f, 3.f);
 	ImGui::Checkbox("UseFixedExposure", &SceneInfo.UseFixedExposure);
 	if (SceneInfo.UseFixedExposure)
@@ -467,6 +469,22 @@ void ragdoll::Scene::CreateRenderTargets()
 		texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
 		texDesc.debugName = "SkyTexture";
 		SkyTexture = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	}
+	uint32_t width = PrimaryWindowRef->GetWidth();
+	uint32_t height = PrimaryWindowRef->GetHeight();
+	for (int i = 0; i < MipCount; ++i) {
+		BloomMip& mip = DownsampledImages.emplace_back();
+		mip.Width = width; mip.Height = height;
+		nvrhi::TextureDesc desc;
+		desc.width = mip.Width;
+		desc.height = mip.Height;
+		desc.format = nvrhi::Format::R11G11B10_FLOAT;
+		desc.initialState = nvrhi::ResourceStates::RenderTarget;
+		desc.keepInitialState = true;
+		desc.isRenderTarget = true;
+		desc.debugName = "DownSample" + std::to_string(mip.Width) + "x" + std::to_string(mip.Height);
+		mip.Image = DirectXDevice::GetNativeDevice()->createTexture(desc);
+		width /= 2; height /= 2;
 	}
 }
 
