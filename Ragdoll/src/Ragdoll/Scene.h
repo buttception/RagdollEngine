@@ -4,6 +4,7 @@
 
 #include "Components/TransformComp.h"
 #include "Components/RenderableComp.h"
+#include "RenderPasses/BloomPass.h"
 #include "Entity/EntityManager.h"
 #include "Octree.h"
 
@@ -108,6 +109,8 @@ namespace ragdoll {
 		float Exposure = 1.f;
 		float SkyDimmer = 0.f;
 		bool UseFixedExposure = 0.f;
+		float FilterRadius = 0.05f;
+		float BloomIntensity = 0.04f;
 	};
 
 	class Scene {
@@ -152,6 +155,9 @@ namespace ragdoll {
 		//sky texture
 		nvrhi::TextureHandle SkyTexture;
 		nvrhi::TextureHandle SkyThetaGammaTable;
+		//bloom
+		std::vector<BloomMip> DownsampledImages;
+		const uint32_t MipCount{ 5 };	//how many times to downsample
 		//distance where the subfrusta are seperated
 		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
 

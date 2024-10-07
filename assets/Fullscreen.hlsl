@@ -21,14 +21,14 @@ void main_vs(
 	outTexcoord = g_texcoord[inVertexId];
 }
 
-Texture2D sceneColor : register(t0);
-sampler sceneColorSampler : register(t1); 
+Texture2D Source : register(t0);
+sampler Sampler : register(s0); 
 
 void main_ps(
     in float4 inPos: SV_Position,
     in float2 inTexcoord : TEXCOORD0,
-    out float4 outColor : SV_Target0
+    out float3 outColor : SV_Target0
 )
 {
-    outColor = sceneColor.Sample(sceneColorSampler, inTexcoord);
+    outColor = Source.Sample(Sampler, inTexcoord).rgb;
 }

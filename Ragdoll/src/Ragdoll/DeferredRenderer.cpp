@@ -29,6 +29,7 @@ void Renderer::Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 	{
 		ShadowMap[i] = scene->ShadowMap[i];
 	}
+	Mips = &scene->DownsampledImages;
 	CreateResource();
 }
 
@@ -84,6 +85,10 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 	ShadowMaskPass->DrawShadowMask(scene->SceneInfo);
 	//light scene color
 	DeferredLightPass->LightPass(scene->SceneInfo);
+	//sky
+	SkyPass->DrawSky(scene->SceneInfo);
+	//bloom
+	BloomPass->Bloom(scene->SceneInfo);
 	//get the exposure needed
 	nvrhi::BufferHandle exposure = AutomaticExposurePass->GetAdaptedLuminance(_dt);
 
@@ -101,9 +106,6 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 	fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
 
 	//after tone map for now since need its own tonemap and gamma correct
-	//sky
-	SkyPass->SetRenderTarget(fb);
-	SkyPass->DrawSky(scene->SceneInfo);
 	//draw debug items
 	DebugPass->SetRenderTarget(fb);
 	DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo);
@@ -176,6 +178,10 @@ void Renderer::CreateResource()
 	SkyPass->SetRenderTarget(fb);
 	SkyPass->SetDependencies(SkyTexture);
 	SkyPass->Init(CommandList);
+	
+	BloomPass = std::make_shared<class BloomPass>();
+	BloomPass->SetDependencies(SceneColor, Mips);
+	BloomPass->Init(CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(SceneColor);
