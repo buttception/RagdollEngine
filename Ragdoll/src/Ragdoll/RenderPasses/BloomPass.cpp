@@ -42,7 +42,7 @@ void BloomPass::DownSample()
 		nvrhi::BindingSetDesc bindingSetDesc;
 		bindingSetDesc.bindings = {
 			nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-			nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[5]),
+			nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[3]),
 			nvrhi::BindingSetItem::Texture_SRV(0, Source),
 		};
 		nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
@@ -99,7 +99,7 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity)
 		nvrhi::BindingSetDesc bindingSetDesc;
 		bindingSetDesc.bindings = {
 			nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-			nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[5]),
+			nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[3]),
 			nvrhi::BindingSetItem::Texture_SRV(0, Source),
 			nvrhi::BindingSetItem::Texture_SRV(1, SceneColor),
 		};
