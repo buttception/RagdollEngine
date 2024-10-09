@@ -74,6 +74,9 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 	CBuffer.EffectShadowStrength = 4.3;
 	CBuffer.EffectShadowPow = 1.5;
 	CBuffer.EffectShadowClamp = 0.98;
+	CBuffer.NormalsUnpackMul = 1.f;
+	CBuffer.NormalsUnpackAdd = 0.f;
+	CBuffer.NormalsWorldToViewspaceMatrix = Matrix::Identity;
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
 	//clear the load counter
 	
