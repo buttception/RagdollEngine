@@ -69,7 +69,7 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 		}
 	}
 	CBuffer.DepthUnpackConsts = Vector2(-0.1, 0);
-	CBuffer.CameraTanHalfFOV = Vector2(tanf(sceneInfo.CameraFov), tanf(sceneInfo.CameraFov * sceneInfo.CameraAspect));
+	CBuffer.CameraTanHalfFOV = Vector2(tanf(sceneInfo.CameraFov), tanf(sceneInfo.CameraFov / sceneInfo.CameraAspect));
 	CBuffer.EffectRadius = 1.2;
 	CBuffer.EffectShadowStrength = 4.3;
 	CBuffer.EffectShadowPow = 1.5;
@@ -77,6 +77,7 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 	CBuffer.NormalsUnpackMul = 1.f;
 	CBuffer.NormalsUnpackAdd = 0.f;
 	CBuffer.NormalsWorldToViewspaceMatrix = Matrix::Identity;
+
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
 	//clear the load counter
 	

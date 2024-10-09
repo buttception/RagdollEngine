@@ -49,6 +49,8 @@ class CACAOPass {
 		Vector2                 DepthBufferInverseDimensions;
 
 		int32_t                 DepthBufferOffset[2];
+		int32_t					Dummy1[2];
+
 		Vector4                 PerPassFullResUVOffset[4];
 
 		Vector2                 OutputBufferDimensions;
