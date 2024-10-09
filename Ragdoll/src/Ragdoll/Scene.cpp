@@ -501,8 +501,7 @@ void ragdoll::Scene::CreateRenderTargets()
 
 	texDesc.format = nvrhi::Format::RGBA8_SNORM;
 	texDesc.debugName = "DeinterleavedNormals";
-	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
-	texDesc.arraySize = 1;
+	texDesc.mipLevels = 1;
 	DeinterleavedNormals = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 }
 

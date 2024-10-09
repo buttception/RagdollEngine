@@ -26,6 +26,7 @@ void Renderer::Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 	SkyTexture = scene->SkyTexture;
 	SkyThetaGammaTable = scene->SkyThetaGammaTable;
 	DeinterleavedDepth = scene->DeinterleavedDepth;
+	DeinterleavedNormals = scene->DeinterleavedNormals;
 	for (int i = 0; i < 4; ++i)
 	{
 		ShadowMap[i] = scene->ShadowMap[i];
@@ -166,7 +167,7 @@ void Renderer::CreateResource()
 	GBufferPass->Init(CommandList);
 
 	CACAOPass = std::make_shared<class CACAOPass>();
-	CACAOPass->SetDependencies({ DepthHandle, NormalHandle, {}, DeinterleavedDepth });
+	CACAOPass->SetDependencies({ DepthHandle, NormalHandle, {}, DeinterleavedDepth, DeinterleavedNormals });
 	CACAOPass->Init(CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()

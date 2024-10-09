@@ -104,4 +104,5 @@ public:
 
 	void GenerateAO(const ragdoll::SceneInformation& sceneInfo);
 	void PrepareDepth(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
+	void PrepareNormal(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
 };

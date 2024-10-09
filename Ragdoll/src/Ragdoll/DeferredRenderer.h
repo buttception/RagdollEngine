@@ -49,6 +49,7 @@ public:
 	nvrhi::TextureHandle ShadowMask;
 	const std::vector<BloomMip>* Mips;
 	nvrhi::TextureHandle DeinterleavedDepth;
+	nvrhi::TextureHandle DeinterleavedNormals;
 	nvrhi::CommandListHandle CommandList;
 
 	//debug infos

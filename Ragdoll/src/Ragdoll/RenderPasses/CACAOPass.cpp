@@ -82,6 +82,8 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 	
     //prepare the depth deinterleaved and mips
     PrepareDepth(sceneInfo, ConstantBufferHandle);
+	//prepare the normal deinterleaved
+	PrepareNormal(sceneInfo, ConstantBufferHandle);
 
 	CommandListRef->endMarker();
 }
@@ -95,7 +97,6 @@ void CACAOPass::PrepareDepth(const ragdoll::SceneInformation& sceneInfo, nvrhi::
 	setDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, CBuffer),
 		nvrhi::BindingSetItem::Texture_SRV(1, DepthBuffer),
-		nvrhi::BindingSetItem::Texture_SRV(2, GBufferNormals),
 		//nvrhi::BindingSetItem::Texture_SRV(10, LoadCounter),
 		//nvrhi::BindingSetItem::Texture_SRV(3, DeinterleavedDepthMips),
 		//nvrhi::BindingSetItem::Texture_SRV(4, DeinterleavedNormals),
@@ -122,5 +123,33 @@ void CACAOPass::PrepareDepth(const ragdoll::SceneInformation& sceneInfo, nvrhi::
 	state.bindings = { setHandle };
 	CommandListRef->setComputeState(state);
 	CommandListRef->dispatch((DeinterleavedDepthMips->getDesc().width + 8 - 1) / 8, (DeinterleavedDepthMips->getDesc().height + 8 - 1) / 8, 1);
+	CommandListRef->endMarker();
+}
+
+void CACAOPass::PrepareNormal(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer)
+{
+	MICROPROFILE_SCOPEI("Render", "Depth Normal", MP_BLUEVIOLET);
+	CommandListRef->beginMarker("Prepare Normal");
+
+	nvrhi::BindingSetDesc setDesc;
+	setDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, CBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(2, GBufferNormals),
+		nvrhi::BindingSetItem::Texture_UAV(4, DeinterleavedNormals, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet{0,1,0,4}),
+		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
+	};
+	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+
+	nvrhi::ComputePipelineDesc PipelineDesc;
+	PipelineDesc.bindingLayouts = { layoutHandle };
+	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("CACAOPrepareNormal.cs.cso");
+	PipelineDesc.CS = shader;
+
+	nvrhi::ComputeState state;
+	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
+	state.bindings = { setHandle };
+	CommandListRef->setComputeState(state);
+	CommandListRef->dispatch((DeinterleavedNormals->getDesc().width + 8 - 1) / 8, (DeinterleavedNormals->getDesc().height + 8 - 1) / 8, 1);
 	CommandListRef->endMarker();
 }
