@@ -486,6 +486,24 @@ void ragdoll::Scene::CreateRenderTargets()
 		mip.Image = DirectXDevice::GetNativeDevice()->createTexture(desc);
 		width /= 2; height /= 2;
 	}
+	texDesc = nvrhi::TextureDesc();
+	texDesc.width = PrimaryWindowRef->GetWidth() / 2 + PrimaryWindowRef->GetWidth() % 2;
+	texDesc.height = PrimaryWindowRef->GetHeight() / 2 + PrimaryWindowRef->GetHeight() % 2;
+	texDesc.format = nvrhi::Format::R16_FLOAT;
+	texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	texDesc.isUAV = true;
+	texDesc.keepInitialState = true;
+	texDesc.debugName = "DeinterleavedDepth";
+	texDesc.dimension = nvrhi::TextureDimension::Texture2DArray;
+	texDesc.arraySize = 4;
+	texDesc.mipLevels = 4;
+	DeinterleavedDepth = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::RGBA8_SNORM;
+	texDesc.debugName = "DeinterleavedNormals";
+	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
+	texDesc.arraySize = 1;
+	DeinterleavedNormals = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 }
 
 void ragdoll::Scene::UpdateTransforms()

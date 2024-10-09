@@ -25,6 +25,7 @@ void Renderer::Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 	ShadowMask = scene->ShadowMask;
 	SkyTexture = scene->SkyTexture;
 	SkyThetaGammaTable = scene->SkyThetaGammaTable;
+	DeinterleavedDepth = scene->DeinterleavedDepth;
 	for (int i = 0; i < 4; ++i)
 	{
 		ShadowMap[i] = scene->ShadowMap[i];
@@ -79,6 +80,8 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 
 	//gbuffer
 	GBufferPass->DrawAllInstances(scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo);
+	//ao
+	CACAOPass->GenerateAO(scene->SceneInfo);
 	//directional light shadow
 	ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles, scene->StaticCascadeInstanceInfos, scene->SceneInfo);
 	//shadow mask pass
@@ -161,6 +164,10 @@ void Renderer::CreateResource()
 	GBufferPass = std::make_shared<class GBufferPass>();
 	GBufferPass->SetRenderTarget(GBuffer);
 	GBufferPass->Init(CommandList);
+
+	CACAOPass = std::make_shared<class CACAOPass>();
+	CACAOPass->SetDependencies({ DepthHandle, NormalHandle, {}, DeinterleavedDepth });
+	CACAOPass->Init(CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(SceneColor);

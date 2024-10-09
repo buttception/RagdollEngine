@@ -10,6 +10,7 @@ call :pull_dependency "tinygltf" "https://github.com/syoyo/tinygltf.git"
 call :pull_dependency "microprofile" "https://github.com/jonasmr/microprofile.git"
 call :pull_dependency "imgui" "--branch docking https://github.com/buttception/imgui.git"
 call :pull_dependency "cxxopts" "https://github.com/jarro2783/cxxopts.git"
+call :pull_dependency "ffx" "https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK.git"
 
 call :exit
 pause >nul

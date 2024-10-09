@@ -7,6 +7,7 @@
 #include "RenderPasses/ShadowMaskPass.h"
 #include "RenderPasses/DeferredLightPass.h"
 #include "RenderPasses/SkyPass.h"
+#include "RenderPasses/CACAOPass.h"
 #include "RenderPasses/DebugPass.h"
 #include "RenderPasses/AutomaticExposurePass.h"
 #include "RenderPasses/ToneMapPass.h"
@@ -26,6 +27,7 @@ public:
 
 	std::shared_ptr<SkyGeneratePass> SkyGeneratePass;
 	std::shared_ptr<GBufferPass> GBufferPass;
+	std::shared_ptr<CACAOPass> CACAOPass;
 	std::shared_ptr<ShadowPass> ShadowPass;
 	std::shared_ptr<ShadowMaskPass> ShadowMaskPass;
 	std::shared_ptr<DeferredLightPass> DeferredLightPass;
@@ -46,6 +48,7 @@ public:
 	nvrhi::TextureHandle ShadowMap[4];
 	nvrhi::TextureHandle ShadowMask;
 	const std::vector<BloomMip>* Mips;
+	nvrhi::TextureHandle DeinterleavedDepth;
 	nvrhi::CommandListHandle CommandList;
 
 	//debug infos

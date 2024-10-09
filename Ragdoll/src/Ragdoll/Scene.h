@@ -158,6 +158,9 @@ namespace ragdoll {
 		//bloom
 		std::vector<BloomMip> DownsampledImages;
 		const uint32_t MipCount{ 5 };	//how many times to downsample
+		//cacao
+		nvrhi::TextureHandle DeinterleavedDepth;
+		nvrhi::TextureHandle DeinterleavedNormals;
 		//distance where the subfrusta are seperated
 		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
 
