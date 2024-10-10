@@ -50,6 +50,7 @@ public:
 	const std::vector<BloomMip>* Mips;
 	nvrhi::TextureHandle DeinterleavedDepth;
 	nvrhi::TextureHandle DeinterleavedNormals;
+	nvrhi::TextureHandle SSAOPong;
 	nvrhi::CommandListHandle CommandList;
 
 	//debug infos

@@ -503,6 +503,10 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "DeinterleavedNormals";
 	texDesc.mipLevels = 1;
 	DeinterleavedNormals = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::RG8_UNORM;
+	texDesc.debugName = "SSAOBufferPong";
+	SSAOBufferPong = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 }
 
 void ragdoll::Scene::UpdateTransforms()

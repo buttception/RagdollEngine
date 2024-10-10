@@ -161,6 +161,7 @@ namespace ragdoll {
 		//cacao
 		nvrhi::TextureHandle DeinterleavedDepth;
 		nvrhi::TextureHandle DeinterleavedNormals;
+		nvrhi::TextureHandle SSAOBufferPong;
 		//distance where the subfrusta are seperated
 		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
 

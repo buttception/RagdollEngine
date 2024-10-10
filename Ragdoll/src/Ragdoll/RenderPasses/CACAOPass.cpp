@@ -68,12 +68,32 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 			CBuffer.PatternRotScaleMatrices[passId][subPass].w = -scale * ca;
 		}
 	}
+	CBuffer.NDCToViewMul.x = CBuffer.CameraTanHalfFOV.x * 2.0f;
+	CBuffer.NDCToViewMul.y = CBuffer.CameraTanHalfFOV.y * -2.0f;
+	CBuffer.NDCToViewAdd.x = CBuffer.CameraTanHalfFOV.x * -1.0f;
+	CBuffer.NDCToViewAdd.y = CBuffer.CameraTanHalfFOV.y * 1.0f;
+	const float ratio = ((float)DepthBuffer->getDesc().height) / ((float)DepthBuffer->getDesc().width);
+	const float border = (1.0f - ratio) / 2.0f;
+	CBuffer.DepthBufferUVToViewMul.x = CBuffer.NDCToViewMul.x / ratio;
+	CBuffer.DepthBufferUVToViewAdd.x = CBuffer.NDCToViewAdd.x - CBuffer.NDCToViewMul.x * border / ratio;
+	CBuffer.DepthBufferUVToViewMul.y = CBuffer.NDCToViewMul.y / ratio;
+	CBuffer.DepthBufferUVToViewAdd.y = CBuffer.NDCToViewAdd.y - CBuffer.NDCToViewMul.y * border / ratio;
 	CBuffer.DepthUnpackConsts = Vector2(-0.1, 0);
-	CBuffer.CameraTanHalfFOV = Vector2(tanf(sceneInfo.CameraFov), tanf(sceneInfo.CameraFov / sceneInfo.CameraAspect));
+	float halfFovX = sceneInfo.CameraFov * 0.5f * DirectX::XM_PI / 180.f;
+	CBuffer.CameraTanHalfFOV = Vector2(tanf(halfFovX), tanf(halfFovX / sceneInfo.CameraAspect));
 	CBuffer.EffectRadius = 1.2;
 	CBuffer.EffectShadowStrength = 4.3;
 	CBuffer.EffectShadowPow = 1.5;
 	CBuffer.EffectShadowClamp = 0.98;
+	CBuffer.EffectFadeOutMul = -0.05;
+	CBuffer.EffectFadeOutAdd = 2.f;
+	float effectSamplingRadiusNearLimit = (CBuffer.EffectRadius * 1.2f);
+	effectSamplingRadiusNearLimit /= CBuffer.CameraTanHalfFOV.y;  // to keep the effect same regardless of FOV
+	CBuffer.EffectSamplingRadiusNearLimitRec = 1.f / effectSamplingRadiusNearLimit;
+	CBuffer.DepthPrecisionOffsetMod = 0.9992f;
+	CBuffer.NegRecEffectRadius = -1.f / CBuffer.EffectRadius;
+	CBuffer.LoadCounterAvgDiv = 1.54907e-07;
+	CBuffer.AdaptiveSampleCountLimit = 0.75f;
 	CBuffer.NormalsUnpackMul = 1.f;
 	CBuffer.NormalsUnpackAdd = 0.f;
 	CBuffer.NormalsWorldToViewspaceMatrix = Matrix::Identity;
@@ -85,6 +105,8 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
     PrepareDepth(sceneInfo, ConstantBufferHandle);
 	//prepare the normal deinterleaved
 	PrepareNormal(sceneInfo, ConstantBufferHandle);
+	//part 1 ssao generate
+	GenerateObscurance(sceneInfo, ConstantBufferHandle);
 
 	CommandListRef->endMarker();
 }
@@ -152,5 +174,35 @@ void CACAOPass::PrepareNormal(const ragdoll::SceneInformation& sceneInfo, nvrhi:
 	state.bindings = { setHandle };
 	CommandListRef->setComputeState(state);
 	CommandListRef->dispatch((DeinterleavedNormals->getDesc().width + 8 - 1) / 8, (DeinterleavedNormals->getDesc().height + 8 - 1) / 8, 1);
+	CommandListRef->endMarker();
+}
+
+void CACAOPass::GenerateObscurance(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer)
+{
+	MICROPROFILE_SCOPEI("Render", "Obscurance", MP_BLUEVIOLET);
+	CommandListRef->beginMarker("Generate Obscurance");
+
+	nvrhi::BindingSetDesc setDesc;
+	setDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, CBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(3, DeinterleavedDepthMips, nvrhi::Format::UNKNOWN, {0, 4, 0, 4}),
+		nvrhi::BindingSetItem::Texture_SRV(4, DeinterleavedNormals, nvrhi::Format::UNKNOWN, {0, 1, 0, 4}),
+		nvrhi::BindingSetItem::Texture_UAV(6, SSAOPong, nvrhi::Format::UNKNOWN, {0, 1, 0, 4}),
+		nvrhi::BindingSetItem::Sampler(1, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Mirror]),
+		nvrhi::BindingSetItem::Sampler(3, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
+	};
+	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+
+	nvrhi::ComputePipelineDesc PipelineDesc;
+	PipelineDesc.bindingLayouts = { layoutHandle };
+	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("CACAOPrepareQ3.cs.cso");
+	PipelineDesc.CS = shader;
+
+	nvrhi::ComputeState state;
+	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
+	state.bindings = { setHandle };
+	CommandListRef->setComputeState(state);
+	CommandListRef->dispatch((SSAOPong->getDesc().width + 8 - 1) / 8, (SSAOPong->getDesc().height + 8 - 1) / 8, 4);
 	CommandListRef->endMarker();
 }
