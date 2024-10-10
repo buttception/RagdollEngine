@@ -51,6 +51,10 @@ public:
 	nvrhi::TextureHandle DeinterleavedDepth;
 	nvrhi::TextureHandle DeinterleavedNormals;
 	nvrhi::TextureHandle SSAOPong;
+	nvrhi::TextureHandle SSAOPing;
+	nvrhi::TextureHandle ImportanceMap;
+	nvrhi::TextureHandle ImportanceMapPong;
+	nvrhi::TextureHandle LoadCounter;
 	nvrhi::CommandListHandle CommandList;
 
 	//debug infos

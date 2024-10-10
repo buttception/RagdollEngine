@@ -107,5 +107,8 @@ public:
 	void GenerateAO(const ragdoll::SceneInformation& sceneInfo);
 	void PrepareDepth(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
 	void PrepareNormal(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
-	void GenerateObscurance(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
+	void PrepareObscurance(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
+	void PrepareImportance(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
+	void PrepareImportanceA(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
+	void PrepareImportanceB(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
 };

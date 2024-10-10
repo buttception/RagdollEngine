@@ -28,6 +28,10 @@ void Renderer::Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 	DeinterleavedDepth = scene->DeinterleavedDepth;
 	DeinterleavedNormals = scene->DeinterleavedNormals;
 	SSAOPong = scene->SSAOBufferPong;
+	SSAOPing = scene->SSAOBufferPing;
+	ImportanceMap = scene->ImportanceMap;
+	ImportanceMapPong = scene->ImportanceMapPong;
+	LoadCounter = scene->LoadCounter;
 	for (int i = 0; i < 4; ++i)
 	{
 		ShadowMap[i] = scene->ShadowMap[i];
@@ -168,7 +172,7 @@ void Renderer::CreateResource()
 	GBufferPass->Init(CommandList);
 
 	CACAOPass = std::make_shared<class CACAOPass>();
-	CACAOPass->SetDependencies({ DepthHandle, NormalHandle, {}, DeinterleavedDepth, DeinterleavedNormals, SSAOPong });
+	CACAOPass->SetDependencies({ DepthHandle, NormalHandle, LoadCounter, DeinterleavedDepth, DeinterleavedNormals, SSAOPong, SSAOPing, ImportanceMap, ImportanceMapPong, AlbedoHandle });
 	CACAOPass->Init(CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()

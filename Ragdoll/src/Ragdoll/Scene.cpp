@@ -507,6 +507,24 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.format = nvrhi::Format::RG8_UNORM;
 	texDesc.debugName = "SSAOBufferPong";
 	SSAOBufferPong = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "SSAOBufferPing";
+	SSAOBufferPing = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::R8_UNORM;
+	texDesc.debugName = "ImportanceMap";
+	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
+	texDesc.arraySize = 1;
+	texDesc.width = PrimaryWindowRef->GetWidth() / 4 + PrimaryWindowRef->GetWidth() % 4;
+	texDesc.height = PrimaryWindowRef->GetHeight() / 4 + PrimaryWindowRef->GetHeight() % 4;
+	ImportanceMap = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "ImportanceMapPong";
+	ImportanceMapPong = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::R32_UINT;
+	texDesc.debugName = "LoadCounter";
+	texDesc.width = texDesc.height = 1;
+	texDesc.dimension = nvrhi::TextureDimension::Texture1D;
+	LoadCounter = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 }
 
 void ragdoll::Scene::UpdateTransforms()
