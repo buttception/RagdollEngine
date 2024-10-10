@@ -123,6 +123,7 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 	PrepareImportance(sceneInfo, ConstantBufferHandle);
 	PrepareImportanceA(sceneInfo, ConstantBufferHandle);
 	PrepareImportanceB(sceneInfo, ConstantBufferHandle);
+	SSAOPass(sceneInfo, ConstantBufferHandle);
 
 	CommandListRef->endMarker();
 }
@@ -212,7 +213,7 @@ void CACAOPass::PrepareObscurance(const ragdoll::SceneInformation& sceneInfo, nv
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
-	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("CACAOPrepareQ3.cs.cso");
+	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("CACAOPrepareBaseQ3.cs.cso");
 	PipelineDesc.CS = shader;
 
 	nvrhi::ComputeState state;
@@ -305,5 +306,73 @@ void CACAOPass::PrepareImportanceB(const ragdoll::SceneInformation& sceneInfo, n
 	state.bindings = { setHandle };
 	CommandListRef->setComputeState(state);
 	CommandListRef->dispatch((ImportanceMap->getDesc().width + 8 - 1) / 8, (ImportanceMap->getDesc().height + 8 - 1) / 8, 4);
+	CommandListRef->endMarker();
+}
+
+void CACAOPass::SSAOPass(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer)
+{
+	MICROPROFILE_SCOPEI("Render", "SSAO", MP_BLUEVIOLET);
+	CommandListRef->beginMarker("Generate SSAO");
+
+	nvrhi::BindingSetDesc setDesc;
+	setDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, CBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(10, LoadCounter),
+		nvrhi::BindingSetItem::Texture_SRV(3, DeinterleavedDepthMips),
+		nvrhi::BindingSetItem::Texture_SRV(4, DeinterleavedNormals),
+		nvrhi::BindingSetItem::Texture_SRV(6, SSAOPong),
+		nvrhi::BindingSetItem::Texture_SRV(7, ImportanceMap),
+		nvrhi::BindingSetItem::Texture_UAV(6, SSAOPing),
+		nvrhi::BindingSetItem::Sampler(1, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Mirror]),
+		nvrhi::BindingSetItem::Sampler(2, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp]),
+		nvrhi::BindingSetItem::Sampler(3, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
+	};
+	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+
+	nvrhi::ComputePipelineDesc PipelineDesc;
+	PipelineDesc.bindingLayouts = { layoutHandle };
+	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("CACAOPrepareQ3.cs.cso");
+	PipelineDesc.CS = shader;
+
+	nvrhi::ComputeState state;
+	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
+	state.bindings = { setHandle };
+	CommandListRef->setComputeState(state);
+	CommandListRef->dispatch((SSAOPong->getDesc().width + 8 - 1) / 8, (SSAOPong->getDesc().height + 8 - 1) / 8, 4);
+	CommandListRef->endMarker();
+}
+
+void CACAOPass::BlurSSAO(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer)
+{
+	MICROPROFILE_SCOPEI("Render", "Blur SSAO", MP_BLUEVIOLET);
+	CommandListRef->beginMarker("Blur SSAO");
+
+	nvrhi::BindingSetDesc setDesc;
+	setDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, CBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(10, LoadCounter),
+		nvrhi::BindingSetItem::Texture_SRV(3, DeinterleavedDepthMips),
+		nvrhi::BindingSetItem::Texture_SRV(4, DeinterleavedNormals),
+		nvrhi::BindingSetItem::Texture_SRV(6, SSAOPong),
+		nvrhi::BindingSetItem::Texture_SRV(7, ImportanceMap),
+		nvrhi::BindingSetItem::Texture_UAV(6, SSAOPing),
+		nvrhi::BindingSetItem::Sampler(1, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Mirror]),
+		nvrhi::BindingSetItem::Sampler(2, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp]),
+		nvrhi::BindingSetItem::Sampler(3, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
+	};
+	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+
+	nvrhi::ComputePipelineDesc PipelineDesc;
+	PipelineDesc.bindingLayouts = { layoutHandle };
+	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("CACAOPrepareQ3.cs.cso");
+	PipelineDesc.CS = shader;
+
+	nvrhi::ComputeState state;
+	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
+	state.bindings = { setHandle };
+	CommandListRef->setComputeState(state);
+	CommandListRef->dispatch((SSAOPong->getDesc().width + 8 - 1) / 8, (SSAOPong->getDesc().height + 8 - 1) / 8, 4);
 	CommandListRef->endMarker();
 }
