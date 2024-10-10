@@ -82,11 +82,13 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 	float halfFovX = sceneInfo.CameraFov * 0.5f * DirectX::XM_PI / 180.f;
 	CBuffer.CameraTanHalfFOV = Vector2(tanf(halfFovX), tanf(halfFovX / sceneInfo.CameraAspect));
 	CBuffer.EffectRadius = 1.2;
-	CBuffer.EffectShadowStrength = 4.3;
-	CBuffer.EffectShadowPow = 1.5;
+	CBuffer.EffectShadowStrength = 2.f;
+	CBuffer.EffectShadowPow = 1.2;
 	CBuffer.EffectShadowClamp = 0.98;
-	CBuffer.EffectFadeOutMul = -0.05;
-	CBuffer.EffectFadeOutAdd = 2.f;
+	float fadeOutTo = 10000.f;
+	float fadeOutFrom = 5000.f;
+	CBuffer.EffectFadeOutMul = -1.0f / (fadeOutTo - fadeOutFrom);
+	CBuffer.EffectFadeOutAdd = fadeOutFrom / (fadeOutTo - fadeOutFrom) + 1.0f;
 	float effectSamplingRadiusNearLimit = (CBuffer.EffectRadius * 1.2f);
 	effectSamplingRadiusNearLimit /= CBuffer.CameraTanHalfFOV.y;  // to keep the effect same regardless of FOV
 	CBuffer.EffectSamplingRadiusNearLimitRec = 1.f / effectSamplingRadiusNearLimit;
@@ -97,7 +99,7 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 	CBuffer.AdaptiveSampleCountLimit = 0.75f;
 	CBuffer.NormalsUnpackMul = 1.f;
 	CBuffer.NormalsUnpackAdd = 0.f;
-	CBuffer.NormalsWorldToViewspaceMatrix = Matrix::Identity;
+	CBuffer.NormalsWorldToViewspaceMatrix = sceneInfo.MainCameraView;
 	CBuffer.ImportanceMapDimensions = { (float)ImportanceMap->getDesc().width, (float)ImportanceMap->getDesc().height };
 	CBuffer.ImportanceMapInverseDimensions = Vector2{ 1.f, 1.f } / CBuffer.ImportanceMapDimensions;
 	CBuffer.InvSharpness = 0.02f;
@@ -124,6 +126,8 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 	PrepareImportanceA(sceneInfo, ConstantBufferHandle);
 	PrepareImportanceB(sceneInfo, ConstantBufferHandle);
 	SSAOPass(sceneInfo, ConstantBufferHandle);
+	BlurSSAO(sceneInfo, ConstantBufferHandle);
+	ApplySSAO(sceneInfo, ConstantBufferHandle);
 
 	CommandListRef->endMarker();
 }
@@ -347,32 +351,66 @@ void CACAOPass::BlurSSAO(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 {
 	MICROPROFILE_SCOPEI("Render", "Blur SSAO", MP_BLUEVIOLET);
 	CommandListRef->beginMarker("Blur SSAO");
+	int blurPassCount = 4;
+	const uint32_t w = 4 * 16 - 2 * blurPassCount;
+	const uint32_t h = 3 * 16 - 2 * blurPassCount;
+	const uint32_t dispatchWidth = (SSAOPong->getDesc().width + w - 1) / w;
+	const uint32_t dispatchHeight = (SSAOPong->getDesc().height + h - 1) / h;
+	const uint32_t dispatchDepth = 4;
 
 	nvrhi::BindingSetDesc setDesc;
 	setDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, CBuffer),
-		nvrhi::BindingSetItem::Texture_SRV(10, LoadCounter),
-		nvrhi::BindingSetItem::Texture_SRV(3, DeinterleavedDepthMips),
-		nvrhi::BindingSetItem::Texture_SRV(4, DeinterleavedNormals),
-		nvrhi::BindingSetItem::Texture_SRV(6, SSAOPong),
-		nvrhi::BindingSetItem::Texture_SRV(7, ImportanceMap),
-		nvrhi::BindingSetItem::Texture_UAV(6, SSAOPing),
+		nvrhi::BindingSetItem::Texture_SRV(6, SSAOPing),
+		nvrhi::BindingSetItem::Texture_UAV(6, SSAOPong),
 		nvrhi::BindingSetItem::Sampler(1, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Mirror]),
-		nvrhi::BindingSetItem::Sampler(2, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp]),
-		nvrhi::BindingSetItem::Sampler(3, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
 	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
-	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("CACAOPrepareQ3.cs.cso");
+	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("CACAOBlur.cs.cso");
 	PipelineDesc.CS = shader;
 
 	nvrhi::ComputeState state;
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
 	state.bindings = { setHandle };
 	CommandListRef->setComputeState(state);
-	CommandListRef->dispatch((SSAOPong->getDesc().width + 8 - 1) / 8, (SSAOPong->getDesc().height + 8 - 1) / 8, 4);
+	CommandListRef->dispatch(dispatchWidth, dispatchHeight, dispatchDepth);
+	CommandListRef->endMarker();
+}
+
+void CACAOPass::ApplySSAO(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer)
+{
+	MICROPROFILE_SCOPEI("Render", "Apply SSAO", MP_BLUEVIOLET);
+	CommandListRef->beginMarker("Apply SSAO");
+	int blurPassCount = 4;
+	const uint32_t w = 8;
+	const uint32_t h = 8;
+	const uint32_t dispatchWidth = (GBufferAO->getDesc().width + w - 1) / w;
+	const uint32_t dispatchHeight = (GBufferAO->getDesc().height + h - 1) / h;
+	const uint32_t dispatchDepth = 1;
+
+	nvrhi::BindingSetDesc setDesc;
+	setDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, CBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(6, SSAOPong),
+		nvrhi::BindingSetItem::Texture_UAV(11, GBufferAO),
+		nvrhi::BindingSetItem::Sampler(2, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp]),
+	};
+	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+
+	nvrhi::ComputePipelineDesc PipelineDesc;
+	PipelineDesc.bindingLayouts = { layoutHandle };
+	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("CACAOApply.cs.cso");
+	PipelineDesc.CS = shader;
+
+	nvrhi::ComputeState state;
+	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
+	state.bindings = { setHandle };
+	CommandListRef->setComputeState(state);
+	CommandListRef->dispatch(dispatchWidth, dispatchHeight, dispatchDepth);
 	CommandListRef->endMarker();
 }

@@ -80,7 +80,7 @@ void gbuffer_ps(
 	if(data.roughnessMetallicIndex != -1){
 		RM = Textures[data.roughnessMetallicIndex].Sample(Samplers[data.roughnessMetallicSamplerIndex], inTexcoord);
 	}
-	float ao = 1.f - RM.r;
+	float ao = 1.f;
 	float roughness = RM.g;
 	float metallic = RM.b;
 
@@ -119,19 +119,19 @@ void deferred_light_ps(
 )
 {
 	//getting texture values
-	float4 albedo = albedoTexture.Sample(Samplers[5], inTexcoord);
-	float3 N = Decode(normalTexture.Sample(Samplers[5], inTexcoord).xy);
-	float3 RM = RMTexture.Sample(Samplers[5], inTexcoord).xyz;
-	float4 shadowFactor = ShadowMask.Sample(Samplers[5], inTexcoord);
+	float4 albedo = albedoTexture.Sample(Samplers[6], inTexcoord);
+	float3 N = Decode(normalTexture.Sample(Samplers[6], inTexcoord).xy);
+	float3 RM = RMTexture.Sample(Samplers[6], inTexcoord).xyz;
+	float4 shadowFactor = ShadowMask.Sample(Samplers[6], inTexcoord);
 
 	//getting fragpos
-	float3 fragPos = DepthToWorld(DepthBuffer.Sample(Samplers[5], inTexcoord).r, inTexcoord, InvViewProjMatrix);
+	float3 fragPos = DepthToWorld(DepthBuffer.Sample(Samplers[6], inTexcoord).r, inTexcoord, InvViewProjMatrix);
 
 	//apply pbr lighting, AO is 1.f for now so it does nth
 	//float3 diffuse = max(dot(N, LightDirection), 0) * albedo.rgb;
 	float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.z, RM.y, RM.x);
 
-	float3 ambient = SceneAmbientColor.rgb * albedo.rgb;
+	float3 ambient = SceneAmbientColor.rgb * albedo.rgb * RM.x;
 	float3 lighting = ambient + diffuse * (1.f - shadowFactor.a);
 	outColor = lighting * shadowFactor.rgb;
 }

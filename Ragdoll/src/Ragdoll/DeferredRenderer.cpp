@@ -87,7 +87,8 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 	//gbuffer
 	GBufferPass->DrawAllInstances(scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo);
 	//ao
-	CACAOPass->GenerateAO(scene->SceneInfo);
+	if(scene->SceneInfo.UseCACAO)
+		CACAOPass->GenerateAO(scene->SceneInfo);
 	//directional light shadow
 	ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles, scene->StaticCascadeInstanceInfos, scene->SceneInfo);
 	//shadow mask pass
@@ -172,7 +173,7 @@ void Renderer::CreateResource()
 	GBufferPass->Init(CommandList);
 
 	CACAOPass = std::make_shared<class CACAOPass>();
-	CACAOPass->SetDependencies({ DepthHandle, NormalHandle, LoadCounter, DeinterleavedDepth, DeinterleavedNormals, SSAOPong, SSAOPing, ImportanceMap, ImportanceMapPong, AlbedoHandle });
+	CACAOPass->SetDependencies({ DepthHandle, NormalHandle, LoadCounter, DeinterleavedDepth, DeinterleavedNormals, SSAOPong, SSAOPing, ImportanceMap, ImportanceMapPong, AORoughnessMetallicHandle });
 	CACAOPass->Init(CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()

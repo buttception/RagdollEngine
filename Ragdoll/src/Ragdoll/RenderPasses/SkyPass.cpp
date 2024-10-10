@@ -38,7 +38,7 @@ void SkyPass::DrawSky(const ragdoll::SceneInformation& sceneInfo)
 	bindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 		nvrhi::BindingSetItem::Texture_SRV(0, SkyTexture),
-		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[6])
+		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Trilinear_Clamp])
 	};
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
 	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(bindingSetDesc, BindingLayoutHandle);

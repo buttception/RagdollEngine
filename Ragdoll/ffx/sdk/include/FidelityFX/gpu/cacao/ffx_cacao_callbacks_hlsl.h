@@ -703,17 +703,14 @@ FfxFloat32x3 Decode(FfxFloat32x2 f)
     FfxFloat32x3 n = FfxFloat32x3(f.x, f.y, 1.0 - abs(f.x) - abs(f.y));
     FfxFloat32 t = saturate(-n.z);
     n.xy += n.xy >= 0.0 ? -t : t;
-    float temp = n.z;
-    n.z = n.x;
-    n.x = -temp;
     return normalize(n);
 }
 FfxFloat32x3 FFX_CACAO_Prepare_LoadNormal(FfxUInt32x2 coord)
 {
     //decompress it first
     FfxFloat32x3 normal = Decode(g_NormalIn.Load(FfxInt32x3(coord, 0)).xy);
-    //normal = normal * NormalsUnpackMul().xxx + NormalsUnpackAdd().xxx;
-    //normal = mul(normal, (float3x3)NormalsWorldToViewspaceMatrix()).xyz;
+    normal = normal * NormalsUnpackMul().xxx + NormalsUnpackAdd().xxx;
+    normal = mul(normal, (float3x3)NormalsWorldToViewspaceMatrix()).xyz;
     // normal = normalize(normal);
     return normal;
 }

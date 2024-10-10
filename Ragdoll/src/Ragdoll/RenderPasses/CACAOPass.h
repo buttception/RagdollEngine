@@ -113,4 +113,5 @@ public:
 	void PrepareImportanceB(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
 	void SSAOPass(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
 	void BlurSSAO(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
+	void ApplySSAO(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
 };

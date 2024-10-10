@@ -111,6 +111,7 @@ namespace ragdoll {
 		bool UseFixedExposure = 0.f;
 		float FilterRadius = 0.05f;
 		float BloomIntensity = 0.04f;
+		bool UseCACAO = true;
 	};
 
 	class Scene {

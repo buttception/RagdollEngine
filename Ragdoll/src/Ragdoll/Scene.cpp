@@ -114,6 +114,7 @@ void ragdoll::Scene::Update(float _dt)
 	else
 		ImGui::Text("Adapted Luminance: %f", DeferredRenderer->AdaptedLuminance);
 	ImGui::SliderFloat("Sky Dimmer e-6", &SceneInfo.SkyDimmer, 0.f, 1.f);
+	ImGui::Checkbox("CACAO", &SceneInfo.UseCACAO);
 	if (ImGui::Checkbox("Freeze Culling Matrix", &bFreezeFrustumCulling))
 		bIsCameraDirty = true;
 	if (ImGui::Checkbox("Show Octree", &Config.bDrawOctree))
@@ -420,35 +421,38 @@ void ragdoll::Scene::CreateRenderTargets()
 	nvrhi::TextureDesc texDesc;
 	texDesc.width = PrimaryWindowRef->GetBufferWidth();
 	texDesc.height = PrimaryWindowRef->GetBufferHeight();
-	texDesc.initialState = nvrhi::ResourceStates::RenderTarget;
-	texDesc.clearValue = 0.f;
-	texDesc.useClearValue = true;
-	texDesc.isRenderTarget = true;
-	texDesc.sampleCount = 1;
 	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
 	texDesc.keepInitialState = true;
-	texDesc.mipLevels = 1;
-	texDesc.isTypeless = false;
 
-	if (!SceneColor) {
-		texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
-		texDesc.debugName = "SceneColor";
-		SceneColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.initialState = nvrhi::ResourceStates::Common;
+	texDesc.isUAV = true;
+	texDesc.isRenderTarget = true;
+	if (!GBufferORM) {
+		texDesc.format = nvrhi::Format::RGBA8_UNORM;
+		texDesc.debugName = "GBufferORM";
+		GBufferORM = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	}
+
+	texDesc.sampleCount = 1;
+	texDesc.isTypeless = false;
+	texDesc.useClearValue = true;
+	texDesc.clearValue = 0.f;
+	texDesc.isUAV = false;
+	texDesc.initialState = nvrhi::ResourceStates::RenderTarget;
 	if (!GBufferAlbedo) {
 		texDesc.format = nvrhi::Format::RGBA8_UNORM;
 		texDesc.debugName = "GBufferAlbedo";
 		GBufferAlbedo = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	}
+	if (!SceneColor) {
+		texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
+		texDesc.debugName = "SceneColor";
+		SceneColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	}
 	if (!GBufferNormal) {
 		texDesc.format = nvrhi::Format::RG16_UNORM;
 		texDesc.debugName = "GBufferNormal";
 		GBufferNormal = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-	}
-	if (!GBufferORM) {
-		texDesc.format = nvrhi::Format::RGBA8_UNORM;
-		texDesc.debugName = "GBufferORM";
-		GBufferORM = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	}
 	if (!ShadowMask) {
 		texDesc.format = nvrhi::Format::RGBA8_UNORM;
