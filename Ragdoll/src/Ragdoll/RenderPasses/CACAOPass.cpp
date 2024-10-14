@@ -81,9 +81,9 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 	CBuffer.DepthUnpackConsts = Vector2(-0.1, 0);
 	float halfFovX = sceneInfo.CameraFov * 0.5f * DirectX::XM_PI / 180.f;
 	CBuffer.CameraTanHalfFOV = Vector2(tanf(halfFovX), tanf(halfFovX / sceneInfo.CameraAspect));
-	CBuffer.EffectRadius = 1.2;
+	CBuffer.EffectRadius = 1.5;
 	CBuffer.EffectShadowStrength = 2.f;
-	CBuffer.EffectShadowPow = 1.2;
+	CBuffer.EffectShadowPow = 1.5;
 	CBuffer.EffectShadowClamp = 0.98;
 	float fadeOutTo = 10000.f;
 	float fadeOutFrom = 5000.f;

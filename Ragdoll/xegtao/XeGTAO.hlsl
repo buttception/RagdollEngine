@@ -28,6 +28,10 @@ cbuffer GTAOConstantBuffer                      : register( b0 )
     GTAOConstants               g_GTAOConsts;
 }
 
+cbuffer g_Const : register(b1) {
+	float4x4 viewMatrix;
+};
+
 #include "XeGTAO.hlsli"
 
 // input output textures for the first pass (XeGTAO_PrefilterDepths16x16)
@@ -40,7 +44,7 @@ RWTexture2D<lpfloat>        g_outWorkingDepthMIP4   : register( u4 );   // outpu
 
 // input output textures for the second pass (XeGTAO_MainPass)
 Texture2D<lpfloat>          g_srcWorkingDepth       : register( t0 );   // viewspace depth with MIPs, output by XeGTAO_PrefilterDepths16x16 and consumed by XeGTAO_MainPass
-Texture2D<uint>             g_srcNormalmap          : register( t1 );   // source normal map (if used)
+Texture2D<float2>           g_srcNormalmap          : register( t1 );   // source normal map (if used)
 Texture2D<uint>             g_srcHilbertLUT         : register( t5 );   // hilbert lookup table  (if any)
 RWTexture2D<uint>           g_outWorkingAOTerm      : register( u0 );   // output AO term (includes bent normals if enabled - packed as R11G11B10 scaled by AO)
 RWTexture2D<unorm float>    g_outWorkingEdges       : register( u1 );   // output depth-based edges used by the denoiser
@@ -50,24 +54,20 @@ RWTexture2D<uint>           g_outNormalmap          : register( u0 );   // outpu
 Texture2D<uint>             g_srcWorkingAOTerm      : register( t0 );   // coming from previous pass
 Texture2D<lpfloat>          g_srcWorkingEdges       : register( t1 );   // coming from previous pass
 RWTexture2D<uint>           g_outFinalAOTerm        : register( u0 );   // final AO term - just 'visibility' or 'visibility + bent normals'
+RWTexture2D<float4>           g_outAO                 : register( u1 );   // orm
 
 // Engine-specific normal map loader
 lpfloat3 LoadNormal( int2 pos )
 {
-#if 1
     // special decoding for external normals stored in 11_11_10 unorm - modify appropriately to support your own encoding 
-    uint packedInput = g_srcNormalmap.Load( int3(pos, 0) ).x;
-    float3 unpackedOutput = XeGTAO_R11G11B10_UNORM_to_FLOAT3( packedInput );
-    float3 normal = normalize(unpackedOutput * 2.0.xxx - 1.0.xxx);
-#else 
-    // example of a different encoding
-    float3 encodedNormal = g_srcNormalmap.Load(int3(pos, 0)).xyz;
-    float3 normal = normalize(encodedNormal * 2.0.xxx - 1.0.xxx);
-#endif
-
-#if 0 // compute worldspace to viewspace here if your engine stores normals in worldspace; if generating normals from depth here, they're already in viewspace
-    normal = mul( (float3x3)g_globals.View, normal );
-#endif
+    float2 f = g_srcNormalmap.Load( int3(pos, 0) ).xy;
+    f = f * 2.0 - 1.0;
+ 
+    // https://twitter.com/Stubbesaurus/status/937994790553227264
+    float3 normal = float3(f.x, f.y, 1.0 - abs(f.x) - abs(f.y));
+    float t = saturate(-normal.z);
+    normal.xy += normal.xy >= 0.0 ? -t : t;
+    normal = mul(float4(normal, 0.f), viewMatrix).xyz;
 
     return (lpfloat3)normal;
 }
@@ -146,6 +146,15 @@ void CSDenoiseLastPass( const uint2 dispatchThreadID : SV_DispatchThreadID )
     const uint2 pixCoordBase = dispatchThreadID * uint2( 2, 1 );    // we're computing 2 horizontal pixels at a time (performance optimization)
     // g_samplerPointClamp is a sampler with D3D12_FILTER_MIN_MAG_MIP_POINT filter and D3D12_TEXTURE_ADDRESS_MODE_CLAMP addressing mode
     XeGTAO_Denoise( pixCoordBase, g_GTAOConsts, g_srcWorkingAOTerm, g_srcWorkingEdges, g_samplerPointClamp, g_outFinalAOTerm, true );
+    GroupMemoryBarrierWithGroupSync();
+    const uint2 coord = dispatchThreadID * uint2(8, 8);
+    for(int i = coord.x; i < coord.x + 8; ++i)
+    {
+        for(int j = coord.y; j < coord.y + 8; ++j)
+        {
+            g_outAO[int2(i,j)].x = (float)g_outFinalAOTerm[int2(i,j)] / 255.f;
+        }
+    }
 }
 
 // Optional screen space viewspace normals from depth generation

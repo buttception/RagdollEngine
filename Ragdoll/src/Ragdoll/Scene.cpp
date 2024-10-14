@@ -544,6 +544,16 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
 	texDesc.mipLevels = 5;
 	DepthMips = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.format = nvrhi::Format::R8_UINT;
+	texDesc.debugName = "AOTerm";
+	texDesc.mipLevels = 1;
+	AOTerm = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "FinalAOTerm";
+	FinalAOTerm = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.format = nvrhi::Format::R8_UNORM;
+	texDesc.debugName = "EdgeMap";
+	Edges = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
 }
 
 void ragdoll::Scene::UpdateTransforms()
