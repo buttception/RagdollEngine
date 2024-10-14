@@ -32,6 +32,7 @@ cbuffer g_Const : register(b1) {
 	float4x4 viewMatrix;
 };
 
+#define XE_GTAO_GENERATE_NORMALS_INPLACE
 #include "XeGTAO.hlsli"
 
 // input output textures for the first pass (XeGTAO_PrefilterDepths16x16)
@@ -68,6 +69,7 @@ lpfloat3 LoadNormal( int2 pos )
     float t = saturate(-normal.z);
     normal.xy += normal.xy >= 0.0 ? -t : t;
     normal = mul(float4(normal, 0.f), viewMatrix).xyz;
+    return (lpfloat3)float3(0.f, 0.f, 0.f);
 
     return (lpfloat3)normal;
 }

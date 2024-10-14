@@ -10,6 +10,7 @@
 
 #define GET_BATCH_DIMENSION_DEPTH(x, y) (x + 16-1) / 16, (y + 16-1) / 16, 1
 #define GET_BATCH_DIMENSION_AO(x, y) (x + XE_GTAO_NUMTHREADS_X-1) / XE_GTAO_NUMTHREADS_X, (y + XE_GTAO_NUMTHREADS_Y-1) / XE_GTAO_NUMTHREADS_Y, 1
+#define GET_BATCH_DIMENSION_NOISE(x,y) (x + (XE_GTAO_NUMTHREADS_X*2)-1) / (XE_GTAO_NUMTHREADS_X*2), (y + XE_GTAO_NUMTHREADS_Y-1) / XE_GTAO_NUMTHREADS_Y, 1
 
 void XeGTAOPass::Init(nvrhi::CommandListHandle cmdList)
 {
@@ -29,7 +30,7 @@ void XeGTAOPass::SetDependencies(Textures dependencies)
 
 void XeGTAOPass::UpdateConstants(const uint32_t width, const uint32_t height, const Matrix& projMatrix)
 {
-	XeGTAO::GTAOUpdateConstants(CBuffer, width, height, Settings, &projMatrix._11, false, false);
+	XeGTAO::GTAOUpdateConstants(CBuffer, width, height, Settings, &projMatrix._11, true, false);
 }
 
 void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
@@ -153,7 +154,7 @@ void XeGTAOPass::Denoise(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 		state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
 		state.bindings = { setHandle };
 		CommandListRef->setComputeState(state);
-		CommandListRef->dispatch(GET_BATCH_DIMENSION_AO(DepthMips->getDesc().width, DepthMips->getDesc().height));
+		CommandListRef->dispatch(GET_BATCH_DIMENSION_NOISE(DepthMips->getDesc().width, DepthMips->getDesc().height));
 	}
 	CommandListRef->endMarker();
 }
