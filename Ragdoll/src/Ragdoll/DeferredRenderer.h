@@ -12,6 +12,7 @@
 #include "RenderPasses/AutomaticExposurePass.h"
 #include "RenderPasses/ToneMapPass.h"
 #include "RenderPasses/BloomPass.h"
+#include "RenderPasses/XeGTAOPass.h"
 
 namespace ragdoll {
 	class Window;
@@ -28,6 +29,7 @@ public:
 	std::shared_ptr<SkyGeneratePass> SkyGeneratePass;
 	std::shared_ptr<GBufferPass> GBufferPass;
 	std::shared_ptr<CACAOPass> CACAOPass;
+	std::shared_ptr<XeGTAOPass> XeGTAOPass;
 	std::shared_ptr<ShadowPass> ShadowPass;
 	std::shared_ptr<ShadowMaskPass> ShadowMaskPass;
 	std::shared_ptr<DeferredLightPass> DeferredLightPass;
@@ -55,6 +57,10 @@ public:
 	nvrhi::TextureHandle ImportanceMap;
 	nvrhi::TextureHandle ImportanceMapPong;
 	nvrhi::TextureHandle LoadCounter;
+	nvrhi::TextureHandle DepthMips;
+	nvrhi::TextureHandle AOTerm;
+	nvrhi::TextureHandle Edges;
+	nvrhi::TextureHandle FinalAOTerm;
 	nvrhi::CommandListHandle CommandList;
 
 	//debug infos

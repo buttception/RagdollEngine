@@ -34,7 +34,7 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 {
 	CommandListRef->beginMarker("CACAO");
 	//cbuffer shared amongst all
-	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "DownSample CBuffer", 1);
+	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "CACAO CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 	
 	CBuffer.DepthBufferDimensions = Vector2(DepthBuffer->getDesc().width, DepthBuffer->getDesc().height);

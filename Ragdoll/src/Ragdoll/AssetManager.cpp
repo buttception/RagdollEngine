@@ -371,7 +371,7 @@ nvrhi::ShaderHandle AssetManager::GetShader(const std::string& shaderFilename)
 		type = nvrhi::ShaderType::Compute;
 	}
 	uint32_t size{};
-	const uint8_t* data = FileManagerRef->ImmediateLoad(shaderFilename, size);
+	const uint8_t* data = FileManagerRef->ImmediateLoad("cso/" + shaderFilename, size);
 	nvrhi::ShaderDesc desc;
 	desc.shaderType = type;
 	desc.debugName = shaderFilename;

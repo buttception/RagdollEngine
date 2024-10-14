@@ -111,7 +111,8 @@ namespace ragdoll {
 		bool UseFixedExposure = 0.f;
 		float FilterRadius = 0.05f;
 		float BloomIntensity = 0.04f;
-		bool UseCACAO = true;
+		bool UseCACAO = false;
+		bool UseXeGTAO = true;
 	};
 
 	class Scene {
@@ -167,6 +168,11 @@ namespace ragdoll {
 		nvrhi::TextureHandle ImportanceMap;
 		nvrhi::TextureHandle ImportanceMapPong;
 		nvrhi::TextureHandle LoadCounter;
+		//xegtao
+		nvrhi::TextureHandle DepthMips;
+		nvrhi::TextureHandle AOTerm;
+		nvrhi::TextureHandle Edges;
+		nvrhi::TextureHandle FinalAOTerm;
 		//distance where the subfrusta are seperated
 		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
 

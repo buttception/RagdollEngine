@@ -114,7 +114,10 @@ void ragdoll::Scene::Update(float _dt)
 	else
 		ImGui::Text("Adapted Luminance: %f", DeferredRenderer->AdaptedLuminance);
 	ImGui::SliderFloat("Sky Dimmer e-6", &SceneInfo.SkyDimmer, 0.f, 1.f);
-	ImGui::Checkbox("CACAO", &SceneInfo.UseCACAO);
+	if (ImGui::Checkbox("CACAO", &SceneInfo.UseCACAO))
+		SceneInfo.UseXeGTAO = SceneInfo.UseCACAO ? false : SceneInfo.UseXeGTAO;
+	if (ImGui::Checkbox("XeGTAO", &SceneInfo.UseXeGTAO))
+		SceneInfo.UseCACAO = SceneInfo.UseXeGTAO ? false : SceneInfo.UseXeGTAO;
 	if (ImGui::Checkbox("Freeze Culling Matrix", &bFreezeFrustumCulling))
 		bIsCameraDirty = true;
 	if (ImGui::Checkbox("Show Octree", &Config.bDrawOctree))
@@ -500,7 +503,7 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "DeinterleavedDepth";
 	texDesc.dimension = nvrhi::TextureDimension::Texture2DArray;
 	texDesc.arraySize = 4;
-	texDesc.mipLevels = 4;
+	texDesc.mipLevels = 5;
 	DeinterleavedDepth = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::RGBA8_SNORM;
@@ -529,6 +532,18 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.width = texDesc.height = 1;
 	texDesc.dimension = nvrhi::TextureDimension::Texture1D;
 	LoadCounter = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc = nvrhi::TextureDesc();
+	texDesc.width = PrimaryWindowRef->GetBufferWidth();
+	texDesc.height = PrimaryWindowRef->GetBufferHeight();
+	texDesc.format = nvrhi::Format::R16_FLOAT;
+	texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	texDesc.isUAV = true;
+	texDesc.keepInitialState = true;
+	texDesc.debugName = "DepthMips";
+	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
+	texDesc.mipLevels = 5;
+	DepthMips = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 }
 
 void ragdoll::Scene::UpdateTransforms()

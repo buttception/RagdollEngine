@@ -32,6 +32,7 @@ void Renderer::Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 	ImportanceMap = scene->ImportanceMap;
 	ImportanceMapPong = scene->ImportanceMapPong;
 	LoadCounter = scene->LoadCounter;
+	DepthMips = scene->DepthMips;
 	for (int i = 0; i < 4; ++i)
 	{
 		ShadowMap[i] = scene->ShadowMap[i];
@@ -89,6 +90,8 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 	//ao
 	if(scene->SceneInfo.UseCACAO)
 		CACAOPass->GenerateAO(scene->SceneInfo);
+	if (scene->SceneInfo.UseXeGTAO)
+		XeGTAOPass->GenerateAO(scene->SceneInfo);
 	//directional light shadow
 	ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles, scene->StaticCascadeInstanceInfos, scene->SceneInfo);
 	//shadow mask pass
@@ -175,6 +178,10 @@ void Renderer::CreateResource()
 	CACAOPass = std::make_shared<class CACAOPass>();
 	CACAOPass->SetDependencies({ DepthHandle, NormalHandle, LoadCounter, DeinterleavedDepth, DeinterleavedNormals, SSAOPong, SSAOPing, ImportanceMap, ImportanceMapPong, AORoughnessMetallicHandle });
 	CACAOPass->Init(CommandList);
+
+	XeGTAOPass = std::make_shared<class XeGTAOPass>();
+	XeGTAOPass->SetDependencies({ DepthHandle, NormalHandle, AORoughnessMetallicHandle, DepthMips });
+	XeGTAOPass->Init(CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(SceneColor);
