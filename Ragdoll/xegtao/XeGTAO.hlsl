@@ -55,7 +55,7 @@ RWTexture2D<uint>           g_outNormalmap          : register( u0 );   // outpu
 Texture2D<uint>             g_srcWorkingAOTerm      : register( t0 );   // coming from previous pass
 Texture2D<lpfloat>          g_srcWorkingEdges       : register( t1 );   // coming from previous pass
 RWTexture2D<uint>           g_outFinalAOTerm        : register( u0 );   // final AO term - just 'visibility' or 'visibility + bent normals'
-RWTexture2D<float4>           g_outAO                 : register( u1 );   // orm
+RWTexture2D<float4>         g_outAO                 : register( u1 );   // orm
 
 // Engine-specific normal map loader
 lpfloat3 LoadNormal( int2 pos )
@@ -148,13 +148,17 @@ void CSDenoiseLastPass( const uint2 dispatchThreadID : SV_DispatchThreadID )
     const uint2 pixCoordBase = dispatchThreadID * uint2( 2, 1 );    // we're computing 2 horizontal pixels at a time (performance optimization)
     // g_samplerPointClamp is a sampler with D3D12_FILTER_MIN_MAG_MIP_POINT filter and D3D12_TEXTURE_ADDRESS_MODE_CLAMP addressing mode
     XeGTAO_Denoise( pixCoordBase, g_GTAOConsts, g_srcWorkingAOTerm, g_srcWorkingEdges, g_samplerPointClamp, g_outFinalAOTerm, true );
-    GroupMemoryBarrierWithGroupSync();
-    const uint2 coord = dispatchThreadID * uint2(8, 8);
-    for(int i = coord.x; i < coord.x + 8; ++i)
+}
+
+[numthreads(XE_GTAO_NUMTHREADS_X, XE_GTAO_NUMTHREADS_Y, 1)]
+void CSComposeAO( const uint2 dispatchThreadID : SV_DispatchThreadID )
+{
+    const uint2 coord = dispatchThreadID * uint2(16, 8);
+    for(int i = coord.x; i < coord.x + 16; ++i)
     {
         for(int j = coord.y; j < coord.y + 8; ++j)
         {
-            g_outAO[int2(i,j)].x = (float)g_outFinalAOTerm[int2(i,j)] / 255.f;
+            g_outAO[int2(i,j)].x = (float)g_srcWorkingAOTerm[int2(i,j)] / 255.f;
         }
     }
 }

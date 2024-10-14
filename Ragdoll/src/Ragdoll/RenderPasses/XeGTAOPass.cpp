@@ -49,6 +49,7 @@ void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 	GenerateDepthMips(sceneInfo, ConstantBufferHandle, MatrixHandle);
 	MainPass(sceneInfo, ConstantBufferHandle, MatrixHandle);
 	Denoise(sceneInfo, ConstantBufferHandle, MatrixHandle);
+	Compose(sceneInfo, ConstantBufferHandle, MatrixHandle);
 
 	CommandListRef->endMarker();
 }
@@ -156,5 +157,35 @@ void XeGTAOPass::Denoise(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 		CommandListRef->setComputeState(state);
 		CommandListRef->dispatch(GET_BATCH_DIMENSION_NOISE(DepthMips->getDesc().width, DepthMips->getDesc().height));
 	}
+	CommandListRef->endMarker();
+}
+
+void XeGTAOPass::Compose(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle BufferHandle, nvrhi::BufferHandle matrix)
+{
+	MICROPROFILE_SCOPEI("Render", "Compose", MP_BLUEVIOLET);
+	CommandListRef->beginMarker("Compose");
+
+	nvrhi::BindingSetDesc setDesc;
+	setDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, BufferHandle),
+	nvrhi::BindingSetItem::ConstantBuffer(1, matrix),
+		nvrhi::BindingSetItem::Texture_SRV(0, FinalAOTerm),
+		nvrhi::BindingSetItem::Texture_UAV(1, ORM),
+		nvrhi::BindingSetItem::Sampler(10, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
+	};
+	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+
+	nvrhi::ComputePipelineDesc PipelineDesc;
+	PipelineDesc.bindingLayouts = { layoutHandle };
+	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("CSComposeAO.cs.cso");
+	PipelineDesc.CS = shader;
+
+	nvrhi::ComputeState state;
+	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
+	state.bindings = { setHandle };
+	CommandListRef->setComputeState(state);
+	CommandListRef->dispatch(GET_BATCH_DIMENSION_NOISE(DepthMips->getDesc().width, DepthMips->getDesc().height));
+
 	CommandListRef->endMarker();
 }
