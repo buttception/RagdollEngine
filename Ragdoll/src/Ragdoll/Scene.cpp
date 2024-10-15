@@ -111,21 +111,28 @@ void ragdoll::Scene::Update(float _dt)
 		"None",
 		"NormalMap",
 		"ORM",
+		"Velocity",
 	};
-	if (ImGui::Combo("Texture View", &selectedItem, items, 3))
+	if (ImGui::Combo("Texture View", &selectedItem, items, 4))
 	{
 		switch (selectedItem) {
 		case 1:
 			DebugInfo.CompCount = 2;
 			DebugInfo.DbgTarget = GBufferNormal;
-			DebugInfo.Add = 0.f;
-			DebugInfo.Mul = 1.f;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One;
 			break;
 		case 2:
 			DebugInfo.CompCount = 3;
 			DebugInfo.DbgTarget = GBufferORM;
-			DebugInfo.Add = 0.f;
-			DebugInfo.Mul = 1.f;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One; 
+			break;
+		case 3:
+			DebugInfo.CompCount = 3;
+			DebugInfo.DbgTarget = VelocityBuffer;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One;
 			break;
 		case 0:
 		default:
@@ -305,6 +312,7 @@ void ragdoll::Scene::UpdateControls(float _dt)
 	SceneInfo.MainCameraView = DirectX::XMMatrixLookAtLH(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
 	if (!bFreezeFrustumCulling)
 		CameraView = SceneInfo.MainCameraView;
+	SceneInfo.PrevMainCameraViewProj = SceneInfo.MainCameraViewProj;
 	SceneInfo.MainCameraViewProj = SceneInfo.MainCameraView * SceneInfo.InfiniteReverseZProj;
 	if (!bFreezeFrustumCulling)
 		CameraViewProjection = SceneInfo.MainCameraViewProj;
@@ -473,6 +481,10 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "GBufferNormal";
 	GBufferNormal = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
+	texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
+	texDesc.debugName = "VelocityBuffer";
+	VelocityBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
 	texDesc.format = nvrhi::Format::RGBA8_UNORM;
 	texDesc.debugName = "ShadowMask";
 	ShadowMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
@@ -486,7 +498,7 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.width = texDesc.height = 2000;
 	texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	texDesc.isUAV = true;
-	texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
+	texDesc.format = nvrhi::Format::RG16_SNORM;
 	texDesc.debugName = "SkyTexture";
 	SkyTexture = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
@@ -644,6 +656,7 @@ void ragdoll::Scene::PopulateStaticProxies()
 			Proxy.bIsLit = mat.bIsLit;
 			Proxy.ModelToWorld = tComp->m_ModelToWorld;
 			Proxy.InvModelToWorld = tComp->m_ModelToWorld.Invert();
+			Proxy.PrevWorldMatrix = tComp->m_PrevModelToWorld;
 			Proxy.BufferIndex = submesh.VertexBufferIndex;
 			Proxy.MaterialIndex = submesh.MaterialIndex;
 			AssetManager::GetInstance()->VertexBufferInfos[Proxy.BufferIndex].BestFitBox.Transform(Proxy.BoundingBox, tComp->m_ModelToWorld);
@@ -1117,6 +1130,8 @@ Matrix ragdoll::Scene::GetLocalModelMatrix(const TransformComp& trans)
 
 void ragdoll::Scene::UpdateTransform(TransformComp& comp, const Guid& guid)
 {
+	//set the prev transform regardless of dirty
+	comp.m_PrevModelToWorld = comp.m_ModelToWorld;
 	//check if state is dirty
 	bool dirtyFromHere = false;
 	if (!m_DirtyOnwards)

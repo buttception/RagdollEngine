@@ -13,7 +13,7 @@ void FramebufferViewer::Init(nvrhi::CommandListHandle cmdList)
 	CommandListRef = cmdList;
 }
 
-void FramebufferViewer::DrawTarget(nvrhi::TextureHandle texture, float add, float mul, uint32_t numComp)
+void FramebufferViewer::DrawTarget(nvrhi::TextureHandle texture, Vector4 add, Vector4 mul, uint32_t numComp)
 {
 	MICROPROFILE_SCOPEI("Render", "Debug Framebuffer View", MP_BLUEVIOLET);
 	//create cbuffer

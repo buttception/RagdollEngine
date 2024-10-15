@@ -47,6 +47,7 @@ public:
 	nvrhi::TextureHandle AlbedoHandle;
 	nvrhi::TextureHandle NormalHandle;
 	nvrhi::TextureHandle AORoughnessMetallicHandle;
+	nvrhi::TextureHandle VelocityBuffer;
 	nvrhi::TextureHandle DepthHandle;
 	nvrhi::FramebufferHandle GBuffer;
 	nvrhi::TextureHandle ShadowMap[4];

@@ -21,6 +21,7 @@ void Renderer::Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 	AlbedoHandle = scene->GBufferAlbedo;
 	NormalHandle = scene->GBufferNormal;
 	AORoughnessMetallicHandle = scene->GBufferORM;
+	VelocityBuffer = scene->VelocityBuffer;
 	DepthHandle = scene->SceneDepthZ;
 	ShadowMask = scene->ShadowMask;
 	SkyTexture = scene->SkyTexture;
@@ -72,6 +73,7 @@ void Renderer::BeginFrame()
 		CommandList->clearTextureFloat(AlbedoHandle, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(NormalHandle, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(AORoughnessMetallicHandle, nvrhi::AllSubresources, col);
+		CommandList->clearTextureFloat(VelocityBuffer, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(ShadowMask, nvrhi::AllSubresources, col);
 		
 		CommandList->endMarker();
@@ -176,6 +178,7 @@ void Renderer::CreateResource()
 		.addColorAttachment(AlbedoHandle)
 		.addColorAttachment(NormalHandle)
 		.addColorAttachment(AORoughnessMetallicHandle)
+		.addColorAttachment(VelocityBuffer)
 		.setDepthAttachment(DepthHandle);
 	GBuffer = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
 

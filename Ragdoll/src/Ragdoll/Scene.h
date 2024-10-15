@@ -16,6 +16,7 @@ namespace ragdoll {
 	struct Proxy {
 		Matrix ModelToWorld;
 		Matrix InvModelToWorld;
+		Matrix PrevWorldMatrix;
 		DirectX::BoundingBox BoundingBox;
 
 		Vector4 Color = Vector4::One;
@@ -36,6 +37,7 @@ namespace ragdoll {
 	struct InstanceData {
 		Matrix ModelToWorld;
 		Matrix InvModelToWorld;
+		Matrix PrevWorldMatrix;
 
 		Vector4 Color = Vector4::One;
 		float Roughness = 0.f;
@@ -52,6 +54,7 @@ namespace ragdoll {
 		InstanceData& operator=(const Proxy& proxy) {
 			ModelToWorld = proxy.ModelToWorld;
 			InvModelToWorld = proxy.InvModelToWorld;
+			PrevWorldMatrix = proxy.PrevWorldMatrix;
 
 			Color = proxy.Color;
 			Roughness = proxy.Roughness;
@@ -77,8 +80,8 @@ namespace ragdoll {
 		uint32_t CulledOctantsCount{};
 		nvrhi::TextureHandle DbgTarget;
 		uint32_t CompCount;
-		float Add;
-		float Mul;
+		Vector4 Add;
+		Vector4 Mul;
 	};
 
 	struct SceneConfig {
@@ -97,6 +100,7 @@ namespace ragdoll {
 
 	struct SceneInformation {
 		Matrix MainCameraViewProj;
+		Matrix PrevMainCameraViewProj;
 		Matrix InfiniteReverseZProj;
 		Matrix MainCameraView;
 		CascadeInfo CascadeInfo[4];

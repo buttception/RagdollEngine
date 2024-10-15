@@ -1,6 +1,6 @@
 cbuffer g_Const : register(b0) {
-		float CompAdd;
-		float CompMul;
+		float4 CompAdd;
+		float4 CompMul;
 		uint ComponentCount;
 };
 
@@ -13,20 +13,20 @@ void main_ps(
     out float4 outColor : SV_Target0
 )
 {
-    float4 finalColor = float4(1.f, 1.f, 1.f, 1.f);
+    float4 finalColor = float4(0.f, 0.f, 0.f, 1.f);
     [branch]
     switch(ComponentCount){
         case 1:
-            finalColor.x = Source.Sample(Sampler, inTexcoord).x * CompMul + CompAdd;
+            finalColor.x = float(Source.Sample(Sampler, inTexcoord).x) * CompMul.x + CompAdd.x;
             break;
         case 2:
-            finalColor.xy = Source.Sample(Sampler, inTexcoord).xy * CompMul + CompAdd.xx;
+            finalColor.xy = float2(Source.Sample(Sampler, inTexcoord).xy) * CompMul.xy + CompAdd.xy;
             break;
         case 3:
-            finalColor.xyz = Source.Sample(Sampler, inTexcoord).xyz * CompMul + CompAdd.xxx;
+            finalColor.xyz = Source.Sample(Sampler, inTexcoord).xyz * CompMul.xyz + CompAdd.xyz;
             break;
         case 4:
-            finalColor.xyzw = Source.Sample(Sampler, inTexcoord).xyzw * CompMul + CompAdd.xxxx;
+            finalColor.xyzw = Source.Sample(Sampler, inTexcoord).xyzw * CompMul.xyzw + CompAdd.xyzw;
             break;
         default:
             break;
