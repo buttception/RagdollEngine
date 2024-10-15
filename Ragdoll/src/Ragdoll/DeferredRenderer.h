@@ -63,7 +63,8 @@ public:
 	nvrhi::TextureHandle DepthMips;
 	nvrhi::TextureHandle AOTerm;
 	nvrhi::TextureHandle Edges;
-	nvrhi::TextureHandle FinalAOTerm;
+	nvrhi::TextureHandle FinalAOTermA;
+	nvrhi::TextureHandle FinalAOTermB;
 	nvrhi::CommandListHandle CommandList;
 
 	//debug infos

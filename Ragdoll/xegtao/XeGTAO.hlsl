@@ -55,6 +55,11 @@ RWTexture2D<uint>           g_outNormalmap          : register( u0 );   // outpu
 Texture2D<uint>             g_srcWorkingAOTerm      : register( t0 );   // coming from previous pass
 Texture2D<lpfloat>          g_srcWorkingEdges       : register( t1 );   // coming from previous pass
 RWTexture2D<uint>           g_outFinalAOTerm        : register( u0 );   // final AO term - just 'visibility' or 'visibility + bent normals'
+
+// composition pass
+Texture2D<uint>             g_currAOTerm            : register( t0 );   // coming from previous pass
+Texture2D<uint>             g_prevAOTerm            : register( t1 );   // coming from previous pass
+Texture2D<uint>             g_velocityBuffer        : register( t2 );   // velocity buffer
 RWTexture2D<float4>         g_outAO                 : register( u1 );   // orm
 
 // Engine-specific normal map loader
@@ -157,7 +162,14 @@ void CSComposeAO( const uint2 dispatchThreadID : SV_DispatchThreadID )
     {
         for(int j = coord.y; j < coord.y + 8; ++j)
         {
-            g_outAO[int2(i,j)].x = (float)g_srcWorkingAOTerm[int2(i,j)] / 255.f;
+            float2 newTexcoord = float2(i, j) * g_GTAOConsts.ViewportPixelSize - g_velocityBuffer[int2(i,j)];
+            float prevAOTerm, currAOTerm;
+            prevAOTerm = currAOTerm = (float)g_currAOTerm[int2(i,j)] / 255.f;
+            if(newTexcoord.x >= 0.f && newTexcoord.x <= 1.f && newTexcoord.y >= 0.f && newTexcoord.y <= 1.f)
+            {
+                prevAOTerm = (float)g_prevAOTerm[int2(newTexcoord.xy * g_GTAOConsts.ViewportSize)] / 255.f;
+            }
+            g_outAO[int2(i,j)].x = lerp(currAOTerm, prevAOTerm, 0.5f);
         }
     }
 }

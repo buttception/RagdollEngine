@@ -25,7 +25,9 @@ void XeGTAOPass::SetDependencies(Textures dependencies)
 	DepthMips = dependencies.DepthMips;
 	AOTerm = dependencies.AOTerm;
 	EdgeMap = dependencies.EdgeMap;
-	FinalAOTerm = dependencies.FinalAOTerm;
+	FinalAOTermA = dependencies.FinalAOTermA;
+	FinalAOTermB = dependencies.FinalAOTermB;
+	VelocityBuffer = dependencies.VelocityBuffer;
 }
 
 void XeGTAOPass::UpdateConstants(const uint32_t width, const uint32_t height, const Matrix& projMatrix)
@@ -126,7 +128,7 @@ void XeGTAOPass::Denoise(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 	CommandListRef->beginMarker("Denoise");
 
 	const int passCount = std::max(1, Settings.DenoisePasses); // even without denoising we have to run a single last pass to output correct term into the external output texture
-	nvrhi::TextureHandle AOPing{ AOTerm }, AOPong{ FinalAOTerm };
+	nvrhi::TextureHandle AOPing{ AOTerm }, AOPong{ CBuffer.NoiseIndex % 2 == 0 ? FinalAOTermA : FinalAOTermB };
 	for (int i = 0; i < passCount; i++)
 	{
 		const bool lastPass = i == passCount - 1;
@@ -171,7 +173,9 @@ void XeGTAOPass::Compose(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 	setDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, BufferHandle),
 	nvrhi::BindingSetItem::ConstantBuffer(1, matrix),
-		nvrhi::BindingSetItem::Texture_SRV(0, FinalAOTerm),
+		nvrhi::BindingSetItem::Texture_SRV(0, CBuffer.NoiseIndex % 2 == 0 ? FinalAOTermA : FinalAOTermB),
+		nvrhi::BindingSetItem::Texture_SRV(1, CBuffer.NoiseIndex % 2 == 0 ? FinalAOTermB : FinalAOTermA),
+		nvrhi::BindingSetItem::Texture_SRV(2, VelocityBuffer),
 		nvrhi::BindingSetItem::Texture_UAV(1, ORM),
 		nvrhi::BindingSetItem::Sampler(10, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 	};

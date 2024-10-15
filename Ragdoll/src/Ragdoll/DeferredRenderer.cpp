@@ -35,7 +35,8 @@ void Renderer::Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 	LoadCounter = scene->LoadCounter;
 	DepthMips = scene->DepthMips;
 	AOTerm = scene->AOTerm;
-	FinalAOTerm = scene->FinalAOTermA;
+	FinalAOTermA = scene->FinalAOTermA;
+	FinalAOTermB = scene->FinalAOTermB;
 	Edges = scene->Edges;
 	for (int i = 0; i < 4; ++i)
 	{
@@ -191,7 +192,7 @@ void Renderer::CreateResource()
 	CACAOPass->Init(CommandList);
 
 	XeGTAOPass = std::make_shared<class XeGTAOPass>();
-	XeGTAOPass->SetDependencies({ DepthHandle, NormalHandle, AORoughnessMetallicHandle, DepthMips, AOTerm, Edges, FinalAOTerm });
+	XeGTAOPass->SetDependencies({ DepthHandle, NormalHandle, AORoughnessMetallicHandle, DepthMips, AOTerm, Edges, FinalAOTermA, FinalAOTermB, VelocityBuffer });
 	XeGTAOPass->Init(CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()

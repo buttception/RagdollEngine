@@ -440,6 +440,8 @@ void ragdoll::Scene::CreateRenderTargets()
 	depthBufferDesc.format = nvrhi::Format::D32;
 	depthBufferDesc.isTypeless = true;
 	depthBufferDesc.debugName = "SceneDepthZ";
+	depthBufferDesc.clearValue = 0.f;
+	depthBufferDesc.useClearValue = true;
 	SceneDepthZ = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
 
 	depthBufferDesc.width = 2000;
@@ -455,6 +457,8 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.height = PrimaryWindowRef->GetBufferHeight();
 	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
 	texDesc.keepInitialState = true;
+	texDesc.useClearValue = true;
+	texDesc.clearValue = 0.f;
 
 	texDesc.initialState = nvrhi::ResourceStates::Common;
 	texDesc.isUAV = true;
@@ -465,8 +469,6 @@ void ragdoll::Scene::CreateRenderTargets()
 
 	texDesc.sampleCount = 1;
 	texDesc.isTypeless = false;
-	texDesc.useClearValue = true;
-	texDesc.clearValue = 0.f;
 	texDesc.isUAV = false;
 	texDesc.initialState = nvrhi::ResourceStates::RenderTarget;
 	texDesc.format = nvrhi::Format::RGBA8_UNORM;
@@ -481,7 +483,7 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "GBufferNormal";
 	GBufferNormal = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
-	texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
+	texDesc.format = nvrhi::Format::RG16_FLOAT;
 	texDesc.debugName = "VelocityBuffer";
 	VelocityBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
@@ -575,8 +577,10 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "AOTerm";
 	texDesc.mipLevels = 1;
 	AOTerm = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-	texDesc.debugName = "FinalAOTerm";
+	texDesc.debugName = "FinalAOTermA";
 	FinalAOTermA = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "FinalAOTermB";
+	FinalAOTermB = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::R8_UNORM;
 	texDesc.debugName = "EdgeMap";

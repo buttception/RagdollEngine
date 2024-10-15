@@ -22,7 +22,10 @@ class XeGTAOPass {
 		nvrhi::TextureHandle DepthMips;
 		nvrhi::TextureHandle AOTerm;
 		nvrhi::TextureHandle EdgeMap;
-		nvrhi::TextureHandle FinalAOTerm;
+		nvrhi::TextureHandle FinalAOTermA;
+		nvrhi::TextureHandle FinalAOTermB;
+
+		nvrhi::TextureHandle VelocityBuffer;
 	};
 
 	//inputs
@@ -34,7 +37,9 @@ class XeGTAOPass {
 	nvrhi::TextureHandle DepthMips;
 	nvrhi::TextureHandle AOTerm;
 	nvrhi::TextureHandle EdgeMap;
-	nvrhi::TextureHandle FinalAOTerm;
+	nvrhi::TextureHandle FinalAOTermA;
+	nvrhi::TextureHandle FinalAOTermB;
+	nvrhi::TextureHandle VelocityBuffer;
 
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
