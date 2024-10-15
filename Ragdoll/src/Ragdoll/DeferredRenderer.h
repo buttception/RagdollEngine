@@ -9,6 +9,7 @@
 #include "RenderPasses/SkyPass.h"
 #include "RenderPasses/CACAOPass.h"
 #include "RenderPasses/DebugPass.h"
+#include "RenderPasses/FramebufferViewer.h"
 #include "RenderPasses/AutomaticExposurePass.h"
 #include "RenderPasses/ToneMapPass.h"
 #include "RenderPasses/BloomPass.h"
@@ -38,6 +39,7 @@ public:
 	std::shared_ptr<AutomaticExposurePass> AutomaticExposurePass;
 	std::shared_ptr<ToneMapPass> ToneMapPass;
 	std::shared_ptr<DebugPass> DebugPass;
+	std::shared_ptr<FramebufferViewer> FramebufferViewer;
 
 	nvrhi::TextureHandle SkyTexture;
 	nvrhi::TextureHandle SkyThetaGammaTable;

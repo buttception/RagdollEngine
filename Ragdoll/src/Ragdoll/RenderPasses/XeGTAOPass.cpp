@@ -30,7 +30,9 @@ void XeGTAOPass::SetDependencies(Textures dependencies)
 
 void XeGTAOPass::UpdateConstants(const uint32_t width, const uint32_t height, const Matrix& projMatrix)
 {
-	XeGTAO::GTAOUpdateConstants(CBuffer, width, height, Settings, &projMatrix._11, true, false);
+	static uint32_t framecounter = 0;
+	framecounter++;
+	XeGTAO::GTAOUpdateConstants(CBuffer, width, height, Settings, &projMatrix._11, true, framecounter);
 }
 
 void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
@@ -107,7 +109,7 @@ void XeGTAOPass::MainPass(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buf
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
-	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("CSGTAOHigh.cs.cso");
+	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("CSGTAOLow.cs.cso");
 	PipelineDesc.CS = shader;
 
 	nvrhi::ComputeState state;

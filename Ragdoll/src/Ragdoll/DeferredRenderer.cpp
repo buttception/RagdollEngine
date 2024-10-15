@@ -34,7 +34,7 @@ void Renderer::Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 	LoadCounter = scene->LoadCounter;
 	DepthMips = scene->DepthMips;
 	AOTerm = scene->AOTerm;
-	FinalAOTerm = scene->FinalAOTerm;
+	FinalAOTerm = scene->FinalAOTermA;
 	Edges = scene->Edges;
 	for (int i = 0; i < 4; ++i)
 	{
@@ -125,6 +125,11 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 	//draw debug items
 	DebugPass->SetRenderTarget(fb);
 	DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo);
+
+	if (scene->DebugInfo.DbgTarget)
+	{
+		FramebufferViewer->DrawTarget(scene->DebugInfo.DbgTarget, scene->DebugInfo.Add, scene->DebugInfo.Mul, scene->DebugInfo.CompCount);
+	}
 
 	CommandList->close();
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
@@ -229,4 +234,7 @@ void Renderer::CreateResource()
 	DebugPass = std::make_shared<class DebugPass>();
 	DebugPass->SetRenderTarget(fb);
 	DebugPass->Init(CommandList);
+
+	FramebufferViewer = std::make_shared<class FramebufferViewer>();
+	FramebufferViewer->Init(CommandList);
 }

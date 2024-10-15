@@ -75,6 +75,10 @@ namespace ragdoll {
 
 	struct DebugInfo {
 		uint32_t CulledOctantsCount{};
+		nvrhi::TextureHandle DbgTarget;
+		uint32_t CompCount;
+		float Add;
+		float Mul;
 	};
 
 	struct SceneConfig {
@@ -151,6 +155,7 @@ namespace ragdoll {
 		nvrhi::TextureHandle GBufferAlbedo;
 		nvrhi::TextureHandle GBufferNormal;
 		nvrhi::TextureHandle GBufferORM;
+		nvrhi::TextureHandle VelocityBuffer;
 		//shadows
 		nvrhi::TextureHandle ShadowMap[4];
 		nvrhi::TextureHandle ShadowMask;
@@ -172,7 +177,8 @@ namespace ragdoll {
 		nvrhi::TextureHandle DepthMips;
 		nvrhi::TextureHandle AOTerm;
 		nvrhi::TextureHandle Edges;
-		nvrhi::TextureHandle FinalAOTerm;
+		nvrhi::TextureHandle FinalAOTermA;
+		nvrhi::TextureHandle FinalAOTermB;
 		//distance where the subfrusta are seperated
 		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
 
