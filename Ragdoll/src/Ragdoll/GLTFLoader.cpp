@@ -76,9 +76,9 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndice
 	//since i need the modelstack already i no need transform system to update
 	//transComp->m_Dirty = true;
 	if (!modelStack.empty())
-		transComp->m_ModelToWorld = modelStack.top() * mat;
+		transComp->m_PrevModelToWorld = transComp->m_ModelToWorld = modelStack.top() * mat;
 	else
-		transComp->m_ModelToWorld = mat;
+		transComp->m_PrevModelToWorld = transComp->m_ModelToWorld = mat;
 	modelStack.push(mat);
 
 	//get max extents in world space

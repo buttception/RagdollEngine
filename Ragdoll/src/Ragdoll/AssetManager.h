@@ -61,6 +61,7 @@ enum class SamplerTypes
 	Point_Clamp,
 	Point_Wrap,
 	Point_Repeat,
+	Point_Mirror,
 	Linear_Clamp,
 	Linear_Wrap,
 	Linear_Repeat,

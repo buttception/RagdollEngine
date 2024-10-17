@@ -40,6 +40,7 @@ struct TransformComp
 
 	//cached as shaders need this always
 	Matrix m_ModelToWorld;
+	Matrix m_PrevModelToWorld;
 
 	//let child right sibling system
 	ragdoll::Guid m_Parent{};

@@ -220,6 +220,13 @@ void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
 	Samplers[(int)SamplerTypes::Point_Repeat] = Device->createSampler(samplerDesc);
+	samplerDesc.minFilter = 0;
+	samplerDesc.magFilter = 0;
+	samplerDesc.mipFilter = 0;
+	samplerDesc.addressU = nvrhi::SamplerAddressMode::Mirror;
+	samplerDesc.addressV = nvrhi::SamplerAddressMode::Mirror;
+	samplerDesc.addressW = nvrhi::SamplerAddressMode::Mirror;
+	Samplers[(int)SamplerTypes::Point_Mirror] = Device->createSampler(samplerDesc);
 
 	samplerDesc.minFilter = 1;
 	samplerDesc.magFilter = 1;
@@ -364,7 +371,7 @@ nvrhi::ShaderHandle AssetManager::GetShader(const std::string& shaderFilename)
 		type = nvrhi::ShaderType::Compute;
 	}
 	uint32_t size{};
-	const uint8_t* data = FileManagerRef->ImmediateLoad(shaderFilename, size);
+	const uint8_t* data = FileManagerRef->ImmediateLoad("cso/" + shaderFilename, size);
 	nvrhi::ShaderDesc desc;
 	desc.shaderType = type;
 	desc.debugName = shaderFilename;

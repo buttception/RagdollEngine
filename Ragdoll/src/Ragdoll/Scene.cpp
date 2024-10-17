@@ -105,15 +105,61 @@ void ragdoll::Scene::Update(float _dt)
 		//need to call bat file to recompile
 		AssetManager::GetInstance()->RecompileShaders();
 	}
+	//view textures
+	static int selectedItem = 0;
+	const char* items[] = {
+		"None",
+		"NormalMap",
+		"ORM",
+		"Velocity",
+		"AO",
+	};
+	if (ImGui::Combo("Texture View", &selectedItem, items, 5))
+	{
+		switch (selectedItem) {
+		case 1:
+			DebugInfo.CompCount = 2;
+			DebugInfo.DbgTarget = GBufferNormal;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One;
+			break;
+		case 2:
+			DebugInfo.CompCount = 2;
+			DebugInfo.DbgTarget = GBufferRM;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One; 
+			break;
+		case 3:
+			DebugInfo.CompCount = 3;
+			DebugInfo.DbgTarget = VelocityBuffer;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One;
+			break;
+		case 4:
+			DebugInfo.CompCount = 1;
+			DebugInfo.DbgTarget = AONormalized;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One;
+			break;
+		case 0:
+		default:
+			DebugInfo.DbgTarget = nullptr;
+		}
+	}
 	ImGui::SliderFloat("Filter Radius", &SceneInfo.FilterRadius, 0.001f, 1.f);
 	ImGui::SliderFloat("Bloom Intensity", &SceneInfo.BloomIntensity, 0.f, 1.f);
 	ImGui::SliderFloat("Gamma", &SceneInfo.Gamma, 0.5f, 3.f);
+	ImGui::SliderFloat("AO Modulation factor", &SceneInfo.ModulationFactor, 0.f, 1.f);
 	ImGui::Checkbox("UseFixedExposure", &SceneInfo.UseFixedExposure);
 	if (SceneInfo.UseFixedExposure)
 		ImGui::SliderFloat("Exposure", &SceneInfo.Exposure, 0.f, 2.f);
 	else
 		ImGui::Text("Adapted Luminance: %f", DeferredRenderer->AdaptedLuminance);
 	ImGui::SliderFloat("Sky Dimmer e-6", &SceneInfo.SkyDimmer, 0.f, 1.f);
+	if (ImGui::Checkbox("CACAO", &SceneInfo.UseCACAO))
+		SceneInfo.UseXeGTAO = SceneInfo.UseCACAO ? false : SceneInfo.UseXeGTAO;
+	if (ImGui::Checkbox("XeGTAO", &SceneInfo.UseXeGTAO))
+		SceneInfo.UseCACAO = SceneInfo.UseXeGTAO ? false : SceneInfo.UseXeGTAO;
 	if (ImGui::Checkbox("Freeze Culling Matrix", &bFreezeFrustumCulling))
 		bIsCameraDirty = true;
 	if (ImGui::Checkbox("Show Octree", &Config.bDrawOctree))
@@ -274,6 +320,7 @@ void ragdoll::Scene::UpdateControls(float _dt)
 	SceneInfo.MainCameraView = DirectX::XMMatrixLookAtLH(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
 	if (!bFreezeFrustumCulling)
 		CameraView = SceneInfo.MainCameraView;
+	SceneInfo.PrevMainCameraViewProj = SceneInfo.MainCameraViewProj;
 	SceneInfo.MainCameraViewProj = SceneInfo.MainCameraView * SceneInfo.InfiniteReverseZProj;
 	if (!bFreezeFrustumCulling)
 		CameraViewProjection = SceneInfo.MainCameraViewProj;
@@ -389,7 +436,6 @@ void ragdoll::Scene::CreateCustomMeshes()
 
 void ragdoll::Scene::CreateRenderTargets()
 {
-	//check if the depth buffer i want is already in the asset manager
 	nvrhi::TextureDesc depthBufferDesc;
 	depthBufferDesc.width = PrimaryWindowRef->GetBufferWidth();
 	depthBufferDesc.height = PrimaryWindowRef->GetBufferHeight();
@@ -401,75 +447,71 @@ void ragdoll::Scene::CreateRenderTargets()
 	depthBufferDesc.mipLevels = 1;
 	depthBufferDesc.format = nvrhi::Format::D32;
 	depthBufferDesc.isTypeless = true;
-	if (!SceneDepthZ) {
-		//create a depth buffer
-		depthBufferDesc.debugName = "SceneDepthZ";
-		SceneDepthZ = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
-	}
-	if (!ShadowMap[0]) {
-		depthBufferDesc.width = 2000;
-		depthBufferDesc.height = 2000;
-		for (int i = 0; i < 4; ++i)
-		{
-			depthBufferDesc.debugName = "ShadowMap" + std::to_string(i);
-			ShadowMap[i] = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
-		}
+	depthBufferDesc.debugName = "SceneDepthZ";
+	depthBufferDesc.clearValue = 0.f;
+	depthBufferDesc.useClearValue = true;
+	SceneDepthZ = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
+
+	depthBufferDesc.width = 2000;
+	depthBufferDesc.height = 2000;
+	for (int i = 0; i < 4; ++i)
+	{
+		depthBufferDesc.debugName = "ShadowMap" + std::to_string(i);
+		ShadowMap[i] = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
 	}
 
-	//create the gbuffer stuff
 	nvrhi::TextureDesc texDesc;
 	texDesc.width = PrimaryWindowRef->GetBufferWidth();
 	texDesc.height = PrimaryWindowRef->GetBufferHeight();
-	texDesc.initialState = nvrhi::ResourceStates::RenderTarget;
-	texDesc.clearValue = 0.f;
-	texDesc.useClearValue = true;
-	texDesc.isRenderTarget = true;
-	texDesc.sampleCount = 1;
 	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
 	texDesc.keepInitialState = true;
-	texDesc.mipLevels = 1;
-	texDesc.isTypeless = false;
+	texDesc.useClearValue = true;
+	texDesc.clearValue = 0.f;
 
-	if (!SceneColor) {
-		texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
-		texDesc.debugName = "SceneColor";
-		SceneColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-	}
-	if (!GBufferAlbedo) {
-		texDesc.format = nvrhi::Format::RGBA8_UNORM;
-		texDesc.debugName = "GBufferAlbedo";
-		GBufferAlbedo = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-	}
-	if (!GBufferNormal) {
-		texDesc.format = nvrhi::Format::RG16_UNORM;
-		texDesc.debugName = "GBufferNormal";
-		GBufferNormal = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-	}
-	if (!GBufferORM) {
-		texDesc.format = nvrhi::Format::RGBA8_UNORM;
-		texDesc.debugName = "GBufferORM";
-		GBufferORM = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-	}
-	if (!ShadowMask) {
-		texDesc.format = nvrhi::Format::RGBA8_UNORM;
-		texDesc.debugName = "ShadowMask";
-		ShadowMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-	}
-	if (!SkyThetaGammaTable) {
-		texDesc.width = 64;
-		texDesc.height = 2;
-		texDesc.format = nvrhi::Format::RGBA8_UNORM;
-		texDesc.debugName = "SkyThetaGammaTable";
-		SkyThetaGammaTable = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-	}
-	if (!SkyTexture) {
-		texDesc.width = texDesc.height = 2000;
-		texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
-		texDesc.isUAV = true;
-		texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
-		texDesc.debugName = "SkyTexture";
-		SkyTexture = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-	}
+	texDesc.initialState = nvrhi::ResourceStates::Common;
+	texDesc.isUAV = true;
+	texDesc.isRenderTarget = true;
+	texDesc.format = nvrhi::Format::RG8_UNORM;
+	texDesc.debugName = "GBufferRM";
+	GBufferRM = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.sampleCount = 1;
+	texDesc.isTypeless = false;
+	texDesc.isUAV = false;
+	texDesc.initialState = nvrhi::ResourceStates::RenderTarget;
+	texDesc.format = nvrhi::Format::RGBA8_UNORM;
+	texDesc.debugName = "GBufferAlbedo";
+	GBufferAlbedo = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
+	texDesc.debugName = "SceneColor";
+	SceneColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::RG16_UNORM;
+	texDesc.debugName = "GBufferNormal";
+	GBufferNormal = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::RG16_FLOAT;
+	texDesc.debugName = "VelocityBuffer";
+	VelocityBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::RGBA8_UNORM;
+	texDesc.debugName = "ShadowMask";
+	ShadowMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.width = 64;
+	texDesc.height = 2;
+	texDesc.format = nvrhi::Format::RGBA8_UNORM;
+	texDesc.debugName = "SkyThetaGammaTable";
+	SkyThetaGammaTable = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.width = texDesc.height = 2000;
+	texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	texDesc.isUAV = true;
+	texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
+	texDesc.debugName = "SkyTexture";
+	SkyTexture = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
 	uint32_t width = PrimaryWindowRef->GetWidth();
 	uint32_t height = PrimaryWindowRef->GetHeight();
 	for (int i = 0; i < MipCount; ++i) {
@@ -486,6 +528,76 @@ void ragdoll::Scene::CreateRenderTargets()
 		mip.Image = DirectXDevice::GetNativeDevice()->createTexture(desc);
 		width /= 2; height /= 2;
 	}
+
+	texDesc = nvrhi::TextureDesc();
+	texDesc.width = PrimaryWindowRef->GetWidth() / 2 + PrimaryWindowRef->GetWidth() % 2;
+	texDesc.height = PrimaryWindowRef->GetHeight() / 2 + PrimaryWindowRef->GetHeight() % 2;
+	texDesc.format = nvrhi::Format::R16_FLOAT;
+	texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	texDesc.isUAV = true;
+	texDesc.keepInitialState = true;
+	texDesc.debugName = "DeinterleavedDepth";
+	texDesc.dimension = nvrhi::TextureDimension::Texture2DArray;
+	texDesc.arraySize = 4;
+	texDesc.mipLevels = 5;
+	DeinterleavedDepth = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::RGBA8_SNORM;
+	texDesc.debugName = "DeinterleavedNormals";
+	texDesc.mipLevels = 1;
+	DeinterleavedNormals = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::RG8_UNORM;
+	texDesc.debugName = "SSAOBufferPong";
+	SSAOBufferPong = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "SSAOBufferPing";
+	SSAOBufferPing = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::R8_UNORM;
+	texDesc.debugName = "ImportanceMap";
+	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
+	texDesc.arraySize = 1;
+	texDesc.width = PrimaryWindowRef->GetWidth() / 4 + PrimaryWindowRef->GetWidth() % 4;
+	texDesc.height = PrimaryWindowRef->GetHeight() / 4 + PrimaryWindowRef->GetHeight() % 4;
+	ImportanceMap = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "ImportanceMapPong";
+	ImportanceMapPong = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::R32_UINT;
+	texDesc.debugName = "LoadCounter";
+	texDesc.width = texDesc.height = 1;
+	texDesc.dimension = nvrhi::TextureDimension::Texture1D;
+	LoadCounter = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc = nvrhi::TextureDesc();
+	texDesc.width = PrimaryWindowRef->GetBufferWidth();
+	texDesc.height = PrimaryWindowRef->GetBufferHeight();
+	texDesc.format = nvrhi::Format::R16_FLOAT;
+	texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	texDesc.isUAV = true;
+	texDesc.keepInitialState = true;
+	texDesc.debugName = "DepthMips";
+	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
+	texDesc.mipLevels = 5;
+	DepthMips = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::R8_UINT;
+	texDesc.debugName = "AOTerm";
+	texDesc.mipLevels = 1;
+	AOTerm = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "FinalAOTerm";
+	FinalAOTerm = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.format = nvrhi::Format::R8_UNORM;
+	texDesc.debugName = "AOTermAccumulation";
+	AOTermAccumulation = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.format = nvrhi::Format::R8_UNORM;
+	texDesc.debugName = "AONormalized";
+	AONormalized = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::R8_UNORM;
+	texDesc.debugName = "EdgeMap";
+	Edges = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
 }
 
 void ragdoll::Scene::UpdateTransforms()
@@ -560,6 +672,7 @@ void ragdoll::Scene::PopulateStaticProxies()
 			Proxy.bIsLit = mat.bIsLit;
 			Proxy.ModelToWorld = tComp->m_ModelToWorld;
 			Proxy.InvModelToWorld = tComp->m_ModelToWorld.Invert();
+			Proxy.PrevWorldMatrix = tComp->m_PrevModelToWorld;
 			Proxy.BufferIndex = submesh.VertexBufferIndex;
 			Proxy.MaterialIndex = submesh.MaterialIndex;
 			AssetManager::GetInstance()->VertexBufferInfos[Proxy.BufferIndex].BestFitBox.Transform(Proxy.BoundingBox, tComp->m_ModelToWorld);
@@ -1033,6 +1146,8 @@ Matrix ragdoll::Scene::GetLocalModelMatrix(const TransformComp& trans)
 
 void ragdoll::Scene::UpdateTransform(TransformComp& comp, const Guid& guid)
 {
+	//set the prev transform regardless of dirty
+	comp.m_PrevModelToWorld = comp.m_ModelToWorld;
 	//check if state is dirty
 	bool dirtyFromHere = false;
 	if (!m_DirtyOnwards)

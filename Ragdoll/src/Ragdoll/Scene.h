@@ -16,6 +16,7 @@ namespace ragdoll {
 	struct Proxy {
 		Matrix ModelToWorld;
 		Matrix InvModelToWorld;
+		Matrix PrevWorldMatrix;
 		DirectX::BoundingBox BoundingBox;
 
 		Vector4 Color = Vector4::One;
@@ -36,6 +37,7 @@ namespace ragdoll {
 	struct InstanceData {
 		Matrix ModelToWorld;
 		Matrix InvModelToWorld;
+		Matrix PrevWorldMatrix;
 
 		Vector4 Color = Vector4::One;
 		float Roughness = 0.f;
@@ -52,6 +54,7 @@ namespace ragdoll {
 		InstanceData& operator=(const Proxy& proxy) {
 			ModelToWorld = proxy.ModelToWorld;
 			InvModelToWorld = proxy.InvModelToWorld;
+			PrevWorldMatrix = proxy.PrevWorldMatrix;
 
 			Color = proxy.Color;
 			Roughness = proxy.Roughness;
@@ -75,6 +78,10 @@ namespace ragdoll {
 
 	struct DebugInfo {
 		uint32_t CulledOctantsCount{};
+		nvrhi::TextureHandle DbgTarget;
+		uint32_t CompCount;
+		Vector4 Add;
+		Vector4 Mul;
 	};
 
 	struct SceneConfig {
@@ -93,6 +100,7 @@ namespace ragdoll {
 
 	struct SceneInformation {
 		Matrix MainCameraViewProj;
+		Matrix PrevMainCameraViewProj;
 		Matrix InfiniteReverseZProj;
 		Matrix MainCameraView;
 		CascadeInfo CascadeInfo[4];
@@ -111,6 +119,9 @@ namespace ragdoll {
 		bool UseFixedExposure = 0.f;
 		float FilterRadius = 0.05f;
 		float BloomIntensity = 0.04f;
+		bool UseCACAO = false;
+		bool UseXeGTAO = true;
+		float ModulationFactor = 0.9f;
 	};
 
 	class Scene {
@@ -148,7 +159,8 @@ namespace ragdoll {
 		nvrhi::TextureHandle SceneDepthZ;
 		nvrhi::TextureHandle GBufferAlbedo;
 		nvrhi::TextureHandle GBufferNormal;
-		nvrhi::TextureHandle GBufferORM;
+		nvrhi::TextureHandle GBufferRM;
+		nvrhi::TextureHandle VelocityBuffer;
 		//shadows
 		nvrhi::TextureHandle ShadowMap[4];
 		nvrhi::TextureHandle ShadowMask;
@@ -158,6 +170,21 @@ namespace ragdoll {
 		//bloom
 		std::vector<BloomMip> DownsampledImages;
 		const uint32_t MipCount{ 5 };	//how many times to downsample
+		//cacao
+		nvrhi::TextureHandle DeinterleavedDepth;
+		nvrhi::TextureHandle DeinterleavedNormals;
+		nvrhi::TextureHandle SSAOBufferPong;
+		nvrhi::TextureHandle SSAOBufferPing;
+		nvrhi::TextureHandle ImportanceMap;
+		nvrhi::TextureHandle ImportanceMapPong;
+		nvrhi::TextureHandle LoadCounter;
+		//xegtao
+		nvrhi::TextureHandle DepthMips;
+		nvrhi::TextureHandle AOTerm;
+		nvrhi::TextureHandle Edges;
+		nvrhi::TextureHandle FinalAOTerm;
+		nvrhi::TextureHandle AOTermAccumulation;
+		nvrhi::TextureHandle AONormalized;
 		//distance where the subfrusta are seperated
 		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
 
