@@ -20,7 +20,8 @@ void Renderer::Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 	SceneColor = scene->SceneColor;
 	AlbedoHandle = scene->GBufferAlbedo;
 	NormalHandle = scene->GBufferNormal;
-	AORoughnessMetallicHandle = scene->GBufferORM;
+	RoughnessMetallicHandle = scene->GBufferRM;
+	AOHandle = scene->AONormalized;
 	VelocityBuffer = scene->VelocityBuffer;
 	DepthHandle = scene->SceneDepthZ;
 	ShadowMask = scene->ShadowMask;
@@ -35,8 +36,8 @@ void Renderer::Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 	LoadCounter = scene->LoadCounter;
 	DepthMips = scene->DepthMips;
 	AOTerm = scene->AOTerm;
-	FinalAOTermA = scene->FinalAOTermA;
-	FinalAOTermB = scene->FinalAOTermB;
+	FinalAOTermA = scene->FinalAOTerm;
+	AOTermAccumulation = scene->AOTermAccumulation;
 	Edges = scene->Edges;
 	for (int i = 0; i < 4; ++i)
 	{
@@ -73,7 +74,7 @@ void Renderer::BeginFrame()
 		CommandList->clearTextureFloat(SceneColor, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(AlbedoHandle, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(NormalHandle, nvrhi::AllSubresources, col);
-		CommandList->clearTextureFloat(AORoughnessMetallicHandle, nvrhi::AllSubresources, col);
+		CommandList->clearTextureFloat(RoughnessMetallicHandle, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(VelocityBuffer, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(ShadowMask, nvrhi::AllSubresources, col);
 		
@@ -178,7 +179,7 @@ void Renderer::CreateResource()
 	fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(AlbedoHandle)
 		.addColorAttachment(NormalHandle)
-		.addColorAttachment(AORoughnessMetallicHandle)
+		.addColorAttachment(RoughnessMetallicHandle)
 		.addColorAttachment(VelocityBuffer)
 		.setDepthAttachment(DepthHandle);
 	GBuffer = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
@@ -188,11 +189,11 @@ void Renderer::CreateResource()
 	GBufferPass->Init(CommandList);
 
 	CACAOPass = std::make_shared<class CACAOPass>();
-	CACAOPass->SetDependencies({ DepthHandle, NormalHandle, LoadCounter, DeinterleavedDepth, DeinterleavedNormals, SSAOPong, SSAOPing, ImportanceMap, ImportanceMapPong, AORoughnessMetallicHandle });
+	CACAOPass->SetDependencies({ DepthHandle, NormalHandle, LoadCounter, DeinterleavedDepth, DeinterleavedNormals, SSAOPong, SSAOPing, ImportanceMap, ImportanceMapPong, AOHandle });
 	CACAOPass->Init(CommandList);
 
 	XeGTAOPass = std::make_shared<class XeGTAOPass>();
-	XeGTAOPass->SetDependencies({ DepthHandle, NormalHandle, AORoughnessMetallicHandle, DepthMips, AOTerm, Edges, FinalAOTermA, FinalAOTermB, VelocityBuffer });
+	XeGTAOPass->SetDependencies({ DepthHandle, NormalHandle, AOHandle, DepthMips, AOTerm, Edges, FinalAOTermA, AOTermAccumulation, VelocityBuffer });
 	XeGTAOPass->Init(CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()
@@ -200,7 +201,7 @@ void Renderer::CreateResource()
 	fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
 	DeferredLightPass = std::make_shared<class DeferredLightPass>();
 	DeferredLightPass->SetRenderTarget(fb);
-	DeferredLightPass->SetDependencies(AlbedoHandle, NormalHandle, AORoughnessMetallicHandle, DepthHandle, ShadowMask);
+	DeferredLightPass->SetDependencies(AlbedoHandle, NormalHandle, RoughnessMetallicHandle, AOHandle, DepthHandle, ShadowMask);
 	DeferredLightPass->Init(CommandList);
 
 	fbDesc = nvrhi::FramebufferDesc()

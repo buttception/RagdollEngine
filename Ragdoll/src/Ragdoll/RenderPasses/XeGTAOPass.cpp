@@ -9,6 +9,7 @@
 #include "Ragdoll/DirectXDevice.h"
 
 #define GET_BATCH_DIMENSION_DEPTH(x, y) (x + 16-1) / 16, (y + 16-1) / 16, 1
+#define GET_BATCH_DIMENSION_COMPOSE(x, y) (x + 8-1) / 8, (y + 8-1) / 8, 1
 #define GET_BATCH_DIMENSION_AO(x, y) (x + XE_GTAO_NUMTHREADS_X-1) / XE_GTAO_NUMTHREADS_X, (y + XE_GTAO_NUMTHREADS_Y-1) / XE_GTAO_NUMTHREADS_Y, 1
 #define GET_BATCH_DIMENSION_NOISE(x,y) (x + (XE_GTAO_NUMTHREADS_X*2)-1) / (XE_GTAO_NUMTHREADS_X*2), (y + XE_GTAO_NUMTHREADS_Y-1) / XE_GTAO_NUMTHREADS_Y, 1
 
@@ -21,20 +22,20 @@ void XeGTAOPass::SetDependencies(Textures dependencies)
 {
 	DepthBuffer = dependencies.DepthBuffer;
 	NormalMap = dependencies.NormalMap;
-	ORM = dependencies.ORM;
+	AO = dependencies.AO;
 	DepthMips = dependencies.DepthMips;
 	AOTerm = dependencies.AOTerm;
 	EdgeMap = dependencies.EdgeMap;
-	FinalAOTermA = dependencies.FinalAOTermA;
-	FinalAOTermB = dependencies.FinalAOTermB;
+	FinalAOTerm = dependencies.FinalAOTermA;
+	AONormalizedAccumulation = dependencies.AOTermAccumulation;
 	VelocityBuffer = dependencies.VelocityBuffer;
 }
 
 void XeGTAOPass::UpdateConstants(const uint32_t width, const uint32_t height, const Matrix& projMatrix)
 {
 	static uint32_t framecounter = 0;
-	framecounter++;
 	XeGTAO::GTAOUpdateConstants(CBuffer, width, height, Settings, &projMatrix._11, true, framecounter);
+	framecounter++;
 }
 
 void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
@@ -46,9 +47,20 @@ void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(XeGTAO::GTAOConstants));
 
-	CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(Matrix), "ViewMatrix CBuffer", 1);
+	CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ViewMatrix CBuffer", 1);
+	OtherBuffer.viewMatrix = sceneInfo.MainCameraView;
+	OtherBuffer.prevViewProjMatrix = sceneInfo.PrevMainCameraViewProj;
+	OtherBuffer.InvViewProjMatrix = sceneInfo.MainCameraViewProj.Invert();
+	static bool firstFrame = true;
+	if (firstFrame)
+	{
+		firstFrame = false;
+		OtherBuffer.modulationFactor = 0.f;
+	}
+	else
+		OtherBuffer.modulationFactor = sceneInfo.ModulationFactor;
 	nvrhi::BufferHandle MatrixHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
-	CommandListRef->writeBuffer(MatrixHandle, &sceneInfo.MainCameraView, sizeof(Matrix));
+	CommandListRef->writeBuffer(MatrixHandle, &OtherBuffer, sizeof(ConstantBuffer));
 
 	GenerateDepthMips(sceneInfo, ConstantBufferHandle, MatrixHandle);
 	MainPass(sceneInfo, ConstantBufferHandle, MatrixHandle);
@@ -128,7 +140,7 @@ void XeGTAOPass::Denoise(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 	CommandListRef->beginMarker("Denoise");
 
 	const int passCount = std::max(1, Settings.DenoisePasses); // even without denoising we have to run a single last pass to output correct term into the external output texture
-	nvrhi::TextureHandle AOPing{ AOTerm }, AOPong{ CBuffer.NoiseIndex % 2 == 0 ? FinalAOTermA : FinalAOTermB };
+	nvrhi::TextureHandle AOPing{ AOTerm }, AOPong{ FinalAOTerm };
 	for (int i = 0; i < passCount; i++)
 	{
 		const bool lastPass = i == passCount - 1;
@@ -142,7 +154,6 @@ void XeGTAOPass::Denoise(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 			nvrhi::BindingSetItem::Texture_SRV(0, AOPing),
 			nvrhi::BindingSetItem::Texture_SRV(1, EdgeMap),
 			nvrhi::BindingSetItem::Texture_UAV(0, AOPong),
-			nvrhi::BindingSetItem::Texture_UAV(1, ORM),
 			nvrhi::BindingSetItem::Sampler(10, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 		};
 		nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
@@ -172,11 +183,12 @@ void XeGTAOPass::Compose(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 	nvrhi::BindingSetDesc setDesc;
 	setDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, BufferHandle),
-	nvrhi::BindingSetItem::ConstantBuffer(1, matrix),
-		nvrhi::BindingSetItem::Texture_SRV(0, CBuffer.NoiseIndex % 2 == 0 ? FinalAOTermA : FinalAOTermB),
-		nvrhi::BindingSetItem::Texture_SRV(1, CBuffer.NoiseIndex % 2 == 0 ? FinalAOTermB : FinalAOTermA),
-		nvrhi::BindingSetItem::Texture_SRV(2, VelocityBuffer),
-		nvrhi::BindingSetItem::Texture_UAV(1, ORM),
+		nvrhi::BindingSetItem::ConstantBuffer(1, matrix),
+		nvrhi::BindingSetItem::Texture_SRV(0, FinalAOTerm ),
+		nvrhi::BindingSetItem::Texture_SRV(1, VelocityBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(2, DepthBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(3, AONormalizedAccumulation),
+		nvrhi::BindingSetItem::Texture_UAV(1, AO),
 		nvrhi::BindingSetItem::Sampler(10, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
@@ -191,7 +203,8 @@ void XeGTAOPass::Compose(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
 	state.bindings = { setHandle };
 	CommandListRef->setComputeState(state);
-	CommandListRef->dispatch(GET_BATCH_DIMENSION_NOISE(DepthMips->getDesc().width, DepthMips->getDesc().height));
+	CommandListRef->dispatch(GET_BATCH_DIMENSION_COMPOSE(DepthMips->getDesc().width, DepthMips->getDesc().height));
+	CommandListRef->copyTexture(AONormalizedAccumulation, nvrhi::TextureSlice().resolve(AONormalizedAccumulation->getDesc()), AO, nvrhi::TextureSlice().resolve(AO->getDesc()));
 
 	CommandListRef->endMarker();
 }

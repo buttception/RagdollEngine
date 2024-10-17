@@ -46,7 +46,8 @@ public:
 	nvrhi::TextureHandle SceneColor;
 	nvrhi::TextureHandle AlbedoHandle;
 	nvrhi::TextureHandle NormalHandle;
-	nvrhi::TextureHandle AORoughnessMetallicHandle;
+	nvrhi::TextureHandle RoughnessMetallicHandle;
+	nvrhi::TextureHandle AOHandle;
 	nvrhi::TextureHandle VelocityBuffer;
 	nvrhi::TextureHandle DepthHandle;
 	nvrhi::FramebufferHandle GBuffer;
@@ -64,7 +65,7 @@ public:
 	nvrhi::TextureHandle AOTerm;
 	nvrhi::TextureHandle Edges;
 	nvrhi::TextureHandle FinalAOTermA;
-	nvrhi::TextureHandle FinalAOTermB;
+	nvrhi::TextureHandle AOTermAccumulation;
 	nvrhi::CommandListHandle CommandList;
 
 	//debug infos

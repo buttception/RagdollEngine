@@ -1,5 +1,6 @@
 #ifndef __INTELLISENSE__    // avoids some pesky intellisense errors
 #include "XeGTAO.h"
+#include "Utils.hlsli"
 #endif
 
 #define VA_SATURATE     saturate
@@ -12,6 +13,7 @@
 
 // PREDEFINED GLOBAL SAMPLER SLOTS
 #define SHADERGLOBAL_POINTCLAMP_SAMPLERSLOT                 10
+#define SHADERGLOBAL_LINEARCLAMP_SAMPLERSLOT                12
 
 #define CONCATENATE_HELPER(a, b) a##b
 #define CONCATENATE(a, b) CONCATENATE_HELPER(a, b)
@@ -22,6 +24,7 @@
 #define U_CONCATENATER(x) CONCATENATE(u,x)
 
 SamplerState                            g_samplerPointClamp                     : register( S_CONCATENATER( SHADERGLOBAL_POINTCLAMP_SAMPLERSLOT         ) ); 
+SamplerState                            g_samplerLinearClamp                     : register( S_CONCATENATER( SHADERGLOBAL_LINEARCLAMP_SAMPLERSLOT         ) ); 
 
 cbuffer GTAOConstantBuffer                      : register( b0 )
 {
@@ -30,6 +33,9 @@ cbuffer GTAOConstantBuffer                      : register( b0 )
 
 cbuffer g_Const : register(b1) {
 	float4x4 viewMatrix;
+    float4x4 InvViewProjMatrix;
+    float4x4 prevViewProjMatrix;
+    float modulationFactor;
 };
 
 //#define XE_GTAO_GENERATE_NORMALS_INPLACE
@@ -58,9 +64,10 @@ RWTexture2D<uint>           g_outFinalAOTerm        : register( u0 );   // final
 
 // composition pass
 Texture2D<uint>             g_currAOTerm            : register( t0 );   // coming from previous pass
-Texture2D<uint>             g_prevAOTerm            : register( t1 );   // coming from previous pass
-Texture2D<uint>             g_velocityBuffer        : register( t2 );   // velocity buffer
-RWTexture2D<float4>         g_outAO                 : register( u1 );   // orm
+Texture2D<float>            g_velocityBuffer        : register( t1 );   // velocity buffer
+Texture2D<float>            g_depth                 : register( t2 );   // depth buffer
+Texture2D<float>            g_accumulationAOTerm    : register( t3 );   // accumulated term
+RWTexture2D<float>          g_outAO                 : register( u1 );   // orm
 
 // Engine-specific normal map loader
 lpfloat3 LoadNormal( int2 pos )
@@ -154,24 +161,45 @@ void CSDenoiseLastPass( const uint2 dispatchThreadID : SV_DispatchThreadID )
     XeGTAO_Denoise( pixCoordBase, g_GTAOConsts, g_srcWorkingAOTerm, g_srcWorkingEdges, g_samplerPointClamp, g_outFinalAOTerm, true );
 }
 
-[numthreads(XE_GTAO_NUMTHREADS_X, XE_GTAO_NUMTHREADS_Y, 1)]
+[numthreads(8, 8, 1)]
 void CSComposeAO( const uint2 dispatchThreadID : SV_DispatchThreadID )
 {
-    const uint2 coord = dispatchThreadID * uint2(16, 8);
-    for(int i = coord.x; i < coord.x + 16; ++i)
+    uint i = dispatchThreadID.x;
+    uint j = dispatchThreadID.y;
+    float2 texcoord = float2(i,j) * g_GTAOConsts.ViewportPixelSize;
+    float depth = g_depth[int2(i,j)];
+    //get the current fragment pos
+    float3 worldPos = DepthToWorld(depth, texcoord, InvViewProjMatrix);
+    //get where it was in the prev frame in clip space
+    float4 prevNdcPos = mul(float4(worldPos, 1.f), prevViewProjMatrix);
+    //get where it is in ndc space
+    prevNdcPos /= prevNdcPos.w;
+    //get where it will be in screenspace [0, 1]
+    float2 prevScreenspacePos = prevNdcPos.xy * float2(0.5f, -0.5f) + float2(0.5f, 0.5f);
+    
+    float currModulationFactor = modulationFactor;
+    float oldAOTerm = 0.f;
+    if(prevScreenspacePos.x >= 1.f || prevScreenspacePos.x <= 0.f || prevScreenspacePos.y >= 1.f || prevScreenspacePos.y <= 0.f)
     {
-        for(int j = coord.y; j < coord.y + 8; ++j)
-        {
-            float2 newTexcoord = float2(i, j) * g_GTAOConsts.ViewportPixelSize - g_velocityBuffer[int2(i,j)];
-            float prevAOTerm, currAOTerm;
-            prevAOTerm = currAOTerm = (float)g_currAOTerm[int2(i,j)] / 255.f;
-            if(newTexcoord.x >= 0.f && newTexcoord.x <= 1.f && newTexcoord.y >= 0.f && newTexcoord.y <= 1.f)
-            {
-                prevAOTerm = (float)g_prevAOTerm[int2(newTexcoord.xy * g_GTAOConsts.ViewportSize)] / 255.f;
-            }
-            g_outAO[int2(i,j)].x = lerp(currAOTerm, prevAOTerm, 0.5f);
-        }
+        //outside ndc, dont lerp any old values
+        currModulationFactor = 0.f;
     }
+    else
+    {
+        //get where the texel space of the pixel should be in the previous frame
+        int2 texelPos = int2(prevScreenspacePos.xy * g_GTAOConsts.ViewportSize + float2(0.5f, 0.5f));
+        texelPos.x = clamp(texelPos.x, 0, g_GTAOConsts.ViewportSize.x - 1);
+        texelPos.y = clamp(texelPos.y, 0, g_GTAOConsts.ViewportSize.y - 1);
+        //get the pixel movement
+        float2 texcoordDiff = float2(prevScreenspacePos.xy - texcoord);
+        currModulationFactor *= clamp(1.f - length(texcoordDiff), 0.f, 1.f);
+        //get what the ao was in the last frame at that fragpos
+        oldAOTerm = g_accumulationAOTerm[texelPos];
+    }
+    float newAOTerm = (float)g_currAOTerm[int2(i,j)] / 255.f;
+    float interpolatedTerm = lerp(newAOTerm, oldAOTerm, currModulationFactor);
+    //write the accumulated value onto the the accumulation buffer
+    g_outAO[int2(i,j)] = interpolatedTerm;
 }
 
 // Optional screen space viewspace normals from depth generation

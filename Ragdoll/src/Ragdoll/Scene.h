@@ -121,6 +121,7 @@ namespace ragdoll {
 		float BloomIntensity = 0.04f;
 		bool UseCACAO = false;
 		bool UseXeGTAO = true;
+		float ModulationFactor = 0.9f;
 	};
 
 	class Scene {
@@ -158,7 +159,7 @@ namespace ragdoll {
 		nvrhi::TextureHandle SceneDepthZ;
 		nvrhi::TextureHandle GBufferAlbedo;
 		nvrhi::TextureHandle GBufferNormal;
-		nvrhi::TextureHandle GBufferORM;
+		nvrhi::TextureHandle GBufferRM;
 		nvrhi::TextureHandle VelocityBuffer;
 		//shadows
 		nvrhi::TextureHandle ShadowMap[4];
@@ -181,8 +182,9 @@ namespace ragdoll {
 		nvrhi::TextureHandle DepthMips;
 		nvrhi::TextureHandle AOTerm;
 		nvrhi::TextureHandle Edges;
-		nvrhi::TextureHandle FinalAOTermA;
-		nvrhi::TextureHandle FinalAOTermB;
+		nvrhi::TextureHandle FinalAOTerm;
+		nvrhi::TextureHandle AOTermAccumulation;
+		nvrhi::TextureHandle AONormalized;
 		//distance where the subfrusta are seperated
 		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
 

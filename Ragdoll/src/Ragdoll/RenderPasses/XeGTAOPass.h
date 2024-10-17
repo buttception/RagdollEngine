@@ -6,6 +6,13 @@ namespace ragdoll {
 	struct SceneInformation;
 }
 class XeGTAOPass {
+	struct ConstantBuffer
+	{
+		Matrix viewMatrix;
+		Matrix InvViewProjMatrix;
+		Matrix prevViewProjMatrix;
+		float modulationFactor;
+	} OtherBuffer;
 	XeGTAO::GTAOConstants CBuffer;
 	XeGTAO::GTAOSettings Settings;
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
@@ -16,14 +23,14 @@ class XeGTAOPass {
 		// inputs
 		nvrhi::TextureHandle DepthBuffer;
 		nvrhi::TextureHandle NormalMap;
-		nvrhi::TextureHandle ORM;
+		nvrhi::TextureHandle AO;
 
 		//outputs
 		nvrhi::TextureHandle DepthMips;
 		nvrhi::TextureHandle AOTerm;
 		nvrhi::TextureHandle EdgeMap;
 		nvrhi::TextureHandle FinalAOTermA;
-		nvrhi::TextureHandle FinalAOTermB;
+		nvrhi::TextureHandle AOTermAccumulation;
 
 		nvrhi::TextureHandle VelocityBuffer;
 	};
@@ -31,14 +38,14 @@ class XeGTAOPass {
 	//inputs
 	nvrhi::TextureHandle DepthBuffer;
 	nvrhi::TextureHandle NormalMap;
-	nvrhi::TextureHandle ORM;
+	nvrhi::TextureHandle AO;
 
 	//outputs
 	nvrhi::TextureHandle DepthMips;
 	nvrhi::TextureHandle AOTerm;
 	nvrhi::TextureHandle EdgeMap;
-	nvrhi::TextureHandle FinalAOTermA;
-	nvrhi::TextureHandle FinalAOTermB;
+	nvrhi::TextureHandle FinalAOTerm;
+	nvrhi::TextureHandle AONormalizedAccumulation;
 	nvrhi::TextureHandle VelocityBuffer;
 
 public:

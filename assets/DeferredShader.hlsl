@@ -71,7 +71,7 @@ void gbuffer_ps(
 	in uint inInstanceId : TEXCOORD7,
 	out float4 outColor : SV_Target0,
 	out float2 outNormals: SV_Target1,
-	out float4 outAORoughnessMetallic: SV_Target2,
+	out float2 outRoughnessMetallic: SV_Target2,
 	out float2 outVelocity: SV_Target3
 )
 {
@@ -101,7 +101,7 @@ void gbuffer_ps(
 	//draw to the targets
 	outColor = albedo;
 	outNormals.xy = Encode(N);
-	outAORoughnessMetallic = float4(ao, roughness, metallic, 0.f);
+	outRoughnessMetallic = float2(roughness, metallic);
 	float4 clipPos = mul(inFragPos, viewProjMatrix);
 	float4 ndcPos = clipPos / clipPos.w;
 	float4 prevClipPos = mul(inPrevFragPos, prevViewProjMatrix);
@@ -121,8 +121,9 @@ cbuffer g_LightConst : register(b1) {
 Texture2D albedoTexture : register(t0);
 Texture2D normalTexture : register(t1);
 Texture2D RMTexture : register(t2);
-Texture2D DepthBuffer : register(t3);
-Texture2D ShadowMask : register(t4);
+Texture2D AOTexture : register(t3);
+Texture2D DepthBuffer : register(t4);
+Texture2D ShadowMask : register(t5);
 
 void deferred_light_ps(
 	in float4 inPos : SV_Position,
@@ -133,7 +134,8 @@ void deferred_light_ps(
 	//getting texture values
 	float4 albedo = albedoTexture.Sample(Samplers[6], inTexcoord);
 	float3 N = Decode(normalTexture.Sample(Samplers[6], inTexcoord).xy);
-	float3 RM = RMTexture.Sample(Samplers[6], inTexcoord).xyz;
+	float2 RM = RMTexture.Sample(Samplers[6], inTexcoord).xy;
+	float AO = AOTexture.Sample(Samplers[6], inTexcoord).x;
 	float4 shadowFactor = ShadowMask.Sample(Samplers[6], inTexcoord);
 
 	//getting fragpos
@@ -141,9 +143,9 @@ void deferred_light_ps(
 
 	//apply pbr lighting, AO is 1.f for now so it does nth
 	//float3 diffuse = max(dot(N, LightDirection), 0) * albedo.rgb;
-	float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.z, RM.y, RM.x);
+	float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.y, RM.x, AO);
 
-	float3 ambient = SceneAmbientColor.rgb * albedo.rgb * RM.x;
+	float3 ambient = SceneAmbientColor.rgb * albedo.rgb * AO;
 	float3 lighting = ambient + diffuse * (1.f - shadowFactor.a);
 	outColor = lighting * shadowFactor.rgb;
 }

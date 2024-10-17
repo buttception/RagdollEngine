@@ -112,8 +112,9 @@ void ragdoll::Scene::Update(float _dt)
 		"NormalMap",
 		"ORM",
 		"Velocity",
+		"AO",
 	};
-	if (ImGui::Combo("Texture View", &selectedItem, items, 4))
+	if (ImGui::Combo("Texture View", &selectedItem, items, 5))
 	{
 		switch (selectedItem) {
 		case 1:
@@ -123,14 +124,20 @@ void ragdoll::Scene::Update(float _dt)
 			DebugInfo.Mul = Vector4::One;
 			break;
 		case 2:
-			DebugInfo.CompCount = 3;
-			DebugInfo.DbgTarget = GBufferORM;
+			DebugInfo.CompCount = 2;
+			DebugInfo.DbgTarget = GBufferRM;
 			DebugInfo.Add = Vector4::Zero;
 			DebugInfo.Mul = Vector4::One; 
 			break;
 		case 3:
 			DebugInfo.CompCount = 3;
 			DebugInfo.DbgTarget = VelocityBuffer;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One;
+			break;
+		case 4:
+			DebugInfo.CompCount = 1;
+			DebugInfo.DbgTarget = AONormalized;
 			DebugInfo.Add = Vector4::Zero;
 			DebugInfo.Mul = Vector4::One;
 			break;
@@ -142,6 +149,7 @@ void ragdoll::Scene::Update(float _dt)
 	ImGui::SliderFloat("Filter Radius", &SceneInfo.FilterRadius, 0.001f, 1.f);
 	ImGui::SliderFloat("Bloom Intensity", &SceneInfo.BloomIntensity, 0.f, 1.f);
 	ImGui::SliderFloat("Gamma", &SceneInfo.Gamma, 0.5f, 3.f);
+	ImGui::SliderFloat("AO Modulation factor", &SceneInfo.ModulationFactor, 0.f, 1.f);
 	ImGui::Checkbox("UseFixedExposure", &SceneInfo.UseFixedExposure);
 	if (SceneInfo.UseFixedExposure)
 		ImGui::SliderFloat("Exposure", &SceneInfo.Exposure, 0.f, 2.f);
@@ -463,9 +471,9 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.initialState = nvrhi::ResourceStates::Common;
 	texDesc.isUAV = true;
 	texDesc.isRenderTarget = true;
-	texDesc.format = nvrhi::Format::RGBA8_UNORM;
-	texDesc.debugName = "GBufferORM";
-	GBufferORM = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.format = nvrhi::Format::RG8_UNORM;
+	texDesc.debugName = "GBufferRM";
+	GBufferRM = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.sampleCount = 1;
 	texDesc.isTypeless = false;
@@ -500,7 +508,7 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.width = texDesc.height = 2000;
 	texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	texDesc.isUAV = true;
-	texDesc.format = nvrhi::Format::RG16_SNORM;
+	texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
 	texDesc.debugName = "SkyTexture";
 	SkyTexture = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
@@ -577,10 +585,14 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "AOTerm";
 	texDesc.mipLevels = 1;
 	AOTerm = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-	texDesc.debugName = "FinalAOTermA";
-	FinalAOTermA = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-	texDesc.debugName = "FinalAOTermB";
-	FinalAOTermB = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "FinalAOTerm";
+	FinalAOTerm = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.format = nvrhi::Format::R8_UNORM;
+	texDesc.debugName = "AOTermAccumulation";
+	AOTermAccumulation = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.format = nvrhi::Format::R8_UNORM;
+	texDesc.debugName = "AONormalized";
+	AONormalized = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::R8_UNORM;
 	texDesc.debugName = "EdgeMap";

@@ -20,11 +20,12 @@ void DeferredLightPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
 	RenderTarget = renderTarget;
 }
 
-void DeferredLightPass::SetDependencies(nvrhi::TextureHandle albedo, nvrhi::TextureHandle normal, nvrhi::TextureHandle orm, nvrhi::TextureHandle depth, nvrhi::TextureHandle shadowMask)
+void DeferredLightPass::SetDependencies(nvrhi::TextureHandle albedo, nvrhi::TextureHandle normal, nvrhi::TextureHandle rm, nvrhi::TextureHandle ao, nvrhi::TextureHandle depth, nvrhi::TextureHandle shadowMask)
 {
 	AlbedoHandle = albedo;
 	NormalHandle = normal;
-	AORoughnessMetallicHandle = orm;
+	RoughnessMetallicHandle = rm;
+	AOHandle = ao;
 	DepthHandle = depth;
 	ShadowMask = shadowMask;
 }
@@ -49,9 +50,10 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
 		nvrhi::BindingSetItem::ConstantBuffer(1, ConstantBufferHandle),
 		nvrhi::BindingSetItem::Texture_SRV(0, AlbedoHandle),
 		nvrhi::BindingSetItem::Texture_SRV(1, NormalHandle),
-		nvrhi::BindingSetItem::Texture_SRV(2, AORoughnessMetallicHandle),
-		nvrhi::BindingSetItem::Texture_SRV(3, DepthHandle),
-		nvrhi::BindingSetItem::Texture_SRV(4, ShadowMask)
+		nvrhi::BindingSetItem::Texture_SRV(2, RoughnessMetallicHandle),
+		nvrhi::BindingSetItem::Texture_SRV(3, AOHandle),
+		nvrhi::BindingSetItem::Texture_SRV(4, DepthHandle),
+		nvrhi::BindingSetItem::Texture_SRV(5, ShadowMask)
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
 	{
