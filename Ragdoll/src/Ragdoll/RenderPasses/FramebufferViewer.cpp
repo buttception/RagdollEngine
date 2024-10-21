@@ -16,6 +16,7 @@ void FramebufferViewer::Init(nvrhi::CommandListHandle cmdList)
 void FramebufferViewer::DrawTarget(nvrhi::TextureHandle texture, Vector4 add, Vector4 mul, uint32_t numComp)
 {
 	MICROPROFILE_SCOPEI("Render", "Debug Framebuffer View", MP_BLUEVIOLET);
+	MICROPROFILE_SCOPEGPUI("Framebuffer View", MP_LIGHTYELLOW1);
 	//create cbuffer
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "FB View CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);

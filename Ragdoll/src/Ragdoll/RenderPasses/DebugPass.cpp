@@ -23,6 +23,7 @@ void DebugPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
 void DebugPass::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t instanceCount, const ragdoll::SceneInformation& sceneInfo)
 {
 	MICROPROFILE_SCOPEI("Render", "Draw Bounding Box", MP_ALICEBLUE);
+	MICROPROFILE_SCOPEGPUI("Debug Instance Draw", MP_LIGHTYELLOW1);
 	if (instanceCount == 0)
 		return;
 	//create a constant buffer here

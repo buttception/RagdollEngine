@@ -33,6 +33,7 @@ void DeferredLightPass::SetDependencies(nvrhi::TextureHandle albedo, nvrhi::Text
 void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
 {
 	MICROPROFILE_SCOPEI("Render", "Light Pass", MP_BLUEVIOLET);
+	MICROPROFILE_SCOPEGPUI("Light Pass", MP_LIGHTYELLOW1);
 	//create a constant buffer here
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "DeferredLight CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);

@@ -40,6 +40,8 @@ void XeGTAOPass::UpdateConstants(const uint32_t width, const uint32_t height, co
 
 void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 {
+	MICROPROFILE_SCOPEI("Render", "XeGTAO", MP_BLUEVIOLET);
+	MICROPROFILE_SCOPEGPUI("XeGTAO", MP_YELLOWGREEN);
 	CommandListRef->beginMarker("XeGTAO");
 	UpdateConstants(DepthBuffer->getDesc().width, DepthBuffer->getDesc().height, sceneInfo.InfiniteReverseZProj);
 	//cbuffer shared amongst all
@@ -61,11 +63,22 @@ void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 		OtherBuffer.modulationFactor = sceneInfo.ModulationFactor;
 	nvrhi::BufferHandle MatrixHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 	CommandListRef->writeBuffer(MatrixHandle, &OtherBuffer, sizeof(ConstantBuffer));
-
-	GenerateDepthMips(sceneInfo, ConstantBufferHandle, MatrixHandle);
-	MainPass(sceneInfo, ConstantBufferHandle, MatrixHandle);
-	Denoise(sceneInfo, ConstantBufferHandle, MatrixHandle);
-	Compose(sceneInfo, ConstantBufferHandle, MatrixHandle);
+	{
+		MICROPROFILE_SCOPEGPUI("Prepare Depth Mips", MP_LIGHTYELLOW1);
+		GenerateDepthMips(sceneInfo, ConstantBufferHandle, MatrixHandle);
+	}
+	{
+		MICROPROFILE_SCOPEGPUI("Generate SSAO", MP_LIGHTYELLOW1);
+		MainPass(sceneInfo, ConstantBufferHandle, MatrixHandle);
+	}
+	{
+		MICROPROFILE_SCOPEGPUI("Denoise SSAO", MP_LIGHTYELLOW1);
+		Denoise(sceneInfo, ConstantBufferHandle, MatrixHandle);
+	}
+	{
+		MICROPROFILE_SCOPEGPUI("Apply SSAO", MP_LIGHTYELLOW1);
+		Compose(sceneInfo, ConstantBufferHandle, MatrixHandle);
+	}
 
 	CommandListRef->endMarker();
 }

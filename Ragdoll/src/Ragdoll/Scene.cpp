@@ -466,11 +466,16 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
 	texDesc.keepInitialState = true;
 	texDesc.useClearValue = true;
-	texDesc.clearValue = 0.f;
-
 	texDesc.initialState = nvrhi::ResourceStates::Common;
 	texDesc.isUAV = true;
 	texDesc.isRenderTarget = true;
+
+	texDesc.clearValue = 1.f;
+	texDesc.format = nvrhi::Format::R8_UNORM;
+	texDesc.debugName = "AONormalized";
+	AONormalized = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	
+	texDesc.clearValue = 0.f;
 	texDesc.format = nvrhi::Format::RG8_UNORM;
 	texDesc.debugName = "GBufferRM";
 	GBufferRM = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
@@ -590,9 +595,6 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.format = nvrhi::Format::R8_UNORM;
 	texDesc.debugName = "AOTermAccumulation";
 	AOTermAccumulation = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-	texDesc.format = nvrhi::Format::R8_UNORM;
-	texDesc.debugName = "AONormalized";
-	AONormalized = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::R8_UNORM;
 	texDesc.debugName = "EdgeMap";

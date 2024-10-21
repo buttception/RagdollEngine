@@ -1,6 +1,7 @@
 #include "ragdollpch.h"
 
 #include "nvrhi/utils.h"
+#include <microprofile.h>
 
 #include "AssetManager.h"
 #include "DirectXDevice.h"
@@ -323,35 +324,41 @@ uint32_t AssetManager::AddVertices(const std::vector<Vertex>& newVertices, const
 void AssetManager::UpdateVBOIBO()
 {
 	CommandList->open();
-	CommandList->beginMarker("Update global buffer");
+	MICROPROFILE_GPU_SET_CONTEXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer, MicroProfileGetGlobalGpuThreadLog());
+	{
+		MICROPROFILE_SCOPEI("Render", "Create VBO IBO", MP_BLUEVIOLET);
+		MICROPROFILE_SCOPEGPUI("Create VBO IBO", MP_LIGHTYELLOW1);
+		CommandList->beginMarker("Update global buffer");
 
-	nvrhi::BufferDesc vertexBufDesc;
-	vertexBufDesc.byteSize = Vertices.size() * sizeof(Vertex);	//the offset is already the size of the vb
-	vertexBufDesc.isVertexBuffer = true;
-	vertexBufDesc.debugName = "Global vertex buffer";
-	vertexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;	//set as copy dest to copy over data
-	//smth smth syncrhonization need to be this state to be written
+		nvrhi::BufferDesc vertexBufDesc;
+		vertexBufDesc.byteSize = Vertices.size() * sizeof(Vertex);	//the offset is already the size of the vb
+		vertexBufDesc.isVertexBuffer = true;
+		vertexBufDesc.debugName = "Global vertex buffer";
+		vertexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;	//set as copy dest to copy over data
+		//smth smth syncrhonization need to be this state to be written
 
-	VBO = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(vertexBufDesc);
-	//copy data over
-	CommandList->beginTrackingBufferState(VBO, nvrhi::ResourceStates::CopyDest);	//i tink this is to update nvrhi resource manager state tracker
-	CommandList->writeBuffer(VBO, Vertices.data(), vertexBufDesc.byteSize);
-	CommandList->setPermanentBufferState(VBO, nvrhi::ResourceStates::VertexBuffer);	//now its a vb
+		VBO = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(vertexBufDesc);
+		//copy data over
+		CommandList->beginTrackingBufferState(VBO, nvrhi::ResourceStates::CopyDest);	//i tink this is to update nvrhi resource manager state tracker
+		CommandList->writeBuffer(VBO, Vertices.data(), vertexBufDesc.byteSize);
+		CommandList->setPermanentBufferState(VBO, nvrhi::ResourceStates::VertexBuffer);	//now its a vb
 
-	nvrhi::BufferDesc indexBufDesc;
-	indexBufDesc.byteSize = Indices.size() * sizeof(uint32_t);
-	indexBufDesc.isIndexBuffer = true;
-	indexBufDesc.debugName = "Global index buffer";
-	indexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;
+		nvrhi::BufferDesc indexBufDesc;
+		indexBufDesc.byteSize = Indices.size() * sizeof(uint32_t);
+		indexBufDesc.isIndexBuffer = true;
+		indexBufDesc.debugName = "Global index buffer";
+		indexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;
 
-	IBO = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(indexBufDesc);
-	CommandList->beginTrackingBufferState(IBO, nvrhi::ResourceStates::CopyDest);
-	CommandList->writeBuffer(IBO, Indices.data(), indexBufDesc.byteSize);
-	CommandList->setPermanentBufferState(IBO, nvrhi::ResourceStates::IndexBuffer);
+		IBO = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(indexBufDesc);
+		CommandList->beginTrackingBufferState(IBO, nvrhi::ResourceStates::CopyDest);
+		CommandList->writeBuffer(IBO, Indices.data(), indexBufDesc.byteSize);
+		CommandList->setPermanentBufferState(IBO, nvrhi::ResourceStates::IndexBuffer);
 
-	CommandList->endMarker();
+		CommandList->endMarker();
+	}
 	CommandList->close();
 	DirectXDevice::GetInstance()->m_NvrhiDevice->executeCommandList(CommandList);
+	MicroProfileFlip(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer);
 }
 
 nvrhi::ShaderHandle AssetManager::GetShader(const std::string& shaderFilename)

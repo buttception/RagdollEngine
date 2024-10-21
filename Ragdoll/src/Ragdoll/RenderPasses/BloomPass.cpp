@@ -21,6 +21,7 @@ void BloomPass::SetDependencies(nvrhi::TextureHandle sceneColor, const std::vect
 
 void BloomPass::Bloom(const ragdoll::SceneInformation& sceneInfo)
 {
+	MICROPROFILE_SCOPEGPUI("Bloom", MP_YELLOWGREEN);
 	DownSample();
 	UpSample(sceneInfo.FilterRadius, sceneInfo.BloomIntensity);
 }
@@ -34,6 +35,7 @@ void BloomPass::DownSample()
 
 	nvrhi::TextureHandle Source = SceneColor;
 	for (const BloomMip& mip : *Mips) {
+		MICROPROFILE_SCOPEGPUI("Bloom Down Sample", MP_LIGHTYELLOW1);
 		//create the target
 		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
 			.addColorAttachment(mip.Image);
@@ -89,6 +91,7 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity)
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 
 	for (int i = Mips->size() - 1; i > 0; --i) {
+		MICROPROFILE_SCOPEGPUI("Bloom Up Sample GPU", MP_LIGHTYELLOW1);
 		nvrhi::TextureHandle Source = Mips->operator[](i).Image;
 		nvrhi::TextureHandle Target = Mips->operator[](i - 1).Image;
 		//create the target
@@ -135,47 +138,49 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity)
 		CommandListRef->draw(args);
 	}
 	CommandListRef->endMarker();
-	CBufferUS.BloomIntensity = 0.f;
+	{
+		MICROPROFILE_SCOPEGPUI("Apply Bloom", MP_LIGHTYELLOW1);
+		CBufferUS.BloomIntensity = 0.f;
+		//copy the first mip into scene color
+		//create the target
+		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
+			.addColorAttachment(SceneColor);
+		nvrhi::FramebufferHandle TargetFB = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
+		//create the binding set and layout
+		nvrhi::BindingSetDesc bindingSetDesc;
+		bindingSetDesc.bindings = {
+			nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[5]),
+			nvrhi::BindingSetItem::Texture_SRV(0, Mips->operator[](0).Image),
+		};
+		nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
+		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+		//create the pipeline
+		nvrhi::GraphicsPipelineDesc PipelineDesc;
+		PipelineDesc.addBindingLayout(BindingLayoutHandle);
+		nvrhi::ShaderHandle VertexShader = AssetManager::GetInstance()->GetShader("Fullscreen.vs.cso");
+		nvrhi::ShaderHandle PixelShader = AssetManager::GetInstance()->GetShader("Fullscreen.ps.cso");
+		PipelineDesc.setVertexShader(VertexShader);
+		PipelineDesc.setFragmentShader(PixelShader);
 
-	//copy the first mip into scene color
-	//create the target
-	nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(SceneColor);
-	nvrhi::FramebufferHandle TargetFB = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
-	//create the binding set and layout
-	nvrhi::BindingSetDesc bindingSetDesc;
-	bindingSetDesc.bindings = {
-		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[5]),
-		nvrhi::BindingSetItem::Texture_SRV(0, Mips->operator[](0).Image),
-	};
-	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
-	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(bindingSetDesc, BindingLayoutHandle);
-	//create the pipeline
-	nvrhi::GraphicsPipelineDesc PipelineDesc;
-	PipelineDesc.addBindingLayout(BindingLayoutHandle);
-	nvrhi::ShaderHandle VertexShader = AssetManager::GetInstance()->GetShader("Fullscreen.vs.cso");
-	nvrhi::ShaderHandle PixelShader = AssetManager::GetInstance()->GetShader("Fullscreen.ps.cso");
-	PipelineDesc.setVertexShader(VertexShader);
-	PipelineDesc.setFragmentShader(PixelShader);
+		PipelineDesc.renderState.depthStencilState.depthTestEnable = false;
+		PipelineDesc.renderState.depthStencilState.stencilEnable = false;
+		PipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+		PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+		PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
+		//create the state
+		nvrhi::GraphicsState state;
+		state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, TargetFB);
+		state.framebuffer = TargetFB;
+		state.viewport.addViewportAndScissorRect(TargetFB->getFramebufferInfo().getViewport());
+		state.addBindingSet(BindingSetHandle);
 
-	PipelineDesc.renderState.depthStencilState.depthTestEnable = false;
-	PipelineDesc.renderState.depthStencilState.stencilEnable = false;
-	PipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
-	PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
-	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
-	//create the state
-	nvrhi::GraphicsState state;
-	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, TargetFB);
-	state.framebuffer = TargetFB;
-	state.viewport.addViewportAndScissorRect(TargetFB->getFramebufferInfo().getViewport());
-	state.addBindingSet(BindingSetHandle);
+		CommandListRef->beginMarker("Bloom Pass");
+		CommandListRef->setGraphicsState(state);
 
-	CommandListRef->beginMarker("Bloom Pass");
-	CommandListRef->setGraphicsState(state);
-
-	nvrhi::DrawArguments args;
-	args.vertexCount = 3;
-	CommandListRef->draw(args);
+		nvrhi::DrawArguments args;
+		args.vertexCount = 3;
+		CommandListRef->draw(args);
+	}
 
 	CommandListRef->endMarker();
 }
