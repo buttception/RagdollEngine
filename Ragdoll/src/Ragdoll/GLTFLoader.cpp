@@ -12,6 +12,11 @@
 
 // Define these only in *one* .cc file.
 #define TINYGLTF_IMPLEMENTATION
+#define MULTITHREAD_LOAD
+#ifdef MULTITHREAD_LOAD
+#define TINYGLTF_NO_EXTERNAL_IMAGE
+#endif
+#define TINYGLTF_USE_CPP14
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
@@ -347,6 +352,30 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 
 	uint32_t textureIndicesOffset;
 	{
+#ifdef MULTITHREAD_LOAD
+		//load the images but have 1 thread per image
+		for (int i = 0; i < model.images.size(); ++i)
+		{
+			auto& img = AssetManager::GetInstance()->Images.emplace_back();
+			//push the loading into the taskflow
+			tinygltf::Image& itImg = model.images[i];
+			TaskFlow.emplace(
+				[&itImg, path, &img]()
+				{
+					std::filesystem::path modelPath = path.parent_path() / itImg.uri;
+					//load raw bytes, do not use stbi load
+					//use stbi_info_from_memory to check header on info for how to load
+					//use stbi_load_from_memory to load the image data, set up all the desc with that info
+					//do not free the image here, free it when creating textures in gpu
+					img.RawData = stbi_load(modelPath.string().c_str(), &itImg.width, &itImg.height, &itImg.component, 4);
+					//set all the details before doing the gpu creation
+					RD_ASSERT(img.RawData == nullptr, "Failed to load image");
+				});
+		}
+		//execute all the task
+		Executor.run(TaskFlow).wait();
+		return;
+#else
 		CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
 		CommandList->open();
 		MICROPROFILE_SCOPEI("Load", "Load Textures", MP_DARKCYAN);
@@ -357,6 +386,10 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			std::unordered_map<int32_t, int32_t> gltfSourceToImageIndex{};
 			for (int i = 0; i < model.images.size(); ++i)
 			{
+				//use task flow?
+				//each thread can do a stbi_image_load call on each uri
+				//after each thread does the stbi image load, it can create its own command list and load the texture into the gpu
+
 				const tinygltf::Image& itImg = model.images[i];
 				nvrhi::TextureDesc texDesc;
 				texDesc.width = itImg.width;
@@ -520,6 +553,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			mat.bIsLit = true;
 			AssetManager::GetInstance()->Materials.emplace_back(mat);
 		}
+#endif
 	}
 	
 	{

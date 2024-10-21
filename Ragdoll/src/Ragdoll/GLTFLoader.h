@@ -2,6 +2,7 @@
 #include "Ragdoll/Math/RagdollMath.h"
 #include "Ragdoll/AssetManager.h"
 #include <nvrhi/nvrhi.h>
+#include <taskflow.hpp>
 
 class DirectXDevice;
 namespace ragdoll {
@@ -20,6 +21,9 @@ class GLTFLoader {
 	std::vector<Vertex> VertexStagingBuffer;
 
 	nvrhi::CommandListHandle CommandList;
+
+	tf::Executor Executor;
+	tf::Taskflow TaskFlow;
 public:
 	void Init(std::filesystem::path root, std::shared_ptr<ragdoll::FileManager> fm, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> tl);
 	void LoadAndCreateModel(const std::string& fileName);

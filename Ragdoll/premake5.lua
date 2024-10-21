@@ -57,6 +57,7 @@ project "Ragdoll"
 		"%{IncludesDir.tinygltf}",
 		"%{IncludesDir.microprofile}",
 		"%{IncludesDir.cxxopts}",
+		"%{IncludesDir.taskflow}",
     }
 
 	prebuildcommands

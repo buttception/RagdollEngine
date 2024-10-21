@@ -47,6 +47,8 @@ struct Mesh
 
 struct Image
 {
+	//raw byte data, loaded via stbi
+	uint8_t* RawData{ nullptr };
 	nvrhi::TextureHandle TextureHandle;
 };
 

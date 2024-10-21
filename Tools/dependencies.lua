@@ -7,5 +7,6 @@ IncludesDir["tinygltf"] = "%{wks.location}/Ragdoll/dependencies/tinygltf"
 IncludesDir["microprofile"] = "%{wks.location}/Ragdoll/dependencies/microprofile"
 IncludesDir["imgui"] = "%{wks.location}/Ragdoll/dependencies/imgui"
 IncludesDir["cxxopts"] = "%{wks.location}/Ragdoll/dependencies/cxxopts/include"
+IncludesDir["taskflow"] = "%{wks.location}/Ragdoll/dependencies/taskflow/taskflow"
 
 LibDirs = {}
