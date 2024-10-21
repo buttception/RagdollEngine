@@ -60,9 +60,9 @@ void Renderer::BeginFrame()
 	DirectXDevice::GetInstance()->BeginFrame();
 	DirectXDevice::GetNativeDevice()->runGarbageCollection();
 	{
+		MICROPROFILE_SCOPEGPUI("Clear targets", MP_YELLOW);
 		auto bgCol = PrimaryWindowRef->GetBackgroundColor();
 		nvrhi::Color col = nvrhi::Color(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
-		CommandList->open();
 		CommandList->beginMarker("ClearGBuffer");
 		CommandList->clearDepthStencilTexture(DepthHandle, nvrhi::AllSubresources, true, 0.f, false, 0);
 		for (int i = 0; i < 4; ++i)
@@ -75,68 +75,73 @@ void Renderer::BeginFrame()
 		CommandList->clearTextureFloat(AlbedoHandle, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(NormalHandle, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(RoughnessMetallicHandle, nvrhi::AllSubresources, col);
+		CommandList->clearTextureFloat(AOHandle, nvrhi::AllSubresources, 1.f);
 		CommandList->clearTextureFloat(VelocityBuffer, nvrhi::AllSubresources, col);
 		CommandList->clearTextureFloat(ShadowMask, nvrhi::AllSubresources, col);
 		
 		CommandList->endMarker();
-		CommandList->close();
-		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 	}
 }
 
 void Renderer::Render(ragdoll::Scene* scene, float _dt)
 {
-	BeginFrame();
-	
 	CommandList->open();
 
-	SkyGeneratePass->GenerateSky(scene->SceneInfo);
-
-	//gbuffer
-	GBufferPass->DrawAllInstances(scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo);
-	//ao
-	if(scene->SceneInfo.UseCACAO)
-		CACAOPass->GenerateAO(scene->SceneInfo);
-	if (scene->SceneInfo.UseXeGTAO)
-		XeGTAOPass->GenerateAO(scene->SceneInfo);
-	//directional light shadow
-	ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles, scene->StaticCascadeInstanceInfos, scene->SceneInfo);
-	//shadow mask pass
-	ShadowMaskPass->DrawShadowMask(scene->SceneInfo);
-	//light scene color
-	DeferredLightPass->LightPass(scene->SceneInfo);
-	//sky
-	SkyPass->DrawSky(scene->SceneInfo);
-	//bloom
-	BloomPass->Bloom(scene->SceneInfo);
-	//get the exposure needed
-	nvrhi::BufferHandle exposure = AutomaticExposurePass->GetAdaptedLuminance(_dt);
-
-	nvrhi::FramebufferHandle fb;
-	nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer());
-	fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
-	//tone map and gamma correct
-	ToneMapPass->SetRenderTarget(fb);
-	ToneMapPass->ToneMap(scene->SceneInfo, exposure);
-
-	fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer())
-		.setDepthAttachment(DepthHandle);
-	fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
-
-	//after tone map for now since need its own tonemap and gamma correct
-	//draw debug items
-	DebugPass->SetRenderTarget(fb);
-	DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo);
-
-	if (scene->DebugInfo.DbgTarget)
+	MICROPROFILE_GPU_SET_CONTEXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer, MicroProfileGetGlobalGpuThreadLog());
 	{
-		FramebufferViewer->DrawTarget(scene->DebugInfo.DbgTarget, scene->DebugInfo.Add, scene->DebugInfo.Mul, scene->DebugInfo.CompCount);
+		MICROPROFILE_SCOPEGPUI("Full Frame GPU", MP_YELLOW);
+		MICROPROFILE_SCOPEI("Render", "Full Frame CPU", MP_CYAN);
+		BeginFrame();
+
+		SkyGeneratePass->GenerateSky(scene->SceneInfo);
+
+		//gbuffer
+		GBufferPass->DrawAllInstances(scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo);
+		//ao
+		if(scene->SceneInfo.UseCACAO)
+			CACAOPass->GenerateAO(scene->SceneInfo);
+		if (scene->SceneInfo.UseXeGTAO)
+			XeGTAOPass->GenerateAO(scene->SceneInfo);
+		//directional light shadow
+		ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles, scene->StaticCascadeInstanceInfos, scene->SceneInfo);
+		//shadow mask pass
+		ShadowMaskPass->DrawShadowMask(scene->SceneInfo);
+		//light scene color
+		DeferredLightPass->LightPass(scene->SceneInfo);
+		//sky
+		SkyPass->DrawSky(scene->SceneInfo);
+		//bloom
+		BloomPass->Bloom(scene->SceneInfo);
+		//get the exposure needed
+		nvrhi::BufferHandle exposure = AutomaticExposurePass->GetAdaptedLuminance(_dt);
+
+		nvrhi::FramebufferHandle fb;
+		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
+			.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer());
+		fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
+		//tone map and gamma correct
+		ToneMapPass->SetRenderTarget(fb);
+		ToneMapPass->ToneMap(scene->SceneInfo, exposure);
+
+		fbDesc = nvrhi::FramebufferDesc()
+			.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer())
+			.setDepthAttachment(DepthHandle);
+		fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
+
+		//after tone map for now since need its own tonemap and gamma correct
+		//draw debug items
+		DebugPass->SetRenderTarget(fb);
+		DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo);
+
+		if (scene->DebugInfo.DbgTarget)
+		{
+			FramebufferViewer->DrawTarget(scene->DebugInfo.DbgTarget, scene->DebugInfo.Add, scene->DebugInfo.Mul, scene->DebugInfo.CompCount);
+		}
 	}
 
 	CommandList->close();
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
+	MicroProfileFlip(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer);
 
 	//readback all the debug infos needed
 	float* valPtr;

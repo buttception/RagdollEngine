@@ -32,6 +32,7 @@ void ShadowMaskPass::SetDependencies(nvrhi::TextureHandle shadow[4], nvrhi::Text
 void ShadowMaskPass::DrawShadowMask(const ragdoll::SceneInformation& sceneInfo)
 {
 	MICROPROFILE_SCOPEI("Render", "Shadow Mask Pass", MP_BLUEVIOLET);
+	MICROPROFILE_SCOPEGPUI("Shadow Mask Pass", MP_LIGHTYELLOW1);
 
 	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
 	//create a constant buffer here

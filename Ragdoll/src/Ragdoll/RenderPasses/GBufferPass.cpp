@@ -23,6 +23,7 @@ void GBufferPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 	if (infos.empty())
 		return;
 	MICROPROFILE_SCOPEI("Render", "Draw All Instances", MP_BLUEVIOLET);
+	MICROPROFILE_SCOPEGPUI("GBuffer Pass", MP_LIGHTYELLOW1);
 
 	//create a constant buffer here
 	nvrhi::BufferDesc ConstantBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "GBufferPass CBuffer", 1);

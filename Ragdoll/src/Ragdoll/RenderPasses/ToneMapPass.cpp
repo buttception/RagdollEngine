@@ -28,6 +28,7 @@ void ToneMapPass::SetDependencies(nvrhi::TextureHandle SceneColor)
 void ToneMapPass::ToneMap(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle exposureHandle)
 {
 	MICROPROFILE_SCOPEI("Render", "Tone Map Pass", MP_BLUEVIOLET);
+	MICROPROFILE_SCOPEGPUI("Tone Map Pass", MP_LIGHTYELLOW1);
 	//create cbuffer
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ToneMap CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);

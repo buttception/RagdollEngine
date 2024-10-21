@@ -49,6 +49,8 @@ void AutomaticExposurePass::SetDependencies(nvrhi::TextureHandle sceneColor)
 
 nvrhi::BufferHandle AutomaticExposurePass::GetAdaptedLuminance(float _dt)
 {
+	MICROPROFILE_SCOPEI("Render", "Get Luminance", MP_BLUEVIOLET);
+	MICROPROFILE_SCOPEGPUI("Get Luminance", MP_LIGHTYELLOW1);
 	float minLuminance = -8.f;
 	float maxLuminance = 8.5;
 

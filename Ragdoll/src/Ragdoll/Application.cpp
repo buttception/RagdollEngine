@@ -29,8 +29,9 @@
 __________________________________________________________________________________*/
 
 #include "ragdollpch.h"
-
 #include "Application.h"
+
+#define MICROPROFILE_GPU_TIMERS_D3D12 1
 #include <microprofile.h>
 
 #include "Core/Logger.h"
@@ -69,6 +70,7 @@ namespace ragdoll
 		//turn on profiling
 		MicroProfileSetEnableAllGroups(true);
 		MicroProfileSetForceMetaCounters(true);
+		MICROPROFILE_GPU_INIT_QUEUE("GPU-Graphics-Queue");
 		RD_CORE_INFO("Open localhost:{} in chrome to capture profile data", MicroProfileWebServerPort());
 
 		MICROPROFILE_TIMELINE_ENTER_STATIC(MP_DARKGOLDENROD, "Application Initialization");
@@ -94,8 +96,18 @@ namespace ragdoll
 			params.swapChainBufferCount = 2;
 			params.backBufferWidth = m_PrimaryWindow->GetBufferWidth();
 			params.backBufferHeight = m_PrimaryWindow->GetBufferHeight();
-			params.vsyncEnabled = true;
+			params.vsyncEnabled = false;
 			DirectXDevice::GetInstance()->Create(params, m_PrimaryWindow, m_FileManager);
+
+			//setup microprofile for gpu
+			auto device = DirectXDevice::GetInstance();
+			ID3D12CommandQueue* queues[] = {
+				device->m_GraphicsQueue,
+				//device->m_ComputeQueue,
+				//device->m_CopyQueue
+			};
+			MicroProfileGpuInitD3D12(device->m_Device12, 1, (void**)&queues);
+			MicroProfileSetCurrentNodeD3D12(0);
 
 			AssetManager::GetInstance()->Init(m_FileManager);
 
@@ -125,6 +137,8 @@ namespace ragdoll
 		m_Scene->UpdateTransforms();
 		m_Scene->PopulateStaticProxies();
 		m_Scene->ResetTransformDirtyFlags();
+		MicroProfileFlip(nullptr);
+		MicroProfileDumpFileImmediately("init", "init", nullptr);
 	}
 
 	void Application::Run()
@@ -167,6 +181,7 @@ namespace ragdoll
 		std::chrono::get_tzdb_list().~tzdb_list();
 #endif
 		GLFWContext::Shutdown();
+		MicroProfileGpuShutdown();
 		MicroProfileShutdown();
 		RD_CORE_INFO("ragdoll Engine application shut down successfull");
 		Logger::Shutdown();

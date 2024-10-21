@@ -32,6 +32,8 @@ void CACAOPass::SetDependencies(Textures dependencies)
 
 void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 {
+	MICROPROFILE_SCOPEI("Render", "CACAO", MP_BLUEVIOLET);
+	MICROPROFILE_SCOPEGPUI("CACAO", MP_YELLOWGREEN);
 	CommandListRef->beginMarker("CACAO");
 	//cbuffer shared amongst all
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "CACAO CBuffer", 1);
@@ -116,18 +118,42 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 	//clear the load counter
 	CommandListRef->clearTextureUInt(LoadCounter, nvrhi::AllSubresources, 0);
     //prepare the depth deinterleaved and mips
-    PrepareDepth(sceneInfo, ConstantBufferHandle);
+	{
+		MICROPROFILE_SCOPEGPUI("Generate Depth Mips", MP_LIGHTYELLOW1);
+		PrepareDepth(sceneInfo, ConstantBufferHandle);
+	}
 	//prepare the normal deinterleaved
-	PrepareNormal(sceneInfo, ConstantBufferHandle);
+	{
+		MICROPROFILE_SCOPEGPUI("Generate Normal Mips", MP_LIGHTYELLOW1);
+		PrepareNormal(sceneInfo, ConstantBufferHandle);
+	}
 	//part 1 ssao generate
-	PrepareObscurance(sceneInfo, ConstantBufferHandle);
+	{
+		MICROPROFILE_SCOPEGPUI("Prepare Obscurance Map", MP_LIGHTYELLOW1);
+		PrepareObscurance(sceneInfo, ConstantBufferHandle);
+	}
 	//importance map
-	PrepareImportance(sceneInfo, ConstantBufferHandle);
-	PrepareImportanceA(sceneInfo, ConstantBufferHandle);
-	PrepareImportanceB(sceneInfo, ConstantBufferHandle);
-	SSAOPass(sceneInfo, ConstantBufferHandle);
-	BlurSSAO(sceneInfo, ConstantBufferHandle);
-	ApplySSAO(sceneInfo, ConstantBufferHandle);
+	{
+		MICROPROFILE_SCOPEGPUI("Prepare Importance Map", MP_LIGHTYELLOW1);
+		PrepareImportance(sceneInfo, ConstantBufferHandle);
+	}
+	{
+		MICROPROFILE_SCOPEGPUI("Importance Ping Pong", MP_LIGHTYELLOW1);
+		PrepareImportanceA(sceneInfo, ConstantBufferHandle);
+		PrepareImportanceB(sceneInfo, ConstantBufferHandle);
+	}
+	{
+		MICROPROFILE_SCOPEGPUI("Generate SSAO", MP_LIGHTYELLOW1);
+		SSAOPass(sceneInfo, ConstantBufferHandle);
+	}
+	{
+		MICROPROFILE_SCOPEGPUI("Blur SSAO", MP_LIGHTYELLOW1);
+		BlurSSAO(sceneInfo, ConstantBufferHandle);
+	}
+	{
+		MICROPROFILE_SCOPEGPUI("Apply SSAO", MP_LIGHTYELLOW1);
+		ApplySSAO(sceneInfo, ConstantBufferHandle);
+	}
 
 	CommandListRef->endMarker();
 }
