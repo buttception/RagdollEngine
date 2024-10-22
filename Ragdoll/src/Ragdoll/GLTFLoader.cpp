@@ -12,8 +12,8 @@
 
 // Define these only in *one* .cc file.
 #define TINYGLTF_IMPLEMENTATION
-#define MULTITHREAD_LOAD
-#ifdef MULTITHREAD_LOAD
+#define MULTITHREAD_LOAD 1
+#if MULTITHREAD_LOAD 1
 #define TINYGLTF_NO_EXTERNAL_IMAGE
 #endif
 #define TINYGLTF_USE_CPP14
@@ -151,6 +151,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	}
 
 	uint32_t meshIndicesOffset = AssetManager::GetInstance()->Meshes.size();
+	//load meshes
 	{
 		MICROPROFILE_SCOPEI("Load", "Load Meshes", MP_DARKCYAN);
 		// go downwards from meshes
@@ -349,47 +350,253 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	{
 		AssetManager::GetInstance()->UpdateVBOIBO();
 	}
+	uint32_t textureIndicesOffset = AssetManager::GetInstance()->Textures.size();
+	uint32_t imageIndicesOffset = AssetManager::GetInstance()->Images.size();
 
-	uint32_t textureIndicesOffset;
+	//load materials
 	{
-#ifdef MULTITHREAD_LOAD
-		//load the images but have 1 thread per image
+		MICROPROFILE_SCOPEI("Load", "Load materials", MP_CYAN);
+		//load all of the materials
+		for (const tinygltf::Material& gltfMat : model.materials)
+		{
+			Material mat;
+			mat.Metallic = gltfMat.pbrMetallicRoughness.metallicFactor;
+			mat.Roughness = gltfMat.pbrMetallicRoughness.roughnessFactor;
+			mat.Color = Vector4(
+				gltfMat.pbrMetallicRoughness.baseColorFactor[0],
+				gltfMat.pbrMetallicRoughness.baseColorFactor[1],
+				gltfMat.pbrMetallicRoughness.baseColorFactor[2],
+				gltfMat.pbrMetallicRoughness.baseColorFactor[3]);
+			//get the textures
+			if (gltfMat.pbrMetallicRoughness.baseColorTexture.index >= 0)
+				mat.AlbedoTextureIndex = gltfMat.pbrMetallicRoughness.baseColorTexture.index + textureIndicesOffset;
+			if (gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index >= 0)
+				mat.RoughnessMetallicTextureIndex = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index + textureIndicesOffset;
+			if (gltfMat.normalTexture.index >= 0)
+				mat.NormalTextureIndex = gltfMat.normalTexture.index + textureIndicesOffset;
+			mat.bIsLit = true;
+			AssetManager::GetInstance()->Materials.emplace_back(mat);
+		}
+	}
+
+	//load textures
+	{
+		MICROPROFILE_SCOPEI("Load", "Load Textures", MP_DARKCYAN);
+		{
+#if MULTITHREAD_LOAD 1
+			//load the images but have 1 thread per image
+			AssetManager::GetInstance()->Images.resize(model.images.size() + imageIndicesOffset);
+			for (int i = 0; i < model.images.size(); ++i)
+			{
+				Image* img = &AssetManager::GetInstance()->Images[i + imageIndicesOffset];
+				tinygltf::Image* itImg = &model.images[i];
+				//push the loading into the taskflow
+				TaskFlow.emplace(
+					[itImg, path, img]()
+					{
+						std::filesystem::path modelPath = path.parent_path() / itImg->uri;
+						//load raw bytes, do not use stbi load
+						std::ifstream file(modelPath, std::ios::binary | std::ios::ate);
+						RD_ASSERT(!file, "Unable to open file {}:{}", strerror(errno), modelPath.string());
+						std::streamsize size = file.tellg();
+						file.seekg(0, std::ios::beg);
+						//remeber to delete this
+						std::vector<uint8_t> data(size);
+						RD_ASSERT(!file.read((char*)data.data(), size), "Failed to read file {}", itImg->uri);
+						//use stbi_info_from_memory to check header on info for how to load
+						int w = -1, h = -1, comp = -1, req_comp = 0;
+						RD_ASSERT(!stbi_info_from_memory(data.data(), size, &w, &h, &comp), "stb unable to read image {}", itImg->uri);
+						int bits = 8;
+						int pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
+						if (comp == 3)
+							req_comp = 4;
+						//dont support hdr images
+						//use stbi_load_from_memory to load the image data, set up all the desc with that info
+						uint8_t* raw = stbi_load_from_memory(data.data(), size, &w, &h, &comp, req_comp);
+						RD_ASSERT(!raw, "Issue loading {}", itImg->uri);
+						itImg->width = w;
+						itImg->height = h;
+						itImg->component = comp;
+						itImg->bits = bits;
+						itImg->pixel_type = pixel_type;
+						//do not free the image here, free it when creating textures in gpu
+						img->RawData = raw;
+					}
+				);
+			}
+			//execute all the task
+			Executor.run(TaskFlow).wait();
+			TaskFlow.clear();
+#endif
+		}
+	}
+
+	//create textures
+	{
+		MICROPROFILE_SCOPEI("Load", "Populate Create Texture Commandlist", MP_DARKCYAN);
+#if MULTITHREAD_LOAD 1
+		//start up threads to create textures
+		//pre allocate commandlists, TODO: update with a command list pool for everyone to use next time
+		std::vector<nvrhi::ICommandList*> cmdLists(model.images.size());
+		std::vector<nvrhi::CommandListHandle> cmdListHandles(model.images.size());
 		for (int i = 0; i < model.images.size(); ++i)
 		{
-			auto& img = AssetManager::GetInstance()->Images.emplace_back();
-			//push the loading into the taskflow
+			cmdLists[i] = cmdListHandles[i] = DirectXDevice::GetNativeDevice()->createCommandList(nvrhi::CommandListParameters().setEnableImmediateExecution(false));
+			nvrhi::CommandListHandle hdl = cmdListHandles[i];
 			tinygltf::Image& itImg = model.images[i];
+			Image& img = AssetManager::GetInstance()->Images[i + imageIndicesOffset];
+
+			nvrhi::TextureDesc texDesc;
+			texDesc.width = itImg.width;
+			texDesc.height = itImg.height;
+			texDesc.dimension = nvrhi::TextureDimension::Texture2D;
+			switch (itImg.component)
+			{
+			case 1:
+				texDesc.format = nvrhi::Format::R8_UNORM;
+				break;
+			case 2:
+				texDesc.format = nvrhi::Format::RG8_UNORM;
+				break;
+			case 3:
+				texDesc.format = nvrhi::Format::RGBA8_UNORM;
+				break;
+			case 4:
+				texDesc.format = nvrhi::Format::RGBA8_UNORM;
+				break;
+			default:
+				RD_ASSERT(true, "Unsupported texture channel count");
+			}
+			texDesc.debugName = itImg.uri;
+			texDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+			texDesc.isRenderTarget = false;
+			texDesc.keepInitialState = true;
+
+			img.TextureHandle = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+			RD_ASSERT(img.TextureHandle == nullptr, "Issue creating texture handle: {}", itImg.uri);
+
+			DirectXDevice::GetInstance()->m_NvrhiDevice->writeDescriptorTable(AssetManager::GetInstance()->DescriptorTable, nvrhi::BindingSetItem::Texture_SRV(i + imageIndicesOffset, img.TextureHandle));
+
 			TaskFlow.emplace(
-				[&itImg, path, &img]()
+				[hdl, itImg, &img]()
 				{
-					std::filesystem::path modelPath = path.parent_path() / itImg.uri;
-					//load raw bytes, do not use stbi load
-					//use stbi_info_from_memory to check header on info for how to load
-					//use stbi_load_from_memory to load the image data, set up all the desc with that info
-					//do not free the image here, free it when creating textures in gpu
-					img.RawData = stbi_load(modelPath.string().c_str(), &itImg.width, &itImg.height, &itImg.component, 4);
-					//set all the details before doing the gpu creation
-					RD_ASSERT(img.RawData == nullptr, "Failed to load image");
-				});
+					hdl->open();
+					//upload the texture data
+					hdl->writeTexture(img.TextureHandle, 0, 0, img.RawData, itImg.width* (itImg.component == 3 ? 4 : itImg.component));
+					hdl->close();
+				}
+			);
 		}
 		//execute all the task
 		Executor.run(TaskFlow).wait();
-		return;
+		TaskFlow.clear();
+		DirectXDevice::GetNativeDevice()->executeCommandLists(cmdLists.data(), cmdLists.size());
+
+		for (const tinygltf::Texture& itTex : model.textures)
+		{
+			//textures contain a sampler and an image
+			Texture tex;
+			SamplerTypes type;
+			if (itTex.sampler < 0)
+			{
+				//no samplers so use a default one
+			}
+			else
+			{
+				//create the sampler
+				const tinygltf::Sampler gltfSampler = model.samplers[itTex.sampler];
+				switch (gltfSampler.wrapS)
+				{
+				case TINYGLTF_TEXTURE_WRAP_REPEAT:
+					switch (gltfSampler.minFilter)
+					{
+					case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+					case TINYGLTF_TEXTURE_FILTER_LINEAR:
+						if (gltfSampler.magFilter == 1)
+							type = SamplerTypes::Trilinear_Repeat;
+						else
+							type = SamplerTypes::Linear_Repeat;
+						break;
+					case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
+					case TINYGLTF_TEXTURE_FILTER_NEAREST:
+						type = SamplerTypes::Point_Repeat;
+						break;
+					case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
+					case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
+					case -1:
+						RD_CORE_WARN("Sampler do not exist, giving trilinear");
+						type = SamplerTypes::Trilinear_Repeat;
+						break;
+					default:
+						RD_ASSERT(true, "Unknown min filter");
+					}
+					break;
+				case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
+					switch (gltfSampler.minFilter)
+					{
+					case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+					case TINYGLTF_TEXTURE_FILTER_LINEAR:
+						if (gltfSampler.magFilter == 1)
+							type = SamplerTypes::Trilinear_Clamp;
+						else
+							type = SamplerTypes::Linear_Clamp;
+						break;
+					case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
+					case TINYGLTF_TEXTURE_FILTER_NEAREST:
+						type = SamplerTypes::Point_Clamp;
+						break;
+					case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
+					case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
+					case -1:
+						RD_CORE_WARN("Sampler do not exist, giving trilinear");
+						type = SamplerTypes::Trilinear_Clamp;
+						break;
+					default:
+						RD_ASSERT(true, "Unknown min filter");
+					}
+					break;
+				case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
+					switch (gltfSampler.minFilter)
+					{
+					case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+					case TINYGLTF_TEXTURE_FILTER_LINEAR:
+						if (gltfSampler.magFilter == 1)
+							type = SamplerTypes::Trilinear_Repeat;
+						else
+							type = SamplerTypes::Linear_Repeat;
+						break;
+					case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
+					case TINYGLTF_TEXTURE_FILTER_NEAREST:
+						type = SamplerTypes::Point_Repeat;
+						break;
+					case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
+					case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
+					case -1:
+						RD_CORE_WARN("Sampler do not exist, giving trilinear");
+						type = SamplerTypes::Trilinear_Repeat;
+						break;
+					default:
+						RD_ASSERT(true, "Unknown min filter");
+					}
+					break;
+				}
+			}
+			tex.SamplerIndex = (int)type;
+			tex.ImageIndex = itTex.source + imageIndicesOffset;
+			AssetManager::GetInstance()->Textures.emplace_back(tex);
+
+			TINYGLTF_MODE_POINTS;
+		}
 #else
 		CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
 		CommandList->open();
-		MICROPROFILE_SCOPEI("Load", "Load Textures", MP_DARKCYAN);
 		MICROPROFILE_GPU_SET_CONTEXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer, MicroProfileGetGlobalGpuThreadLog());
 		{
-			MICROPROFILE_SCOPEGPUI("Load Textures", MP_LIGHTYELLOW1);
+			MICROPROFILE_SCOPEGPUI("Create Textures", MP_LIGHTYELLOW1);
 			//load the images
 			std::unordered_map<int32_t, int32_t> gltfSourceToImageIndex{};
 			for (int i = 0; i < model.images.size(); ++i)
 			{
-				//use task flow?
-				//each thread can do a stbi_image_load call on each uri
-				//after each thread does the stbi image load, it can create its own command list and load the texture into the gpu
-
 				const tinygltf::Image& itImg = model.images[i];
 				nvrhi::TextureDesc texDesc;
 				texDesc.width = itImg.width;
@@ -528,31 +735,6 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 
 		MicroProfileFlip(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer);
-	}
-
-	{
-		MICROPROFILE_SCOPEI("Load", "Load Textures", MP_CYAN);
-		//load all of the materials
-		for (const tinygltf::Material& gltfMat : model.materials)
-		{
-			Material mat;
-			mat.Metallic = gltfMat.pbrMetallicRoughness.metallicFactor;
-			mat.Roughness = gltfMat.pbrMetallicRoughness.roughnessFactor;
-			mat.Color = Vector4(
-				gltfMat.pbrMetallicRoughness.baseColorFactor[0],
-				gltfMat.pbrMetallicRoughness.baseColorFactor[1],
-				gltfMat.pbrMetallicRoughness.baseColorFactor[2],
-				gltfMat.pbrMetallicRoughness.baseColorFactor[3]);
-			//get the textures
-			if (gltfMat.pbrMetallicRoughness.baseColorTexture.index >= 0)
-				mat.AlbedoTextureIndex = gltfMat.pbrMetallicRoughness.baseColorTexture.index + textureIndicesOffset;
-			if (gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index >= 0)
-				mat.RoughnessMetallicTextureIndex = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index + textureIndicesOffset;
-			if (gltfMat.normalTexture.index >= 0)
-				mat.NormalTextureIndex = gltfMat.normalTexture.index + textureIndicesOffset;
-			mat.bIsLit = true;
-			AssetManager::GetInstance()->Materials.emplace_back(mat);
-		}
 #endif
 	}
 	

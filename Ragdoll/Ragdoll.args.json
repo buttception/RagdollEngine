@@ -41,6 +41,10 @@
           "Command": "--sample \"Sponza\""
         },
         {
+          "Id": "bd2729a9-c38b-48e7-9b27-0c143638583c",
+          "Command": "--sample \"BoxTextured\""
+        },
+        {
           "Id": "395cbeaa-ee05-47d8-8240-23067e17d7e7",
           "Command": "--scene \"other_gltf/Bistro/Bistro.gltf\""
         }

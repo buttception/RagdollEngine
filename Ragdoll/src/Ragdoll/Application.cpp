@@ -137,8 +137,7 @@ namespace ragdoll
 		m_Scene->UpdateTransforms();
 		m_Scene->PopulateStaticProxies();
 		m_Scene->ResetTransformDirtyFlags();
-		MicroProfileFlip(nullptr);
-		MicroProfileDumpFileImmediately("init", "init", nullptr);
+		MicroProfileDumpFileImmediately("init", nullptr, nullptr);
 	}
 
 	void Application::Run()
