@@ -26,9 +26,10 @@ void ShadowPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget[4])
 void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer[4], std::vector<ragdoll::InstanceGroupInfo>* infos, const ragdoll::SceneInformation& sceneInfo)
 {
 	MICROPROFILE_SCOPEI("Render", "Directional Light Shadow Pass", MP_BLUEVIOLET);
-	MICROPROFILE_SCOPEGPUI("Directional Light Shadow", MP_YELLOWGREEN);
+	//MICROPROFILE_SCOPEGPUI("Directional Light Shadow", MP_YELLOWGREEN);
+	CommandListRef->open();
 	for (int i = 0; i < 4; ++i) {
-		MICROPROFILE_SCOPEGPUI("Cascade Shadow", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Cascade Shadow", MP_LIGHTYELLOW1);
 		if (infos[i].empty())
 			continue;
 		nvrhi::FramebufferHandle pipelineFb = RenderTarget[i];
@@ -91,4 +92,5 @@ void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer[4], std::ve
 		CBuffer.InstanceOffset = 0;
 		CommandListRef->endMarker();
 	}
+	CommandListRef->close();
 }

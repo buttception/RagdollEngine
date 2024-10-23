@@ -81,6 +81,8 @@ ________________________________________________________________________________
 // Stringify macro
 #define STRINGIFY(x) #x
 
+#define CONCAT(a, b) a##b
+
 // Function pointer binding with std::functions
 #define RD_BIND_EVENT_FN(fn) std::bind(&fn, this, std::placeholders::_1)
 namespace ragdoll

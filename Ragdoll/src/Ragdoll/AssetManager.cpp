@@ -327,7 +327,7 @@ void AssetManager::UpdateVBOIBO()
 	MICROPROFILE_GPU_SET_CONTEXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer, MicroProfileGetGlobalGpuThreadLog());
 	{
 		MICROPROFILE_SCOPEI("Render", "Create VBO IBO", MP_BLUEVIOLET);
-		MICROPROFILE_SCOPEGPUI("Create VBO IBO", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Create VBO IBO", MP_LIGHTYELLOW1);
 		CommandList->beginMarker("Update global buffer");
 
 		nvrhi::BufferDesc vertexBufDesc;

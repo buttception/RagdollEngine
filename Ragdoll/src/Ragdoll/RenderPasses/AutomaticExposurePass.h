@@ -25,10 +25,10 @@ class AutomaticExposurePass {
 	nvrhi::TextureHandle SceneColor;
 
 	nvrhi::BufferHandle LuminanceHistogramHandle;
-	nvrhi::BufferHandle AdaptedLuminanceHandle;
 
 public:
 	nvrhi::BufferHandle ReadbackBuffer;
+	nvrhi::BufferHandle AdaptedLuminanceHandle;
 
 	void Init(nvrhi::CommandListHandle cmdList);
 	void SetDependencies(nvrhi::TextureHandle sceneColor);

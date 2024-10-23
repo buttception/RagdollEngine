@@ -1,10 +1,12 @@
 #include "ragdollpch.h"
 #include "GLTFLoader.h"
-#include <microprofile.h>
 
 #include "DirectXDevice.h"
 #include "AssetManager.h"
 #include "Ragdoll/Entity/EntityManager.h"
+
+#include "Executor.h"
+#include "Profiler.h"
 
 #include "Ragdoll/Components/TransformComp.h"
 #include "Ragdoll/Components/RenderableComp.h"
@@ -137,7 +139,7 @@ enum AttributeType {
 
 void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 {
-	MICROPROFILE_SCOPEI("Load", "Load GLTF", MP_CYAN);
+	PROFILE_SCOPE(Load, Load GLTF);
 	//ownself open command list
 	tinygltf::TinyGLTF loader;
 	tinygltf::Model model;
@@ -145,7 +147,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	std::filesystem::path path = Root / fileName;
 	std::filesystem::path modelRoot = path.parent_path().lexically_relative(Root);
 	{
-		MICROPROFILE_SCOPEI("Load", "Load GLTF File", MP_DARKCYAN);
+		PROFILE_SCOPE(Load, Load GLTF File);
 		bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, path.string());
 		RD_ASSERT(ret == false, "Issue loading {}", path.string());
 	}
@@ -153,7 +155,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	uint32_t meshIndicesOffset = AssetManager::GetInstance()->Meshes.size();
 	//load meshes
 	{
-		MICROPROFILE_SCOPEI("Load", "Load Meshes", MP_DARKCYAN);
+		PROFILE_SCOPE(Load, Load Meshes);
 		// go downwards from meshes
 		for (const auto& itMesh : model.meshes) {
 			//should not create a new input layout handle, use the one provided by the renderer
@@ -169,7 +171,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			uint32_t materialIndicesOffset = AssetManager::GetInstance()->Materials.size();
 			for (const tinygltf::Primitive& itPrim : itMesh.primitives)
 			{
-				MICROPROFILE_SCOPEI("Render", "Mesh", MP_LIGHTCYAN);
+				PROFILE_SCOPE(Load, Mesh);
 				Submesh submesh{};
 				DirectX::BoundingBox box;
 				VertexBufferInfo buffer;
@@ -355,7 +357,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 
 	//load materials
 	{
-		MICROPROFILE_SCOPEI("Load", "Load materials", MP_CYAN);
+		PROFILE_SCOPE(Load, Load Materials);
 		//load all of the materials
 		for (const tinygltf::Material& gltfMat : model.materials)
 		{
@@ -381,13 +383,14 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 
 	//load textures
 	{
-		MICROPROFILE_SCOPEI("Load", "Load Textures", MP_DARKCYAN);
+		PROFILE_SCOPE(Load, Load Textures);
 		{
 #if MULTITHREAD_LOAD == 1
 			//load the images but have 1 thread per image
 			AssetManager::GetInstance()->Images.resize(model.images.size() + imageIndicesOffset);
 			std::vector<nvrhi::ICommandList*> cmdLists(model.images.size());
 			std::vector<nvrhi::CommandListHandle> cmdListHandles(model.images.size());
+			tf::Taskflow TaskFlow;
 			for (int i = 0; i < model.images.size(); ++i)
 			{
 				cmdLists[i] = cmdListHandles[i] = DirectXDevice::GetNativeDevice()->createCommandList(nvrhi::CommandListParameters().setEnableImmediateExecution(false));
@@ -400,14 +403,13 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 					[itImg, path, img, imageIndicesOffset, i, hdl]()
 					{
 						{
-							MICROPROFILE_SCOPEI("Thread", "stb Texture", MP_GREEN);
+							PROFILE_SCOPE(Load, STB Load);
 							std::filesystem::path modelPath = path.parent_path() / itImg->uri;
 							//load raw bytes, do not use stbi load
 							std::ifstream file(modelPath, std::ios::binary | std::ios::ate);
 							RD_ASSERT(!file, "Unable to open file {}:{}", strerror(errno), modelPath.string());
 							std::streamsize size = file.tellg();
 							file.seekg(0, std::ios::beg);
-							//remeber to delete this
 							std::vector<uint8_t> data(size);
 							RD_ASSERT(!file.read((char*)data.data(), size), "Failed to read file {}", itImg->uri);
 							//use stbi_info_from_memory to check header on info for how to load
@@ -431,7 +433,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 						}
 
 						{
-							MICROPROFILE_SCOPEI("Thread", "create texture", MP_DARKGREEN);
+							PROFILE_SCOPE(Load, Create Texture);
 							nvrhi::TextureDesc texDesc;
 							texDesc.width = itImg->width;
 							texDesc.height = itImg->height;
@@ -465,7 +467,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 						}
 						
 						{
-							MICROPROFILE_SCOPEI("Thread", "Write Texture", MP_LIGHTGREEN);
+							PROFILE_SCOPE(Load, Write Texture);
 							hdl->open();
 							//upload the texture data
 							hdl->writeTexture(img->TextureHandle, 0, 0, img->RawData, itImg->width* (itImg->component == 3 ? 4 : itImg->component));
@@ -475,8 +477,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 				);
 			}
 			//execute all the task
-			Executor.run(TaskFlow).wait();
-			TaskFlow.clear();
+			SExecutor::Executor.run(TaskFlow).wait();
 
 			DirectXDevice::GetNativeDevice()->executeCommandLists(cmdLists.data(), cmdLists.size());
 #else
@@ -484,7 +485,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			CommandList->open();
 			MICROPROFILE_GPU_SET_CONTEXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer, MicroProfileGetGlobalGpuThreadLog());
 			{
-				MICROPROFILE_SCOPEGPUI("Create Textures", MP_LIGHTYELLOW1);
+				//MICROPROFILE_SCOPEGPUI("Create Textures", MP_AUTO);
 				//load the images
 				std::unordered_map<int32_t, int32_t> gltfSourceToImageIndex{};
 				for (int i = 0; i < model.images.size(); ++i)
@@ -536,7 +537,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	}
 
 	{
-		MICROPROFILE_SCOPEI("Load", "Attaching Samplers", MP_DARKCYAN);
+		PROFILE_SCOPE(Load, Attaching Samplers);
 		for (const tinygltf::Texture& itTex : model.textures)
 		{
 			//textures contain a sampler and an image
@@ -633,7 +634,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	}
 	
 	{
-		MICROPROFILE_SCOPEI("Load", "Creating hierarchy", MP_DARKCYAN);
+		PROFILE_SCOPE(Load, Creating Hierarchy);
 		Vector3 min{ FLT_MAX, FLT_MAX, FLT_MAX }, max{ -FLT_MAX, -FLT_MAX, -FLT_MAX };
 		//create all the entities and their components
 		for (const int& rootIndex : model.scenes[0].nodes) {	//iterating through the root nodes

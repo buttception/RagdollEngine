@@ -26,7 +26,8 @@ void SkyGeneratePass::SetDependencies(nvrhi::TextureHandle sky, nvrhi::TextureHa
 void SkyGeneratePass::GenerateSky(const ragdoll::SceneInformation& sceneInfo)
 {
 	MICROPROFILE_SCOPEI("Render", "Generate Sky Texture", MP_BLUEVIOLET);
-	MICROPROFILE_SCOPEGPUI("Generate Sky Texture", MP_LIGHTYELLOW1);
+	//MICROPROFILE_SCOPEGPUI("Generate Sky Texture", MP_LIGHTYELLOW1);
+	CommandListRef->open();
 	//update the sun sky and tables according to scene info
 	Vector3 lightDir = Vector3(sceneInfo.LightDirection.x, sceneInfo.LightDirection.z, sceneInfo.LightDirection.y);
 	SunSky->Update(lightDir, 2.5f, 0.f, 0.f);
@@ -70,4 +71,5 @@ void SkyGeneratePass::GenerateSky(const ragdoll::SceneInformation& sceneInfo)
 	CommandListRef->setComputeState(state);
 	CommandListRef->dispatch(SkyTexture->getDesc().width / 16 + 1, SkyTexture->getDesc().height / 16 + 1, 1);
 	CommandListRef->endMarker();
+	CommandListRef->close();
 }

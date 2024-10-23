@@ -26,7 +26,7 @@ void SkyPass::SetDependencies(nvrhi::TextureHandle sky)
 void SkyPass::DrawSky(const ragdoll::SceneInformation& sceneInfo)
 {
 	MICROPROFILE_SCOPEI("Render", "Sky Pass", MP_BLUEVIOLET);
-	MICROPROFILE_SCOPEGPUI("Sky Pass", MP_LIGHTYELLOW1);
+	//MICROPROFILE_SCOPEGPUI("Sky Pass", MP_LIGHTYELLOW1);
 	//create a constant buffer here
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "Sky CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
@@ -66,6 +66,7 @@ void SkyPass::DrawSky(const ragdoll::SceneInformation& sceneInfo)
 	state.addBindingSet(BindingSetHandle);
 	state.addBindingSet(AssetManager::GetInstance()->DescriptorTable);
 
+	CommandListRef->open();
 	CommandListRef->beginMarker("Sky Pass");
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
 	CommandListRef->setGraphicsState(state);
@@ -75,4 +76,5 @@ void SkyPass::DrawSky(const ragdoll::SceneInformation& sceneInfo)
 	CommandListRef->draw(args);
 
 	CommandListRef->endMarker();
+	CommandListRef->close();
 }

@@ -21,5 +21,5 @@ public:
 
 	void SetRenderTarget(nvrhi::FramebufferHandle renderTarget);
 
-	void DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t instanceCount, const ragdoll::SceneInformation& sceneInfo);
+	bool DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t instanceCount, const ragdoll::SceneInformation& sceneInfo);
 };

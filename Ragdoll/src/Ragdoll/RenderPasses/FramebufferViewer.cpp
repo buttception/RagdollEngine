@@ -16,7 +16,7 @@ void FramebufferViewer::Init(nvrhi::CommandListHandle cmdList)
 void FramebufferViewer::DrawTarget(nvrhi::TextureHandle texture, Vector4 add, Vector4 mul, uint32_t numComp)
 {
 	MICROPROFILE_SCOPEI("Render", "Debug Framebuffer View", MP_BLUEVIOLET);
-	MICROPROFILE_SCOPEGPUI("Framebuffer View", MP_LIGHTYELLOW1);
+	//MICROPROFILE_SCOPEGPUI("Framebuffer View", MP_LIGHTYELLOW1);
 	//create cbuffer
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "FB View CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
@@ -52,6 +52,7 @@ void FramebufferViewer::DrawTarget(nvrhi::TextureHandle texture, Vector4 add, Ve
 	state.viewport.addViewportAndScissorRect(RenderTarget->getFramebufferInfo().getViewport());
 	state.addBindingSet(BindingSetHandle);
 
+	CommandListRef->open();
 	CommandListRef->beginMarker("Framebuffer View");
 	CBuffer.Add = add;
 	CBuffer.Mul = mul;
@@ -64,4 +65,5 @@ void FramebufferViewer::DrawTarget(nvrhi::TextureHandle texture, Vector4 add, Ve
 	CommandListRef->draw(args);
 
 	CommandListRef->endMarker();
+	CommandListRef->close();
 }

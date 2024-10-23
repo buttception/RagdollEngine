@@ -21,9 +21,11 @@ void BloomPass::SetDependencies(nvrhi::TextureHandle sceneColor, const std::vect
 
 void BloomPass::Bloom(const ragdoll::SceneInformation& sceneInfo)
 {
-	MICROPROFILE_SCOPEGPUI("Bloom", MP_YELLOWGREEN);
+	//MICROPROFILE_SCOPEGPUI("Bloom", MP_YELLOWGREEN);
+	CommandListRef->open();
 	DownSample();
 	UpSample(sceneInfo.FilterRadius, sceneInfo.BloomIntensity);
+	CommandListRef->close();
 }
 
 void BloomPass::DownSample()
@@ -35,7 +37,7 @@ void BloomPass::DownSample()
 
 	nvrhi::TextureHandle Source = SceneColor;
 	for (const BloomMip& mip : *Mips) {
-		MICROPROFILE_SCOPEGPUI("Bloom Down Sample", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Bloom Down Sample", MP_LIGHTYELLOW1);
 		//create the target
 		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
 			.addColorAttachment(mip.Image);
@@ -91,7 +93,7 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity)
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 
 	for (int i = Mips->size() - 1; i > 0; --i) {
-		MICROPROFILE_SCOPEGPUI("Bloom Up Sample GPU", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Bloom Up Sample GPU", MP_LIGHTYELLOW1);
 		nvrhi::TextureHandle Source = Mips->operator[](i).Image;
 		nvrhi::TextureHandle Target = Mips->operator[](i - 1).Image;
 		//create the target
@@ -139,7 +141,7 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity)
 	}
 	CommandListRef->endMarker();
 	{
-		MICROPROFILE_SCOPEGPUI("Apply Bloom", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Apply Bloom", MP_LIGHTYELLOW1);
 		CBufferUS.BloomIntensity = 0.f;
 		//copy the first mip into scene color
 		//create the target

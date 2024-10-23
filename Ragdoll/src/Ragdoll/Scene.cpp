@@ -12,14 +12,21 @@
 
 ragdoll::Scene::Scene(Application* app)
 {
+	MICROPROFILE_SCOPEI("Scene", "Scene::Init", MP_DARKRED);
 	EntityManagerRef = app->m_EntityManager;
 	PrimaryWindowRef = app->m_PrimaryWindow;
 
-	CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
-	CreateRenderTargets();
+	{
+		MICROPROFILE_SCOPEI("Render", "Create Render Target", MP_YELLOW);
+		CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
+		CreateRenderTargets();
+	}
 
-	DeferredRenderer = std::make_shared<class Renderer>();
-	DeferredRenderer->Init(app->m_PrimaryWindow, this);
+	{
+		MICROPROFILE_SCOPEI("Render", "Create Renderer", MP_YELLOW);
+		DeferredRenderer = std::make_shared<class Renderer>();
+		DeferredRenderer->Init(app->m_PrimaryWindow, this);
+	}
 	if (app->Config.bCreateCustomMeshes)
 	{
 		Config.bIsThereCustomMeshes = true;
@@ -436,6 +443,7 @@ void ragdoll::Scene::CreateCustomMeshes()
 
 void ragdoll::Scene::CreateRenderTargets()
 {
+	MICROPROFILE_SCOPEI("Render", "Create Render Target", MP_YELLOW);
 	nvrhi::TextureDesc depthBufferDesc;
 	depthBufferDesc.width = PrimaryWindowRef->GetBufferWidth();
 	depthBufferDesc.height = PrimaryWindowRef->GetBufferHeight();

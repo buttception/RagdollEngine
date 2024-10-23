@@ -28,7 +28,7 @@ void ToneMapPass::SetDependencies(nvrhi::TextureHandle SceneColor)
 void ToneMapPass::ToneMap(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle exposureHandle)
 {
 	MICROPROFILE_SCOPEI("Render", "Tone Map Pass", MP_BLUEVIOLET);
-	MICROPROFILE_SCOPEGPUI("Tone Map Pass", MP_LIGHTYELLOW1);
+	//MICROPROFILE_SCOPEGPUI("Tone Map Pass", MP_LIGHTYELLOW1);
 	//create cbuffer
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ToneMap CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
@@ -66,6 +66,7 @@ void ToneMapPass::ToneMap(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buf
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 	state.addBindingSet(BindingSetHandle);
 
+	CommandListRef->open();
 	CommandListRef->beginMarker("Tone Map Pass");
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
 	CommandListRef->setGraphicsState(state);
@@ -75,4 +76,5 @@ void ToneMapPass::ToneMap(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buf
 	CommandListRef->draw(args);
 
 	CommandListRef->endMarker();
+	CommandListRef->close();
 }

@@ -23,7 +23,7 @@ void GBufferPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 	if (infos.empty())
 		return;
 	MICROPROFILE_SCOPEI("Render", "Draw All Instances", MP_BLUEVIOLET);
-	MICROPROFILE_SCOPEGPUI("GBuffer Pass", MP_LIGHTYELLOW1);
+	//MICROPROFILE_SCOPEGPUI("GBuffer Pass", MP_LIGHTYELLOW1);
 
 	//create a constant buffer here
 	nvrhi::BufferDesc ConstantBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "GBufferPass CBuffer", 1);
@@ -73,6 +73,7 @@ void GBufferPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 	state.addBindingSet(BindingSetHandle);
 	state.addBindingSet(AssetManager::GetInstance()->DescriptorTable);
 
+	CommandListRef->open();
 	CommandListRef->beginMarker("Instance Draws");
 	CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
 	CBuffer.PrevViewProj = sceneInfo.PrevMainCameraViewProj;
@@ -96,4 +97,5 @@ void GBufferPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 	CBuffer.InstanceOffset = 0;
 
 	CommandListRef->endMarker();
+	CommandListRef->close();
 }

@@ -26,7 +26,6 @@ class DirectXDevice;
 
 class Renderer {
 public:
-
 	std::shared_ptr<SkyGeneratePass> SkyGeneratePass;
 	std::shared_ptr<GBufferPass> GBufferPass;
 	std::shared_ptr<CACAOPass> CACAOPass;
@@ -40,6 +39,25 @@ public:
 	std::shared_ptr<ToneMapPass> ToneMapPass;
 	std::shared_ptr<DebugPass> DebugPass;
 	std::shared_ptr<FramebufferViewer> FramebufferViewer;
+
+	enum class Pass {
+		SKY_GENERATE,
+		GBUFFER,
+		AO,
+		SHADOW_DEPTH,
+		SHADOW_MASK,
+		LIGHT,
+		SKY,
+		BLOOM,
+		EXPOSURE,
+		TONEMAP,
+		DEBUG,
+		FB_VIEWER,
+
+		COUNT
+	};
+
+	std::vector<nvrhi::CommandListHandle> CommandLists;
 
 	nvrhi::TextureHandle SkyTexture;
 	nvrhi::TextureHandle SkyThetaGammaTable;
