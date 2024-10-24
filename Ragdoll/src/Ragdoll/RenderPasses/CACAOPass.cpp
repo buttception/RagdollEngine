@@ -2,7 +2,7 @@
 #include "CACAOPass.h"
 
 #include <nvrhi/utils.h>
-#include <microprofile.h>
+#include "Ragdoll/Profiler.h"
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
@@ -183,7 +183,7 @@ void CACAOPass::PrepareDepth(const ragdoll::SceneInformation& sceneInfo, nvrhi::
 		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -211,7 +211,7 @@ void CACAOPass::PrepareNormal(const ragdoll::SceneInformation& sceneInfo, nvrhi:
 		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -241,7 +241,7 @@ void CACAOPass::PrepareObscurance(const ragdoll::SceneInformation& sceneInfo, nv
 		nvrhi::BindingSetItem::Sampler(3, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -269,7 +269,7 @@ void CACAOPass::PrepareImportance(const ragdoll::SceneInformation& sceneInfo, nv
 		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -297,7 +297,7 @@ void CACAOPass::PrepareImportanceA(const ragdoll::SceneInformation& sceneInfo, n
 		nvrhi::BindingSetItem::Sampler(2, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -326,7 +326,7 @@ void CACAOPass::PrepareImportanceB(const ragdoll::SceneInformation& sceneInfo, n
 		nvrhi::BindingSetItem::Sampler(2, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -360,7 +360,7 @@ void CACAOPass::SSAOPass(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 		nvrhi::BindingSetItem::Sampler(3, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -394,7 +394,7 @@ void CACAOPass::BlurSSAO(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 		nvrhi::BindingSetItem::Sampler(1, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Mirror]),
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -428,7 +428,7 @@ void CACAOPass::ApplySSAO(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buf
 		nvrhi::BindingSetItem::Sampler(2, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp]),
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };

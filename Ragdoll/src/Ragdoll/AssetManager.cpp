@@ -81,8 +81,11 @@ nvrhi::GraphicsPipelineHandle AssetManager::GetGraphicsPipeline(const nvrhi::Gra
 	uint32_t hash = Hash(desc);
 	if (GPSOs.contains(hash))
 		return GPSOs.at(hash);
-	RD_CORE_INFO("GPSO created");
-	return GPSOs[hash] = DirectXDevice::GetNativeDevice()->createGraphicsPipeline(desc, fb);
+	{
+		std::lock_guard<std::mutex> LockGuard(Mutex);
+		RD_CORE_INFO("GPSO created");
+		return GPSOs[hash] = DirectXDevice::GetNativeDevice()->createGraphicsPipeline(desc, fb);
+	}
 }
 
 nvrhi::ComputePipelineHandle AssetManager::GetComputePipeline(const nvrhi::ComputePipelineDesc& desc)
@@ -90,8 +93,11 @@ nvrhi::ComputePipelineHandle AssetManager::GetComputePipeline(const nvrhi::Compu
 	uint32_t hash = Hash(desc);
 	if (CPSOs.contains(hash))
 		return CPSOs.at(hash);
-	RD_CORE_INFO("CPSO created");
-	return CPSOs[hash] = DirectXDevice::GetNativeDevice()->createComputePipeline(desc);
+	{
+		std::lock_guard<std::mutex> LockGuard(Mutex);
+		RD_CORE_INFO("CPSO created");
+		return CPSOs[hash] = DirectXDevice::GetNativeDevice()->createComputePipeline(desc);
+	}
 }
 
 nvrhi::BindingLayoutHandle AssetManager::GetBindingLayout(const nvrhi::BindingSetDesc& desc)
@@ -114,8 +120,11 @@ nvrhi::BindingLayoutHandle AssetManager::GetBindingLayout(const nvrhi::BindingSe
 	uint32_t hash = HashBytes(&layoutDesc);
 	if (BindingLayouts.contains(hash))
 		return BindingLayouts.at(hash);
-	RD_CORE_INFO("Binding Layout created");
-	return BindingLayouts[hash] = DirectXDevice::GetNativeDevice()->createBindingLayout(layoutDesc);
+	{
+		std::lock_guard<std::mutex> LockGuard(Mutex);
+		RD_CORE_INFO("Binding Layout created");
+		return BindingLayouts[hash] = DirectXDevice::GetNativeDevice()->createBindingLayout(layoutDesc);
+	}
 }
 
 void AssetManager::RecompileShaders()

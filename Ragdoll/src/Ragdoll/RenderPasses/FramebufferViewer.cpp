@@ -2,7 +2,7 @@
 #include "FramebufferViewer.h"
 
 #include <nvrhi/utils.h>
-#include <microprofile.h>
+#include "Ragdoll/Profiler.h"
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
@@ -28,7 +28,7 @@ void FramebufferViewer::DrawTarget(nvrhi::TextureHandle texture, Vector4 add, Ve
 		nvrhi::BindingSetItem::Texture_SRV(0, texture),
 	};
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
-	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(bindingSetDesc, BindingLayoutHandle);
 
 	nvrhi::GraphicsPipelineDesc PipelineDesc;
 	PipelineDesc.addBindingLayout(BindingLayoutHandle);

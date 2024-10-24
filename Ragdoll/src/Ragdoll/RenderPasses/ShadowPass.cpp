@@ -2,7 +2,7 @@
 #include "ShadowPass.h"
 
 #include <nvrhi/utils.h>
-#include <microprofile.h>
+#include "Ragdoll/Profiler.h"
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
@@ -43,7 +43,7 @@ void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer[4], std::ve
 			nvrhi::BindingSetItem::StructuredBuffer_SRV(0, instanceBuffer[i]),
 		};
 		nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
-		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(BindingSetDesc, BindingLayoutHandle);
+		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);
 
 		nvrhi::GraphicsPipelineDesc PipelineDesc;
 		PipelineDesc.addBindingLayout(BindingLayoutHandle); 

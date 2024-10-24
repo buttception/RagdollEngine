@@ -149,4 +149,5 @@ private:
 	nvrhi::CommandListHandle CommandList;	//asset manager commandlist
 	std::shared_ptr<ragdoll::FileManager> FileManagerRef;
 	inline static std::unique_ptr<AssetManager> s_Instance;
+	std::mutex Mutex;
 };

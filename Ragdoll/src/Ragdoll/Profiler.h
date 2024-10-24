@@ -27,5 +27,6 @@ struct ProfileScope {
 };
 
 struct ProfileGPUScope {
-
+	//temp for testing
+	inline static std::mutex Mutex;
 };

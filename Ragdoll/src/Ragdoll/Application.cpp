@@ -70,7 +70,6 @@ namespace ragdoll
 		//turn on profiling
 		MicroProfileSetEnableAllGroups(true);
 		MicroProfileSetForceMetaCounters(true);
-		MICROPROFILE_GPU_INIT_QUEUE("GPU-Graphics-Queue");
 		RD_CORE_INFO("Open localhost:{} in chrome to capture profile data", MicroProfileWebServerPort());
 
 		{

@@ -2,7 +2,7 @@
 #include "AutomaticExposurePass.h"
 
 #include <nvrhi/utils.h>
-#include <microprofile.h>
+#include "Ragdoll/Profiler.h"
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
@@ -68,7 +68,7 @@ nvrhi::BufferHandle AutomaticExposurePass::GetAdaptedLuminance(float _dt)
 		nvrhi::BindingSetItem::Texture_SRV(0, SceneColor)
 	};
 	nvrhi::BindingLayoutHandle LuminanceHistogramBindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(histoSetDesc);
-	nvrhi::BindingSetHandle LuminanceHistogramBindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(histoSetDesc, LuminanceHistogramBindingLayoutHandle);
+	nvrhi::BindingSetHandle LuminanceHistogramBindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(histoSetDesc, LuminanceHistogramBindingLayoutHandle);
 
 	nvrhi::BindingSetDesc averageSetDesc;
 	averageSetDesc.bindings = {
@@ -77,7 +77,7 @@ nvrhi::BufferHandle AutomaticExposurePass::GetAdaptedLuminance(float _dt)
 		nvrhi::BindingSetItem::TypedBuffer_UAV(1, LuminanceHistogramHandle),
 	};
 	nvrhi::BindingLayoutHandle LuminanceAverageBindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(averageSetDesc);
-	nvrhi::BindingSetHandle LuminanceAverageBindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(averageSetDesc, LuminanceAverageBindingLayoutHandle);
+	nvrhi::BindingSetHandle LuminanceAverageBindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(averageSetDesc, LuminanceAverageBindingLayoutHandle);
 
 	//pipeline descs
 	nvrhi::ComputePipelineDesc LuminanceHistogramPipelineDesc;

@@ -100,6 +100,12 @@ nvrhi::TextureHandle DirectXDevice::GetCurrentBackbuffer()
 	return m_RhiSwapChainBuffers[m_SwapChain->GetCurrentBackBufferIndex()];
 }
 
+nvrhi::BindingSetHandle DirectXDevice::CreateBindingSet(nvrhi::BindingSetDesc desc, nvrhi::BindingLayoutHandle layout)
+{
+	std::lock_guard<std::mutex> LockGuard(Mutex);
+	return m_NvrhiDevice->createBindingSet(desc, layout);
+}
+
 bool DirectXDevice::CreateDevice()
 {
 #define HR_RETURN(hr) if(FAILED(hr)) return false;

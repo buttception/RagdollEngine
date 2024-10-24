@@ -341,6 +341,5 @@ void ImguiRenderer::CreateFontTexture()
 		samplerDesc.minFilter = samplerDesc.magFilter = samplerDesc.mipFilter = true;
 		FontSampler = m_DirectXTest->m_NvrhiDevice->createSampler(samplerDesc);
 		RD_ASSERT(FontSampler == nullptr, "Failed to create font sampler for imgui");
-
 	}
 }

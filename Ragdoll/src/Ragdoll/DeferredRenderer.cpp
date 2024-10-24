@@ -63,9 +63,10 @@ void Renderer::BeginFrame()
 	PROFILE_SCOPE(Load, Begin Frame);
 	DirectXDevice::GetInstance()->BeginFrame();
 	DirectXDevice::GetNativeDevice()->runGarbageCollection();
+	CommandList->open();
 	{
-		////MICROPROFILE_SCOPEGPUI("Clear targets", MP_YELLOW);
-		CommandList->open();
+		//MICROPROFILE_GPU_SET_CONTEXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer, MicroProfileGetGlobalGpuThreadLog());
+		//MICROPROFILE_SCOPEGPUI("Clear targets", MP_YELLOW);
 		auto bgCol = PrimaryWindowRef->GetBackgroundColor();
 		nvrhi::Color col = nvrhi::Color(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
 		CommandList->beginMarker("ClearGBuffer");
@@ -85,8 +86,8 @@ void Renderer::BeginFrame()
 		CommandList->clearTextureFloat(ShadowMask, nvrhi::AllSubresources, col);
 		
 		CommandList->endMarker();
-		CommandList->close();
 	}
+	CommandList->close();
 }
 
 void Renderer::Render(ragdoll::Scene* scene, float _dt)
@@ -191,11 +192,11 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 	SExecutor::Executor.run(Taskflow).wait();
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 	DirectXDevice::GetNativeDevice()->executeCommandLists(activeList.data(), activeList.size());
+
+	MicroProfileFlip(CommandLists[(int)Pass::GBUFFER]->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer);
 #else
-	MICROPROFILE_GPU_SET_CONTEXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer, MicroProfileGetGlobalGpuThreadLog());
 	std::vector<nvrhi::ICommandList*> activeList;
 	{
-		//MICROPROFILE_SCOPEGPUI("Full Frame GPU", MP_YELLOW);
 		MICROPROFILE_SCOPEI("Render", "Full Frame CPU", MP_CYAN);
 		BeginFrame();
 

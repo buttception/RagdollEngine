@@ -2,7 +2,7 @@
 #include "BloomPass.h"
 
 #include <nvrhi/utils.h>
-#include <microprofile.h>
+#include "Ragdoll/Profiler.h"
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
@@ -50,7 +50,7 @@ void BloomPass::DownSample()
 			nvrhi::BindingSetItem::Texture_SRV(0, Source),
 		};
 		nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
-		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(bindingSetDesc, BindingLayoutHandle);
 		//create the pipeline
 		nvrhi::GraphicsPipelineDesc PipelineDesc;
 		PipelineDesc.addBindingLayout(BindingLayoutHandle);
@@ -109,7 +109,7 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity)
 			nvrhi::BindingSetItem::Texture_SRV(1, SceneColor),
 		};
 		nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
-		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(bindingSetDesc, BindingLayoutHandle);
 		//create the pipeline
 		nvrhi::GraphicsPipelineDesc PipelineDesc;
 		PipelineDesc.addBindingLayout(BindingLayoutHandle);
@@ -155,7 +155,7 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity)
 			nvrhi::BindingSetItem::Texture_SRV(0, Mips->operator[](0).Image),
 		};
 		nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
-		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(bindingSetDesc, BindingLayoutHandle);
 		//create the pipeline
 		nvrhi::GraphicsPipelineDesc PipelineDesc;
 		PipelineDesc.addBindingLayout(BindingLayoutHandle);
