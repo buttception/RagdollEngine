@@ -65,8 +65,8 @@ void Renderer::BeginFrame()
 	DirectXDevice::GetNativeDevice()->runGarbageCollection();
 	CommandList->open();
 	{
-		//MICROPROFILE_GPU_SET_CONTEXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer, MicroProfileGetGlobalGpuThreadLog());
-		//MICROPROFILE_SCOPEGPUI("Clear targets", MP_YELLOW);
+		MICROPROFILE_GPU_SET_CONTEXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer, MicroProfileGetGlobalGpuThreadLog());
+		MICROPROFILE_SCOPEGPUI("Clear targets", MP_YELLOW);
 		auto bgCol = PrimaryWindowRef->GetBackgroundColor();
 		nvrhi::Color col = nvrhi::Color(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
 		CommandList->beginMarker("ClearGBuffer");

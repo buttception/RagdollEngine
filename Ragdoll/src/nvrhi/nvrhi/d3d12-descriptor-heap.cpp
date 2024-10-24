@@ -115,6 +115,7 @@ namespace nvrhi::d3d12
 
         // Find a contiguous range of 'count' indices for which m_AllocatedDescriptors[index] is false
 
+        m_SearchStart = 0;  //devin: fixed issue where search start and max descriptor size gives lesser than count
         for (DescriptorIndex index = m_SearchStart; index < m_NumDescriptors; index++)
         {
             if (m_AllocatedDescriptors[index])

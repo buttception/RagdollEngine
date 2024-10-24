@@ -102,7 +102,7 @@ nvrhi::TextureHandle DirectXDevice::GetCurrentBackbuffer()
 
 nvrhi::BindingSetHandle DirectXDevice::CreateBindingSet(nvrhi::BindingSetDesc desc, nvrhi::BindingLayoutHandle layout)
 {
-	std::lock_guard<std::mutex> LockGuard(Mutex);
+	//std::lock_guard<std::mutex> LockGuard(Mutex);
 	return m_NvrhiDevice->createBindingSet(desc, layout);
 }
 
