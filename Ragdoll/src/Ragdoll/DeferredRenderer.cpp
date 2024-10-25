@@ -87,7 +87,7 @@ void Renderer::BeginFrame()
 void Renderer::Render(ragdoll::Scene* scene, float _dt)
 {
 #if MULTITHREAD_RENDER == 1
-	RD_SCOPE(Render, Full Frame CPU)
+	RD_SCOPE(Render, Full Frame)
 	tf::Taskflow Taskflow;
 	std::vector<nvrhi::ICommandList*> activeList;
 	Taskflow.emplace([this]() {
@@ -124,9 +124,21 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 	}
 
 	Taskflow.emplace([this, &scene]() {
-		ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles, scene->StaticCascadeInstanceInfos, scene->SceneInfo);
+		ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles[0], scene->StaticCascadeInstanceInfos[0], scene->SceneInfo, 0);
 	});
-	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH]);
+	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH0]);
+	Taskflow.emplace([this, &scene]() {
+		ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles[1], scene->StaticCascadeInstanceInfos[1], scene->SceneInfo, 1);
+		});
+	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH1]);
+	Taskflow.emplace([this, &scene]() {
+		ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles[2], scene->StaticCascadeInstanceInfos[2], scene->SceneInfo, 2);
+		});
+	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH2]);
+	Taskflow.emplace([this, &scene]() {
+		ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles[3], scene->StaticCascadeInstanceInfos[3], scene->SceneInfo, 3);
+		});
+	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH3]);
 
 	Taskflow.emplace([this, &scene]() {
 		ShadowMaskPass->DrawShadowMask(scene->SceneInfo);
@@ -191,10 +203,11 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 	//submit the logs in the order of execution
 	MICROPROFILE_GPU_SUBMIT(EnterCommandListSectionGpu::Queue, CommandList->Work);
 	RD_GPU_SUBMIT(activeList);
-	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
-	DirectXDevice::GetNativeDevice()->executeCommandLists(activeList.data(), activeList.size());
-
-	MicroProfileFlip(CommandLists[(int)Pass::GBUFFER]->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer);
+	{
+		RD_SCOPE(Render, ExecuteCommandList);
+		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
+		DirectXDevice::GetNativeDevice()->executeCommandLists(activeList.data(), activeList.size());
+	}
 #else
 	std::vector<nvrhi::ICommandList*> activeList;
 	{
@@ -266,16 +279,24 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList); //command list to clear screen
 	DirectXDevice::GetNativeDevice()->executeCommandLists(activeList.data(), activeList.size());
-	//MicroProfileFlip(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer);
 #endif
-
-	//readback all the debug infos needed
-	float* valPtr;
-	if (valPtr = (float*)DirectXDevice::GetNativeDevice()->mapBuffer(AutomaticExposurePass->ReadbackBuffer, nvrhi::CpuAccessMode::Read))
 	{
-		AdaptedLuminance = *valPtr;
+		//this process is long because it is waiting for the gpu to be done first
+		RD_SCOPE(Render, Readback);
+		//readback all the debug infos needed
+		float* valPtr;
+		{
+			RD_SCOPE(Render, Map);
+			if (valPtr = (float*)DirectXDevice::GetNativeDevice()->mapBuffer(AutomaticExposurePass->ReadbackBuffer, nvrhi::CpuAccessMode::Read))
+			{
+				AdaptedLuminance = *valPtr;
+			}
+		}
+		{
+			RD_SCOPE(Render, Unmap);
+			DirectXDevice::GetNativeDevice()->unmapBuffer(AutomaticExposurePass->ReadbackBuffer);
+		}
 	}
-	DirectXDevice::GetNativeDevice()->unmapBuffer(AutomaticExposurePass->ReadbackBuffer);
 }
 
 void Renderer::CreateResource()
@@ -301,7 +322,7 @@ void Renderer::CreateResource()
 	}
 	ShadowPass = std::make_shared<class ShadowPass>();
 	ShadowPass->SetRenderTarget(fbArr);
-	ShadowPass->Init(CommandLists[(int)Pass::SHADOW_DEPTH]);
+	ShadowPass->Init(CommandLists[(int)Pass::SHADOW_DEPTH0], CommandLists[(int)Pass::SHADOW_DEPTH1], CommandLists[(int)Pass::SHADOW_DEPTH2], CommandLists[(int)Pass::SHADOW_DEPTH3]);
 
 	nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
 		.addColorAttachment(ShadowMask);

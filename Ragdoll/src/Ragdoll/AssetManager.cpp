@@ -1,7 +1,7 @@
 #include "ragdollpch.h"
 
 #include "nvrhi/utils.h"
-#include <microprofile.h>
+#include "Profiler.h"
 
 #include "AssetManager.h"
 #include "DirectXDevice.h"
@@ -78,14 +78,12 @@ uint32_t Hash(const nvrhi::ComputePipelineDesc& desc) {
 
 nvrhi::GraphicsPipelineHandle AssetManager::GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb)
 {
+	std::lock_guard<std::mutex> LockGuard(Mutex);
 	uint32_t hash = Hash(desc);
 	if (GPSOs.contains(hash))
 		return GPSOs.at(hash);
-	{
-		std::lock_guard<std::mutex> LockGuard(Mutex);
-		RD_CORE_INFO("GPSO created");
-		return GPSOs[hash] = DirectXDevice::GetNativeDevice()->createGraphicsPipeline(desc, fb);
-	}
+	RD_CORE_INFO("GPSO created");
+	return GPSOs[hash] = DirectXDevice::GetNativeDevice()->createGraphicsPipeline(desc, fb);
 }
 
 nvrhi::ComputePipelineHandle AssetManager::GetComputePipeline(const nvrhi::ComputePipelineDesc& desc)
@@ -102,6 +100,7 @@ nvrhi::ComputePipelineHandle AssetManager::GetComputePipeline(const nvrhi::Compu
 
 nvrhi::BindingLayoutHandle AssetManager::GetBindingLayout(const nvrhi::BindingSetDesc& desc)
 {
+	RD_SCOPE(Asset, GetBindingLayout);
 	static auto ConvertSetToLayout = [](const nvrhi::BindingSetItemArray& setDesc, nvrhi::BindingLayoutItemArray& layoutDesc)
 		{
 			for (auto& item : setDesc)

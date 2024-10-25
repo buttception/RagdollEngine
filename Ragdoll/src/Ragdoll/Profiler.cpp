@@ -47,7 +47,9 @@ EnterCommandListSectionGpu::~EnterCommandListSectionGpu()
 	CommandList->Work = MICROPROFILE_GPU_END(Logs[LogIndex]);
 	//close the command list
 	CommandList->close();
-	//no racing potential here i tink
-	//free up the currently used log
-	LogsInUse[LogIndex] = false;
+	{
+		std::lock_guard<std::mutex> lock(LogsMutex); //could be setting to false while others are searching
+		//free up the currently used log
+		LogsInUse[LogIndex] = false;
+	}
 }
