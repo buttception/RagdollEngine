@@ -49,8 +49,8 @@ void AutomaticExposurePass::SetDependencies(nvrhi::TextureHandle sceneColor)
 
 nvrhi::BufferHandle AutomaticExposurePass::GetAdaptedLuminance(float _dt)
 {
-	MICROPROFILE_SCOPEI("Render", "Get Luminance", MP_BLUEVIOLET);
-	//MICROPROFILE_SCOPEGPUI("Get Luminance", MP_LIGHTYELLOW1);
+	RD_SCOPE(Render, AutomaticExposure);
+	RD_GPU_SCOPE("AutomaticExposure", CommandListRef);
 	float minLuminance = -8.f;
 	float maxLuminance = 8.5;
 
@@ -89,8 +89,7 @@ nvrhi::BufferHandle AutomaticExposurePass::GetAdaptedLuminance(float _dt)
 	LuminanceAveragePipelineDesc.bindingLayouts = { LuminanceAverageBindingLayoutHandle };
 	nvrhi::ShaderHandle LuminanceAverageShader = AssetManager::GetInstance()->GetShader("LuminanceAverage.cs.cso");
 	LuminanceAveragePipelineDesc.CS = LuminanceAverageShader;
-	
-	CommandListRef->open();
+
 	CommandListRef->beginMarker("AutomaticExposure");
 	nvrhi::ComputeState state;
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(LuminanceHistogramPipelineDesc);
@@ -117,6 +116,5 @@ nvrhi::BufferHandle AutomaticExposurePass::GetAdaptedLuminance(float _dt)
 	CommandListRef->copyBuffer(ReadbackBuffer, 0, AdaptedLuminanceHandle, 0, sizeof(float));
 
 	CommandListRef->endMarker();
-	CommandListRef->close();
 	return AdaptedLuminanceHandle;
 }

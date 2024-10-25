@@ -32,9 +32,8 @@ void CACAOPass::SetDependencies(Textures dependencies)
 
 void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 {
-	MICROPROFILE_SCOPEI("Render", "CACAO", MP_BLUEVIOLET);
-	//MICROPROFILE_SCOPEGPUI("CACAO", MP_YELLOWGREEN);
-	CommandListRef->open();
+	RD_SCOPE(Render, CACAO);
+	RD_GPU_SCOPE("CACAO", CommandListRef);
 	CommandListRef->beginMarker("CACAO");
 	//cbuffer shared amongst all
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "CACAO CBuffer", 1);
@@ -157,7 +156,6 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 	}
 
 	CommandListRef->endMarker();
-	CommandListRef->close();
 }
 
 void CACAOPass::PrepareDepth(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer)

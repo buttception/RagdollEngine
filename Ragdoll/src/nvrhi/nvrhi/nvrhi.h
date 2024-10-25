@@ -2621,6 +2621,9 @@ namespace nvrhi
         // Returns the owning device, does NOT call AddRef on it
         virtual IDevice* getDevice() = 0;
         virtual const CommandListParameters& getDesc() = 0;
+
+        void* Log = nullptr;  //devin: added this here so command list own the profiler log
+        uint64_t Work = 0;  //devin: id for the work done when ending a scope in microprofile
     };
 
     typedef RefCountPtr<ICommandList> CommandListHandle;

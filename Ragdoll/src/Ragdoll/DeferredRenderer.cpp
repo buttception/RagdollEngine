@@ -60,99 +60,97 @@ void Renderer::Shutdown()
 
 void Renderer::BeginFrame()
 {
-	PROFILE_SCOPE(Load, Begin Frame);
+	RD_SCOPE(Load, Begin Frame);
 	DirectXDevice::GetInstance()->BeginFrame();
-	DirectXDevice::GetNativeDevice()->runGarbageCollection();
-	CommandList->open();
+	RD_GPU_SCOPE("Clear Targets", CommandList);
+	auto bgCol = PrimaryWindowRef->GetBackgroundColor();
+	nvrhi::Color col = nvrhi::Color(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
+	CommandList->beginMarker("ClearGBuffer");
+	CommandList->clearDepthStencilTexture(DepthHandle, nvrhi::AllSubresources, true, 0.f, false, 0);
+	for (int i = 0; i < 4; ++i)
 	{
-		MICROPROFILE_GPU_SET_CONTEXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer, MicroProfileGetGlobalGpuThreadLog());
-		MICROPROFILE_SCOPEGPUI("Clear targets", MP_YELLOW);
-		auto bgCol = PrimaryWindowRef->GetBackgroundColor();
-		nvrhi::Color col = nvrhi::Color(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
-		CommandList->beginMarker("ClearGBuffer");
-		CommandList->clearDepthStencilTexture(DepthHandle, nvrhi::AllSubresources, true, 0.f, false, 0);
-		for (int i = 0; i < 4; ++i)
-		{
-			CommandList->clearDepthStencilTexture(ShadowMap[i], nvrhi::AllSubresources, true, 0.f, false, 0);
-		}
-		col = 0.f;
-		CommandList->clearTextureFloat(DirectXDevice::GetInstance()->GetCurrentBackbuffer(), nvrhi::AllSubresources, col);
-		CommandList->clearTextureFloat(SceneColor, nvrhi::AllSubresources, col);
-		CommandList->clearTextureFloat(AlbedoHandle, nvrhi::AllSubresources, col);
-		CommandList->clearTextureFloat(NormalHandle, nvrhi::AllSubresources, col);
-		CommandList->clearTextureFloat(RoughnessMetallicHandle, nvrhi::AllSubresources, col);
-		CommandList->clearTextureFloat(AOHandle, nvrhi::AllSubresources, 1.f);
-		CommandList->clearTextureFloat(VelocityBuffer, nvrhi::AllSubresources, col);
-		CommandList->clearTextureFloat(ShadowMask, nvrhi::AllSubresources, col);
-		
-		CommandList->endMarker();
+		CommandList->clearDepthStencilTexture(ShadowMap[i], nvrhi::AllSubresources, true, 0.f, false, 0);
 	}
-	CommandList->close();
+	col = 0.f;
+	CommandList->clearTextureFloat(DirectXDevice::GetInstance()->GetCurrentBackbuffer(), nvrhi::AllSubresources, col);
+	CommandList->clearTextureFloat(SceneColor, nvrhi::AllSubresources, col);
+	CommandList->clearTextureFloat(AlbedoHandle, nvrhi::AllSubresources, col);
+	CommandList->clearTextureFloat(NormalHandle, nvrhi::AllSubresources, col);
+	CommandList->clearTextureFloat(RoughnessMetallicHandle, nvrhi::AllSubresources, col);
+	CommandList->clearTextureFloat(AOHandle, nvrhi::AllSubresources, 1.f);
+	CommandList->clearTextureFloat(VelocityBuffer, nvrhi::AllSubresources, col);
+	CommandList->clearTextureFloat(ShadowMask, nvrhi::AllSubresources, col);
+		
+	CommandList->endMarker();
 }
 
 void Renderer::Render(ragdoll::Scene* scene, float _dt)
 {
 #if MULTITHREAD_RENDER == 1
-	PROFILE_SCOPE(Render, Full Frame CPU)
+	RD_SCOPE(Render, Full Frame CPU)
 	tf::Taskflow Taskflow;
 	std::vector<nvrhi::ICommandList*> activeList;
 	Taskflow.emplace([this]() {
+		DirectXDevice::GetNativeDevice()->runGarbageCollection();
+	});
+
+	Taskflow.emplace([this]() {
 		BeginFrame();
-		});
+	});
 
 	Taskflow.emplace([this, &scene]() {
 		SkyGeneratePass->GenerateSky(scene->SceneInfo);
-		});
+	});
 	activeList.emplace_back(CommandLists[(int)Pass::SKY_GENERATE]);
 
 	Taskflow.emplace([this, &scene]() {
 		GBufferPass->DrawAllInstances(scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo);
-		});
+	});
 	activeList.emplace_back(CommandLists[(int)Pass::GBUFFER]);
 
 	if (scene->SceneInfo.UseCACAO)
 	{
 		Taskflow.emplace([this, &scene]() {
 			CACAOPass->GenerateAO(scene->SceneInfo);
-			});
+		});
 		activeList.emplace_back(CommandLists[(int)Pass::AO]);
 	}
 	if (scene->SceneInfo.UseXeGTAO)
 	{
 		Taskflow.emplace([this, &scene]() {
 			XeGTAOPass->GenerateAO(scene->SceneInfo);
-			});
+		});
 		activeList.emplace_back(CommandLists[(int)Pass::AO]);
 	}
 
 	Taskflow.emplace([this, &scene]() {
 		ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles, scene->StaticCascadeInstanceInfos, scene->SceneInfo);
-		});
+	});
 	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH]);
 
 	Taskflow.emplace([this, &scene]() {
 		ShadowMaskPass->DrawShadowMask(scene->SceneInfo);
-		});
+	});
 	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_MASK]);
 
 	Taskflow.emplace([this, &scene]() {
 		DeferredLightPass->LightPass(scene->SceneInfo);
-		});
+	});
 	activeList.emplace_back(CommandLists[(int)Pass::LIGHT]);
 
 	Taskflow.emplace([this, &scene]() {
 		SkyPass->DrawSky(scene->SceneInfo);
-		});
+	});
 	activeList.emplace_back(CommandLists[(int)Pass::SKY]);
 
 	Taskflow.emplace([this, &scene]() {
 		BloomPass->Bloom(scene->SceneInfo);
-		});
+	});
 	activeList.emplace_back(CommandLists[(int)Pass::BLOOM]);
 
 	Taskflow.emplace([this, _dt]() {
 		AutomaticExposurePass->GetAdaptedLuminance(_dt);
-		});
+	});
 	activeList.emplace_back(CommandLists[(int)Pass::EXPOSURE]);
 
 	nvrhi::BufferHandle exposure = AutomaticExposurePass->AdaptedLuminanceHandle;
@@ -164,7 +162,7 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 		//tone map and gamma correct
 		ToneMapPass->SetRenderTarget(fb);
 		ToneMapPass->ToneMap(scene->SceneInfo, exposure);
-		});
+	});
 	activeList.emplace_back(CommandLists[(int)Pass::TONEMAP]);
 
 	Taskflow.emplace([this, &scene]() {
@@ -178,18 +176,21 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 		//draw debug items
 		DebugPass->SetRenderTarget(fb);
 		DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo);
-		});
+	});
 	activeList.emplace_back(CommandLists[(int)Pass::DEBUG]);
 
 	if (scene->DebugInfo.DbgTarget)
 	{
 		Taskflow.emplace([this, &scene]() {
 			FramebufferViewer->DrawTarget(scene->DebugInfo.DbgTarget, scene->DebugInfo.Add, scene->DebugInfo.Mul, scene->DebugInfo.CompCount);
-			});
+		});
 		activeList.emplace_back(CommandLists[(int)Pass::FB_VIEWER]);
 	}
 
 	SExecutor::Executor.run(Taskflow).wait();
+	//submit the logs in the order of execution
+	MICROPROFILE_GPU_SUBMIT(EnterCommandListSectionGpu::Queue, CommandList->Work);
+	RD_GPU_SUBMIT(activeList);
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 	DirectXDevice::GetNativeDevice()->executeCommandLists(activeList.data(), activeList.size());
 

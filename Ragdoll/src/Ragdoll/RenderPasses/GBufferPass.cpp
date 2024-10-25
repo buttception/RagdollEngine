@@ -20,14 +20,11 @@ void GBufferPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
 
 void GBufferPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo)
 {
-	CommandListRef->open();
-	static MicroProfileThreadLogGpu* log = MicroProfileThreadLogGpuAlloc();
+	RD_SCOPE(Render, GBufferPass);
+	RD_GPU_SCOPE("GBufferPass", CommandListRef);
 	if (!infos.empty())
 	{
 		MICROPROFILE_SCOPEI("Render", "Draw All Instances", MP_BLUEVIOLET);
-		MICROPROFILE_GPU_BEGIN(CommandListRef->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer, log);
-		//MICROPROFILE_GPU_SET_CONTEXT(CommandListRef->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer, log);
-		MICROPROFILE_SCOPEGPUI_L(log, "GBuffer Pass", MP_AUTO);
 		//create a constant buffer here
 		nvrhi::BufferDesc ConstantBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "GBufferPass CBuffer", 1);
 		nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(ConstantBufferDesc);
@@ -101,6 +98,4 @@ void GBufferPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 
 		CommandListRef->endMarker();
 	}
-	MICROPROFILE_GPU_END(log);
-	CommandListRef->close();
 }

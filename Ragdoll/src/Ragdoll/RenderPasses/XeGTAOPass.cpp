@@ -40,9 +40,9 @@ void XeGTAOPass::UpdateConstants(const uint32_t width, const uint32_t height, co
 
 void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 {
-	MICROPROFILE_SCOPEI("Render", "XeGTAO", MP_BLUEVIOLET);
-	//MICROPROFILE_SCOPEGPUI("XeGTAO", MP_YELLOWGREEN);
-	CommandListRef->open();
+	RD_SCOPE(Render, XeGTAO);
+	RD_GPU_SCOPE("XeGTAO", CommandListRef);
+
 	CommandListRef->beginMarker("XeGTAO");
 	UpdateConstants(DepthBuffer->getDesc().width, DepthBuffer->getDesc().height, sceneInfo.InfiniteReverseZProj);
 	//cbuffer shared amongst all
@@ -82,7 +82,6 @@ void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 	}
 
 	CommandListRef->endMarker();
-	CommandListRef->close();
 }
 
 void XeGTAOPass::GenerateDepthMips(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle BufferHandle, nvrhi::BufferHandle matrix)

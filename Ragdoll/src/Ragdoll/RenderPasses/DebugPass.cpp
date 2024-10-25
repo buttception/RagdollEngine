@@ -20,16 +20,13 @@ void DebugPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
 	RenderTarget = renderTarget;
 }
 
-bool DebugPass::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t instanceCount, const ragdoll::SceneInformation& sceneInfo)
+void DebugPass::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t instanceCount, const ragdoll::SceneInformation& sceneInfo)
 {
-	MICROPROFILE_SCOPEI("Render", "Draw Bounding Box", MP_ALICEBLUE);
-	//MICROPROFILE_SCOPEGPUI("Debug Instance Draw", MP_LIGHTYELLOW1);
-	CommandListRef->open();
+	RD_SCOPE(Render, Debug);
+	RD_GPU_SCOPE("Debug", CommandListRef);
+
 	if (instanceCount == 0)
-	{
-		CommandListRef->close();
-		return false;
-	}
+		return;
 	//create a constant buffer here
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "DebugPass CBuffer", 1);
 	nvrhi::BufferHandle	ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
@@ -74,7 +71,4 @@ bool DebugPass::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t i
 	CommandListRef->draw(args);
 
 	CommandListRef->endMarker();
-	CommandListRef->close();
-
-	return true;
 }

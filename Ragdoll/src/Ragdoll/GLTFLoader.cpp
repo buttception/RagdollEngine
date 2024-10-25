@@ -139,7 +139,7 @@ enum AttributeType {
 
 void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 {
-	PROFILE_SCOPE(Load, Load GLTF);
+	RD_SCOPE(Load, Load GLTF);
 	//ownself open command list
 	tinygltf::TinyGLTF loader;
 	tinygltf::Model model;
@@ -147,7 +147,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	std::filesystem::path path = Root / fileName;
 	std::filesystem::path modelRoot = path.parent_path().lexically_relative(Root);
 	{
-		PROFILE_SCOPE(Load, Load GLTF File);
+		RD_SCOPE(Load, Load GLTF File);
 		bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, path.string());
 		RD_ASSERT(ret == false, "Issue loading {}", path.string());
 	}
@@ -155,7 +155,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	uint32_t meshIndicesOffset = AssetManager::GetInstance()->Meshes.size();
 	//load meshes
 	{
-		PROFILE_SCOPE(Load, Load Meshes);
+		RD_SCOPE(Load, Load Meshes);
 		// go downwards from meshes
 		for (const auto& itMesh : model.meshes) {
 			//should not create a new input layout handle, use the one provided by the renderer
@@ -171,7 +171,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			uint32_t materialIndicesOffset = AssetManager::GetInstance()->Materials.size();
 			for (const tinygltf::Primitive& itPrim : itMesh.primitives)
 			{
-				PROFILE_SCOPE(Load, Mesh);
+				RD_SCOPE(Load, Mesh);
 				Submesh submesh{};
 				DirectX::BoundingBox box;
 				VertexBufferInfo buffer;
@@ -357,7 +357,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 
 	//load materials
 	{
-		PROFILE_SCOPE(Load, Load Materials);
+		RD_SCOPE(Load, Load Materials);
 		//load all of the materials
 		for (const tinygltf::Material& gltfMat : model.materials)
 		{
@@ -383,7 +383,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 
 	//load textures
 	{
-		PROFILE_SCOPE(Load, Load Textures);
+		RD_SCOPE(Load, Load Textures);
 		{
 #if MULTITHREAD_LOAD == 1
 			//load the images but have 1 thread per image
@@ -403,7 +403,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 					[itImg, path, img, imageIndicesOffset, i, hdl]()
 					{
 						{
-							PROFILE_SCOPE(Load, STB Load);
+							RD_SCOPE(Load, STB Load);
 							std::filesystem::path modelPath = path.parent_path() / itImg->uri;
 							//load raw bytes, do not use stbi load
 							std::ifstream file(modelPath, std::ios::binary | std::ios::ate);
@@ -433,7 +433,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 						}
 
 						{
-							PROFILE_SCOPE(Load, Create Texture);
+							RD_SCOPE(Load, Create Texture);
 							nvrhi::TextureDesc texDesc;
 							texDesc.width = itImg->width;
 							texDesc.height = itImg->height;
@@ -467,7 +467,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 						}
 						
 						{
-							PROFILE_SCOPE(Load, Write Texture);
+							RD_SCOPE(Load, Write Texture);
 							hdl->open();
 							//upload the texture data
 							hdl->writeTexture(img->TextureHandle, 0, 0, img->RawData, itImg->width* (itImg->component == 3 ? 4 : itImg->component));
@@ -537,7 +537,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	}
 
 	{
-		PROFILE_SCOPE(Load, Attaching Samplers);
+		RD_SCOPE(Load, Attaching Samplers);
 		for (const tinygltf::Texture& itTex : model.textures)
 		{
 			//textures contain a sampler and an image
@@ -634,7 +634,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	}
 	
 	{
-		PROFILE_SCOPE(Load, Creating Hierarchy);
+		RD_SCOPE(Load, Creating Hierarchy);
 		Vector3 min{ FLT_MAX, FLT_MAX, FLT_MAX }, max{ -FLT_MAX, -FLT_MAX, -FLT_MAX };
 		//create all the entities and their components
 		for (const int& rootIndex : model.scenes[0].nodes) {	//iterating through the root nodes

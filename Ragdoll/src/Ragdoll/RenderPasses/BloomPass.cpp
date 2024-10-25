@@ -21,11 +21,10 @@ void BloomPass::SetDependencies(nvrhi::TextureHandle sceneColor, const std::vect
 
 void BloomPass::Bloom(const ragdoll::SceneInformation& sceneInfo)
 {
-	//MICROPROFILE_SCOPEGPUI("Bloom", MP_YELLOWGREEN);
-	CommandListRef->open();
+	RD_SCOPE(Render, Bloom);
+	RD_GPU_SCOPE("Bloom", CommandListRef);
 	DownSample();
 	UpSample(sceneInfo.FilterRadius, sceneInfo.BloomIntensity);
-	CommandListRef->close();
 }
 
 void BloomPass::DownSample()

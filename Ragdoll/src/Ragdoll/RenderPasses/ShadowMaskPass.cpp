@@ -31,8 +31,8 @@ void ShadowMaskPass::SetDependencies(nvrhi::TextureHandle shadow[4], nvrhi::Text
 
 void ShadowMaskPass::DrawShadowMask(const ragdoll::SceneInformation& sceneInfo)
 {
-	MICROPROFILE_SCOPEI("Render", "Shadow Mask Pass", MP_BLUEVIOLET);
-	//MICROPROFILE_SCOPEGPUI("Shadow Mask Pass", MP_LIGHTYELLOW1);
+	RD_SCOPE(Render, ShadowMask);
+	RD_GPU_SCOPE("ShadowMask", CommandListRef);
 
 	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
 	//create a constant buffer here
@@ -79,7 +79,6 @@ void ShadowMaskPass::DrawShadowMask(const ragdoll::SceneInformation& sceneInfo)
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 	state.addBindingSet(BindingSetHandle);
 
-	CommandListRef->open();
 	CommandListRef->beginMarker("Shadow Mask Pass");
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
 	CommandListRef->setGraphicsState(state);
@@ -89,5 +88,4 @@ void ShadowMaskPass::DrawShadowMask(const ragdoll::SceneInformation& sceneInfo)
 	CommandListRef->draw(args);
 
 	CommandListRef->endMarker();
-	CommandListRef->close();
 }
