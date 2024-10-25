@@ -3,12 +3,15 @@
 #include "Scene.h"
 
 #include <nvrhi/utils.h>
-#include <microprofile.h>
+#include "Profiler.h"
 #include "Application.h"
 #include "Entity/EntityManager.h"
 #include "AssetManager.h"
 #include "DirectXDevice.h"
 #include "GeometryBuilder.h"
+#include "ImGuiRenderer.h"
+#include "DeferredRenderer.h"
+#include "Graphics/Window/Window.h"
 
 ragdoll::Scene::Scene(Application* app)
 {
@@ -41,89 +44,54 @@ ragdoll::Scene::Scene(Application* app)
 void ragdoll::Scene::Update(float _dt)
 {
 	ImguiInterface->BeginFrame();
-	UpdateControls(_dt);
 
-	//spawn more shits temp
-	const static Vector3 t_range{ 50.f, 50.f, 50.f };
-	const static Vector3 t_min = { -25.f, -25.f, -25.f };
-	const static Vector3 s_range{ 0.2f, 0.2f, 0.2f };
-	const static Vector3 s_min{ 0.3f, 0.3f, 0.3f };
-	static int32_t currentGeomCount{};
-
-	if (Config.bIsThereCustomMeshes)
+	if (ImguiInterface->DrawSpawn(DebugInfo, SceneInfo, Config))
 	{
-		ImGui::Begin("Spawn");
-		ImGui::Text("Current Geom Count: %d", currentGeomCount);
-		if (ImGui::Button("Spawn 500 geometry")) {
-			for (int i = 0; i < 500; ++i) {
-				MICROPROFILE_SCOPEI("Creation", "Entity Create", MP_GREEN);
-				currentGeomCount++;
-				Vector3 pos{
-					t_min.x + (std::rand() / (float)RAND_MAX) * t_range.x,
-					t_min.y + (std::rand() / (float)RAND_MAX) * t_range.y,
-					t_min.z + (std::rand() / (float)RAND_MAX) * t_range.z,
-				};
-				Vector3 scale{
-					s_min.x + (std::rand() / (float)RAND_MAX) * s_range.x,
-					s_min.y + (std::rand() / (float)RAND_MAX) * s_range.y,
-					s_min.z + (std::rand() / (float)RAND_MAX) * s_range.z,
-				};
-				Vector3 eulerRotate{
-					std::rand() / (float)RAND_MAX * DirectX::XM_2PI,
-					std::rand() / (float)RAND_MAX * DirectX::XM_2PI,
-					std::rand() / (float)RAND_MAX * DirectX::XM_2PI
-				};
-				entt::entity ent;
-				{
-					MICROPROFILE_SCOPEI("Creation", "Creating Entity", MP_DARKGREEN);
-					ent = EntityManagerRef->CreateEntity();
-				}
-				{
-					MICROPROFILE_SCOPEI("Creation", "Setting Transform", MP_GREENYELLOW);
-					auto tcomp = EntityManagerRef->AddComponent<TransformComp>(ent);
-					tcomp->m_LocalPosition = pos;
-					tcomp->m_LocalScale = scale;
-					tcomp->m_LocalRotation = Quaternion::CreateFromYawPitchRoll(eulerRotate.y, eulerRotate.x, eulerRotate.z);
-					{
-						MICROPROFILE_SCOPEI("Creation", "Adding at Root", MP_DARKOLIVEGREEN);
-						AddEntityAtRootLevel(EntityManagerRef->GetGuid(ent));
-					}
-				}
-				{
-					MICROPROFILE_SCOPEI("Creation", "Setting Renderable", MP_FORESTGREEN);
-					auto rcomp = EntityManagerRef->AddComponent<RenderableComp>(ent);
-					rcomp->meshIndex = std::rand() / (float)RAND_MAX * 25;
-				}
-			}
-			{
-				MICROPROFILE_SCOPEI("Creation", "Entity Update", MP_DARKSEAGREEN);
-				UpdateTransforms();			//update all the dirty transforms
-				PopulateStaticProxies();	//create all the proxies to iterate
-				ResetTransformDirtyFlags();	//reset the dirty flags
-				bIsCameraDirty = true;
-			}
-			//MicroProfileDumpFileImmediately("test.html", nullptr, nullptr);
+		//spawn more shits temp
+		const static Vector3 t_range{ 50.f, 50.f, 50.f };
+		const static Vector3 t_min = { -25.f, -25.f, -25.f };
+		const static Vector3 s_range{ 0.2f, 0.2f, 0.2f };
+		const static Vector3 s_min{ 0.3f, 0.3f, 0.3f };
+		static int32_t currentGeomCount{};
+
+		for (int i = 0; i < 500; ++i) {
+			MICROPROFILE_SCOPEI("Creation", "Entity Create", MP_GREEN);
+			currentGeomCount++;
+			Vector3 pos{
+				t_min.x + (std::rand() / (float)RAND_MAX) * t_range.x,
+				t_min.y + (std::rand() / (float)RAND_MAX) * t_range.y,
+				t_min.z + (std::rand() / (float)RAND_MAX) * t_range.z,
+			};
+			Vector3 scale{
+				s_min.x + (std::rand() / (float)RAND_MAX) * s_range.x,
+				s_min.y + (std::rand() / (float)RAND_MAX) * s_range.y,
+				s_min.z + (std::rand() / (float)RAND_MAX) * s_range.z,
+			};
+			Vector3 eulerRotate{
+				std::rand() / (float)RAND_MAX * DirectX::XM_2PI,
+				std::rand() / (float)RAND_MAX * DirectX::XM_2PI,
+				std::rand() / (float)RAND_MAX * DirectX::XM_2PI
+			};
+			entt::entity ent;
+			ent = EntityManagerRef->CreateEntity();
+			auto tcomp = EntityManagerRef->AddComponent<TransformComp>(ent);
+			tcomp->m_LocalPosition = pos;
+			tcomp->m_LocalScale = scale;
+			tcomp->m_LocalRotation = Quaternion::CreateFromYawPitchRoll(eulerRotate.y, eulerRotate.x, eulerRotate.z);
+			AddEntityAtRootLevel(EntityManagerRef->GetGuid(ent));
+			auto rcomp = EntityManagerRef->AddComponent<RenderableComp>(ent);
+			rcomp->meshIndex = std::rand() / (float)RAND_MAX * 25;
 		}
-		ImGui::End();
+		{
+			RD_SCOPE(Entity, Create);
+			UpdateTransforms();			//update all the dirty transforms
+			PopulateStaticProxies();	//create all the proxies to iterate
+			ResetTransformDirtyFlags();	//reset the dirty flags
+			SceneInfo.bIsCameraDirty = true;
+		}
 	}
-
-	ImGui::Begin("Debug");
-	if (ImGui::Button("Reload Shaders")) {
-		//need to call bat file to recompile
-		AssetManager::GetInstance()->RecompileShaders();
-	}
-	//view textures
-	static int selectedItem = 0;
-	const char* items[] = {
-		"None",
-		"NormalMap",
-		"ORM",
-		"Velocity",
-		"AO",
-	};
-	if (ImGui::Combo("Texture View", &selectedItem, items, 5))
-	{
-		switch (selectedItem) {
+	if (int item = ImguiInterface->DrawFBViewer()) {
+		switch (item) {
 		case 1:
 			DebugInfo.CompCount = 2;
 			DebugInfo.DbgTarget = GBufferNormal;
@@ -134,7 +102,7 @@ void ragdoll::Scene::Update(float _dt)
 			DebugInfo.CompCount = 2;
 			DebugInfo.DbgTarget = GBufferRM;
 			DebugInfo.Add = Vector4::Zero;
-			DebugInfo.Mul = Vector4::One; 
+			DebugInfo.Mul = Vector4::One;
 			break;
 		case 3:
 			DebugInfo.CompCount = 3;
@@ -153,60 +121,17 @@ void ragdoll::Scene::Update(float _dt)
 			DebugInfo.DbgTarget = nullptr;
 		}
 	}
-	ImGui::SliderFloat("Filter Radius", &SceneInfo.FilterRadius, 0.001f, 1.f);
-	ImGui::SliderFloat("Bloom Intensity", &SceneInfo.BloomIntensity, 0.f, 1.f);
-	ImGui::SliderFloat("Gamma", &SceneInfo.Gamma, 0.5f, 3.f);
-	ImGui::SliderFloat("AO Modulation factor", &SceneInfo.ModulationFactor, 0.f, 1.f);
-	ImGui::Checkbox("UseFixedExposure", &SceneInfo.UseFixedExposure);
-	if (SceneInfo.UseFixedExposure)
-		ImGui::SliderFloat("Exposure", &SceneInfo.Exposure, 0.f, 2.f);
-	else
-		ImGui::Text("Adapted Luminance: %f", DeferredRenderer->AdaptedLuminance);
-	ImGui::SliderFloat("Sky Dimmer e-6", &SceneInfo.SkyDimmer, 0.f, 1.f);
-	if (ImGui::Checkbox("CACAO", &SceneInfo.UseCACAO))
-		SceneInfo.UseXeGTAO = SceneInfo.UseCACAO ? false : SceneInfo.UseXeGTAO;
-	if (ImGui::Checkbox("XeGTAO", &SceneInfo.UseXeGTAO))
-		SceneInfo.UseCACAO = SceneInfo.UseXeGTAO ? false : SceneInfo.UseXeGTAO;
-	if (ImGui::Checkbox("Freeze Culling Matrix", &bFreezeFrustumCulling))
-		bIsCameraDirty = true;
-	if (ImGui::Checkbox("Show Octree", &Config.bDrawOctree))
-		bIsCameraDirty = true;
-	if (Config.bDrawOctree) {
-		if (ImGui::DragIntRange2("Octree Level", &Config.DrawOctreeLevelMin, &Config.DrawOctreeLevelMax, 0.1f, 0, Octree::MaxDepth))
-			BuildDebugInstances(StaticDebugInstanceDatas);
-	}
-	if (ImGui::Checkbox("Show Boxes", &Config.bDrawBoxes))
-		bIsCameraDirty = true;
-	if (ImGui::SliderInt("Show Cascades", &SceneInfo.EnableCascadeDebug, 0, 4))
-		BuildDebugInstances(StaticDebugInstanceDatas);
-	if (SceneInfo.EnableCascadeDebug > 0) {
-		if (ImGui::TreeNode("Cascade Info"))
-		{
-			for (int i = 0; i < 4; ++i) {
-				if (ImGui::TreeNode(("Cascade" + std::to_string(i)).c_str(), "Casecade %d", i))
-				{
-					ImGui::Text("Position: %1.f, %1.f, %1.f", SceneInfo.CascadeInfo[i].center.x, SceneInfo.CascadeInfo[i].center.y, SceneInfo.CascadeInfo[i].center.z);
-					ImGui::Text("Dimension: %.2f, %.2f", SceneInfo.CascadeInfo[i].width, SceneInfo.CascadeInfo[i].height);
-					ImGui::Text("NearFar: %.2f, %.2f", SceneInfo.CascadeInfo[i].nearZ, SceneInfo.CascadeInfo[i].farZ);
-					ImGui::TreePop();
-				}
-			}
-			ImGui::TreePop();
-		}
-	}
-	ImGui::Text("%d entities count", EntityManagerRef->GetRegistry().view<entt::entity>().size_hint());
-	ImGui::Text("%d instance count", StaticInstanceDatas.size());
-	ImGui::Text("%d octants culled", DebugInfo.CulledOctantsCount);
-	ImGui::Text("%d proxies in octree", Octree::TotalProxies);
-	ImGui::End();
+	SceneInfo.Luminance = DeferredRenderer->AdaptedLuminance;
 
-	if (bIsCameraDirty)
+	ImguiInterface->DrawControl(DebugInfo, SceneInfo, Config, _dt);
+	ImguiInterface->DrawSettings(DebugInfo, SceneInfo, Config);
+	if (SceneInfo.bIsCameraDirty)
 	{
 		DebugInfo.CulledOctantsCount = 0;
 		UpdateShadowCascadesExtents();
 		BuildStaticCascadeMapInstances();
 		UpdateShadowLightMatrices();
-		BuildStaticInstances(CameraProjection, CameraView, StaticInstanceDatas, StaticInstanceGroupInfos);
+		BuildStaticInstances(ImguiInterface->CameraProjection, ImguiInterface->CameraView, StaticInstanceDatas, StaticInstanceGroupInfos);
 		BuildDebugInstances(StaticDebugInstanceDatas);
 	}
 
@@ -215,7 +140,7 @@ void ragdoll::Scene::Update(float _dt)
 	ImguiInterface->Render();
 	DirectXDevice::GetInstance()->Present();
 
-	bIsCameraDirty = false;
+	SceneInfo.bIsCameraDirty = false;
 }
 
 void ragdoll::Scene::Shutdown()
@@ -224,126 +149,6 @@ void ragdoll::Scene::Shutdown()
 	ImguiInterface = nullptr;
 	DeferredRenderer->Shutdown();
 	DeferredRenderer = nullptr;
-}
-
-void ragdoll::Scene::UpdateControls(float _dt)
-{
-	//manipulate the cube and camera
-	struct Data {
-		Vector3 cameraPos = { 0.f, 1.f, 5.f };
-		float cameraYaw = DirectX::XM_PI;
-		float cameraPitch = 0.f;
-		float cameraFov = 90.f;
-		float cameraNear = 0.01f;
-		float cameraFar = 1000.f;
-		float cameraWidth = 16.f;
-		float cameraHeight = 9.f;
-		float cameraSpeed = 5.f;
-		float cameraRotationSpeed = 15.f;
-		Color dirLightColor = { 1.f,1.f,1.f,1.f };
-		Color ambientLight = { 0.2f, 0.2f, 0.2f, 1.f };
-		float lightIntensity = 1.f;
-		Vector2 azimuthAndElevation = { 0.f, 90.f };
-	};
-	static Data data;
-	ImGui::Begin("Camera Manipulate");
-	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera FOV (Degrees)", &data.cameraFov, 60.f, 120.f) : true;
-	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera Near", &data.cameraNear, 0.01f, 1.f) : true;
-	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera Far", &data.cameraFar, 10.f, 10000.f) : true;
-	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera Width", &data.cameraWidth, 0.01f, 30.f) : true;
-	bIsCameraDirty = !bIsCameraDirty ? ImGui::SliderFloat("Camera Height", &data.cameraHeight, 0.01f, 20.f) : true;
-	ImGui::SliderFloat("Camera Speed", &data.cameraSpeed, 0.01f, 30.f);
-	ImGui::SliderFloat("Camera Rotation Speed (Degrees)", &data.cameraRotationSpeed, 5.f, 100.f);
-	ImGui::ColorEdit3("Light Diffuse", &data.dirLightColor.x);
-	ImGui::SliderFloat("Light Intensity", &data.lightIntensity, 0.1f, 10.f);
-	ImGui::ColorEdit3("Ambient Light Diffuse", &data.ambientLight.x);
-	if (ImGui::SliderFloat("Azimuth (Degrees)", &data.azimuthAndElevation.x, 0.f, 360.f))
-	{
-		UpdateShadowCascadesExtents();
-		BuildStaticCascadeMapInstances();
-		UpdateShadowLightMatrices();
-		BuildDebugInstances(StaticDebugInstanceDatas);
-	}
-	if(ImGui::SliderFloat("Elevation (Degrees)", &data.azimuthAndElevation.y, 0.01f, 90.f))
-	{
-		UpdateShadowCascadesExtents();
-		BuildStaticCascadeMapInstances();
-		UpdateShadowLightMatrices();
-		BuildDebugInstances(StaticDebugInstanceDatas);
-	}
-	ImGui::End();
-
-	SceneInfo.CameraFov = data.cameraFov;
-	SceneInfo.CameraAspect = data.cameraWidth / data.cameraHeight;
-	SceneInfo.CameraNear = data.cameraNear;
-
-	//make a infinite z inverse projection matrix
-	float e = 1 / tanf(DirectX::XMConvertToRadians(data.cameraFov) / 2.f);
-	SceneInfo.InfiniteReverseZProj._11 = e;
-	SceneInfo.InfiniteReverseZProj._22 = e * (data.cameraWidth / data.cameraHeight);
-	SceneInfo.InfiniteReverseZProj._33 = 0.f;
-	SceneInfo.InfiniteReverseZProj._44 = 0.f;
-	SceneInfo.InfiniteReverseZProj._43 = data.cameraNear;
-	SceneInfo.InfiniteReverseZProj._34 = 1.f;
-	if (!bFreezeFrustumCulling)
-		CameraProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraWidth / data.cameraHeight, data.cameraNear, data.cameraFar);
-	Vector3 cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
-
-	//hardcoded handling of movement now
-	if (!ImGui::IsAnyItemFocused() && !ImGui::IsAnyItemActive()) {
-		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_W))
-		{
-			bIsCameraDirty = true;
-			data.cameraPos += cameraDir * data.cameraSpeed * PrimaryWindowRef->GetFrameTime();
-		}
-		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_S))
-		{
-			bIsCameraDirty = true;
-			data.cameraPos -= cameraDir * data.cameraSpeed * PrimaryWindowRef->GetFrameTime();
-		}
-		Vector3 cameraRight = cameraDir.Cross(Vector3(0.f, 1.f, 0.f));
-		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_A))
-		{
-			bIsCameraDirty = true;
-			data.cameraPos += cameraRight * data.cameraSpeed * PrimaryWindowRef->GetFrameTime();
-		}
-		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_D))
-		{
-			bIsCameraDirty = true;
-			data.cameraPos -= cameraRight * data.cameraSpeed * PrimaryWindowRef->GetFrameTime();
-		}
-		if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
-		{
-			bIsCameraDirty = true;
-			auto& io = ImGui::GetIO();
-			data.cameraYaw += io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindowRef->GetFrameTime();
-			data.cameraPitch += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * PrimaryWindowRef->GetFrameTime();
-			data.cameraPitch = data.cameraPitch > DirectX::XM_PIDIV2 - 0.1f ? DirectX::XM_PIDIV2 - 0.1f : data.cameraPitch;
-			data.cameraPitch = data.cameraPitch < -DirectX::XM_PIDIV2 + 0.1f ? -DirectX::XM_PIDIV2 + 0.1f : data.cameraPitch;
-		}
-	}
-	cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
-
-	SceneInfo.MainCameraView = DirectX::XMMatrixLookAtLH(data.cameraPos, data.cameraPos + cameraDir, Vector3(0.f, 1.f, 0.f));
-	if (!bFreezeFrustumCulling)
-		CameraView = SceneInfo.MainCameraView;
-	SceneInfo.PrevMainCameraViewProj = SceneInfo.MainCameraViewProj;
-	SceneInfo.MainCameraViewProj = SceneInfo.MainCameraView * SceneInfo.InfiniteReverseZProj;
-	if (!bFreezeFrustumCulling)
-		CameraViewProjection = SceneInfo.MainCameraViewProj;
-	SceneInfo.SceneAmbientColor = data.ambientLight;
-	SceneInfo.LightDiffuseColor = data.dirLightColor;
-	SceneInfo.LightIntensity = data.lightIntensity;
-	Vector2 azimuthElevationRad = {
-		DirectX::XMConvertToRadians(data.azimuthAndElevation.x),
-		DirectX::XMConvertToRadians(data.azimuthAndElevation.y) };
-	SceneInfo.LightDirection = Vector3(
-		cosf(azimuthElevationRad.y) * sinf(azimuthElevationRad.x),
-		sinf(azimuthElevationRad.y),
-		cosf(azimuthElevationRad.y) * cosf(azimuthElevationRad.x)
-	);
-	SceneInfo.LightDirection.Normalize();
-	SceneInfo.MainCameraPosition = data.cameraPos;
 }
 
 void ragdoll::Scene::CreateCustomMeshes()
