@@ -1,7 +1,7 @@
 #include "ragdollpch.h"
 
 #include "nvrhi/utils.h"
-#include <microprofile.h>
+#include "Profiler.h"
 
 #include "AssetManager.h"
 #include "DirectXDevice.h"
@@ -78,6 +78,7 @@ uint32_t Hash(const nvrhi::ComputePipelineDesc& desc) {
 
 nvrhi::GraphicsPipelineHandle AssetManager::GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb)
 {
+	std::lock_guard<std::mutex> LockGuard(Mutex);
 	uint32_t hash = Hash(desc);
 	if (GPSOs.contains(hash))
 		return GPSOs.at(hash);
@@ -90,12 +91,16 @@ nvrhi::ComputePipelineHandle AssetManager::GetComputePipeline(const nvrhi::Compu
 	uint32_t hash = Hash(desc);
 	if (CPSOs.contains(hash))
 		return CPSOs.at(hash);
-	RD_CORE_INFO("CPSO created");
-	return CPSOs[hash] = DirectXDevice::GetNativeDevice()->createComputePipeline(desc);
+	{
+		std::lock_guard<std::mutex> LockGuard(Mutex);
+		RD_CORE_INFO("CPSO created");
+		return CPSOs[hash] = DirectXDevice::GetNativeDevice()->createComputePipeline(desc);
+	}
 }
 
 nvrhi::BindingLayoutHandle AssetManager::GetBindingLayout(const nvrhi::BindingSetDesc& desc)
 {
+	RD_SCOPE(Asset, GetBindingLayout);
 	static auto ConvertSetToLayout = [](const nvrhi::BindingSetItemArray& setDesc, nvrhi::BindingLayoutItemArray& layoutDesc)
 		{
 			for (auto& item : setDesc)
@@ -114,8 +119,11 @@ nvrhi::BindingLayoutHandle AssetManager::GetBindingLayout(const nvrhi::BindingSe
 	uint32_t hash = HashBytes(&layoutDesc);
 	if (BindingLayouts.contains(hash))
 		return BindingLayouts.at(hash);
-	RD_CORE_INFO("Binding Layout created");
-	return BindingLayouts[hash] = DirectXDevice::GetNativeDevice()->createBindingLayout(layoutDesc);
+	{
+		std::lock_guard<std::mutex> LockGuard(Mutex);
+		RD_CORE_INFO("Binding Layout created");
+		return BindingLayouts[hash] = DirectXDevice::GetNativeDevice()->createBindingLayout(layoutDesc);
+	}
 }
 
 void AssetManager::RecompileShaders()
@@ -327,7 +335,7 @@ void AssetManager::UpdateVBOIBO()
 	MICROPROFILE_GPU_SET_CONTEXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer, MicroProfileGetGlobalGpuThreadLog());
 	{
 		MICROPROFILE_SCOPEI("Render", "Create VBO IBO", MP_BLUEVIOLET);
-		MICROPROFILE_SCOPEGPUI("Create VBO IBO", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Create VBO IBO", MP_LIGHTYELLOW1);
 		CommandList->beginMarker("Update global buffer");
 
 		nvrhi::BufferDesc vertexBufDesc;

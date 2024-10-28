@@ -2,7 +2,7 @@
 #include "ToneMapPass.h"
 
 #include <nvrhi/utils.h>
-#include <microprofile.h>
+#include "Ragdoll/Profiler.h"
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
@@ -27,8 +27,8 @@ void ToneMapPass::SetDependencies(nvrhi::TextureHandle SceneColor)
 
 void ToneMapPass::ToneMap(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle exposureHandle)
 {
-	MICROPROFILE_SCOPEI("Render", "Tone Map Pass", MP_BLUEVIOLET);
-	MICROPROFILE_SCOPEGPUI("Tone Map Pass", MP_LIGHTYELLOW1);
+	RD_SCOPE(Render, Tonemap);
+	RD_GPU_SCOPE("Tonemap", CommandListRef);
 	//create cbuffer
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ToneMap CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
@@ -45,7 +45,7 @@ void ToneMapPass::ToneMap(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buf
 		nvrhi::BindingSetItem::TypedBuffer_UAV(0, exposureHandle)
 	};
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
-	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(bindingSetDesc, BindingLayoutHandle);
 
 	nvrhi::GraphicsPipelineDesc PipelineDesc;
 	PipelineDesc.addBindingLayout(BindingLayoutHandle);

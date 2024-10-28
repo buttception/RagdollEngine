@@ -2,6 +2,7 @@
 #include <imgui.h>
 #include <nvrhi/nvrhi.h>
 class DirectXDevice;
+#include "Scene.h"
 
 class ImguiRenderer {
 public:
@@ -19,8 +20,16 @@ public:
 	std::vector<ImDrawVert> VertexBufferRaw;
 	std::vector<ImDrawIdx> IndexBufferRaw;
 
+	Matrix CameraViewProjection;
+	Matrix CameraProjection;
+	Matrix CameraView;
+
 	void Init(DirectXDevice* dx);
 	void BeginFrame();
+	bool DrawSpawn(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneInformation& SceneInfo, ragdoll::SceneConfig& Config);
+	void DrawControl(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneInformation& SceneInfo, ragdoll::SceneConfig& Config, float _dt);
+	int32_t DrawFBViewer();
+	void DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneInformation& SceneInfo, ragdoll::SceneConfig& Config);
 	void Render();
 	void BackbufferResizing();
 	void Shutdown();

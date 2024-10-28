@@ -2,7 +2,7 @@
 #include "CACAOPass.h"
 
 #include <nvrhi/utils.h>
-#include <microprofile.h>
+#include "Ragdoll/Profiler.h"
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
@@ -32,8 +32,8 @@ void CACAOPass::SetDependencies(Textures dependencies)
 
 void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 {
-	MICROPROFILE_SCOPEI("Render", "CACAO", MP_BLUEVIOLET);
-	MICROPROFILE_SCOPEGPUI("CACAO", MP_YELLOWGREEN);
+	RD_SCOPE(Render, CACAO);
+	RD_GPU_SCOPE("CACAO", CommandListRef);
 	CommandListRef->beginMarker("CACAO");
 	//cbuffer shared amongst all
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "CACAO CBuffer", 1);
@@ -119,39 +119,39 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 	CommandListRef->clearTextureUInt(LoadCounter, nvrhi::AllSubresources, 0);
     //prepare the depth deinterleaved and mips
 	{
-		MICROPROFILE_SCOPEGPUI("Generate Depth Mips", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Generate Depth Mips", MP_LIGHTYELLOW1);
 		PrepareDepth(sceneInfo, ConstantBufferHandle);
 	}
 	//prepare the normal deinterleaved
 	{
-		MICROPROFILE_SCOPEGPUI("Generate Normal Mips", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Generate Normal Mips", MP_LIGHTYELLOW1);
 		PrepareNormal(sceneInfo, ConstantBufferHandle);
 	}
 	//part 1 ssao generate
 	{
-		MICROPROFILE_SCOPEGPUI("Prepare Obscurance Map", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Prepare Obscurance Map", MP_LIGHTYELLOW1);
 		PrepareObscurance(sceneInfo, ConstantBufferHandle);
 	}
 	//importance map
 	{
-		MICROPROFILE_SCOPEGPUI("Prepare Importance Map", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Prepare Importance Map", MP_LIGHTYELLOW1);
 		PrepareImportance(sceneInfo, ConstantBufferHandle);
 	}
 	{
-		MICROPROFILE_SCOPEGPUI("Importance Ping Pong", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Importance Ping Pong", MP_LIGHTYELLOW1);
 		PrepareImportanceA(sceneInfo, ConstantBufferHandle);
 		PrepareImportanceB(sceneInfo, ConstantBufferHandle);
 	}
 	{
-		MICROPROFILE_SCOPEGPUI("Generate SSAO", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Generate SSAO", MP_LIGHTYELLOW1);
 		SSAOPass(sceneInfo, ConstantBufferHandle);
 	}
 	{
-		MICROPROFILE_SCOPEGPUI("Blur SSAO", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Blur SSAO", MP_LIGHTYELLOW1);
 		BlurSSAO(sceneInfo, ConstantBufferHandle);
 	}
 	{
-		MICROPROFILE_SCOPEGPUI("Apply SSAO", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Apply SSAO", MP_LIGHTYELLOW1);
 		ApplySSAO(sceneInfo, ConstantBufferHandle);
 	}
 
@@ -181,7 +181,7 @@ void CACAOPass::PrepareDepth(const ragdoll::SceneInformation& sceneInfo, nvrhi::
 		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -209,7 +209,7 @@ void CACAOPass::PrepareNormal(const ragdoll::SceneInformation& sceneInfo, nvrhi:
 		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -239,7 +239,7 @@ void CACAOPass::PrepareObscurance(const ragdoll::SceneInformation& sceneInfo, nv
 		nvrhi::BindingSetItem::Sampler(3, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -267,7 +267,7 @@ void CACAOPass::PrepareImportance(const ragdoll::SceneInformation& sceneInfo, nv
 		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -295,7 +295,7 @@ void CACAOPass::PrepareImportanceA(const ragdoll::SceneInformation& sceneInfo, n
 		nvrhi::BindingSetItem::Sampler(2, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -324,7 +324,7 @@ void CACAOPass::PrepareImportanceB(const ragdoll::SceneInformation& sceneInfo, n
 		nvrhi::BindingSetItem::Sampler(2, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -358,7 +358,7 @@ void CACAOPass::SSAOPass(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 		nvrhi::BindingSetItem::Sampler(3, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -392,7 +392,7 @@ void CACAOPass::BlurSSAO(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 		nvrhi::BindingSetItem::Sampler(1, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Mirror]),
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -426,7 +426,7 @@ void CACAOPass::ApplySSAO(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buf
 		nvrhi::BindingSetItem::Sampler(2, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp]),
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };

@@ -2,7 +2,7 @@
 #include "BloomPass.h"
 
 #include <nvrhi/utils.h>
-#include <microprofile.h>
+#include "Ragdoll/Profiler.h"
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
@@ -21,21 +21,22 @@ void BloomPass::SetDependencies(nvrhi::TextureHandle sceneColor, const std::vect
 
 void BloomPass::Bloom(const ragdoll::SceneInformation& sceneInfo)
 {
-	MICROPROFILE_SCOPEGPUI("Bloom", MP_YELLOWGREEN);
+	RD_SCOPE(Render, Bloom);
+	RD_GPU_SCOPE("Bloom", CommandListRef);
 	DownSample();
 	UpSample(sceneInfo.FilterRadius, sceneInfo.BloomIntensity);
 }
 
 void BloomPass::DownSample()
 {
-	MICROPROFILE_SCOPEI("Render", "Bloom Down Sample Pass", MP_BLUEVIOLET);
+	RD_SCOPE(Render, DownSample);
 	CommandListRef->beginMarker("Down Sample Pass");
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBufferDS), "DownSample CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 
 	nvrhi::TextureHandle Source = SceneColor;
 	for (const BloomMip& mip : *Mips) {
-		MICROPROFILE_SCOPEGPUI("Bloom Down Sample", MP_LIGHTYELLOW1);
+		RD_SCOPE(Render, DownSampleMip);
 		//create the target
 		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
 			.addColorAttachment(mip.Image);
@@ -48,30 +49,33 @@ void BloomPass::DownSample()
 			nvrhi::BindingSetItem::Texture_SRV(0, Source),
 		};
 		nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
-		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(bindingSetDesc, BindingLayoutHandle);
-		//create the pipeline
-		nvrhi::GraphicsPipelineDesc PipelineDesc;
-		PipelineDesc.addBindingLayout(BindingLayoutHandle);
-		nvrhi::ShaderHandle VertexShader = AssetManager::GetInstance()->GetShader("Fullscreen.vs.cso");
-		nvrhi::ShaderHandle PixelShader = AssetManager::GetInstance()->GetShader("DownSample.ps.cso");
-		PipelineDesc.setVertexShader(VertexShader);
-		PipelineDesc.setFragmentShader(PixelShader);
+		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(bindingSetDesc, BindingLayoutHandle);
+		{
+			RD_SCOPE(Render, GetPipelineSetState);
+			//create the pipeline
+			nvrhi::GraphicsPipelineDesc PipelineDesc;
+			PipelineDesc.addBindingLayout(BindingLayoutHandle);
+			nvrhi::ShaderHandle VertexShader = AssetManager::GetInstance()->GetShader("Fullscreen.vs.cso");
+			nvrhi::ShaderHandle PixelShader = AssetManager::GetInstance()->GetShader("DownSample.ps.cso");
+			PipelineDesc.setVertexShader(VertexShader);
+			PipelineDesc.setFragmentShader(PixelShader);
 
-		PipelineDesc.renderState.depthStencilState.depthTestEnable = false;
-		PipelineDesc.renderState.depthStencilState.stencilEnable = false;
-		PipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
-		PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
-		PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
-		//create the state
-		nvrhi::GraphicsState state;
-		state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, target);
-		state.framebuffer = target;
-		state.viewport.addViewportAndScissorRect(target->getFramebufferInfo().getViewport());
-		state.addBindingSet(BindingSetHandle);
+			PipelineDesc.renderState.depthStencilState.depthTestEnable = false;
+			PipelineDesc.renderState.depthStencilState.stencilEnable = false;
+			PipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+			PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+			PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
+			//create the state
+			nvrhi::GraphicsState state;
+			state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, target);
+			state.framebuffer = target;
+			state.viewport.addViewportAndScissorRect(target->getFramebufferInfo().getViewport());
+			state.addBindingSet(BindingSetHandle);
 
-		CBufferDS.Width = mip.Width; CBufferDS.Height = mip.Height;
-		CommandListRef->writeBuffer(ConstantBufferHandle, &CBufferDS, sizeof(ConstantBufferDS));
-		CommandListRef->setGraphicsState(state);
+			CBufferDS.Width = mip.Width; CBufferDS.Height = mip.Height;
+			CommandListRef->writeBuffer(ConstantBufferHandle, &CBufferDS, sizeof(ConstantBufferDS));
+			CommandListRef->setGraphicsState(state);
+		}
 
 		nvrhi::DrawArguments args;
 		args.vertexCount = 3;
@@ -85,13 +89,14 @@ void BloomPass::DownSample()
 
 void BloomPass::UpSample(float filterRadius, float bloomIntensity)
 {
-	MICROPROFILE_SCOPEI("Render", "Bloom Up Sample Pass", MP_BLUEVIOLET);
+	RD_SCOPE(Render, UpSample);
 	CommandListRef->beginMarker("Up Sample Pass");
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBufferUS), "UpSample CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 
 	for (int i = Mips->size() - 1; i > 0; --i) {
-		MICROPROFILE_SCOPEGPUI("Bloom Up Sample GPU", MP_LIGHTYELLOW1);
+		RD_SCOPE(Render, UpSampleMip);
+		//MICROPROFILE_SCOPEGPUI("Bloom Up Sample GPU", MP_LIGHTYELLOW1);
 		nvrhi::TextureHandle Source = Mips->operator[](i).Image;
 		nvrhi::TextureHandle Target = Mips->operator[](i - 1).Image;
 		//create the target
@@ -107,7 +112,7 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity)
 			nvrhi::BindingSetItem::Texture_SRV(1, SceneColor),
 		};
 		nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
-		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(bindingSetDesc, BindingLayoutHandle);
 		//create the pipeline
 		nvrhi::GraphicsPipelineDesc PipelineDesc;
 		PipelineDesc.addBindingLayout(BindingLayoutHandle);
@@ -139,7 +144,7 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity)
 	}
 	CommandListRef->endMarker();
 	{
-		MICROPROFILE_SCOPEGPUI("Apply Bloom", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Apply Bloom", MP_LIGHTYELLOW1);
 		CBufferUS.BloomIntensity = 0.f;
 		//copy the first mip into scene color
 		//create the target
@@ -153,7 +158,7 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity)
 			nvrhi::BindingSetItem::Texture_SRV(0, Mips->operator[](0).Image),
 		};
 		nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
-		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(bindingSetDesc, BindingLayoutHandle);
 		//create the pipeline
 		nvrhi::GraphicsPipelineDesc PipelineDesc;
 		PipelineDesc.addBindingLayout(BindingLayoutHandle);

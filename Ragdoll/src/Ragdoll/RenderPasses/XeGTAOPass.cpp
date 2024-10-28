@@ -2,7 +2,7 @@
 #include "XeGTAOPass.h"
 
 #include <nvrhi/utils.h>
-#include <microprofile.h>
+#include "Ragdoll/Profiler.h"
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
@@ -40,8 +40,9 @@ void XeGTAOPass::UpdateConstants(const uint32_t width, const uint32_t height, co
 
 void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 {
-	MICROPROFILE_SCOPEI("Render", "XeGTAO", MP_BLUEVIOLET);
-	MICROPROFILE_SCOPEGPUI("XeGTAO", MP_YELLOWGREEN);
+	RD_SCOPE(Render, XeGTAO);
+	RD_GPU_SCOPE("XeGTAO", CommandListRef);
+
 	CommandListRef->beginMarker("XeGTAO");
 	UpdateConstants(DepthBuffer->getDesc().width, DepthBuffer->getDesc().height, sceneInfo.InfiniteReverseZProj);
 	//cbuffer shared amongst all
@@ -64,19 +65,19 @@ void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 	nvrhi::BufferHandle MatrixHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 	CommandListRef->writeBuffer(MatrixHandle, &OtherBuffer, sizeof(ConstantBuffer));
 	{
-		MICROPROFILE_SCOPEGPUI("Prepare Depth Mips", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Prepare Depth Mips", MP_LIGHTYELLOW1);
 		GenerateDepthMips(sceneInfo, ConstantBufferHandle, MatrixHandle);
 	}
 	{
-		MICROPROFILE_SCOPEGPUI("Generate SSAO", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Generate SSAO", MP_LIGHTYELLOW1);
 		MainPass(sceneInfo, ConstantBufferHandle, MatrixHandle);
 	}
 	{
-		MICROPROFILE_SCOPEGPUI("Denoise SSAO", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Denoise SSAO", MP_LIGHTYELLOW1);
 		Denoise(sceneInfo, ConstantBufferHandle, MatrixHandle);
 	}
 	{
-		MICROPROFILE_SCOPEGPUI("Apply SSAO", MP_LIGHTYELLOW1);
+		//MICROPROFILE_SCOPEGPUI("Apply SSAO", MP_LIGHTYELLOW1);
 		Compose(sceneInfo, ConstantBufferHandle, MatrixHandle);
 	}
 
@@ -101,7 +102,7 @@ void XeGTAOPass::GenerateDepthMips(const ragdoll::SceneInformation& sceneInfo, n
 		nvrhi::BindingSetItem::Sampler(10, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -132,7 +133,7 @@ void XeGTAOPass::MainPass(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buf
 		nvrhi::BindingSetItem::Sampler(10, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
@@ -170,7 +171,7 @@ void XeGTAOPass::Denoise(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 			nvrhi::BindingSetItem::Sampler(10, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 		};
 		nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-		nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+		nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 		std::swap(AOPing, AOPong);      // ping becomes pong, pong becomes ping.
 
@@ -205,7 +206,7 @@ void XeGTAOPass::Compose(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 		nvrhi::BindingSetItem::Sampler(10, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };

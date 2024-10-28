@@ -1,10 +1,12 @@
 #include "ragdollpch.h"
 #include "GLTFLoader.h"
-#include <microprofile.h>
 
 #include "DirectXDevice.h"
 #include "AssetManager.h"
 #include "Ragdoll/Entity/EntityManager.h"
+
+#include "Executor.h"
+#include "Profiler.h"
 
 #include "Ragdoll/Components/TransformComp.h"
 #include "Ragdoll/Components/RenderableComp.h"
@@ -12,6 +14,11 @@
 
 // Define these only in *one* .cc file.
 #define TINYGLTF_IMPLEMENTATION
+#define MULTITHREAD_LOAD 1
+#if MULTITHREAD_LOAD == 1
+#define TINYGLTF_NO_EXTERNAL_IMAGE
+#endif
+#define TINYGLTF_USE_CPP14
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
@@ -132,7 +139,7 @@ enum AttributeType {
 
 void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 {
-	MICROPROFILE_SCOPEI("Load", "Load GLTF", MP_CYAN);
+	RD_SCOPE(Load, Load GLTF);
 	//ownself open command list
 	tinygltf::TinyGLTF loader;
 	tinygltf::Model model;
@@ -140,14 +147,15 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	std::filesystem::path path = Root / fileName;
 	std::filesystem::path modelRoot = path.parent_path().lexically_relative(Root);
 	{
-		MICROPROFILE_SCOPEI("Load", "Load GLTF File", MP_DARKCYAN);
+		RD_SCOPE(Load, Load GLTF File);
 		bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, path.string());
 		RD_ASSERT(ret == false, "Issue loading {}", path.string());
 	}
 
 	uint32_t meshIndicesOffset = AssetManager::GetInstance()->Meshes.size();
+	//load meshes
 	{
-		MICROPROFILE_SCOPEI("Load", "Load Meshes", MP_DARKCYAN);
+		RD_SCOPE(Load, Load Meshes);
 		// go downwards from meshes
 		for (const auto& itMesh : model.meshes) {
 			//should not create a new input layout handle, use the one provided by the renderer
@@ -163,7 +171,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			uint32_t materialIndicesOffset = AssetManager::GetInstance()->Materials.size();
 			for (const tinygltf::Primitive& itPrim : itMesh.primitives)
 			{
-				MICROPROFILE_SCOPEI("Render", "Mesh", MP_LIGHTCYAN);
+				RD_SCOPE(Load, Mesh);
 				Submesh submesh{};
 				DirectX::BoundingBox box;
 				VertexBufferInfo buffer;
@@ -344,161 +352,12 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	{
 		AssetManager::GetInstance()->UpdateVBOIBO();
 	}
+	uint32_t textureIndicesOffset = AssetManager::GetInstance()->Textures.size();
+	uint32_t imageIndicesOffset = AssetManager::GetInstance()->Images.size();
 
-	uint32_t textureIndicesOffset;
+	//load materials
 	{
-		CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
-		CommandList->open();
-		MICROPROFILE_SCOPEI("Load", "Load Textures", MP_DARKCYAN);
-		MICROPROFILE_GPU_SET_CONTEXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer, MicroProfileGetGlobalGpuThreadLog());
-		{
-			MICROPROFILE_SCOPEGPUI("Load Textures", MP_LIGHTYELLOW1);
-			//load the images
-			std::unordered_map<int32_t, int32_t> gltfSourceToImageIndex{};
-			for (int i = 0; i < model.images.size(); ++i)
-			{
-				const tinygltf::Image& itImg = model.images[i];
-				nvrhi::TextureDesc texDesc;
-				texDesc.width = itImg.width;
-				texDesc.height = itImg.height;
-				texDesc.dimension = nvrhi::TextureDimension::Texture2D;
-				switch (itImg.component)
-				{
-				case 1:
-					texDesc.format = nvrhi::Format::R8_UNORM;
-					break;
-				case 2:
-					texDesc.format = nvrhi::Format::RG8_UNORM;
-					break;
-				case 3:
-					texDesc.format = nvrhi::Format::RGBA8_UNORM;
-					break;
-				case 4:
-					texDesc.format = nvrhi::Format::RGBA8_UNORM;
-					break;
-				default:
-					RD_ASSERT(true, "Unsupported texture channel count");
-				}
-				texDesc.debugName = itImg.uri;
-				texDesc.initialState = nvrhi::ResourceStates::ShaderResource;
-				texDesc.isRenderTarget = false;
-				texDesc.keepInitialState = true;
-
-				Image img;
-				img.TextureHandle = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-				RD_ASSERT(img.TextureHandle == nullptr, "Issue creating texture handle: {}", itImg.uri);
-
-				//upload the texture data
-				CommandList->writeTexture(img.TextureHandle, 0, 0, itImg.image.data(), itImg.width * itImg.component);
-				//write to descriptor table
-				int32_t index = AssetManager::GetInstance()->AddImage(img);
-				gltfSourceToImageIndex[i] = index;
-			}
-			textureIndicesOffset = AssetManager::GetInstance()->Textures.size();
-			for (const tinygltf::Texture& itTex : model.textures)
-			{
-				//textures contain a sampler and an image
-				Texture tex;
-				SamplerTypes type;
-				if (itTex.sampler < 0)
-				{
-					//no samplers so use a default one
-				}
-				else
-				{
-					//create the sampler
-					const tinygltf::Sampler gltfSampler = model.samplers[itTex.sampler];
-					switch (gltfSampler.wrapS)
-					{
-					case TINYGLTF_TEXTURE_WRAP_REPEAT:
-						switch (gltfSampler.minFilter)
-						{
-						case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
-						case TINYGLTF_TEXTURE_FILTER_LINEAR:
-							if (gltfSampler.magFilter == 1)
-								type = SamplerTypes::Trilinear_Repeat;
-							else
-								type = SamplerTypes::Linear_Repeat;
-							break;
-						case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
-						case TINYGLTF_TEXTURE_FILTER_NEAREST:
-							type = SamplerTypes::Point_Repeat;
-							break;
-						case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
-						case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
-						case -1:
-							RD_CORE_WARN("Sampler do not exist, giving trilinear");
-							type = SamplerTypes::Trilinear_Repeat;
-							break;
-						default:
-							RD_ASSERT(true, "Unknown min filter");
-						}
-						break;
-					case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
-						switch (gltfSampler.minFilter)
-						{
-						case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
-						case TINYGLTF_TEXTURE_FILTER_LINEAR:
-							if (gltfSampler.magFilter == 1)
-								type = SamplerTypes::Trilinear_Clamp;
-							else
-								type = SamplerTypes::Linear_Clamp;
-							break;
-						case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
-						case TINYGLTF_TEXTURE_FILTER_NEAREST:
-							type = SamplerTypes::Point_Clamp;
-							break;
-						case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
-						case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
-						case -1:
-							RD_CORE_WARN("Sampler do not exist, giving trilinear");
-							type = SamplerTypes::Trilinear_Clamp;
-							break;
-						default:
-							RD_ASSERT(true, "Unknown min filter");
-						}
-						break;
-					case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
-						switch (gltfSampler.minFilter)
-						{
-						case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
-						case TINYGLTF_TEXTURE_FILTER_LINEAR:
-							if (gltfSampler.magFilter == 1)
-								type = SamplerTypes::Trilinear_Repeat;
-							else
-								type = SamplerTypes::Linear_Repeat;
-							break;
-						case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
-						case TINYGLTF_TEXTURE_FILTER_NEAREST:
-							type = SamplerTypes::Point_Repeat;
-							break;
-						case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
-						case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
-						case -1:
-							RD_CORE_WARN("Sampler do not exist, giving trilinear");
-							type = SamplerTypes::Trilinear_Repeat;
-							break;
-						default:
-							RD_ASSERT(true, "Unknown min filter");
-						}
-						break;
-					}
-				}
-				tex.SamplerIndex = (int)type;
-				tex.ImageIndex = gltfSourceToImageIndex.at(itTex.source);
-				AssetManager::GetInstance()->Textures.emplace_back(tex);
-
-				TINYGLTF_MODE_POINTS;
-			}
-		}
-		CommandList->close();
-		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
-
-		MicroProfileFlip(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer);
-	}
-
-	{
-		MICROPROFILE_SCOPEI("Load", "Load Textures", MP_CYAN);
+		RD_SCOPE(Load, Load Materials);
 		//load all of the materials
 		for (const tinygltf::Material& gltfMat : model.materials)
 		{
@@ -521,9 +380,261 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			AssetManager::GetInstance()->Materials.emplace_back(mat);
 		}
 	}
+
+	//load textures
+	{
+		RD_SCOPE(Load, Load Textures);
+		{
+#if MULTITHREAD_LOAD == 1
+			//load the images but have 1 thread per image
+			AssetManager::GetInstance()->Images.resize(model.images.size() + imageIndicesOffset);
+			std::vector<nvrhi::ICommandList*> cmdLists(model.images.size());
+			std::vector<nvrhi::CommandListHandle> cmdListHandles(model.images.size());
+			tf::Taskflow TaskFlow;
+			for (int i = 0; i < model.images.size(); ++i)
+			{
+				cmdLists[i] = cmdListHandles[i] = DirectXDevice::GetNativeDevice()->createCommandList(nvrhi::CommandListParameters().setEnableImmediateExecution(false));
+				nvrhi::CommandListHandle hdl = cmdListHandles[i];
+
+				Image* img = &AssetManager::GetInstance()->Images[i + imageIndicesOffset];
+				tinygltf::Image* itImg = &model.images[i];
+				//push the loading into the taskflow
+				TaskFlow.emplace(
+					[itImg, path, img, imageIndicesOffset, i, hdl]()
+					{
+						{
+							RD_SCOPE(Load, STB Load);
+							std::filesystem::path modelPath = path.parent_path() / itImg->uri;
+							//load raw bytes, do not use stbi load
+							std::ifstream file(modelPath, std::ios::binary | std::ios::ate);
+							RD_ASSERT(!file, "Unable to open file {}:{}", strerror(errno), modelPath.string());
+							std::streamsize size = file.tellg();
+							file.seekg(0, std::ios::beg);
+							std::vector<uint8_t> data(size);
+							RD_ASSERT(!file.read((char*)data.data(), size), "Failed to read file {}", itImg->uri);
+							//use stbi_info_from_memory to check header on info for how to load
+							int w = -1, h = -1, comp = -1, req_comp = 0;
+							RD_ASSERT(!stbi_info_from_memory(data.data(), size, &w, &h, &comp), "stb unable to read image {}", itImg->uri);
+							int bits = 8;
+							int pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
+							if (comp == 3)
+								req_comp = 4;
+							//dont support hdr images
+							//use stbi_load_from_memory to load the image data, set up all the desc with that info
+							uint8_t* raw = stbi_load_from_memory(data.data(), size, &w, &h, &comp, req_comp);
+							RD_ASSERT(!raw, "Issue loading {}", itImg->uri);
+							itImg->width = w;
+							itImg->height = h;
+							itImg->component = comp;
+							itImg->bits = bits;
+							itImg->pixel_type = pixel_type;
+							//do not free the image here, free it when creating textures in gpu
+							img->RawData = raw;
+						}
+
+						{
+							RD_SCOPE(Load, Create Texture);
+							nvrhi::TextureDesc texDesc;
+							texDesc.width = itImg->width;
+							texDesc.height = itImg->height;
+							texDesc.dimension = nvrhi::TextureDimension::Texture2D;
+							switch (itImg->component)
+							{
+							case 1:
+								texDesc.format = nvrhi::Format::R8_UNORM;
+								break;
+							case 2:
+								texDesc.format = nvrhi::Format::RG8_UNORM;
+								break;
+							case 3:
+								texDesc.format = nvrhi::Format::RGBA8_UNORM;
+								break;
+							case 4:
+								texDesc.format = nvrhi::Format::RGBA8_UNORM;
+								break;
+							default:
+								RD_ASSERT(true, "Unsupported texture channel count");
+							}
+							texDesc.debugName = itImg->uri;
+							texDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+							texDesc.isRenderTarget = false;
+							texDesc.keepInitialState = true;
+
+							img->TextureHandle = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+							RD_ASSERT(img->TextureHandle == nullptr, "Issue creating texture handle: {}", itImg->uri);
+
+							DirectXDevice::GetInstance()->m_NvrhiDevice->writeDescriptorTable(AssetManager::GetInstance()->DescriptorTable, nvrhi::BindingSetItem::Texture_SRV(i + imageIndicesOffset, img->TextureHandle));
+						}
+						
+						{
+							RD_SCOPE(Load, Write Texture);
+							hdl->open();
+							//upload the texture data
+							hdl->writeTexture(img->TextureHandle, 0, 0, img->RawData, itImg->width* (itImg->component == 3 ? 4 : itImg->component));
+							hdl->close();
+						}
+					}
+				);
+			}
+			//execute all the task
+			SExecutor::Executor.run(TaskFlow).wait();
+
+			DirectXDevice::GetNativeDevice()->executeCommandLists(cmdLists.data(), cmdLists.size());
+#else
+			CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
+			CommandList->open();
+			MICROPROFILE_GPU_SET_CONTEXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer, MicroProfileGetGlobalGpuThreadLog());
+			{
+				//MICROPROFILE_SCOPEGPUI("Create Textures", MP_AUTO);
+				//load the images
+				std::unordered_map<int32_t, int32_t> gltfSourceToImageIndex{};
+				for (int i = 0; i < model.images.size(); ++i)
+				{
+					const tinygltf::Image& itImg = model.images[i];
+					nvrhi::TextureDesc texDesc;
+					texDesc.width = itImg.width;
+					texDesc.height = itImg.height;
+					texDesc.dimension = nvrhi::TextureDimension::Texture2D;
+					switch (itImg.component)
+					{
+					case 1:
+						texDesc.format = nvrhi::Format::R8_UNORM;
+						break;
+					case 2:
+						texDesc.format = nvrhi::Format::RG8_UNORM;
+						break;
+					case 3:
+						texDesc.format = nvrhi::Format::RGBA8_UNORM;
+						break;
+					case 4:
+						texDesc.format = nvrhi::Format::RGBA8_UNORM;
+						break;
+					default:
+						RD_ASSERT(true, "Unsupported texture channel count");
+					}
+					texDesc.debugName = itImg.uri;
+					texDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+					texDesc.isRenderTarget = false;
+					texDesc.keepInitialState = true;
+
+					Image img;
+					img.TextureHandle = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+					RD_ASSERT(img.TextureHandle == nullptr, "Issue creating texture handle: {}", itImg.uri);
+
+					//upload the texture data
+					CommandList->writeTexture(img.TextureHandle, 0, 0, itImg.image.data(), itImg.width * itImg.component);
+					//write to descriptor table
+					int32_t index = AssetManager::GetInstance()->AddImage(img);
+					gltfSourceToImageIndex[i] = index;
+				}
+			}
+			CommandList->close();
+			DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
+
+			MicroProfileFlip(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer);
+#endif
+		}
+	}
+
+	{
+		RD_SCOPE(Load, Attaching Samplers);
+		for (const tinygltf::Texture& itTex : model.textures)
+		{
+			//textures contain a sampler and an image
+			Texture tex;
+			SamplerTypes type;
+			if (itTex.sampler < 0)
+			{
+				//no samplers so use a default one
+			}
+			else
+			{
+				//create the sampler
+				const tinygltf::Sampler gltfSampler = model.samplers[itTex.sampler];
+				switch (gltfSampler.wrapS)
+				{
+				case TINYGLTF_TEXTURE_WRAP_REPEAT:
+					switch (gltfSampler.minFilter)
+					{
+					case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+					case TINYGLTF_TEXTURE_FILTER_LINEAR:
+						if (gltfSampler.magFilter == 1)
+							type = SamplerTypes::Trilinear_Repeat;
+						else
+							type = SamplerTypes::Linear_Repeat;
+						break;
+					case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
+					case TINYGLTF_TEXTURE_FILTER_NEAREST:
+						type = SamplerTypes::Point_Repeat;
+						break;
+					case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
+					case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
+					case -1:
+						RD_CORE_WARN("Sampler do not exist, giving trilinear");
+						type = SamplerTypes::Trilinear_Repeat;
+						break;
+					default:
+						RD_ASSERT(true, "Unknown min filter");
+					}
+					break;
+				case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
+					switch (gltfSampler.minFilter)
+					{
+					case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+					case TINYGLTF_TEXTURE_FILTER_LINEAR:
+						if (gltfSampler.magFilter == 1)
+							type = SamplerTypes::Trilinear_Clamp;
+						else
+							type = SamplerTypes::Linear_Clamp;
+						break;
+					case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
+					case TINYGLTF_TEXTURE_FILTER_NEAREST:
+						type = SamplerTypes::Point_Clamp;
+						break;
+					case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
+					case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
+					case -1:
+						RD_CORE_WARN("Sampler do not exist, giving trilinear");
+						type = SamplerTypes::Trilinear_Clamp;
+						break;
+					default:
+						RD_ASSERT(true, "Unknown min filter");
+					}
+					break;
+				case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
+					switch (gltfSampler.minFilter)
+					{
+					case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+					case TINYGLTF_TEXTURE_FILTER_LINEAR:
+						if (gltfSampler.magFilter == 1)
+							type = SamplerTypes::Trilinear_Repeat;
+						else
+							type = SamplerTypes::Linear_Repeat;
+						break;
+					case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
+					case TINYGLTF_TEXTURE_FILTER_NEAREST:
+						type = SamplerTypes::Point_Repeat;
+						break;
+					case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
+					case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
+					case -1:
+						RD_CORE_WARN("Sampler do not exist, giving trilinear");
+						type = SamplerTypes::Trilinear_Repeat;
+						break;
+					default:
+						RD_ASSERT(true, "Unknown min filter");
+					}
+					break;
+				}
+			}
+			tex.SamplerIndex = (int)type;
+			tex.ImageIndex = itTex.source + imageIndicesOffset;
+			AssetManager::GetInstance()->Textures.emplace_back(tex);
+		}
+	}
 	
 	{
-		MICROPROFILE_SCOPEI("Load", "Get Scene Extents", MP_CYAN);
+		RD_SCOPE(Load, Creating Hierarchy);
 		Vector3 min{ FLT_MAX, FLT_MAX, FLT_MAX }, max{ -FLT_MAX, -FLT_MAX, -FLT_MAX };
 		//create all the entities and their components
 		for (const int& rootIndex : model.scenes[0].nodes) {	//iterating through the root nodes

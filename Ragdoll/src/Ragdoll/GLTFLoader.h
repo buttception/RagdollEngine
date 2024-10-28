@@ -2,6 +2,7 @@
 #include "Ragdoll/Math/RagdollMath.h"
 #include "Ragdoll/AssetManager.h"
 #include <nvrhi/nvrhi.h>
+#include <taskflow.hpp>
 
 class DirectXDevice;
 namespace ragdoll {

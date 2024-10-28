@@ -23,10 +23,10 @@ namespace ragdoll {
 	struct InstanceGroupInfo;
 }
 class DirectXDevice;
+class ImguiRenderer;
 
 class Renderer {
 public:
-
 	std::shared_ptr<SkyGeneratePass> SkyGeneratePass;
 	std::shared_ptr<GBufferPass> GBufferPass;
 	std::shared_ptr<CACAOPass> CACAOPass;
@@ -40,6 +40,28 @@ public:
 	std::shared_ptr<ToneMapPass> ToneMapPass;
 	std::shared_ptr<DebugPass> DebugPass;
 	std::shared_ptr<FramebufferViewer> FramebufferViewer;
+
+	enum class Pass {
+		SKY_GENERATE,
+		GBUFFER,
+		AO,
+		SHADOW_DEPTH0,
+		SHADOW_DEPTH1,
+		SHADOW_DEPTH2,
+		SHADOW_DEPTH3,
+		SHADOW_MASK,
+		LIGHT,
+		SKY,
+		BLOOM,
+		EXPOSURE,
+		TONEMAP,
+		DEBUG,
+		FB_VIEWER,
+
+		COUNT
+	};
+
+	std::vector<nvrhi::CommandListHandle> CommandLists;
 
 	nvrhi::TextureHandle SkyTexture;
 	nvrhi::TextureHandle SkyThetaGammaTable;
@@ -75,7 +97,7 @@ public:
 	void Shutdown();
 
 	void BeginFrame();
-	void Render(ragdoll::Scene* scene, float _dt);
+	void Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRenderer> imgui);
 private:
 	std::shared_ptr<ragdoll::Window> PrimaryWindowRef;
 	//handled at renderer

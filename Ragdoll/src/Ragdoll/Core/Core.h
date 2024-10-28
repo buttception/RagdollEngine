@@ -81,6 +81,8 @@ ________________________________________________________________________________
 // Stringify macro
 #define STRINGIFY(x) #x
 
+#define CONCAT(a, b) a##b
+
 // Function pointer binding with std::functions
 #define RD_BIND_EVENT_FN(fn) std::bind(&fn, this, std::placeholders::_1)
 namespace ragdoll
@@ -91,7 +93,6 @@ using EventCallbackFn = std::function<void(ragdoll::Event&)>;
 
 #define RD_LOG_EVENT false
 #define RD_LOG_INPUT false
-#define RD_OPENGL_DEBUG_LEVEL 1 //0 for errors, //1 for medium, //2 for low, //3 for notifications
 
 //ignore warnings
 #pragma warning(push)

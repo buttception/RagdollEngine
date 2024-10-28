@@ -1,6 +1,4 @@
 #pragma once
-#include "ImGuiRenderer.h"
-#include "DeferredRenderer.h"
 
 #include "Components/TransformComp.h"
 #include "Components/RenderableComp.h"
@@ -8,10 +6,13 @@
 #include "Entity/EntityManager.h"
 #include "Octree.h"
 
+class Renderer;
+class ImguiRenderer;
 namespace ragdoll {
 	class EntityManager;
 	class TransformSystem;
 	class Application;
+	class Window;
 
 	struct Proxy {
 		Matrix ModelToWorld;
@@ -117,11 +118,14 @@ namespace ragdoll {
 		float Exposure = 1.f;
 		float SkyDimmer = 0.f;
 		bool UseFixedExposure = 0.f;
+		float Luminance = 0.f;
 		float FilterRadius = 0.05f;
 		float BloomIntensity = 0.04f;
 		bool UseCACAO = false;
 		bool UseXeGTAO = true;
 		float ModulationFactor = 0.9f;
+		bool bIsCameraDirty{ true };
+		bool bFreezeFrustumCulling{ false };
 	};
 
 	class Scene {
@@ -141,18 +145,12 @@ namespace ragdoll {
 
 		//Rendering
 		nvrhi::CommandListHandle CommandList;
-		bool bIsCameraDirty{ true };
-		bool bFreezeFrustumCulling{ false };
 
 	public:
 		std::shared_ptr<Renderer> DeferredRenderer;
 		SceneConfig Config;
 		DebugInfo DebugInfo;
 		Octree StaticOctree;
-
-		Matrix CameraViewProjection;
-		Matrix CameraProjection;
-		Matrix CameraView;
 
 		//render targets
 		nvrhi::TextureHandle SceneColor;
@@ -193,7 +191,6 @@ namespace ragdoll {
 		void Update(float _dt);
 		void Shutdown();
 
-		void UpdateControls(float _dt);
 		void CreateCustomMeshes();
 		void CreateRenderTargets();
 

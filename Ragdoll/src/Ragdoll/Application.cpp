@@ -70,34 +70,46 @@ namespace ragdoll
 		//turn on profiling
 		MicroProfileSetEnableAllGroups(true);
 		MicroProfileSetForceMetaCounters(true);
-		MICROPROFILE_GPU_INIT_QUEUE("GPU-Graphics-Queue");
 		RD_CORE_INFO("Open localhost:{} in chrome to capture profile data", MicroProfileWebServerPort());
 
-		MICROPROFILE_TIMELINE_ENTER_STATIC(MP_DARKGOLDENROD, "Application Initialization");
 		{
+			MICROPROFILE_SCOPEI("App", "Init", MP_AUTO);
 			GLFWContext::Init();
 
-			m_PrimaryWindow = std::make_shared<Window>();
-			m_PrimaryWindow->Init();
-			//bind the application callback to the window
-			m_PrimaryWindow->SetEventCallback(RD_BIND_EVENT_FN(Application::OnEvent));
-			//setup input handler
-			m_InputHandler = std::make_shared<InputHandler>();
-			m_InputHandler->Init();
-			//create the entity manager
-			m_EntityManager = std::make_shared<EntityManager>();
-			//create the file manager
-			m_FileManager = std::make_shared<FileManager>();
-			m_FileManager->Init();
-
-			DeviceCreationParameters params;
-			params.enableDebugRuntime = true;
-			params.enableNvrhiValidationLayer = true;
-			params.swapChainBufferCount = 2;
-			params.backBufferWidth = m_PrimaryWindow->GetBufferWidth();
-			params.backBufferHeight = m_PrimaryWindow->GetBufferHeight();
-			params.vsyncEnabled = false;
-			DirectXDevice::GetInstance()->Create(params, m_PrimaryWindow, m_FileManager);
+			{
+				MICROPROFILE_SCOPEI("App", "Window Creation", MP_AUTO);
+				m_PrimaryWindow = std::make_shared<Window>();
+				m_PrimaryWindow->Init();
+				//bind the application callback to the window
+				m_PrimaryWindow->SetEventCallback(RD_BIND_EVENT_FN(Application::OnEvent));
+			}
+			{
+				MICROPROFILE_SCOPEI("App", "Input Handler Init", MP_AUTO);
+				m_InputHandler = std::make_shared<InputHandler>();
+				m_InputHandler->Init();
+			}
+			{
+				MICROPROFILE_SCOPEI("App", "entt creation", MP_AUTO);
+				//create the entity manager
+				m_EntityManager = std::make_shared<EntityManager>();
+			}
+			{
+				MICROPROFILE_SCOPEI("App", "Filemanager Init", MP_AUTO);
+				//create the file manager
+				m_FileManager = std::make_shared<FileManager>();
+				m_FileManager->Init();
+			}
+			{
+				MICROPROFILE_SCOPEI("App", "D3D12 Device creation", MP_AUTO);
+				DeviceCreationParameters params;
+				params.enableDebugRuntime = true;
+				params.enableNvrhiValidationLayer = true;
+				params.swapChainBufferCount = 2;
+				params.backBufferWidth = m_PrimaryWindow->GetBufferWidth();
+				params.backBufferHeight = m_PrimaryWindow->GetBufferHeight();
+				params.vsyncEnabled = false;
+				DirectXDevice::GetInstance()->Create(params, m_PrimaryWindow, m_FileManager);
+			}
 
 			//setup microprofile for gpu
 			auto device = DirectXDevice::GetInstance();
@@ -113,11 +125,10 @@ namespace ragdoll
 
 			m_Scene = std::make_shared<Scene>(this);
 		}
-		MICROPROFILE_TIMELINE_LEAVE_STATIC("Application Initialization");
 
 
-		MICROPROFILE_TIMELINE_ENTER_STATIC(MP_DARKGOLDENROD, "GLTF Load");
 		{
+			MICROPROFILE_SCOPEI("App", "Load", MP_AUTO);
 			GLTFLoader loader;
 			loader.Init(m_FileManager->GetRoot(), m_FileManager, m_EntityManager, m_Scene);
 			if (!Config.glTfSampleSceneToLoad.empty())
@@ -132,13 +143,11 @@ namespace ragdoll
 				loader.LoadAndCreateModel(Config.glTfSceneToLoad);
 			}
 		}
-		MICROPROFILE_TIMELINE_LEAVE_STATIC("GLTF Load");
 
 		m_Scene->UpdateTransforms();
 		m_Scene->PopulateStaticProxies();
 		m_Scene->ResetTransformDirtyFlags();
-		MicroProfileFlip(nullptr);
-		MicroProfileDumpFileImmediately("init", "init", nullptr);
+		//MicroProfileDumpFileImmediately("init", nullptr, nullptr);
 	}
 
 	void Application::Run()
@@ -162,6 +171,10 @@ namespace ragdoll
 			m_PrimaryWindow->IncFpsCounter();
 			m_Frametime = 0;
 			MicroProfileFlip(nullptr);
+
+			static uint32_t FrameCount = 0;
+			if(FrameCount++ == 10)
+				MicroProfileDumpFileImmediately("init", nullptr, nullptr);
 
 			if (ImGui::IsKeyPressed(ImGuiKey_F1)) {
 				MicroProfileDumpFileImmediately("test", "test", nullptr);

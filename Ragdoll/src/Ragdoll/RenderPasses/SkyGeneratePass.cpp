@@ -2,7 +2,7 @@
 #include "SkyGeneratePass.h"
 
 #include <nvrhi/utils.h>
-#include <microprofile.h>
+#include "Ragdoll/Profiler.h"
 
 #include "Ragdoll/DirectXDevice.h"
 #include "Ragdoll/AssetManager.h"
@@ -25,8 +25,9 @@ void SkyGeneratePass::SetDependencies(nvrhi::TextureHandle sky, nvrhi::TextureHa
 
 void SkyGeneratePass::GenerateSky(const ragdoll::SceneInformation& sceneInfo)
 {
-	MICROPROFILE_SCOPEI("Render", "Generate Sky Texture", MP_BLUEVIOLET);
-	MICROPROFILE_SCOPEGPUI("Generate Sky Texture", MP_LIGHTYELLOW1);
+	RD_SCOPE(Render, GenerateSky);
+	RD_GPU_SCOPE("GenerateSky", CommandListRef);
+	CommandListRef->beginMarker("Generate Sky");
 	//update the sun sky and tables according to scene info
 	Vector3 lightDir = Vector3(sceneInfo.LightDirection.x, sceneInfo.LightDirection.z, sceneInfo.LightDirection.y);
 	SunSky->Update(lightDir, 2.5f, 0.f, 0.f);
@@ -45,14 +46,13 @@ void SkyGeneratePass::GenerateSky(const ragdoll::SceneInformation& sceneInfo)
 		nvrhi::BindingSetItem::Texture_UAV(0, SkyTexture)
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
-	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetNativeDevice()->createBindingSet(setDesc, layoutHandle);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
 	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("SkyGenerate.cs.cso");
 	PipelineDesc.CS = shader;
 
-	CommandListRef->beginMarker("Generate Sky");
 	nvrhi::ComputeState state;
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
 	state.bindings = { setHandle };

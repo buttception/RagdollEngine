@@ -1,6 +1,7 @@
 #include "ragdollpch.h"
 #include "DirectXDevice.h"
 #include <nvrhi/utils.h>
+#include "Profiler.h"
 
 //========================temp=======================
 
@@ -98,6 +99,12 @@ void DirectXDevice::Shutdown()
 nvrhi::TextureHandle DirectXDevice::GetCurrentBackbuffer()
 {
 	return m_RhiSwapChainBuffers[m_SwapChain->GetCurrentBackBufferIndex()];
+}
+
+nvrhi::BindingSetHandle DirectXDevice::CreateBindingSet(nvrhi::BindingSetDesc desc, nvrhi::BindingLayoutHandle layout)
+{
+	RD_SCOPE(Device, CreateBindingSet);
+	return m_NvrhiDevice->createBindingSet(desc, layout);
 }
 
 bool DirectXDevice::CreateDevice()

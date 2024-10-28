@@ -139,6 +139,7 @@ public:
 	void Shutdown();
 
 	nvrhi::TextureHandle GetCurrentBackbuffer();
+	nvrhi::BindingSetHandle CreateBindingSet(nvrhi::BindingSetDesc desc, nvrhi::BindingLayoutHandle layout);
 private:
 	bool CreateDevice();
 	bool CreateSwapChain();
@@ -146,4 +147,6 @@ private:
 	void ResizeSwapChain();
 	void ReleaseRenderTargets();
 	void DestroyDeviceAndSwapChain();
+
+	std::mutex Mutex;
 };

@@ -2,7 +2,7 @@
 #include "DebugPass.h"
 
 #include <nvrhi/utils.h>
-#include <microprofile.h>
+#include "Ragdoll/Profiler.h"
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
@@ -22,8 +22,9 @@ void DebugPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
 
 void DebugPass::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t instanceCount, const ragdoll::SceneInformation& sceneInfo)
 {
-	MICROPROFILE_SCOPEI("Render", "Draw Bounding Box", MP_ALICEBLUE);
-	MICROPROFILE_SCOPEGPUI("Debug Instance Draw", MP_LIGHTYELLOW1);
+	RD_SCOPE(Render, Debug);
+	RD_GPU_SCOPE("Debug", CommandListRef);
+
 	if (instanceCount == 0)
 		return;
 	//create a constant buffer here
@@ -39,7 +40,7 @@ void DebugPass::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t i
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, instanceBuffer),
 	};
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
-	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(bindingSetDesc, BindingLayoutHandle);
 
 	nvrhi::GraphicsPipelineDesc PipelineDesc;
 	PipelineDesc.addBindingLayout(BindingLayoutHandle);

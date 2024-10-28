@@ -2,7 +2,7 @@
 #include "ShadowMaskPass.h"
 
 #include <nvrhi/utils.h>
-#include <microprofile.h>
+#include "Ragdoll/Profiler.h"
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
@@ -31,8 +31,8 @@ void ShadowMaskPass::SetDependencies(nvrhi::TextureHandle shadow[4], nvrhi::Text
 
 void ShadowMaskPass::DrawShadowMask(const ragdoll::SceneInformation& sceneInfo)
 {
-	MICROPROFILE_SCOPEI("Render", "Shadow Mask Pass", MP_BLUEVIOLET);
-	MICROPROFILE_SCOPEGPUI("Shadow Mask Pass", MP_LIGHTYELLOW1);
+	RD_SCOPE(Render, ShadowMask);
+	RD_GPU_SCOPE("ShadowMask", CommandListRef);
 
 	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
 	//create a constant buffer here
@@ -58,7 +58,7 @@ void ShadowMaskPass::DrawShadowMask(const ragdoll::SceneInformation& sceneInfo)
 		
 	};
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
-	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetNativeDevice()->createBindingSet(bindingSetDesc, BindingLayoutHandle);
+	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(bindingSetDesc, BindingLayoutHandle);
 
 	nvrhi::GraphicsPipelineDesc PipelineDesc;
 	PipelineDesc.addBindingLayout(BindingLayoutHandle);
