@@ -43,88 +43,92 @@ ragdoll::Scene::Scene(Application* app)
 
 void ragdoll::Scene::Update(float _dt)
 {
-	ImguiInterface->BeginFrame();
-
-	if (ImguiInterface->DrawSpawn(DebugInfo, SceneInfo, Config))
 	{
-		//spawn more shits temp
-		const static Vector3 t_range{ 50.f, 50.f, 50.f };
-		const static Vector3 t_min = { -25.f, -25.f, -25.f };
-		const static Vector3 s_range{ 0.2f, 0.2f, 0.2f };
-		const static Vector3 s_min{ 0.3f, 0.3f, 0.3f };
-		static int32_t currentGeomCount{};
+		RD_SCOPE(Render, ImGuiBuildData)
+		ImguiInterface->BeginFrame();
 
-		for (int i = 0; i < 500; ++i) {
-			MICROPROFILE_SCOPEI("Creation", "Entity Create", MP_GREEN);
-			currentGeomCount++;
-			Vector3 pos{
-				t_min.x + (std::rand() / (float)RAND_MAX) * t_range.x,
-				t_min.y + (std::rand() / (float)RAND_MAX) * t_range.y,
-				t_min.z + (std::rand() / (float)RAND_MAX) * t_range.z,
-			};
-			Vector3 scale{
-				s_min.x + (std::rand() / (float)RAND_MAX) * s_range.x,
-				s_min.y + (std::rand() / (float)RAND_MAX) * s_range.y,
-				s_min.z + (std::rand() / (float)RAND_MAX) * s_range.z,
-			};
-			Vector3 eulerRotate{
-				std::rand() / (float)RAND_MAX * DirectX::XM_2PI,
-				std::rand() / (float)RAND_MAX * DirectX::XM_2PI,
-				std::rand() / (float)RAND_MAX * DirectX::XM_2PI
-			};
-			entt::entity ent;
-			ent = EntityManagerRef->CreateEntity();
-			auto tcomp = EntityManagerRef->AddComponent<TransformComp>(ent);
-			tcomp->m_LocalPosition = pos;
-			tcomp->m_LocalScale = scale;
-			tcomp->m_LocalRotation = Quaternion::CreateFromYawPitchRoll(eulerRotate.y, eulerRotate.x, eulerRotate.z);
-			AddEntityAtRootLevel(EntityManagerRef->GetGuid(ent));
-			auto rcomp = EntityManagerRef->AddComponent<RenderableComp>(ent);
-			rcomp->meshIndex = std::rand() / (float)RAND_MAX * 25;
-		}
+		if (ImguiInterface->DrawSpawn(DebugInfo, SceneInfo, Config))
 		{
-			RD_SCOPE(Entity, Create);
-			UpdateTransforms();			//update all the dirty transforms
-			PopulateStaticProxies();	//create all the proxies to iterate
-			ResetTransformDirtyFlags();	//reset the dirty flags
-			SceneInfo.bIsCameraDirty = true;
-		}
-	}
-	if (int item = ImguiInterface->DrawFBViewer()) {
-		switch (item) {
-		case 1:
-			DebugInfo.CompCount = 2;
-			DebugInfo.DbgTarget = GBufferNormal;
-			DebugInfo.Add = Vector4::Zero;
-			DebugInfo.Mul = Vector4::One;
-			break;
-		case 2:
-			DebugInfo.CompCount = 2;
-			DebugInfo.DbgTarget = GBufferRM;
-			DebugInfo.Add = Vector4::Zero;
-			DebugInfo.Mul = Vector4::One;
-			break;
-		case 3:
-			DebugInfo.CompCount = 3;
-			DebugInfo.DbgTarget = VelocityBuffer;
-			DebugInfo.Add = Vector4::Zero;
-			DebugInfo.Mul = Vector4::One;
-			break;
-		case 4:
-			DebugInfo.CompCount = 1;
-			DebugInfo.DbgTarget = AONormalized;
-			DebugInfo.Add = Vector4::Zero;
-			DebugInfo.Mul = Vector4::One;
-			break;
-		case 0:
-		default:
-			DebugInfo.DbgTarget = nullptr;
-		}
-	}
-	SceneInfo.Luminance = DeferredRenderer->AdaptedLuminance;
+			//spawn more shits temp
+			const static Vector3 t_range{ 50.f, 50.f, 50.f };
+			const static Vector3 t_min = { -25.f, -25.f, -25.f };
+			const static Vector3 s_range{ 0.2f, 0.2f, 0.2f };
+			const static Vector3 s_min{ 0.3f, 0.3f, 0.3f };
+			static int32_t currentGeomCount{};
 
-	ImguiInterface->DrawControl(DebugInfo, SceneInfo, Config, _dt);
-	ImguiInterface->DrawSettings(DebugInfo, SceneInfo, Config);
+			for (int i = 0; i < 500; ++i) {
+				MICROPROFILE_SCOPEI("Creation", "Entity Create", MP_GREEN);
+				currentGeomCount++;
+				Vector3 pos{
+					t_min.x + (std::rand() / (float)RAND_MAX) * t_range.x,
+					t_min.y + (std::rand() / (float)RAND_MAX) * t_range.y,
+					t_min.z + (std::rand() / (float)RAND_MAX) * t_range.z,
+				};
+				Vector3 scale{
+					s_min.x + (std::rand() / (float)RAND_MAX) * s_range.x,
+					s_min.y + (std::rand() / (float)RAND_MAX) * s_range.y,
+					s_min.z + (std::rand() / (float)RAND_MAX) * s_range.z,
+				};
+				Vector3 eulerRotate{
+					std::rand() / (float)RAND_MAX * DirectX::XM_2PI,
+					std::rand() / (float)RAND_MAX * DirectX::XM_2PI,
+					std::rand() / (float)RAND_MAX * DirectX::XM_2PI
+				};
+				entt::entity ent;
+				ent = EntityManagerRef->CreateEntity();
+				auto tcomp = EntityManagerRef->AddComponent<TransformComp>(ent);
+				tcomp->m_LocalPosition = pos;
+				tcomp->m_LocalScale = scale;
+				tcomp->m_LocalRotation = Quaternion::CreateFromYawPitchRoll(eulerRotate.y, eulerRotate.x, eulerRotate.z);
+				AddEntityAtRootLevel(EntityManagerRef->GetGuid(ent));
+				auto rcomp = EntityManagerRef->AddComponent<RenderableComp>(ent);
+				rcomp->meshIndex = std::rand() / (float)RAND_MAX * 25;
+			}
+			{
+				RD_SCOPE(Entity, Create);
+				UpdateTransforms();			//update all the dirty transforms
+				PopulateStaticProxies();	//create all the proxies to iterate
+				ResetTransformDirtyFlags();	//reset the dirty flags
+				SceneInfo.bIsCameraDirty = true;
+			}
+		}
+		if (int item = ImguiInterface->DrawFBViewer()) {
+			switch (item) {
+			case 1:
+				DebugInfo.CompCount = 2;
+				DebugInfo.DbgTarget = GBufferNormal;
+				DebugInfo.Add = Vector4::Zero;
+				DebugInfo.Mul = Vector4::One;
+				break;
+			case 2:
+				DebugInfo.CompCount = 2;
+				DebugInfo.DbgTarget = GBufferRM;
+				DebugInfo.Add = Vector4::Zero;
+				DebugInfo.Mul = Vector4::One;
+				break;
+			case 3:
+				DebugInfo.CompCount = 3;
+				DebugInfo.DbgTarget = VelocityBuffer;
+				DebugInfo.Add = Vector4::Zero;
+				DebugInfo.Mul = Vector4::One;
+				break;
+			case 4:
+				DebugInfo.CompCount = 1;
+				DebugInfo.DbgTarget = AONormalized;
+				DebugInfo.Add = Vector4::Zero;
+				DebugInfo.Mul = Vector4::One;
+				break;
+			case 0:
+			default:
+				DebugInfo.DbgTarget = nullptr;
+			}
+		}
+		SceneInfo.Luminance = DeferredRenderer->AdaptedLuminance;
+
+		ImguiInterface->DrawControl(DebugInfo, SceneInfo, Config, _dt);
+		ImguiInterface->DrawSettings(DebugInfo, SceneInfo, Config);
+	}
+
 	if (SceneInfo.bIsCameraDirty)
 	{
 		DebugInfo.CulledOctantsCount = 0;
@@ -135,9 +139,8 @@ void ragdoll::Scene::Update(float _dt)
 		BuildDebugInstances(StaticDebugInstanceDatas);
 	}
 
-	DeferredRenderer->Render(this, _dt);
+	DeferredRenderer->Render(this, _dt, ImguiInterface);
 
-	ImguiInterface->Render();
 	DirectXDevice::GetInstance()->Present();
 
 	SceneInfo.bIsCameraDirty = false;

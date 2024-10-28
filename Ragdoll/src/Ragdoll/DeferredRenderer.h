@@ -23,6 +23,7 @@ namespace ragdoll {
 	struct InstanceGroupInfo;
 }
 class DirectXDevice;
+class ImguiRenderer;
 
 class Renderer {
 public:
@@ -96,7 +97,7 @@ public:
 	void Shutdown();
 
 	void BeginFrame();
-	void Render(ragdoll::Scene* scene, float _dt);
+	void Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRenderer> imgui);
 private:
 	std::shared_ptr<ragdoll::Window> PrimaryWindowRef;
 	//handled at renderer

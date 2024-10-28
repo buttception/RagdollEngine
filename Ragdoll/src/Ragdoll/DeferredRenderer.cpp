@@ -11,6 +11,7 @@
 #include "Ragdoll/Components/RenderableComp.h"
 #include "Scene.h"
 #include "GeometryBuilder.h"
+#include "ImGuiRenderer.h"
 
 #include "Executor.h"
 #include "Profiler.h"
@@ -84,8 +85,25 @@ void Renderer::BeginFrame()
 	CommandList->endMarker();
 }
 
-void Renderer::Render(ragdoll::Scene* scene, float _dt)
+void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRenderer> imgui)
 {
+	{
+		//this process is long because it is waiting for the gpu to be done first
+		RD_SCOPE(Render, Readback);
+		//readback all the debug infos needed
+		float* valPtr;
+		{
+			RD_SCOPE(Render, Map);
+			if (valPtr = (float*)DirectXDevice::GetNativeDevice()->mapBuffer(AutomaticExposurePass->ReadbackBuffer, nvrhi::CpuAccessMode::Read))
+			{
+				AdaptedLuminance = *valPtr;
+			}
+		}
+		{
+			RD_SCOPE(Render, Unmap);
+			DirectXDevice::GetNativeDevice()->unmapBuffer(AutomaticExposurePass->ReadbackBuffer);
+		}
+	}
 #if MULTITHREAD_RENDER == 1
 	RD_SCOPE(Render, Full Frame)
 	tf::Taskflow Taskflow;
@@ -199,14 +217,20 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 		activeList.emplace_back(CommandLists[(int)Pass::FB_VIEWER]);
 	}
 
+	Taskflow.emplace([&imgui]() {
+		imgui->Render();
+	});
+
 	SExecutor::Executor.run(Taskflow).wait();
 	//submit the logs in the order of execution
 	MICROPROFILE_GPU_SUBMIT(EnterCommandListSectionGpu::Queue, CommandList->Work);
 	RD_GPU_SUBMIT(activeList);
+	MICROPROFILE_GPU_SUBMIT(EnterCommandListSectionGpu::Queue, imgui->CommandList->Work);
 	{
 		RD_SCOPE(Render, ExecuteCommandList);
 		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 		DirectXDevice::GetNativeDevice()->executeCommandLists(activeList.data(), activeList.size());
+		DirectXDevice::GetNativeDevice()->executeCommandList(imgui->CommandList);
 	}
 #else
 	std::vector<nvrhi::ICommandList*> activeList;
@@ -280,23 +304,6 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt)
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList); //command list to clear screen
 	DirectXDevice::GetNativeDevice()->executeCommandLists(activeList.data(), activeList.size());
 #endif
-	{
-		//this process is long because it is waiting for the gpu to be done first
-		RD_SCOPE(Render, Readback);
-		//readback all the debug infos needed
-		float* valPtr;
-		{
-			RD_SCOPE(Render, Map);
-			if (valPtr = (float*)DirectXDevice::GetNativeDevice()->mapBuffer(AutomaticExposurePass->ReadbackBuffer, nvrhi::CpuAccessMode::Read))
-			{
-				AdaptedLuminance = *valPtr;
-			}
-		}
-		{
-			RD_SCOPE(Render, Unmap);
-			DirectXDevice::GetNativeDevice()->unmapBuffer(AutomaticExposurePass->ReadbackBuffer);
-		}
-	}
 }
 
 void Renderer::CreateResource()

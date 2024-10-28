@@ -4,7 +4,7 @@
 #include "backends/imgui_impl_glfw.cpp"
 #include "AssetManager.h"
 
-#include <microprofile.h>
+#include "Profiler.h"
 
 void ImguiRenderer::Init(DirectXDevice* dx)
 {
@@ -19,7 +19,7 @@ void ImguiRenderer::Init(DirectXDevice* dx)
 	// Setup Dear ImGui style
 	ImGui::StyleColorsDark();
 
-	CommandList = m_DirectXTest->m_NvrhiDevice->createCommandList();
+	CommandList = m_DirectXTest->m_NvrhiDevice->createCommandList(nvrhi::CommandListParameters().setEnableImmediateExecution(false));
 	CommandList->open();
 
 	nvrhi::ShaderHandle imGuiVS = AssetManager::GetInstance()->GetShader("imgui.vs.cso");
@@ -228,6 +228,7 @@ void ImguiRenderer::DrawControl(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneInf
 
 int32_t ImguiRenderer::DrawFBViewer()
 {
+	ImGui::Begin("FB View");
 	//view textures
 	static int selectedItem = 0;
 	const char* items[] = {
@@ -238,6 +239,7 @@ int32_t ImguiRenderer::DrawFBViewer()
 		"AO",
 	};
 	ImGui::Combo("Texture View", &selectedItem, items, 5);
+	ImGui::End();
 	return selectedItem;
 }
 
@@ -297,13 +299,13 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 
 void ImguiRenderer::Render()
 {
-	MICROPROFILE_SCOPEI("Render", "ImGui", MP_BLUE);
+	RD_SCOPE(Render, ImGuiBuildCommandBuffer);
+	RD_GPU_SCOPE("ImGuiBuildCommandBuffer", CommandList);
 	ImGui::Render();
 
 	ImDrawData* drawData = ImGui::GetDrawData();
 	const auto& io = ImGui::GetIO();
 
-	CommandList->open();
 	CommandList->beginMarker("ImGUI");
 
 	if (!UpdateGeometry(CommandList))
@@ -392,8 +394,6 @@ void ImguiRenderer::Render()
 	}
 
 	CommandList->endMarker();
-	CommandList->close();
-	m_DirectXTest->m_NvrhiDevice->executeCommandList(CommandList);
 }
 
 void ImguiRenderer::BackbufferResizing()
