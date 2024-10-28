@@ -300,7 +300,7 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 void ImguiRenderer::Render()
 {
 	RD_SCOPE(Render, ImGuiBuildCommandBuffer);
-	RD_GPU_SCOPE("ImGuiBuildCommandBuffer", CommandList);
+	RD_GPU_SCOPE("ImGuiDraw", CommandList);
 	ImGui::Render();
 
 	ImDrawData* drawData = ImGui::GetDrawData();
