@@ -39,7 +39,6 @@ project "Ragdoll"
 		"imgui",
 		"d3d12",
 		"dxgi",
-		"Windows_x86_64/x86_64/nvsdk_ngx_s.lib",
 	}
 	
 	vpaths 
@@ -78,6 +77,10 @@ project "Ragdoll"
 		optimize "off"
 		symbols "on"
 		kind "ConsoleApp"
+		links
+		{
+			"Windows_x86_64/x86_64/nvsdk_ngx_s_dbg_iterator0.lib",
+		}
 
 	filter "configurations:Release"
 		defines "RAGDOLL_RELEASE"
@@ -86,4 +89,8 @@ project "Ragdoll"
 		symbols "off"
 		kind "WindowedApp"
 		entrypoint "mainCRTStartup"
+		links
+		{
+			"Windows_x86_64/x86_64/nvsdk_ngx_s.lib",
+		}
 	
