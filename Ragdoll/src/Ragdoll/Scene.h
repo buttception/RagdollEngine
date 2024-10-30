@@ -236,6 +236,6 @@ namespace ragdoll {
 		void UpdateTransform(TransformComp& comp, const Guid& id);
 
 		//Debug
-		void AddOctantDebug(const Octant& octant, uint32_t level);
+		void AddOctantDebug(const Octant& octant, int32_t level);
 	};
 }

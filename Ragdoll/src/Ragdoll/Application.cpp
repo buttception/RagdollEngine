@@ -147,37 +147,38 @@ namespace ragdoll
 		m_Scene->UpdateTransforms();
 		m_Scene->PopulateStaticProxies();
 		m_Scene->ResetTransformDirtyFlags();
-		//MicroProfileDumpFileImmediately("init", nullptr, nullptr);
 	}
 
 	void Application::Run()
 	{
 		while (m_Running)
 		{
-			MICROPROFILE_SCOPE(MAIN);
-			//m_InputHandler->Update(m_PrimaryWindow->GetDeltaTime());
-			m_FileManager->Update();
+			MicroProfileFlip(nullptr);
 			{
-				MICROPROFILE_SCOPEI("Update", "Wait", MP_YELLOW);
-				while (m_Frametime < m_TargetFrametime) {
-					m_PrimaryWindow->Update();
-					m_Frametime += m_PrimaryWindow->GetDeltaTime();
-					YieldProcessor();
+				MICROPROFILE_SCOPE(MAIN);
+				//m_InputHandler->Update(m_PrimaryWindow->GetDeltaTime());
+				m_FileManager->Update();
+				{
+					MICROPROFILE_SCOPEI("Update", "Wait", MP_YELLOW);
+					while (m_Frametime < m_TargetFrametime) {
+						m_PrimaryWindow->Update();
+						m_Frametime += m_PrimaryWindow->GetDeltaTime();
+						YieldProcessor();
+					}
 				}
+
+				m_Scene->Update(static_cast<float>(m_Frametime));
+				m_PrimaryWindow->SetFrametime(m_Frametime);
+				m_PrimaryWindow->IncFpsCounter();
+				m_Frametime = 0;
 			}
 
-			m_Scene->Update(m_Frametime);
-			m_PrimaryWindow->SetFrametime(m_Frametime);
-			m_PrimaryWindow->IncFpsCounter();
-			m_Frametime = 0;
-			MicroProfileFlip(nullptr);
-
-			static uint32_t FrameCount = 0;
-			if(FrameCount++ == 10)
-				MicroProfileDumpFileImmediately("init", nullptr, nullptr);
+			static uint32_t FrameCount = 1;
+			if(++FrameCount == 29)
+				MicroProfileDumpFileImmediately("init_capture", nullptr, nullptr);
 
 			if (ImGui::IsKeyPressed(ImGuiKey_F1)) {
-				MicroProfileDumpFileImmediately("test", "test", nullptr);
+				MicroProfileDumpFileImmediately("frame_capture", nullptr, nullptr);
 			}
 		}
 	}

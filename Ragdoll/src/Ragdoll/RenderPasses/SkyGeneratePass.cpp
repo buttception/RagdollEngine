@@ -33,7 +33,6 @@ void SkyGeneratePass::GenerateSky(const ragdoll::SceneInformation& sceneInfo)
 	SunSky->Update(lightDir, 2.5f, 0.f, 0.f);
 	Table->FindThetaGammaTables(*SunSky);
 	//write to the table textures
-	uint32_t size;
 	CommandListRef->writeTexture(ThetaGammaTable, 0, 0, Table->Data, Table->kTableSize * sizeof(uint32_t));
 	//dispatch cs to make the sky texture
 	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "Sky CBuffer", 1);
@@ -63,9 +62,9 @@ void SkyGeneratePass::GenerateSky(const ragdoll::SceneInformation& sceneInfo)
 	CBuffer.maxTheta = Table->mMaxTheta;
 	CBuffer.maxGamma = Table->mMaxGamma;
 	if (sceneInfo.SkyDimmer == 0.f)
-		CBuffer.scalar = 0.499999987e-04;
+		CBuffer.scalar = 0.499999987e-04f;
 	else
-		CBuffer.scalar = sceneInfo.SkyDimmer * 1e-04;
+		CBuffer.scalar = sceneInfo.SkyDimmer * 1e-04f;
 	CommandListRef->writeBuffer(cBufHandle, &CBuffer, sizeof(ConstantBuffer));
 	CommandListRef->setComputeState(state);
 	CommandListRef->dispatch(SkyTexture->getDesc().width / 16 + 1, SkyTexture->getDesc().height / 16 + 1, 1);

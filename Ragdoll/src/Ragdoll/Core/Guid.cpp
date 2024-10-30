@@ -57,7 +57,7 @@ namespace ragdoll
 		}
 		else
 		{
-			m_Settings.m_MachineId = ConvertMacAddressToNumber(macAddress);
+			m_Settings.m_MachineId = (uint16_t)ConvertMacAddressToNumber(macAddress);
 		}
 		m_Initialized = true;
 	}

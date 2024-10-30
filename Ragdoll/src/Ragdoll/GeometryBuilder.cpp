@@ -23,7 +23,7 @@ void ReverseWinding(std::vector<uint32_t>& indices, std::vector<Vertex>& vertice
     }
 }
 
-int32_t GeometryBuilder::BuildCube(float size)
+size_t GeometryBuilder::BuildCube(float size)
 {
     Vertices.clear();
     Vertices.clear();
@@ -55,14 +55,14 @@ int32_t GeometryBuilder::BuildCube(float size)
         Vector3 side2 = normal.Cross(side1);
 
         // Six indices (two triangles) per face.
-        const size_t vbase = Vertices.size();
-        Indices.push_back(vbase + 0);
-        Indices.push_back(vbase + 1);
-        Indices.push_back(vbase + 2);
+        const uint32_t vbase = static_cast<uint32_t>(Vertices.size());
+        Indices.push_back(vbase + 0u);
+        Indices.push_back(vbase + 1u);
+        Indices.push_back(vbase + 2u);
 
-        Indices.push_back(vbase + 0);
-        Indices.push_back(vbase + 2);
-        Indices.push_back(vbase + 3);
+        Indices.push_back(vbase + 0u);
+        Indices.push_back(vbase + 2u);
+        Indices.push_back(vbase + 3u);
 
         // Four vertices per face.
         // position // color // normal // tangent // binormal // t0
@@ -104,7 +104,7 @@ int32_t GeometryBuilder::BuildCube(float size)
         v0.tangent = v1.tangent = v2.tangent = tangent;
     }
 
-    uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    size_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
     Vector3 min, max;
     min = max = Vertices[0].position;
     for (const Vertex& v : Vertices) {
@@ -116,20 +116,20 @@ int32_t GeometryBuilder::BuildCube(float size)
     return index;
 }
 
-int32_t GeometryBuilder::BuildSphere(float diameter, uint32_t tessellation)
+size_t GeometryBuilder::BuildSphere(float diameter, uint32_t tessellation)
 {
 	Vertices.clear();
 	Indices.clear();
 
 	RD_ASSERT(tessellation < 3, "Invalid tessellation for sphere creation");
 
-    const size_t verticalSegments = tessellation;
-    const size_t horizontalSegments = tessellation * 2;
+    const uint32_t verticalSegments = tessellation;
+    const uint32_t horizontalSegments = tessellation * 2;
 
     const float radius = diameter / 2;
 
     // Create rings of vertices at progressively higher latitudes.
-    for (size_t i = 0; i <= verticalSegments; i++)
+    for (uint32_t i = 0; i <= verticalSegments; i++)
     {
         const float v = 1 - float(i) / float(verticalSegments);
 
@@ -139,7 +139,7 @@ int32_t GeometryBuilder::BuildSphere(float diameter, uint32_t tessellation)
         DirectX::XMScalarSinCos(&dy, &dxz, latitude);
 
         // Create a single ring of vertices at this latitude.
-        for (size_t j = 0; j <= horizontalSegments; j++)
+        for (uint32_t j = 0; j <= horizontalSegments; j++)
         {
             const float u = float(j) / float(horizontalSegments);
 
@@ -159,14 +159,14 @@ int32_t GeometryBuilder::BuildSphere(float diameter, uint32_t tessellation)
     }
 
     // Fill the index buffer with triangles joining each pair of latitude rings.
-    const size_t stride = horizontalSegments + 1;
+    const uint32_t stride = horizontalSegments + 1;
 
-    for (size_t i = 0; i < verticalSegments; i++)
+    for (uint32_t i = 0; i < verticalSegments; i++)
     {
-        for (size_t j = 0; j <= horizontalSegments; j++)
+        for (uint32_t j = 0; j <= horizontalSegments; j++)
         {
-            const size_t nextI = i + 1;
-            const size_t nextJ = (j + 1) % stride;
+            const uint32_t nextI = i + 1;
+            const uint32_t nextJ = (j + 1) % stride;
 
             Indices.push_back(i * stride + j);
             Indices.push_back(nextI * stride + j);
@@ -203,7 +203,7 @@ int32_t GeometryBuilder::BuildSphere(float diameter, uint32_t tessellation)
         v0.tangent = v1.tangent = v2.tangent = tangent;
     }
 
-    uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    size_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
     Vector3 min, max;
     min = max = Vertices[0].position;
     for (const Vertex& v : Vertices) {
@@ -237,20 +237,20 @@ DirectX::XMVECTOR GetCircleTangent(size_t i, size_t tessellation) noexcept
     return v;
 }
 
-void CreateCylinderCap(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, size_t tessellation, float height, float radius, bool isTop)
+void CreateCylinderCap(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, uint32_t tessellation, float height, float radius, bool isTop)
 {
     // Create cap indices.
-    for (size_t i = 0; i < tessellation - 2; i++)
+    for (uint32_t i = 0; i < tessellation - 2; i++)
     {
-        size_t i1 = (i + 1) % tessellation;
-        size_t i2 = (i + 2) % tessellation;
+        uint32_t i1 = (i + 1) % tessellation;
+        uint32_t i2 = (i + 2) % tessellation;
 
         if (isTop)
         {
             std::swap(i1, i2);
         }
 
-        const size_t vbase = vertices.size();
+        const uint32_t vbase = static_cast<uint32_t>(vertices.size());
         indices.push_back(vbase);
         indices.push_back(vbase + i1);
         indices.push_back(vbase + i2);
@@ -282,7 +282,7 @@ void CreateCylinderCap(std::vector<Vertex>& vertices, std::vector<uint32_t>& ind
     }
 }
 
-int32_t GeometryBuilder::BuildCylinder(float height, float diameter, size_t tessellation)
+size_t GeometryBuilder::BuildCylinder(float height, float diameter, uint32_t tessellation)
 {
     Vertices.clear();
     Indices.clear();
@@ -295,10 +295,10 @@ int32_t GeometryBuilder::BuildCylinder(float height, float diameter, size_t tess
     const Vector3 topOffset{ 0.f, height, 0.f};
 
     const float radius = diameter / 2;
-    const size_t stride = tessellation + 1;
+    const uint32_t stride = tessellation + 1;
 
     // Create a ring of triangles around the outside of the cylinder.
-    for (size_t i = 0; i <= tessellation; i++)
+    for (uint32_t i = 0; i <= tessellation; i++)
     {
         const Vector3 normal = GetCircleVector(i, tessellation);
 
@@ -350,7 +350,7 @@ int32_t GeometryBuilder::BuildCylinder(float height, float diameter, size_t tess
         v0.tangent = v1.tangent = v2.tangent = tangent;
     }
 
-    uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    size_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
     Vector3 min, max;
     min = max = Vertices[0].position;
     for (const Vertex& v : Vertices) {
@@ -362,7 +362,7 @@ int32_t GeometryBuilder::BuildCylinder(float height, float diameter, size_t tess
     return index;
 }
 
-int32_t GeometryBuilder::BuildCone(float diameter, float height, size_t tessellation)
+size_t GeometryBuilder::BuildCone(float diameter, float height, uint32_t tessellation)
 {
     Vertices.clear();
     Indices.clear();
@@ -375,10 +375,10 @@ int32_t GeometryBuilder::BuildCone(float diameter, float height, size_t tessella
     const DirectX::XMVECTOR topOffset = DirectX::XMVectorScale(DirectX::g_XMIdentityR1, height);
 
     const float radius = diameter / 2;
-    const size_t stride = tessellation + 1;
+    const uint32_t stride = tessellation + 1;
 
     // Create a ring of triangles around the outside of the cone.
-    for (size_t i = 0; i <= tessellation; i++)
+    for (uint32_t i = 0; i <= tessellation; i++)
     {
         const DirectX::XMVECTOR circlevec = GetCircleVector(i, tessellation);
 
@@ -433,7 +433,7 @@ int32_t GeometryBuilder::BuildCone(float diameter, float height, size_t tessella
         v0.tangent = v1.tangent = v2.tangent = tangent;
     }
 
-    uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    size_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
     Vector3 min, max;
     min = max = Vertices[0].position;
     for (const Vertex& v : Vertices) {
@@ -445,7 +445,7 @@ int32_t GeometryBuilder::BuildCone(float diameter, float height, size_t tessella
     return index;
 }
 
-int32_t GeometryBuilder::BuildIcosahedron(float size)
+size_t GeometryBuilder::BuildIcosahedron(float size)
 {
     Vertices.clear();
     Indices.clear();
@@ -504,7 +504,7 @@ int32_t GeometryBuilder::BuildIcosahedron(float size)
             DirectX::XMVectorSubtract(verts[v2].v, verts[v0].v));
         normal = DirectX::XMVector3Normalize(normal);
 
-        const size_t base = Vertices.size();
+        const uint32_t base = static_cast<uint32_t>(Vertices.size());
         Indices.push_back(base);
         Indices.push_back(base + 1);
         Indices.push_back(base + 2);
@@ -544,7 +544,7 @@ int32_t GeometryBuilder::BuildIcosahedron(float size)
         v0.tangent = v1.tangent = v2.tangent = tangent;
     }
 
-    uint32_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
+    size_t index = AssetManager::GetInstance()->AddVertices(Vertices, Indices);
     Vector3 min, max;
     min = max = Vertices[0].position;
     for (const Vertex& v : Vertices) {

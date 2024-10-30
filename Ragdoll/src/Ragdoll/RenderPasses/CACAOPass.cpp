@@ -39,9 +39,9 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "CACAO CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 	
-	CBuffer.DepthBufferDimensions = Vector2(DepthBuffer->getDesc().width, DepthBuffer->getDesc().height);
+	CBuffer.DepthBufferDimensions = Vector2((float)DepthBuffer->getDesc().width, (float)DepthBuffer->getDesc().height);
 	CBuffer.DepthBufferInverseDimensions = Vector2(1.f, 1.f) / CBuffer.DepthBufferDimensions;
-	CBuffer.DeinterleavedDepthBufferDimensions = Vector2(DeinterleavedDepthMips->getDesc().width, DeinterleavedDepthMips->getDesc().height);
+	CBuffer.DeinterleavedDepthBufferDimensions = Vector2((float)DeinterleavedDepthMips->getDesc().width, (float)DeinterleavedDepthMips->getDesc().height);
 	CBuffer.DeinterleavedDepthBufferInverseDimensions = Vector2(1.f, 1.f) / CBuffer.DeinterleavedDepthBufferDimensions;
 	CBuffer.EffectRadius = 1.2f;
 	const int spmap[5]{ 0, 1, 4, 3, 2 };
@@ -80,13 +80,13 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo)
 	CBuffer.DepthBufferUVToViewAdd.x = CBuffer.NDCToViewAdd.x - CBuffer.NDCToViewMul.x * border / ratio;
 	CBuffer.DepthBufferUVToViewMul.y = CBuffer.NDCToViewMul.y / ratio;
 	CBuffer.DepthBufferUVToViewAdd.y = CBuffer.NDCToViewAdd.y - CBuffer.NDCToViewMul.y * border / ratio;
-	CBuffer.DepthUnpackConsts = Vector2(-0.1, 0);
+	CBuffer.DepthUnpackConsts = Vector2(-0.1f, 0);
 	float halfFovX = sceneInfo.CameraFov * 0.5f * DirectX::XM_PI / 180.f;
 	CBuffer.CameraTanHalfFOV = Vector2(tanf(halfFovX), tanf(halfFovX / sceneInfo.CameraAspect));
 	CBuffer.EffectRadius = 1.5;
 	CBuffer.EffectShadowStrength = 2.f;
-	CBuffer.EffectShadowPow = 1.5;
-	CBuffer.EffectShadowClamp = 0.98;
+	CBuffer.EffectShadowPow = 1.5f;
+	CBuffer.EffectShadowClamp = 0.98f;
 	float fadeOutTo = 10000.f;
 	float fadeOutFrom = 5000.f;
 	CBuffer.EffectFadeOutMul = -1.0f / (fadeOutTo - fadeOutFrom);

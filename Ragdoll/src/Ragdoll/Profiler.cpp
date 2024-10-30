@@ -29,7 +29,7 @@ EnterCommandListSectionGpu::EnterCommandListSectionGpu(const char* name, nvrhi::
 			//not enuf logs get a new one
 			log = Logs.emplace_back(MicroProfileThreadLogGpuAlloc());
 			LogsInUse.emplace_back(true);
-			LogIndex = LogsInUse.size() - 1;
+			LogIndex = (int32_t)LogsInUse.size() - 1;
 		}
 	}
 

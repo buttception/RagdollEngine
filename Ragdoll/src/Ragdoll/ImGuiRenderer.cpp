@@ -89,10 +89,10 @@ void ImguiRenderer::Init(DirectXDevice* dx)
 void ImguiRenderer::BeginFrame()
 {
 	ImGuiIO& io = ImGui::GetIO();
-	io.DeltaTime = m_DirectXTest->m_PrimaryWindow->GetFrameTime();
+	io.DeltaTime = (float)m_DirectXTest->m_PrimaryWindow->GetFrameTime();
 	io.MouseDrawCursor = false;
-	io.DisplaySize.x = m_DirectXTest->m_PrimaryWindow->GetBufferWidth();
-	io.DisplaySize.y = m_DirectXTest->m_PrimaryWindow->GetBufferHeight();
+	io.DisplaySize.x = (float)m_DirectXTest->m_PrimaryWindow->GetBufferWidth();
+	io.DisplaySize.y = (float)m_DirectXTest->m_PrimaryWindow->GetBufferHeight();
 	
 	ImGui::NewFrame();
 }

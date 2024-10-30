@@ -20,7 +20,7 @@ void DebugPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
 	RenderTarget = renderTarget;
 }
 
-void DebugPass::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t instanceCount, const ragdoll::SceneInformation& sceneInfo)
+void DebugPass::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, size_t instanceCount, const ragdoll::SceneInformation& sceneInfo)
 {
 	RD_SCOPE(Render, Debug);
 	RD_GPU_SCOPE("Debug", CommandListRef);
@@ -67,7 +67,7 @@ void DebugPass::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, uint32_t i
 
 	nvrhi::DrawArguments args;
 	args.vertexCount = 24;
-	args.instanceCount = instanceCount;
+	args.instanceCount = (uint32_t)instanceCount;
 	CommandListRef->draw(args);
 
 	CommandListRef->endMarker();

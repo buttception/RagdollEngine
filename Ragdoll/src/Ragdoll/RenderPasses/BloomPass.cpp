@@ -94,7 +94,7 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity)
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBufferUS), "UpSample CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 
-	for (int i = Mips->size() - 1; i > 0; --i) {
+	for (size_t i = Mips->size() - 1; i > 0; --i) {
 		RD_SCOPE(Render, UpSampleMip);
 		//MICROPROFILE_SCOPEGPUI("Bloom Up Sample GPU", MP_LIGHTYELLOW1);
 		nvrhi::TextureHandle Source = Mips->operator[](i).Image;

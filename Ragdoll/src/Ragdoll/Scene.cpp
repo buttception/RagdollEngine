@@ -82,7 +82,7 @@ void ragdoll::Scene::Update(float _dt)
 				tcomp->m_LocalRotation = Quaternion::CreateFromYawPitchRoll(eulerRotate.y, eulerRotate.x, eulerRotate.z);
 				AddEntityAtRootLevel(EntityManagerRef->GetGuid(ent));
 				auto rcomp = EntityManagerRef->AddComponent<RenderableComp>(ent);
-				rcomp->meshIndex = std::rand() / (float)RAND_MAX * 25;
+				rcomp->meshIndex = (int32_t)(std::rand() / (float)RAND_MAX * 25);
 			}
 			{
 				RD_SCOPE(Entity, Create);
@@ -216,32 +216,32 @@ void ragdoll::Scene::CreateCustomMeshes()
 	//build primitives
 	GeometryBuilder geomBuilder;
 	geomBuilder.Init(DirectXDevice::GetNativeDevice());
-	int32_t id = geomBuilder.BuildCube(1.f);
-	for (int i = 0; i < 5; ++i) {
+	size_t id = geomBuilder.BuildCube(1.f);
+	for (size_t i = 0; i < 5; ++i) {
 		Mesh mesh;
 		mesh.Submeshes.push_back({ id, i });
 		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
 	id = geomBuilder.BuildSphere(1.f, 16);
-	for (int i = 0; i < 5; ++i) {
+	for (size_t i = 0; i < 5; ++i) {
 		Mesh mesh;
 		mesh.Submeshes.push_back({ id, i });
 		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
 	id = geomBuilder.BuildCylinder(1.f, 1.f, 16);
-	for (int i = 0; i < 5; ++i) {
+	for (size_t i = 0; i < 5; ++i) {
 		Mesh mesh;
 		mesh.Submeshes.push_back({ id, i });
 		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
 	id = geomBuilder.BuildCone(1.f, 1.f, 16);
-	for (int i = 0; i < 5; ++i) {
+	for (size_t i = 0; i < 5; ++i) {
 		Mesh mesh;
 		mesh.Submeshes.push_back({ id, i });
 		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
 	id = geomBuilder.BuildIcosahedron(1.f);
-	for (int i = 0; i < 5; ++i) {
+	for (size_t i = 0; i < 5; ++i) {
 		Mesh mesh;
 		mesh.Submeshes.push_back({ id, i });
 		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
@@ -335,7 +335,7 @@ void ragdoll::Scene::CreateRenderTargets()
 
 	uint32_t width = PrimaryWindowRef->GetWidth();
 	uint32_t height = PrimaryWindowRef->GetHeight();
-	for (int i = 0; i < MipCount; ++i) {
+	for (size_t i = 0; i < MipCount; ++i) {
 		BloomMip& mip = DownsampledImages.emplace_back();
 		mip.Width = width; mip.Height = height;
 		nvrhi::TextureDesc desc;
@@ -491,8 +491,8 @@ void ragdoll::Scene::PopulateStaticProxies()
 			Proxy.ModelToWorld = tComp->m_ModelToWorld;
 			Proxy.InvModelToWorld = tComp->m_ModelToWorld.Invert();
 			Proxy.PrevWorldMatrix = tComp->m_PrevModelToWorld;
-			Proxy.BufferIndex = submesh.VertexBufferIndex;
-			Proxy.MaterialIndex = submesh.MaterialIndex;
+			Proxy.BufferIndex = (int32_t)submesh.VertexBufferIndex;
+			Proxy.MaterialIndex = (int32_t)submesh.MaterialIndex;
 			AssetManager::GetInstance()->VertexBufferInfos[Proxy.BufferIndex].BestFitBox.Transform(Proxy.BoundingBox, tComp->m_ModelToWorld);
 			StaticOctree.AddProxy(Proxy.BoundingBox, StaticProxies.size() - 1);
 		}
@@ -848,9 +848,9 @@ void ragdoll::Scene::UpdateShadowCascadesExtents()
 			center += corners[j];
 		}
 		center /= 8.f;
-		center.x = (int)center.x;
-		center.y = (int)center.y;
-		center.z = (int)center.z;
+		center.x = (float)(int32_t)center.x;
+		center.y = (float)(int32_t)center.y;
+		center.z = (float)(int32_t)center.z;
 		//move all corners into a 1x1x1 cube lightspace with the directional light
 		Matrix lightProj = DirectX::XMMatrixOrthographicLH(1.f, 1.f, -0.5f, 0.5f);	//should be a 1x1x1 cube?
 		Vector3 lightDir = -SceneInfo.LightDirection;
@@ -1001,7 +1001,7 @@ void ragdoll::Scene::UpdateTransform(TransformComp& comp, const Guid& guid)
 		m_DirtyOnwards = false;
 }
 
-void ragdoll::Scene::AddOctantDebug(const Octant& octant, uint32_t level)
+void ragdoll::Scene::AddOctantDebug(const Octant& octant, int32_t level)
 {
 	if (octant.bIsCulled)
 		return;

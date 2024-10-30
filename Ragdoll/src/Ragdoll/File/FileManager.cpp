@@ -131,7 +131,7 @@ namespace ragdoll
 			if (buffer.m_Status == Buffer::Status::Callback)
 			{
 				if(buffer.m_Request.m_ReadCallback)
-					buffer.m_Request.m_ReadCallback(buffer.m_Request.m_Guid, buffer.m_Data.data(), buffer.m_Data.size());
+					buffer.m_Request.m_ReadCallback(buffer.m_Request.m_Guid, buffer.m_Data.data(), static_cast<uint32_t>(buffer.m_Data.size()));
 				buffer.m_Status = Buffer::Status::Idle;
 			}
 		}
@@ -214,7 +214,7 @@ namespace ragdoll
 		m_ImmediateBuffer.Load(m_Root);
 		//unlock all mutex
 		m_FileIOMutex->unlock();
-		size = m_ImmediateBuffer.m_Data.size();
+		size = static_cast<uint32_t>(m_ImmediateBuffer.m_Data.size());
 		return m_ImmediateBuffer.m_Data.data();
 	}
 

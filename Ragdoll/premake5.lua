@@ -30,7 +30,7 @@ project "Ragdoll"
 
 	libdirs
 	{
-		
+		"%{LibDirs.dlss}",
 	}
 
 	links
@@ -39,6 +39,7 @@ project "Ragdoll"
 		"imgui",
 		"d3d12",
 		"dxgi",
+		"Windows_x86_64/x86_64/nvsdk_ngx_s.lib",
 	}
 	
 	vpaths 
@@ -59,11 +60,13 @@ project "Ragdoll"
 		"%{IncludesDir.microprofile}",
 		"%{IncludesDir.cxxopts}",
 		"%{IncludesDir.taskflow}",
+		"%{IncludesDir.dlss}",
     }
 
 	prebuildcommands
 	{
-		"\"%{wks.location}Tools\\compileShader.bat\""
+		"xcopy /Y /E /I \"%{LibDirs.dlss}\\Windows_x86_64\\dev\\nvngx_dlss.dll\" \"%{cfg.targetdir}\"",
+		"\"%{wks.location}Tools\\compileShader.bat\"",
 	}
 
 	filter "system:windows"

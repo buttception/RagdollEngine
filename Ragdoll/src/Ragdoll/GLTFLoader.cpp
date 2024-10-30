@@ -152,7 +152,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		RD_ASSERT(ret == false, "Issue loading {}", path.string());
 	}
 
-	uint32_t meshIndicesOffset = AssetManager::GetInstance()->Meshes.size();
+	uint32_t meshIndicesOffset = static_cast<uint32_t>(AssetManager::GetInstance()->Meshes.size());
 	//load meshes
 	{
 		RD_SCOPE(Load, Load Meshes);
@@ -168,7 +168,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			uint32_t vertexCount{};
 
 			//load all the submeshes
-			uint32_t materialIndicesOffset = AssetManager::GetInstance()->Materials.size();
+			size_t materialIndicesOffset = AssetManager::GetInstance()->Materials.size();
 			for (const tinygltf::Primitive& itPrim : itMesh.primitives)
 			{
 				RD_SCOPE(Load, Mesh);
@@ -187,7 +187,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 					const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
 					IndexStagingBuffer.resize(accessor.count);
 					uint8_t* data = model.buffers[bufferView.buffer].data.data();
-					uint32_t byteOffset = bufferView.byteOffset + accessor.byteOffset;
+					size_t byteOffset = bufferView.byteOffset + accessor.byteOffset;
 					//manually assign to reconcil things like short to uint
 					for (int i = 0; i < accessor.count; ++i) {
 						switch (accessor.componentType) {
@@ -210,7 +210,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 					RD_CORE_TRACE("Loaded {} indices at byte offest {}", accessor.count, accessor.byteOffset);
 					RD_CORE_TRACE("Largest index is {}", *std::max_element(indices.begin(), indices.end()));
 #endif
-					buffer.IndicesCount = accessor.count;
+					buffer.IndicesCount = (uint32_t)accessor.count;
 				}
 
 				//add the relevant data into the map to use
@@ -219,7 +219,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 						tinygltf::Accessor vertexAccessor = model.accessors[itAttrib.second];
 						tinygltf::BufferView bufferView = model.bufferViews[vertexAccessor.bufferView];
 						attributeToAccessors[itAttrib.first] = vertexAccessor;
-						vertexCount = vertexAccessor.count;
+						vertexCount = (uint32_t)vertexAccessor.count;
 					}
 					RD_ASSERT(vertexCount == 0, "There are no vertices?");
 				}
@@ -259,11 +259,11 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 						uint32_t size = tinygltf::GetNumComponentsInType(accessor.type) * tinygltf::GetComponentSizeInBytes(accessor.componentType);
 						//memcpy the data from the buffer over into the vertices
 						uint8_t* data = model.buffers[bufferView.buffer].data.data();
-						for (int i = 0; i < vertexCount; ++i) {
+						for (uint32_t i = 0; i < vertexCount; ++i) {
 							Vertex& v = VertexStagingBuffer[i];
 							uint8_t* bytePos = reinterpret_cast<uint8_t*>(&v) + desc->offset;
-							uint32_t byteOffset = accessor.byteOffset + bufferView.byteOffset;
-							uint32_t stride = bufferView.byteStride == 0 ? size : bufferView.byteStride;
+							size_t byteOffset = accessor.byteOffset + bufferView.byteOffset;
+							size_t stride = bufferView.byteStride == 0 ? size : bufferView.byteStride;
 							memcpy(bytePos, data + byteOffset + i * stride, size);
 						}
 
@@ -352,8 +352,8 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	{
 		AssetManager::GetInstance()->UpdateVBOIBO();
 	}
-	uint32_t textureIndicesOffset = AssetManager::GetInstance()->Textures.size();
-	uint32_t imageIndicesOffset = AssetManager::GetInstance()->Images.size();
+	uint32_t textureIndicesOffset = static_cast<uint32_t>(AssetManager::GetInstance()->Textures.size());
+	uint32_t imageIndicesOffset = static_cast<uint32_t>(AssetManager::GetInstance()->Images.size());
 
 	//load materials
 	{
@@ -362,13 +362,13 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		for (const tinygltf::Material& gltfMat : model.materials)
 		{
 			Material mat;
-			mat.Metallic = gltfMat.pbrMetallicRoughness.metallicFactor;
-			mat.Roughness = gltfMat.pbrMetallicRoughness.roughnessFactor;
+			mat.Metallic = (float)gltfMat.pbrMetallicRoughness.metallicFactor;
+			mat.Roughness = (float)gltfMat.pbrMetallicRoughness.roughnessFactor;
 			mat.Color = Vector4(
-				gltfMat.pbrMetallicRoughness.baseColorFactor[0],
-				gltfMat.pbrMetallicRoughness.baseColorFactor[1],
-				gltfMat.pbrMetallicRoughness.baseColorFactor[2],
-				gltfMat.pbrMetallicRoughness.baseColorFactor[3]);
+				static_cast<float>(gltfMat.pbrMetallicRoughness.baseColorFactor[0]),
+				static_cast<float>(gltfMat.pbrMetallicRoughness.baseColorFactor[1]),
+				static_cast<float>(gltfMat.pbrMetallicRoughness.baseColorFactor[2]),
+				static_cast<float>(gltfMat.pbrMetallicRoughness.baseColorFactor[3]));
 			//get the textures
 			if (gltfMat.pbrMetallicRoughness.baseColorTexture.index >= 0)
 				mat.AlbedoTextureIndex = gltfMat.pbrMetallicRoughness.baseColorTexture.index + textureIndicesOffset;
@@ -408,7 +408,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 							//load raw bytes, do not use stbi load
 							std::ifstream file(modelPath, std::ios::binary | std::ios::ate);
 							RD_ASSERT(!file, "Unable to open file {}:{}", strerror(errno), modelPath.string());
-							std::streamsize size = file.tellg();
+							int32_t size = static_cast<int32_t>(file.tellg());
 							file.seekg(0, std::ios::beg);
 							std::vector<uint8_t> data(size);
 							RD_ASSERT(!file.read((char*)data.data(), size), "Failed to read file {}", itImg->uri);
@@ -480,6 +480,12 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			SExecutor::Executor.run(TaskFlow).wait();
 
 			DirectXDevice::GetNativeDevice()->executeCommandLists(cmdLists.data(), cmdLists.size());
+
+			//free all raw bytes
+			for (auto& it : AssetManager::GetInstance()->Images) {
+				stbi_image_free(it.RawData);
+				it.RawData = nullptr;
+			}
 #else
 			CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
 			CommandList->open();
@@ -530,8 +536,6 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			}
 			CommandList->close();
 			DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
-
-			MicroProfileFlip(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer);
 #endif
 		}
 	}
