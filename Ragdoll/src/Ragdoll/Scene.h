@@ -183,6 +183,8 @@ namespace ragdoll {
 		nvrhi::TextureHandle FinalAOTerm;
 		nvrhi::TextureHandle AOTermAccumulation;
 		nvrhi::TextureHandle AONormalized;
+		//final color
+		nvrhi::TextureHandle FinalColor;
 		//distance where the subfrusta are seperated
 		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
 

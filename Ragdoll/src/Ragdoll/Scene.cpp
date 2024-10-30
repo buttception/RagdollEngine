@@ -251,10 +251,13 @@ void ragdoll::Scene::CreateCustomMeshes()
 
 void ragdoll::Scene::CreateRenderTargets()
 {
+	//the render target sizes, later upscaled using dlss to window display size
+	uint32_t TargetWidth = 1280, TargetHeight = 720;
+
 	MICROPROFILE_SCOPEI("Render", "Create Render Target", MP_YELLOW);
 	nvrhi::TextureDesc depthBufferDesc;
-	depthBufferDesc.width = PrimaryWindowRef->GetBufferWidth();
-	depthBufferDesc.height = PrimaryWindowRef->GetBufferHeight();
+	depthBufferDesc.width = TargetWidth;
+	depthBufferDesc.height = TargetHeight;
 	depthBufferDesc.initialState = nvrhi::ResourceStates::DepthWrite;
 	depthBufferDesc.isRenderTarget = true;
 	depthBufferDesc.sampleCount = 1;
@@ -277,8 +280,8 @@ void ragdoll::Scene::CreateRenderTargets()
 	}
 
 	nvrhi::TextureDesc texDesc;
-	texDesc.width = PrimaryWindowRef->GetBufferWidth();
-	texDesc.height = PrimaryWindowRef->GetBufferHeight();
+	texDesc.width = TargetWidth;
+	texDesc.height = TargetHeight;
 	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
 	texDesc.keepInitialState = true;
 	texDesc.useClearValue = true;
@@ -308,6 +311,10 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "SceneColor";
 	SceneColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
+	texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
+	texDesc.debugName = "FinalColor";
+	FinalColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
 	texDesc.format = nvrhi::Format::RG16_UNORM;
 	texDesc.debugName = "GBufferNormal";
 	GBufferNormal = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
@@ -333,8 +340,8 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "SkyTexture";
 	SkyTexture = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
-	uint32_t width = PrimaryWindowRef->GetWidth();
-	uint32_t height = PrimaryWindowRef->GetHeight();
+	uint32_t width = TargetWidth;
+	uint32_t height = TargetHeight;
 	for (size_t i = 0; i < MipCount; ++i) {
 		BloomMip& mip = DownsampledImages.emplace_back();
 		mip.Width = width; mip.Height = height;
@@ -351,8 +358,8 @@ void ragdoll::Scene::CreateRenderTargets()
 	}
 
 	texDesc = nvrhi::TextureDesc();
-	texDesc.width = PrimaryWindowRef->GetWidth() / 2 + PrimaryWindowRef->GetWidth() % 2;
-	texDesc.height = PrimaryWindowRef->GetHeight() / 2 + PrimaryWindowRef->GetHeight() % 2;
+	texDesc.width = TargetWidth / 2 + TargetWidth % 2;
+	texDesc.height = TargetHeight / 2 + TargetHeight % 2;
 	texDesc.format = nvrhi::Format::R16_FLOAT;
 	texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	texDesc.isUAV = true;
@@ -378,8 +385,8 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "ImportanceMap";
 	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
 	texDesc.arraySize = 1;
-	texDesc.width = PrimaryWindowRef->GetWidth() / 4 + PrimaryWindowRef->GetWidth() % 4;
-	texDesc.height = PrimaryWindowRef->GetHeight() / 4 + PrimaryWindowRef->GetHeight() % 4;
+	texDesc.width = TargetWidth / 4 + TargetWidth % 4;
+	texDesc.height = TargetHeight / 4 + TargetHeight % 4;
 	ImportanceMap = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	texDesc.debugName = "ImportanceMapPong";
 	ImportanceMapPong = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
@@ -391,8 +398,8 @@ void ragdoll::Scene::CreateRenderTargets()
 	LoadCounter = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc = nvrhi::TextureDesc();
-	texDesc.width = PrimaryWindowRef->GetBufferWidth();
-	texDesc.height = PrimaryWindowRef->GetBufferHeight();
+	texDesc.width = TargetWidth;
+	texDesc.height = TargetHeight;
 	texDesc.format = nvrhi::Format::R16_FLOAT;
 	texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	texDesc.isUAV = true;

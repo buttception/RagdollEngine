@@ -41,6 +41,11 @@ void NVSDK::Init(ID3D12Device* device)
 
 	//free the params
 	NVSDK_NGX_D3D12_DestroyParameters(params);
+
+	//should get optimal settings for dlss in the future, section 5.2.8
+
+	//create the dlss feature
+	//for now hard coded window size is 1280x720, then dlss it to 1920x1080 for easier resolution comp
 }
 
 void NVSDK::LoggingCallback(const char* message, NVSDK_NGX_Logging_Level loggingLevel, NVSDK_NGX_Feature sourceComponent)

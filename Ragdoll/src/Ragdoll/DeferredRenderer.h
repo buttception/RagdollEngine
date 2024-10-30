@@ -14,6 +14,7 @@
 #include "RenderPasses/ToneMapPass.h"
 #include "RenderPasses/BloomPass.h"
 #include "RenderPasses/XeGTAOPass.h"
+#include "RenderPasses/FinalPass.h"
 
 namespace ragdoll {
 	class Window;
@@ -38,6 +39,7 @@ public:
 	std::shared_ptr<BloomPass> BloomPass;
 	std::shared_ptr<AutomaticExposurePass> AutomaticExposurePass;
 	std::shared_ptr<ToneMapPass> ToneMapPass;
+	std::shared_ptr<FinalPass> FinalPass;
 	std::shared_ptr<DebugPass> DebugPass;
 	std::shared_ptr<FramebufferViewer> FramebufferViewer;
 
@@ -55,6 +57,7 @@ public:
 		BLOOM,
 		EXPOSURE,
 		TONEMAP,
+		FINAL,
 		DEBUG,
 		FB_VIEWER,
 
@@ -88,6 +91,7 @@ public:
 	nvrhi::TextureHandle Edges;
 	nvrhi::TextureHandle FinalAOTermA;
 	nvrhi::TextureHandle AOTermAccumulation;
+	nvrhi::TextureHandle FinalColor;
 	nvrhi::CommandListHandle CommandList;
 
 	//debug infos

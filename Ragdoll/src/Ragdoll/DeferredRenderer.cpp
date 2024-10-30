@@ -16,8 +16,6 @@
 #include "Executor.h"
 #include "Profiler.h"
 
-#define MULTITHREAD_RENDER 1
-
 void Renderer::Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 {
 	PrimaryWindowRef = win;
@@ -43,6 +41,7 @@ void Renderer::Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 	AOTerm = scene->AOTerm;
 	FinalAOTermA = scene->FinalAOTerm;
 	AOTermAccumulation = scene->AOTermAccumulation;
+	FinalColor = scene->FinalColor;
 	Edges = scene->Edges;
 	for (int i = 0; i < 4; ++i)
 	{
@@ -104,7 +103,7 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 			DirectXDevice::GetNativeDevice()->unmapBuffer(AutomaticExposurePass->ReadbackBuffer);
 		}
 	}
-#if MULTITHREAD_RENDER == 1
+
 	RD_SCOPE(Render, Full Frame)
 	tf::Taskflow Taskflow;
 	std::vector<nvrhi::ICommandList*> activeList;
@@ -185,26 +184,11 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 
 	nvrhi::BufferHandle exposure = AutomaticExposurePass->AdaptedLuminanceHandle;
 	Taskflow.emplace([this, &scene, exposure]() {
-		nvrhi::FramebufferHandle fb;
-		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
-			.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer());
-		fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
-		//tone map and gamma correct
-		ToneMapPass->SetRenderTarget(fb);
 		ToneMapPass->ToneMap(scene->SceneInfo, exposure);
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::TONEMAP]);
 
 	Taskflow.emplace([this, &scene]() {
-		nvrhi::FramebufferHandle fb;
-		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
-			.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer())
-			.setDepthAttachment(DepthHandle);
-		fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
-
-		//after tone map for now since need its own tonemap and gamma correct
-		//draw debug items
-		DebugPass->SetRenderTarget(fb);
 		DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo);
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::DEBUG]);
@@ -217,9 +201,20 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 		activeList.emplace_back(CommandLists[(int)Pass::FB_VIEWER]);
 	}
 
+	Taskflow.emplace([this]() {
+		nvrhi::FramebufferDesc desc;
+		desc.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer());
+		nvrhi::FramebufferHandle fb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
+		FinalPass->SetRenderTarget(fb);
+		FinalPass->DrawQuad();
+	});
+	activeList.emplace_back(CommandLists[(int)Pass::FINAL]);
+
 	Taskflow.emplace([&imgui]() {
 		imgui->Render();
 	});
+
+	//TODO: draw to back buffer
 
 	SExecutor::Executor.run(Taskflow).wait();
 	//submit the logs in the order of execution
@@ -232,78 +227,6 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 		DirectXDevice::GetNativeDevice()->executeCommandLists(activeList.data(), activeList.size());
 		DirectXDevice::GetNativeDevice()->executeCommandList(imgui->CommandList);
 	}
-#else
-	std::vector<nvrhi::ICommandList*> activeList;
-	{
-		MICROPROFILE_SCOPEI("Render", "Full Frame CPU", MP_CYAN);
-		BeginFrame();
-
-		SkyGeneratePass->GenerateSky(scene->SceneInfo);
-		activeList.emplace_back(CommandLists[(int)Pass::SKY_GENERATE]);
-
-		//gbuffer
-		GBufferPass->DrawAllInstances(scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo);
-		activeList.emplace_back(CommandLists[(int)Pass::GBUFFER]);
-		//ao
-		if(scene->SceneInfo.UseCACAO)
-		{
-			CACAOPass->GenerateAO(scene->SceneInfo);
-			activeList.emplace_back(CommandLists[(int)Pass::AO]);
-		}
-		if (scene->SceneInfo.UseXeGTAO)
-		{
-			XeGTAOPass->GenerateAO(scene->SceneInfo);
-			activeList.emplace_back(CommandLists[(int)Pass::AO]);
-		}
-		//directional light shadow
-		ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles, scene->StaticCascadeInstanceInfos, scene->SceneInfo);
-		activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH]);
-		//shadow mask pass
-		ShadowMaskPass->DrawShadowMask(scene->SceneInfo);
-		activeList.emplace_back(CommandLists[(int)Pass::SHADOW_MASK]);
-		//light scene color
-		DeferredLightPass->LightPass(scene->SceneInfo);
-		activeList.emplace_back(CommandLists[(int)Pass::LIGHT]);
-		//sky
-		SkyPass->DrawSky(scene->SceneInfo);
-		activeList.emplace_back(CommandLists[(int)Pass::SKY]);
-		//bloom
-		BloomPass->Bloom(scene->SceneInfo);
-		activeList.emplace_back(CommandLists[(int)Pass::BLOOM]);
-		//get the exposure needed
-		nvrhi::BufferHandle exposure = AutomaticExposurePass->GetAdaptedLuminance(_dt);
-		activeList.emplace_back(CommandLists[(int)Pass::EXPOSURE]);
-
-		nvrhi::FramebufferHandle fb;
-		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
-			.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer());
-		fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
-		//tone map and gamma correct
-		ToneMapPass->SetRenderTarget(fb);
-		ToneMapPass->ToneMap(scene->SceneInfo, exposure);
-		activeList.emplace_back(CommandLists[(int)Pass::TONEMAP]);
-
-		fbDesc = nvrhi::FramebufferDesc()
-			.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer())
-			.setDepthAttachment(DepthHandle);
-		fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
-
-		//after tone map for now since need its own tonemap and gamma correct
-		//draw debug items
-		DebugPass->SetRenderTarget(fb);
-		DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo);
-		activeList.emplace_back(CommandLists[(int)Pass::DEBUG]);
-
-		if (scene->DebugInfo.DbgTarget)
-		{
-			FramebufferViewer->DrawTarget(scene->DebugInfo.DbgTarget, scene->DebugInfo.Add, scene->DebugInfo.Mul, scene->DebugInfo.CompCount);
-			activeList.emplace_back(CommandLists[(int)Pass::FB_VIEWER]);
-		}
-	}
-
-	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList); //command list to clear screen
-	DirectXDevice::GetNativeDevice()->executeCommandLists(activeList.data(), activeList.size());
-#endif
 }
 
 void Renderer::CreateResource()
@@ -390,7 +313,7 @@ void Renderer::CreateResource()
 	AutomaticExposurePass->Init(CommandLists[(int)Pass::EXPOSURE]);
 
 	fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer());
+		.addColorAttachment(FinalColor);
 	fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
 	ToneMapPass = std::make_shared<class ToneMapPass>();
 	ToneMapPass->SetRenderTarget(fb);
@@ -398,8 +321,16 @@ void Renderer::CreateResource()
 	ToneMapPass->Init(CommandLists[(int)Pass::TONEMAP]);
 
 	fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer())
-		.setDepthAttachment(DepthHandle);;
+		.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer());
+	fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
+	FinalPass = std::make_shared<class FinalPass>();
+	FinalPass->SetRenderTarget(fb);
+	FinalPass->SetDependencies(FinalColor);
+	FinalPass->Init(CommandLists[(int)Pass::FINAL]);
+
+	fbDesc = nvrhi::FramebufferDesc()
+		.addColorAttachment(SceneColor)
+		.setDepthAttachment(DepthHandle);
 	fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
 	DebugPass = std::make_shared<class DebugPass>();
 	DebugPass->SetRenderTarget(fb);
