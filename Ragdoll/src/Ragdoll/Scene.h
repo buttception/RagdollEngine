@@ -126,6 +126,7 @@ namespace ragdoll {
 		float ModulationFactor = 0.9f;
 		bool bIsCameraDirty{ true };
 		bool bFreezeFrustumCulling{ false };
+		bool bEnableDLSS{ true };
 	};
 
 	class Scene {
@@ -185,6 +186,7 @@ namespace ragdoll {
 		nvrhi::TextureHandle AONormalized;
 		//final color
 		nvrhi::TextureHandle FinalColor;
+		nvrhi::TextureHandle UpscaledBuffer;
 		//distance where the subfrusta are seperated
 		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
 

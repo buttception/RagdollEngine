@@ -19,7 +19,8 @@ std::filesystem::path GetDocumentsPath() {
 void NVSDK::Init(ID3D12Device* device)
 {
 	NVSDK_NGX_FeatureCommonInfo feature{};
-	feature.LoggingInfo.LoggingCallback = LoggingCallback;
+	//feature.LoggingInfo.LoggingCallback = LoggingCallback;
+	feature.LoggingInfo.MinimumLoggingLevel = NVSDK_NGX_LOGGING_LEVEL_ON;
 
 	const std::wstring dir = (GetDocumentsPath() / "NVSDK_Logs");
 	if (!std::filesystem::exists(dir))
@@ -42,25 +43,48 @@ void NVSDK::Init(ID3D12Device* device)
 
 	//get optimal settings for dlss
 	unsigned int RenderWidth, RenderHeight, MaxWidth, MaxHeight, MinWidth, MinHeight;
-	float Sharpness = 0.f;
-	res = NGX_DLSS_GET_OPTIMAL_SETTINGS(Parameters, 1920, 1080, NVSDK_NGX_PerfQuality_Value_Balanced, &RenderWidth, &RenderHeight, &MaxWidth, &MaxHeight, &MinWidth, &MinHeight, &Sharpness);
+	float Sharpness = 1.f;
+	res = NGX_DLSS_GET_OPTIMAL_SETTINGS(Parameters, 1920, 1080, NVSDK_NGX_PerfQuality_Value_MaxQuality, &RenderWidth, &RenderHeight, &MaxWidth, &MaxHeight, &MinWidth, &MinHeight, &Sharpness);
 	RD_ASSERT(res != NVSDK_NGX_Result_Success, "NGSDK: Failed to get optimal settings");
 
 	//create the dlss feature
 	//for now hard coded window size is 1280x720, then dlss it to 1920x1080 for easier resolution comp
-	NVSDK_NGX_DLSS_Create_Params createParams;
+	NVSDK_NGX_DLSS_Create_Params createParams{};
 	createParams.Feature.InWidth = 1280;
 	createParams.Feature.InHeight = 720;
 	createParams.Feature.InTargetWidth = 1920;
 	createParams.Feature.InTargetHeight = 1080;
-	createParams.Feature.InPerfQualityValue = NVSDK_NGX_PerfQuality_Value_Balanced;
+	createParams.Feature.InPerfQualityValue = NVSDK_NGX_PerfQuality_Value_MaxQuality;
+	createParams.InFeatureCreateFlags |= NVSDK_NGX_DLSS_Feature_Flags_DepthInverted;
 	CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
 	CommandList->open();
 	ID3D12GraphicsCommandList* raw = CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList);
 	res = NGX_D3D12_CREATE_DLSS_EXT(raw, 1, 1, &FeatureHandle, Parameters, &createParams);
 	CommandList->close();
+	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 	RD_ASSERT(res != NVSDK_NGX_Result_Success, "NGSDK: Failed to create DLSS feature");
 	RD_CORE_INFO("NVSDK: DLSS feature created");
+}
+
+void NVSDK::Evaluate(nvrhi::TextureHandle InColor, nvrhi::TextureHandle OutColor, nvrhi::TextureHandle InDepth, nvrhi::TextureHandle InMotionVector)
+{
+	NVSDK_NGX_D3D12_DLSS_Eval_Params evalParams{};
+	evalParams.Feature.pInColor = InColor->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
+	evalParams.Feature.pInOutput = OutColor->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
+	evalParams.Feature.InSharpness = 1.f;
+	evalParams.pInDepth = InDepth->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
+	evalParams.pInMotionVectors = InMotionVector->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
+	
+	evalParams.InJitterOffsetX = 0;
+	evalParams.InJitterOffsetY = 0;
+	evalParams.InRenderSubrectDimensions.Width = 1280;
+	evalParams.InRenderSubrectDimensions.Height = 720;
+	//add in profiling next time
+	CommandList->open();
+	NVSDK_NGX_Result res = NGX_D3D12_EVALUATE_DLSS_EXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList), FeatureHandle, Parameters, &evalParams);
+	RD_ASSERT(res != NVSDK_NGX_Result_Success, "NGSDK: Failed to evaluate DLSS feature");
+	CommandList->close();
+	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 }
 
 void NVSDK::Release()
@@ -79,11 +103,12 @@ void NVSDK::LoggingCallback(const char* message, NVSDK_NGX_Logging_Level logging
 {
 	switch(loggingLevel)
 	{
+	case NVSDK_NGX_LOGGING_LEVEL_OFF:
 	case NVSDK_NGX_LOGGING_LEVEL_ON:
 	case NVSDK_NGX_LOGGING_LEVEL_VERBOSE:
-		RD_CORE_INFO("NVSDK Log from {}: {}", (int)sourceComponent, message);
+		RD_CORE_TRACE("{}: {}", (int)sourceComponent, message);
 		break;
 	default:
-		RD_CORE_INFO("idk what these level stands for");
+		RD_CORE_WARN("NVSDK logged a unknown logging level message");
 	}
 }

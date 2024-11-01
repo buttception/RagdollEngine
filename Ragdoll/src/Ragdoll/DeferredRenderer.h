@@ -92,6 +92,7 @@ public:
 	nvrhi::TextureHandle FinalAOTermA;
 	nvrhi::TextureHandle AOTermAccumulation;
 	nvrhi::TextureHandle FinalColor;
+	nvrhi::TextureHandle UpscaledBuffer;
 	nvrhi::CommandListHandle CommandList;
 
 	//debug infos

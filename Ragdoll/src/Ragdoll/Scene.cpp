@@ -311,7 +311,7 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "SceneColor";
 	SceneColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
-	texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
+	texDesc.format = nvrhi::Format::RGBA8_UNORM;
 	texDesc.debugName = "FinalColor";
 	FinalColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
@@ -423,6 +423,11 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "EdgeMap";
 	Edges = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
+	texDesc.width = PrimaryWindowRef->GetWidth();
+	texDesc.height = PrimaryWindowRef->GetHeight();
+	texDesc.format = nvrhi::Format::RGBA8_UNORM;
+	texDesc.debugName = "UpscaledBuffer";
+	UpscaledBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 }
 
 void ragdoll::Scene::UpdateTransforms()

@@ -12,6 +12,7 @@
 #include "Scene.h"
 #include "GeometryBuilder.h"
 #include "ImGuiRenderer.h"
+#include "NVSDK.h"
 
 #include "Executor.h"
 #include "Profiler.h"
@@ -43,6 +44,7 @@ void Renderer::Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 	AOTermAccumulation = scene->AOTermAccumulation;
 	FinalColor = scene->FinalColor;
 	Edges = scene->Edges;
+	UpscaledBuffer = scene->UpscaledBuffer;
 	for (int i = 0; i < 4; ++i)
 	{
 		ShadowMap[i] = scene->ShadowMap[i];
@@ -200,15 +202,19 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 		});
 		activeList.emplace_back(CommandLists[(int)Pass::FB_VIEWER]);
 	}
-
-	Taskflow.emplace([this]() {
-		nvrhi::FramebufferDesc desc;
-		desc.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer());
-		nvrhi::FramebufferHandle fb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
-		FinalPass->SetRenderTarget(fb);
-		FinalPass->DrawQuad();
-	});
-	activeList.emplace_back(CommandLists[(int)Pass::FINAL]);
+	
+	if (!scene->SceneInfo.bEnableDLSS)
+	{
+		Taskflow.emplace([this]() {
+			nvrhi::FramebufferDesc desc;
+			desc.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer());
+			nvrhi::FramebufferHandle fb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
+			FinalPass->SetRenderTarget(fb);
+			FinalPass->SetDependencies(FinalColor);
+			FinalPass->DrawQuad();
+			});
+		activeList.emplace_back(CommandLists[(int)Pass::FINAL]);
+	}
 
 	Taskflow.emplace([&imgui]() {
 		imgui->Render();
@@ -225,8 +231,23 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 		RD_SCOPE(Render, ExecuteCommandList);
 		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 		DirectXDevice::GetNativeDevice()->executeCommandLists(activeList.data(), activeList.size());
-		DirectXDevice::GetNativeDevice()->executeCommandList(imgui->CommandList);
 	}
+
+	if (scene->SceneInfo.bEnableDLSS)
+	{
+		//DLSS pass
+		NVSDK::Evaluate(FinalColor, UpscaledBuffer, DepthHandle, VelocityBuffer);
+
+		nvrhi::FramebufferDesc desc;
+		desc.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer());
+		nvrhi::FramebufferHandle fb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
+		FinalPass->SetRenderTarget(fb);
+		FinalPass->SetDependencies(UpscaledBuffer);
+		FinalPass->DrawQuad();
+		DirectXDevice::GetNativeDevice()->executeCommandList(CommandLists[(int)Pass::FINAL]);
+	}
+
+	DirectXDevice::GetNativeDevice()->executeCommandList(imgui->CommandList);
 }
 
 void Renderer::CreateResource()
