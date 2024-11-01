@@ -33,7 +33,7 @@ void FinalPass::DrawQuad()
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::Texture_SRV(0, FinalColor),
-		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
+		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp])
 	};
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
 	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(bindingSetDesc, BindingLayoutHandle);

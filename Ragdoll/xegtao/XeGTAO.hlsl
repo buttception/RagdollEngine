@@ -197,7 +197,8 @@ void CSComposeAO( const uint2 dispatchThreadID : SV_DispatchThreadID )
         oldAOTerm = g_accumulationAOTerm[texelPos];
     }
     float newAOTerm = (float)g_currAOTerm[int2(i,j)] / 255.f;
-    float interpolatedTerm = lerp(newAOTerm, oldAOTerm, currModulationFactor);
+    //float interpolatedTerm = lerp(newAOTerm, oldAOTerm, currModulationFactor);
+    float interpolatedTerm = newAOTerm;
     //write the accumulated value onto the the accumulation buffer
     g_outAO[int2(i,j)] = interpolatedTerm;
 }

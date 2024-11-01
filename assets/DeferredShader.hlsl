@@ -104,9 +104,11 @@ void gbuffer_ps(
 	outRoughnessMetallic = float2(roughness, metallic);
 	float4 clipPos = mul(inFragPos, viewProjMatrix);
 	float4 ndcPos = clipPos / clipPos.w;
+	ndcPos.xy = ScreenPosToViewportUV(ndcPos.xy);
 	float4 prevClipPos = mul(inPrevFragPos, prevViewProjMatrix);
 	float4 prevNdcPos = prevClipPos / prevClipPos.w;
-	outVelocity = ndcPos.xy - prevNdcPos.xy;
+	prevNdcPos.xy = ScreenPosToViewportUV(prevNdcPos.xy);
+	outVelocity = (prevNdcPos.xy - ndcPos.xy) * float2(1280, 720);
 }
 
 cbuffer g_LightConst : register(b1) {

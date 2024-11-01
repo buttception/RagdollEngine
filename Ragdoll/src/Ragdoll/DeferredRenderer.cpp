@@ -233,7 +233,7 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 		DirectXDevice::GetNativeDevice()->executeCommandLists(activeList.data(), activeList.size());
 	}
 
-	if (scene->SceneInfo.bEnableDLSS)
+	if (scene->SceneInfo.bEnableDLSS && !scene->DebugInfo.DbgTarget)
 	{
 		//DLSS pass
 		NVSDK::Evaluate(FinalColor, UpscaledBuffer, DepthHandle, VelocityBuffer);

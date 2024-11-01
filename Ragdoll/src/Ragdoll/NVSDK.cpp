@@ -43,7 +43,7 @@ void NVSDK::Init(ID3D12Device* device)
 
 	//get optimal settings for dlss
 	unsigned int RenderWidth, RenderHeight, MaxWidth, MaxHeight, MinWidth, MinHeight;
-	float Sharpness = 1.f;
+	float Sharpness = 0.f;
 	res = NGX_DLSS_GET_OPTIMAL_SETTINGS(Parameters, 1920, 1080, NVSDK_NGX_PerfQuality_Value_MaxQuality, &RenderWidth, &RenderHeight, &MaxWidth, &MaxHeight, &MinWidth, &MinHeight, &Sharpness);
 	RD_ASSERT(res != NVSDK_NGX_Result_Success, "NGSDK: Failed to get optimal settings");
 
@@ -56,6 +56,8 @@ void NVSDK::Init(ID3D12Device* device)
 	createParams.Feature.InTargetHeight = 1080;
 	createParams.Feature.InPerfQualityValue = NVSDK_NGX_PerfQuality_Value_MaxQuality;
 	createParams.InFeatureCreateFlags |= NVSDK_NGX_DLSS_Feature_Flags_DepthInverted;
+	createParams.InFeatureCreateFlags |= NVSDK_NGX_DLSS_Feature_Flags_DoSharpening;
+	createParams.InFeatureCreateFlags |= NVSDK_NGX_DLSS_Feature_Flags_MVLowRes;
 	CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
 	CommandList->open();
 	ID3D12GraphicsCommandList* raw = CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList);

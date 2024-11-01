@@ -92,36 +92,36 @@ void ragdoll::Scene::Update(float _dt)
 				SceneInfo.bIsCameraDirty = true;
 			}
 		}
-		if (int item = ImguiInterface->DrawFBViewer()) {
-			switch (item) {
-			case 1:
-				DebugInfo.CompCount = 2;
-				DebugInfo.DbgTarget = GBufferNormal;
-				DebugInfo.Add = Vector4::Zero;
-				DebugInfo.Mul = Vector4::One;
-				break;
-			case 2:
-				DebugInfo.CompCount = 2;
-				DebugInfo.DbgTarget = GBufferRM;
-				DebugInfo.Add = Vector4::Zero;
-				DebugInfo.Mul = Vector4::One;
-				break;
-			case 3:
-				DebugInfo.CompCount = 3;
-				DebugInfo.DbgTarget = VelocityBuffer;
-				DebugInfo.Add = Vector4::Zero;
-				DebugInfo.Mul = Vector4::One;
-				break;
-			case 4:
-				DebugInfo.CompCount = 1;
-				DebugInfo.DbgTarget = AONormalized;
-				DebugInfo.Add = Vector4::Zero;
-				DebugInfo.Mul = Vector4::One;
-				break;
-			case 0:
-			default:
-				DebugInfo.DbgTarget = nullptr;
-			}
+		int item = ImguiInterface->DrawFBViewer();
+		
+		switch (item) {
+		case 1:
+			DebugInfo.CompCount = 2;
+			DebugInfo.DbgTarget = GBufferNormal;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One;
+			break;
+		case 2:
+			DebugInfo.CompCount = 2;
+			DebugInfo.DbgTarget = GBufferRM;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One;
+			break;
+		case 3:
+			DebugInfo.CompCount = 3;
+			DebugInfo.DbgTarget = VelocityBuffer;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One;
+			break;
+		case 4:
+			DebugInfo.CompCount = 1;
+			DebugInfo.DbgTarget = AONormalized;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One;
+			break;
+		case 0:
+		default:
+			DebugInfo.DbgTarget = nullptr;
 		}
 		SceneInfo.Luminance = DeferredRenderer->AdaptedLuminance;
 
