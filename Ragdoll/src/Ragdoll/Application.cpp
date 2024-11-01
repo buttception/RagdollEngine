@@ -188,6 +188,7 @@ namespace ragdoll
 
 	void Application::Shutdown()
 	{
+		NVSDK::Release();
 		AssetManager::GetInstance()->Release();
 		m_Scene->Shutdown();
 		DirectXDevice::GetInstance()->Release();
