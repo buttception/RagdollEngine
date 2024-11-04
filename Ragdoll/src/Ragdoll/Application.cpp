@@ -148,8 +148,6 @@ namespace ragdoll
 		m_Scene->UpdateTransforms();
 		m_Scene->PopulateStaticProxies();
 		m_Scene->ResetTransformDirtyFlags();
-
-		NVSDK::Init(DirectXDevice::GetInstance()->m_Device12);
 	}
 
 	void Application::Run()

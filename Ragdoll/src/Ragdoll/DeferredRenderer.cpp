@@ -220,8 +220,6 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 		imgui->Render();
 	});
 
-	//TODO: draw to back buffer
-
 	SExecutor::Executor.run(Taskflow).wait();
 	//submit the logs in the order of execution
 	{
@@ -235,7 +233,7 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 	if (scene->SceneInfo.bEnableDLSS && !scene->DebugInfo.DbgTarget)
 	{
 		//DLSS pass
-		NVSDK::Evaluate(FinalColor, UpscaledBuffer, DepthHandle, VelocityBuffer);
+		NVSDK::Evaluate(FinalColor, UpscaledBuffer, DepthHandle, VelocityBuffer, scene);
 
 		nvrhi::FramebufferDesc desc;
 		desc.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer());

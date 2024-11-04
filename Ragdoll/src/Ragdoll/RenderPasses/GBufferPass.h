@@ -9,6 +9,7 @@ class GBufferPass {
 	struct ConstantBuffer {
 		//constant buffer struct specific to the forward pass
 		Matrix ViewProj;
+		Matrix ViewProjWithAA;
 		Matrix PrevViewProj;
 		int InstanceOffset{ 0 };
 	}CBuffer;

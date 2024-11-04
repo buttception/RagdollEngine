@@ -75,6 +75,7 @@ void GBufferPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 
 		CommandListRef->beginMarker("Instance Draws");
 		CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
+		CBuffer.ViewProjWithAA = sceneInfo.MainCameraViewProjWithAA;
 		CBuffer.PrevViewProj = sceneInfo.PrevMainCameraViewProj;
 		CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
 

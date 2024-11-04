@@ -101,6 +101,7 @@ namespace ragdoll {
 
 	struct SceneInformation {
 		Matrix MainCameraViewProj;
+		Matrix MainCameraViewProjWithAA;
 		Matrix PrevMainCameraViewProj;
 		Matrix InfiniteReverseZProj;
 		Matrix MainCameraView;
@@ -127,6 +128,10 @@ namespace ragdoll {
 		bool bIsCameraDirty{ true };
 		bool bFreezeFrustumCulling{ false };
 		bool bEnableDLSS{ true };
+		uint32_t RenderWidth = 960;
+		uint32_t RenderHeight = 540;
+		uint32_t TargetWidth;
+		uint32_t TargetHeight;
 	};
 
 	class Scene {
@@ -153,6 +158,9 @@ namespace ragdoll {
 		DebugInfo DebugInfo;
 		Octree StaticOctree;
 
+		std::vector<double> JitterOffsetsX;
+		std::vector<double> JitterOffsetsY;
+		uint32_t PhaseIndex{}, TotalPhaseCount{};
 		//render targets
 		nvrhi::TextureHandle SceneColor;
 		nvrhi::TextureHandle SceneDepthZ;
@@ -238,6 +246,9 @@ namespace ragdoll {
 		void TraverseNode(const Guid& guid);
 		Matrix GetLocalModelMatrix(const TransformComp& trans);
 		void UpdateTransform(TransformComp& comp, const Guid& id);
+
+		// Halton Sequence
+		void HaltonSequence(Vector2 RenderRes, Vector2 TargetRes);	//assuming aspect ratio is same
 
 		//Debug
 		void AddOctantDebug(const Octant& octant, int32_t level);

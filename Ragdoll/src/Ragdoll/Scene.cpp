@@ -12,6 +12,7 @@
 #include "ImGuiRenderer.h"
 #include "DeferredRenderer.h"
 #include "Graphics/Window/Window.h"
+#include "NVSDK.h"
 
 ragdoll::Scene::Scene(Application* app)
 {
@@ -39,6 +40,13 @@ ragdoll::Scene::Scene(Application* app)
 	Config.bDrawOctree = app->Config.bDrawDebugOctree;
 	ImguiInterface = std::make_shared<ImguiRenderer>();
 	ImguiInterface->Init(DirectXDevice::GetInstance());
+
+	SceneInfo.TargetWidth = PrimaryWindowRef->GetWidth();
+	SceneInfo.TargetHeight = PrimaryWindowRef->GetHeight();
+
+	HaltonSequence(Vector2(SceneInfo.RenderWidth, SceneInfo.RenderHeight), Vector2(SceneInfo.TargetWidth, SceneInfo.TargetHeight));
+
+	NVSDK::Init(DirectXDevice::GetInstance()->m_Device12, Vector2(SceneInfo.RenderWidth, SceneInfo.RenderHeight), Vector2(SceneInfo.TargetWidth, SceneInfo.TargetHeight));
 }
 
 void ragdoll::Scene::Update(float _dt)
@@ -126,6 +134,13 @@ void ragdoll::Scene::Update(float _dt)
 		SceneInfo.Luminance = DeferredRenderer->AdaptedLuminance;
 
 		ImguiInterface->DrawControl(DebugInfo, SceneInfo, Config, _dt);
+		PhaseIndex = ++PhaseIndex == TotalPhaseCount ? 0 : PhaseIndex;
+		//jitter the projection
+		Matrix Proj = SceneInfo.InfiniteReverseZProj;
+		Proj.m[2][0] += JitterOffsetsX[PhaseIndex] / (double)SceneInfo.RenderWidth;
+		Proj.m[2][1] += JitterOffsetsY[PhaseIndex] / (double)SceneInfo.RenderHeight;
+		SceneInfo.MainCameraViewProjWithAA = SceneInfo.MainCameraView * Proj;
+
 		ImguiInterface->DrawSettings(DebugInfo, SceneInfo, Config);
 	}
 
@@ -251,13 +266,10 @@ void ragdoll::Scene::CreateCustomMeshes()
 
 void ragdoll::Scene::CreateRenderTargets()
 {
-	//the render target sizes, later upscaled using dlss to window display size
-	uint32_t TargetWidth = 1280, TargetHeight = 720;
-
 	MICROPROFILE_SCOPEI("Render", "Create Render Target", MP_YELLOW);
 	nvrhi::TextureDesc depthBufferDesc;
-	depthBufferDesc.width = TargetWidth;
-	depthBufferDesc.height = TargetHeight;
+	depthBufferDesc.width = SceneInfo.RenderWidth;
+	depthBufferDesc.height = SceneInfo.RenderHeight;
 	depthBufferDesc.initialState = nvrhi::ResourceStates::DepthWrite;
 	depthBufferDesc.isRenderTarget = true;
 	depthBufferDesc.sampleCount = 1;
@@ -280,8 +292,8 @@ void ragdoll::Scene::CreateRenderTargets()
 	}
 
 	nvrhi::TextureDesc texDesc;
-	texDesc.width = TargetWidth;
-	texDesc.height = TargetHeight;
+	texDesc.width = SceneInfo.RenderWidth;
+	texDesc.height = SceneInfo.RenderHeight;
 	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
 	texDesc.keepInitialState = true;
 	texDesc.useClearValue = true;
@@ -340,8 +352,8 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "SkyTexture";
 	SkyTexture = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
-	uint32_t width = TargetWidth;
-	uint32_t height = TargetHeight;
+	uint32_t width = SceneInfo.RenderWidth;
+	uint32_t height = SceneInfo.RenderHeight;
 	for (size_t i = 0; i < MipCount; ++i) {
 		BloomMip& mip = DownsampledImages.emplace_back();
 		mip.Width = width; mip.Height = height;
@@ -358,8 +370,8 @@ void ragdoll::Scene::CreateRenderTargets()
 	}
 
 	texDesc = nvrhi::TextureDesc();
-	texDesc.width = TargetWidth / 2 + TargetWidth % 2;
-	texDesc.height = TargetHeight / 2 + TargetHeight % 2;
+	texDesc.width = SceneInfo.RenderWidth / 2 + SceneInfo.RenderWidth % 2;
+	texDesc.height = SceneInfo.RenderHeight / 2 + SceneInfo.RenderHeight % 2;
 	texDesc.format = nvrhi::Format::R16_FLOAT;
 	texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	texDesc.isUAV = true;
@@ -385,8 +397,8 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "ImportanceMap";
 	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
 	texDesc.arraySize = 1;
-	texDesc.width = TargetWidth / 4 + TargetWidth % 4;
-	texDesc.height = TargetHeight / 4 + TargetHeight % 4;
+	texDesc.width = SceneInfo.RenderWidth / 4 + SceneInfo.RenderWidth % 4;
+	texDesc.height = SceneInfo.RenderHeight / 4 + SceneInfo.RenderHeight % 4;
 	ImportanceMap = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	texDesc.debugName = "ImportanceMapPong";
 	ImportanceMapPong = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
@@ -398,8 +410,8 @@ void ragdoll::Scene::CreateRenderTargets()
 	LoadCounter = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc = nvrhi::TextureDesc();
-	texDesc.width = TargetWidth;
-	texDesc.height = TargetHeight;
+	texDesc.width = SceneInfo.RenderWidth;
+	texDesc.height = SceneInfo.RenderHeight;
 	texDesc.format = nvrhi::Format::R16_FLOAT;
 	texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	texDesc.isUAV = true;
@@ -1011,6 +1023,37 @@ void ragdoll::Scene::UpdateTransform(TransformComp& comp, const Guid& guid)
 	//resets the dirty flags
 	if (dirtyFromHere)
 		m_DirtyOnwards = false;
+}
+
+void ragdoll::Scene::HaltonSequence(Vector2 RenderRes, Vector2 TargetRes)
+{
+	constexpr uint32_t BasePhaseCount = 8;
+	TotalPhaseCount = BasePhaseCount * powf((float)TargetRes.x / (float)RenderRes.x, 2);
+	PhaseIndex = 0;
+	constexpr int32_t BaseX = 2;
+	constexpr int32_t BaseY = 3;
+	JitterOffsetsX.resize(TotalPhaseCount);
+	JitterOffsetsY.resize(TotalPhaseCount);
+	for (int i = 1; i <= TotalPhaseCount; ++i)
+	{
+		double FractionX{ 1.0 }, ValueX{};
+		double FractionY{ 1.0 }, ValueY{};
+		uint32_t IndexX = i, IndexY = i;
+		while (IndexX > 0)
+		{
+			FractionX /= (float)BaseX;
+			ValueX += FractionX * (IndexX % BaseX);
+			IndexX /= BaseX;
+		}
+		while (IndexY)
+		{
+			FractionY /= (float)BaseY;
+			ValueY += FractionY * (IndexY % BaseY);
+			IndexY /= BaseY;
+		}
+		JitterOffsetsX[i - 1] = (ValueX - 0.5); //range [-0.5, 0.5]
+		JitterOffsetsY[i - 1] = (ValueY - 0.5); //range [-0.5, 0.5]
+	}
 }
 
 void ragdoll::Scene::AddOctantDebug(const Octant& octant, int32_t level)

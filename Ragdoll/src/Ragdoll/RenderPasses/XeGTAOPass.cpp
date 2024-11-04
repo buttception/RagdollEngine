@@ -137,7 +137,7 @@ void XeGTAOPass::MainPass(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buf
 
 	nvrhi::ComputePipelineDesc PipelineDesc;
 	PipelineDesc.bindingLayouts = { layoutHandle };
-	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("CSGTAOLow.cs.cso");
+	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("CSGTAOMedium.cs.cso");
 	PipelineDesc.CS = shader;
 
 	nvrhi::ComputeState state;

@@ -6,6 +6,7 @@
 
 #include "DirectXDevice.h"
 #include "Profiler.h"
+#include "Scene.h"
 
 std::filesystem::path GetDocumentsPath() {
 	wchar_t path[MAX_PATH];
@@ -17,7 +18,7 @@ std::filesystem::path GetDocumentsPath() {
 	}
 }
 
-void NVSDK::Init(ID3D12Device* device)
+void NVSDK::Init(ID3D12Device* device, Vector2 RenderRes, Vector2 TargetRes)
 {
 	NVSDK_NGX_FeatureCommonInfo feature{};
 	//feature.LoggingInfo.LoggingCallback = LoggingCallback;
@@ -43,7 +44,6 @@ void NVSDK::Init(ID3D12Device* device)
 	RD_CORE_INFO("DLSS is supported by the current system");
 
 	//get optimal settings for dlss
-	unsigned int RenderWidth, RenderHeight, MaxWidth, MaxHeight, MinWidth, MinHeight;
 	float Sharpness = 0.f;
 	res = NGX_DLSS_GET_OPTIMAL_SETTINGS(Parameters, 1920, 1080, NVSDK_NGX_PerfQuality_Value_MaxQuality, &RenderWidth, &RenderHeight, &MaxWidth, &MaxHeight, &MinWidth, &MinHeight, &Sharpness);
 	RD_ASSERT(res != NVSDK_NGX_Result_Success, "NGSDK: Failed to get optimal settings");
@@ -51,17 +51,21 @@ void NVSDK::Init(ID3D12Device* device)
 	//create the dlss feature
 	//for now hard coded window size is 1280x720, then dlss it to 1920x1080 for easier resolution comp
 	NVSDK_NGX_DLSS_Create_Params createParams{};
-	createParams.Feature.InWidth = 1280;
-	createParams.Feature.InHeight = 720;
+	createParams.Feature.InWidth = 960;
+	createParams.Feature.InHeight = 540;
 	createParams.Feature.InTargetWidth = 1920;
 	createParams.Feature.InTargetHeight = 1080;
 	createParams.Feature.InPerfQualityValue = NVSDK_NGX_PerfQuality_Value_MaxQuality;
 	createParams.InFeatureCreateFlags |= NVSDK_NGX_DLSS_Feature_Flags_DepthInverted;
 	createParams.InFeatureCreateFlags |= NVSDK_NGX_DLSS_Feature_Flags_DoSharpening;
 	createParams.InFeatureCreateFlags |= NVSDK_NGX_DLSS_Feature_Flags_MVLowRes;
-	CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
+	if(!CommandList)
+		CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
 	CommandList->open();
 	ID3D12GraphicsCommandList* raw = CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList);
+	if(FeatureHandle)
+		NVSDK_NGX_D3D12_ReleaseFeature(FeatureHandle);
+	FeatureHandle = nullptr;
 	res = NGX_D3D12_CREATE_DLSS_EXT(raw, 1, 1, &FeatureHandle, Parameters, &createParams);
 	CommandList->close();
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
@@ -69,9 +73,8 @@ void NVSDK::Init(ID3D12Device* device)
 	RD_CORE_INFO("NVSDK: DLSS feature created");
 }
 
-void NVSDK::Evaluate(nvrhi::TextureHandle InColor, nvrhi::TextureHandle OutColor, nvrhi::TextureHandle InDepth, nvrhi::TextureHandle InMotionVector)
+void NVSDK::Evaluate(nvrhi::TextureHandle InColor, nvrhi::TextureHandle OutColor, nvrhi::TextureHandle InDepth, nvrhi::TextureHandle InMotionVector, ragdoll::Scene* scene)
 {
-	
 	{
 		RD_SCOPE(Render, DLSS);
 		RD_GPU_SCOPE("DLSS", CommandList);
@@ -79,14 +82,14 @@ void NVSDK::Evaluate(nvrhi::TextureHandle InColor, nvrhi::TextureHandle OutColor
 		NVSDK_NGX_D3D12_DLSS_Eval_Params evalParams{};
 		evalParams.Feature.pInColor = InColor->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
 		evalParams.Feature.pInOutput = OutColor->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
-		evalParams.Feature.InSharpness = 1.f;
+		evalParams.Feature.InSharpness = Sharpness;
 		evalParams.pInDepth = InDepth->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
 		evalParams.pInMotionVectors = InMotionVector->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
 
-		evalParams.InJitterOffsetX = 0;
-		evalParams.InJitterOffsetY = 0;
-		evalParams.InRenderSubrectDimensions.Width = 1280;
-		evalParams.InRenderSubrectDimensions.Height = 720;
+		evalParams.InJitterOffsetX = scene->JitterOffsetsX[scene->PhaseIndex];
+		evalParams.InJitterOffsetY = -scene->JitterOffsetsY[scene->PhaseIndex];
+		evalParams.InRenderSubrectDimensions.Width = 960;
+		evalParams.InRenderSubrectDimensions.Height = 540;
 
 		NVSDK_NGX_Result res = NGX_D3D12_EVALUATE_DLSS_EXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList), FeatureHandle, Parameters, &evalParams);
 		RD_ASSERT(res != NVSDK_NGX_Result_Success, "NGSDK: Failed to evaluate DLSS feature");
