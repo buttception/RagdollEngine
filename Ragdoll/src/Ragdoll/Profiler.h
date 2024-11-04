@@ -43,6 +43,8 @@ class EnterCommandListSectionGpu {
 public:
 	static uint32_t Queue;
 
+	static void Reset();
+
 	EnterCommandListSectionGpu(const char* name, nvrhi::CommandListHandle cmdList);
 	~EnterCommandListSectionGpu();
 };

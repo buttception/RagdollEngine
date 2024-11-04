@@ -5,6 +5,7 @@
 #include <shlobj.h>
 
 #include "DirectXDevice.h"
+#include "Profiler.h"
 
 std::filesystem::path GetDocumentsPath() {
 	wchar_t path[MAX_PATH];
@@ -70,22 +71,28 @@ void NVSDK::Init(ID3D12Device* device)
 
 void NVSDK::Evaluate(nvrhi::TextureHandle InColor, nvrhi::TextureHandle OutColor, nvrhi::TextureHandle InDepth, nvrhi::TextureHandle InMotionVector)
 {
-	NVSDK_NGX_D3D12_DLSS_Eval_Params evalParams{};
-	evalParams.Feature.pInColor = InColor->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
-	evalParams.Feature.pInOutput = OutColor->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
-	evalParams.Feature.InSharpness = 1.f;
-	evalParams.pInDepth = InDepth->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
-	evalParams.pInMotionVectors = InMotionVector->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
 	
-	evalParams.InJitterOffsetX = 0;
-	evalParams.InJitterOffsetY = 0;
-	evalParams.InRenderSubrectDimensions.Width = 1280;
-	evalParams.InRenderSubrectDimensions.Height = 720;
-	//add in profiling next time
-	CommandList->open();
-	NVSDK_NGX_Result res = NGX_D3D12_EVALUATE_DLSS_EXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList), FeatureHandle, Parameters, &evalParams);
-	RD_ASSERT(res != NVSDK_NGX_Result_Success, "NGSDK: Failed to evaluate DLSS feature");
-	CommandList->close();
+	{
+		RD_SCOPE(Render, DLSS);
+		RD_GPU_SCOPE("DLSS", CommandList);
+
+		NVSDK_NGX_D3D12_DLSS_Eval_Params evalParams{};
+		evalParams.Feature.pInColor = InColor->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
+		evalParams.Feature.pInOutput = OutColor->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
+		evalParams.Feature.InSharpness = 1.f;
+		evalParams.pInDepth = InDepth->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
+		evalParams.pInMotionVectors = InMotionVector->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
+
+		evalParams.InJitterOffsetX = 0;
+		evalParams.InJitterOffsetY = 0;
+		evalParams.InRenderSubrectDimensions.Width = 1280;
+		evalParams.InRenderSubrectDimensions.Height = 720;
+
+		NVSDK_NGX_Result res = NGX_D3D12_EVALUATE_DLSS_EXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList), FeatureHandle, Parameters, &evalParams);
+		RD_ASSERT(res != NVSDK_NGX_Result_Success, "NGSDK: Failed to evaluate DLSS feature");
+	}
+
+	MICROPROFILE_GPU_SUBMIT(EnterCommandListSectionGpu::Queue, CommandList->Work);
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 }
 

@@ -224,12 +224,11 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 
 	SExecutor::Executor.run(Taskflow).wait();
 	//submit the logs in the order of execution
-	MICROPROFILE_GPU_SUBMIT(EnterCommandListSectionGpu::Queue, CommandList->Work);
-	RD_GPU_SUBMIT(activeList);
-	MICROPROFILE_GPU_SUBMIT(EnterCommandListSectionGpu::Queue, imgui->CommandList->Work);
 	{
 		RD_SCOPE(Render, ExecuteCommandList);
+		MICROPROFILE_GPU_SUBMIT(EnterCommandListSectionGpu::Queue, CommandList->Work);
 		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
+		RD_GPU_SUBMIT(activeList);
 		DirectXDevice::GetNativeDevice()->executeCommandLists(activeList.data(), activeList.size());
 	}
 
@@ -244,10 +243,14 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 		FinalPass->SetRenderTarget(fb);
 		FinalPass->SetDependencies(UpscaledBuffer);
 		FinalPass->DrawQuad();
+		MICROPROFILE_GPU_SUBMIT(EnterCommandListSectionGpu::Queue, CommandLists[(int)Pass::FINAL]->Work);
 		DirectXDevice::GetNativeDevice()->executeCommandList(CommandLists[(int)Pass::FINAL]);
 	}
 
+	MICROPROFILE_GPU_SUBMIT(EnterCommandListSectionGpu::Queue, imgui->CommandList->Work);
 	DirectXDevice::GetNativeDevice()->executeCommandList(imgui->CommandList);
+
+	EnterCommandListSectionGpu::Reset();
 }
 
 void Renderer::CreateResource()
