@@ -12,6 +12,7 @@
 #include "ImGuiRenderer.h"
 #include "DeferredRenderer.h"
 #include "Graphics/Window/Window.h"
+#include "NVSDK.h"
 
 ragdoll::Scene::Scene(Application* app)
 {
@@ -39,6 +40,13 @@ ragdoll::Scene::Scene(Application* app)
 	Config.bDrawOctree = app->Config.bDrawDebugOctree;
 	ImguiInterface = std::make_shared<ImguiRenderer>();
 	ImguiInterface->Init(DirectXDevice::GetInstance());
+
+	SceneInfo.TargetWidth = PrimaryWindowRef->GetWidth();
+	SceneInfo.TargetHeight = PrimaryWindowRef->GetHeight();
+
+	HaltonSequence(Vector2(SceneInfo.RenderWidth, SceneInfo.RenderHeight), Vector2(SceneInfo.TargetWidth, SceneInfo.TargetHeight));
+
+	NVSDK::Init(DirectXDevice::GetInstance()->m_Device12, Vector2(SceneInfo.RenderWidth, SceneInfo.RenderHeight), Vector2(SceneInfo.TargetWidth, SceneInfo.TargetHeight));
 }
 
 void ragdoll::Scene::Update(float _dt)
@@ -82,7 +90,7 @@ void ragdoll::Scene::Update(float _dt)
 				tcomp->m_LocalRotation = Quaternion::CreateFromYawPitchRoll(eulerRotate.y, eulerRotate.x, eulerRotate.z);
 				AddEntityAtRootLevel(EntityManagerRef->GetGuid(ent));
 				auto rcomp = EntityManagerRef->AddComponent<RenderableComp>(ent);
-				rcomp->meshIndex = std::rand() / (float)RAND_MAX * 25;
+				rcomp->meshIndex = (int32_t)(std::rand() / (float)RAND_MAX * 25);
 			}
 			{
 				RD_SCOPE(Entity, Create);
@@ -92,40 +100,50 @@ void ragdoll::Scene::Update(float _dt)
 				SceneInfo.bIsCameraDirty = true;
 			}
 		}
-		if (int item = ImguiInterface->DrawFBViewer()) {
-			switch (item) {
-			case 1:
-				DebugInfo.CompCount = 2;
-				DebugInfo.DbgTarget = GBufferNormal;
-				DebugInfo.Add = Vector4::Zero;
-				DebugInfo.Mul = Vector4::One;
-				break;
-			case 2:
-				DebugInfo.CompCount = 2;
-				DebugInfo.DbgTarget = GBufferRM;
-				DebugInfo.Add = Vector4::Zero;
-				DebugInfo.Mul = Vector4::One;
-				break;
-			case 3:
-				DebugInfo.CompCount = 3;
-				DebugInfo.DbgTarget = VelocityBuffer;
-				DebugInfo.Add = Vector4::Zero;
-				DebugInfo.Mul = Vector4::One;
-				break;
-			case 4:
-				DebugInfo.CompCount = 1;
-				DebugInfo.DbgTarget = AONormalized;
-				DebugInfo.Add = Vector4::Zero;
-				DebugInfo.Mul = Vector4::One;
-				break;
-			case 0:
-			default:
-				DebugInfo.DbgTarget = nullptr;
-			}
+		int item = ImguiInterface->DrawFBViewer();
+		
+		switch (item) {
+		case 1:
+			DebugInfo.CompCount = 2;
+			DebugInfo.DbgTarget = RenderTargets.GBufferNormal;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One;
+			break;
+		case 2:
+			DebugInfo.CompCount = 2;
+			DebugInfo.DbgTarget = RenderTargets.GBufferRM;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One;
+			break;
+		case 3:
+			DebugInfo.CompCount = 3;
+			DebugInfo.DbgTarget = RenderTargets.VelocityBuffer;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One;
+			break;
+		case 4:
+			DebugInfo.CompCount = 1;
+			DebugInfo.DbgTarget = RenderTargets.AONormalized;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One;
+			break;
+		case 0:
+		default:
+			DebugInfo.DbgTarget = nullptr;
 		}
 		SceneInfo.Luminance = DeferredRenderer->AdaptedLuminance;
 
 		ImguiInterface->DrawControl(DebugInfo, SceneInfo, Config, _dt);
+		PhaseIndex = ++PhaseIndex == TotalPhaseCount ? 0 : PhaseIndex;
+		//jitter the projection
+		Matrix Proj = SceneInfo.InfiniteReverseZProj;
+		if (SceneInfo.bEnableJitter)
+		{
+			Proj.m[2][0] += JitterOffsetsX[PhaseIndex] / (double)SceneInfo.RenderWidth;
+			Proj.m[2][1] += JitterOffsetsY[PhaseIndex] / (double)SceneInfo.RenderHeight;
+		}
+		SceneInfo.MainCameraViewProjWithAA = SceneInfo.MainCameraView * Proj;
+
 		ImguiInterface->DrawSettings(DebugInfo, SceneInfo, Config);
 	}
 
@@ -139,6 +157,14 @@ void ragdoll::Scene::Update(float _dt)
 		BuildDebugInstances(StaticDebugInstanceDatas);
 	}
 
+	if (SceneInfo.bIsResolutionDirty)
+	{
+		HaltonSequence(Vector2(SceneInfo.RenderWidth, SceneInfo.RenderHeight), Vector2(SceneInfo.TargetWidth, SceneInfo.TargetHeight));
+		NVSDK::Init(DirectXDevice::GetInstance()->m_Device12, Vector2(SceneInfo.RenderWidth, SceneInfo.RenderHeight), Vector2(SceneInfo.TargetWidth, SceneInfo.TargetHeight));
+		CreateRenderTargets();
+		SceneInfo.bIsResolutionDirty = false;
+	}
+
 	DeferredRenderer->Render(this, _dt, ImguiInterface);
 
 	DirectXDevice::GetInstance()->Present();
@@ -148,6 +174,7 @@ void ragdoll::Scene::Update(float _dt)
 
 void ragdoll::Scene::Shutdown()
 {
+	NVSDK::Release();
 	ImguiInterface->Shutdown();
 	ImguiInterface = nullptr;
 	DeferredRenderer->Shutdown();
@@ -216,32 +243,32 @@ void ragdoll::Scene::CreateCustomMeshes()
 	//build primitives
 	GeometryBuilder geomBuilder;
 	geomBuilder.Init(DirectXDevice::GetNativeDevice());
-	int32_t id = geomBuilder.BuildCube(1.f);
-	for (int i = 0; i < 5; ++i) {
+	size_t id = geomBuilder.BuildCube(1.f);
+	for (size_t i = 0; i < 5; ++i) {
 		Mesh mesh;
 		mesh.Submeshes.push_back({ id, i });
 		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
 	id = geomBuilder.BuildSphere(1.f, 16);
-	for (int i = 0; i < 5; ++i) {
+	for (size_t i = 0; i < 5; ++i) {
 		Mesh mesh;
 		mesh.Submeshes.push_back({ id, i });
 		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
 	id = geomBuilder.BuildCylinder(1.f, 1.f, 16);
-	for (int i = 0; i < 5; ++i) {
+	for (size_t i = 0; i < 5; ++i) {
 		Mesh mesh;
 		mesh.Submeshes.push_back({ id, i });
 		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
 	id = geomBuilder.BuildCone(1.f, 1.f, 16);
-	for (int i = 0; i < 5; ++i) {
+	for (size_t i = 0; i < 5; ++i) {
 		Mesh mesh;
 		mesh.Submeshes.push_back({ id, i });
 		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
 	id = geomBuilder.BuildIcosahedron(1.f);
-	for (int i = 0; i < 5; ++i) {
+	for (size_t i = 0; i < 5; ++i) {
 		Mesh mesh;
 		mesh.Submeshes.push_back({ id, i });
 		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
@@ -253,8 +280,8 @@ void ragdoll::Scene::CreateRenderTargets()
 {
 	MICROPROFILE_SCOPEI("Render", "Create Render Target", MP_YELLOW);
 	nvrhi::TextureDesc depthBufferDesc;
-	depthBufferDesc.width = PrimaryWindowRef->GetBufferWidth();
-	depthBufferDesc.height = PrimaryWindowRef->GetBufferHeight();
+	depthBufferDesc.width = SceneInfo.RenderWidth;
+	depthBufferDesc.height = SceneInfo.RenderHeight;
 	depthBufferDesc.initialState = nvrhi::ResourceStates::DepthWrite;
 	depthBufferDesc.isRenderTarget = true;
 	depthBufferDesc.sampleCount = 1;
@@ -266,19 +293,19 @@ void ragdoll::Scene::CreateRenderTargets()
 	depthBufferDesc.debugName = "SceneDepthZ";
 	depthBufferDesc.clearValue = 0.f;
 	depthBufferDesc.useClearValue = true;
-	SceneDepthZ = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
+	RenderTargets.SceneDepthZ = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
 
 	depthBufferDesc.width = 2000;
 	depthBufferDesc.height = 2000;
 	for (int i = 0; i < 4; ++i)
 	{
 		depthBufferDesc.debugName = "ShadowMap" + std::to_string(i);
-		ShadowMap[i] = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
+		RenderTargets.ShadowMap[i] = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
 	}
 
 	nvrhi::TextureDesc texDesc;
-	texDesc.width = PrimaryWindowRef->GetBufferWidth();
-	texDesc.height = PrimaryWindowRef->GetBufferHeight();
+	texDesc.width = SceneInfo.RenderWidth;
+	texDesc.height = SceneInfo.RenderHeight;
 	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
 	texDesc.keepInitialState = true;
 	texDesc.useClearValue = true;
@@ -289,12 +316,12 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.clearValue = 1.f;
 	texDesc.format = nvrhi::Format::R8_UNORM;
 	texDesc.debugName = "AONormalized";
-	AONormalized = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.AONormalized = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	
 	texDesc.clearValue = 0.f;
 	texDesc.format = nvrhi::Format::RG8_UNORM;
 	texDesc.debugName = "GBufferRM";
-	GBufferRM = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.GBufferRM = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.sampleCount = 1;
 	texDesc.isTypeless = false;
@@ -302,41 +329,46 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.initialState = nvrhi::ResourceStates::RenderTarget;
 	texDesc.format = nvrhi::Format::RGBA8_UNORM;
 	texDesc.debugName = "GBufferAlbedo";
-	GBufferAlbedo = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.GBufferAlbedo = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
 	texDesc.debugName = "SceneColor";
-	SceneColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.SceneColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::RGBA8_UNORM;
+	texDesc.debugName = "FinalColor";
+	RenderTargets.FinalColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::RG16_UNORM;
 	texDesc.debugName = "GBufferNormal";
-	GBufferNormal = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.GBufferNormal = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::RG16_FLOAT;
 	texDesc.debugName = "VelocityBuffer";
-	VelocityBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.VelocityBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::RGBA8_UNORM;
 	texDesc.debugName = "ShadowMask";
-	ShadowMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.ShadowMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.width = 64;
 	texDesc.height = 2;
 	texDesc.format = nvrhi::Format::RGBA8_UNORM;
 	texDesc.debugName = "SkyThetaGammaTable";
-	SkyThetaGammaTable = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.SkyThetaGammaTable = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.width = texDesc.height = 2000;
 	texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	texDesc.isUAV = true;
 	texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
 	texDesc.debugName = "SkyTexture";
-	SkyTexture = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.SkyTexture = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
-	uint32_t width = PrimaryWindowRef->GetWidth();
-	uint32_t height = PrimaryWindowRef->GetHeight();
-	for (int i = 0; i < MipCount; ++i) {
-		BloomMip& mip = DownsampledImages.emplace_back();
+	uint32_t width = SceneInfo.RenderWidth;
+	uint32_t height = SceneInfo.RenderHeight;
+	RenderTargets.DownsampledImages.resize(RenderTargets.MipCount);
+	for (size_t i = 0; i < RenderTargets.MipCount; ++i) {
+		BloomMip& mip = RenderTargets.DownsampledImages[i];
 		mip.Width = width; mip.Height = height;
 		nvrhi::TextureDesc desc;
 		desc.width = mip.Width;
@@ -351,8 +383,8 @@ void ragdoll::Scene::CreateRenderTargets()
 	}
 
 	texDesc = nvrhi::TextureDesc();
-	texDesc.width = PrimaryWindowRef->GetWidth() / 2 + PrimaryWindowRef->GetWidth() % 2;
-	texDesc.height = PrimaryWindowRef->GetHeight() / 2 + PrimaryWindowRef->GetHeight() % 2;
+	texDesc.width = SceneInfo.RenderWidth / 2 + SceneInfo.RenderWidth % 2;
+	texDesc.height = SceneInfo.RenderHeight / 2 + SceneInfo.RenderHeight % 2;
 	texDesc.format = nvrhi::Format::R16_FLOAT;
 	texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	texDesc.isUAV = true;
@@ -361,38 +393,38 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.dimension = nvrhi::TextureDimension::Texture2DArray;
 	texDesc.arraySize = 4;
 	texDesc.mipLevels = 5;
-	DeinterleavedDepth = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.DeinterleavedDepth = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::RGBA8_SNORM;
 	texDesc.debugName = "DeinterleavedNormals";
 	texDesc.mipLevels = 1;
-	DeinterleavedNormals = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.DeinterleavedNormals = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::RG8_UNORM;
 	texDesc.debugName = "SSAOBufferPong";
-	SSAOBufferPong = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.SSAOBufferPong = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	texDesc.debugName = "SSAOBufferPing";
-	SSAOBufferPing = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.SSAOBufferPing = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::R8_UNORM;
 	texDesc.debugName = "ImportanceMap";
 	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
 	texDesc.arraySize = 1;
-	texDesc.width = PrimaryWindowRef->GetWidth() / 4 + PrimaryWindowRef->GetWidth() % 4;
-	texDesc.height = PrimaryWindowRef->GetHeight() / 4 + PrimaryWindowRef->GetHeight() % 4;
-	ImportanceMap = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.width = SceneInfo.RenderWidth / 4 + SceneInfo.RenderWidth % 4;
+	texDesc.height = SceneInfo.RenderHeight / 4 + SceneInfo.RenderHeight % 4;
+	RenderTargets.ImportanceMap = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	texDesc.debugName = "ImportanceMapPong";
-	ImportanceMapPong = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.ImportanceMapPong = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::R32_UINT;
 	texDesc.debugName = "LoadCounter";
 	texDesc.width = texDesc.height = 1;
 	texDesc.dimension = nvrhi::TextureDimension::Texture1D;
-	LoadCounter = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.LoadCounter = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc = nvrhi::TextureDesc();
-	texDesc.width = PrimaryWindowRef->GetBufferWidth();
-	texDesc.height = PrimaryWindowRef->GetBufferHeight();
+	texDesc.width = SceneInfo.RenderWidth;
+	texDesc.height = SceneInfo.RenderHeight;
 	texDesc.format = nvrhi::Format::R16_FLOAT;
 	texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	texDesc.isUAV = true;
@@ -400,22 +432,27 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "DepthMips";
 	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
 	texDesc.mipLevels = 5;
-	DepthMips = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.DepthMips = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::R8_UINT;
 	texDesc.debugName = "AOTerm";
 	texDesc.mipLevels = 1;
-	AOTerm = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.AOTerm = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	texDesc.debugName = "FinalAOTerm";
-	FinalAOTerm = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.FinalAOTerm = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	texDesc.format = nvrhi::Format::R8_UNORM;
 	texDesc.debugName = "AOTermAccumulation";
-	AOTermAccumulation = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.AOTermAccumulation = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::R8_UNORM;
 	texDesc.debugName = "EdgeMap";
-	Edges = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.EdgeMap = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
+	texDesc.width = PrimaryWindowRef->GetWidth();
+	texDesc.height = PrimaryWindowRef->GetHeight();
+	texDesc.format = nvrhi::Format::RGBA8_UNORM;
+	texDesc.debugName = "UpscaledBuffer";
+	RenderTargets.UpscaledBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 }
 
 void ragdoll::Scene::UpdateTransforms()
@@ -491,8 +528,8 @@ void ragdoll::Scene::PopulateStaticProxies()
 			Proxy.ModelToWorld = tComp->m_ModelToWorld;
 			Proxy.InvModelToWorld = tComp->m_ModelToWorld.Invert();
 			Proxy.PrevWorldMatrix = tComp->m_PrevModelToWorld;
-			Proxy.BufferIndex = submesh.VertexBufferIndex;
-			Proxy.MaterialIndex = submesh.MaterialIndex;
+			Proxy.BufferIndex = (int32_t)submesh.VertexBufferIndex;
+			Proxy.MaterialIndex = (int32_t)submesh.MaterialIndex;
 			AssetManager::GetInstance()->VertexBufferInfos[Proxy.BufferIndex].BestFitBox.Transform(Proxy.BoundingBox, tComp->m_ModelToWorld);
 			StaticOctree.AddProxy(Proxy.BoundingBox, StaticProxies.size() - 1);
 		}
@@ -848,9 +885,9 @@ void ragdoll::Scene::UpdateShadowCascadesExtents()
 			center += corners[j];
 		}
 		center /= 8.f;
-		center.x = (int)center.x;
-		center.y = (int)center.y;
-		center.z = (int)center.z;
+		center.x = (float)(int32_t)center.x;
+		center.y = (float)(int32_t)center.y;
+		center.z = (float)(int32_t)center.z;
 		//move all corners into a 1x1x1 cube lightspace with the directional light
 		Matrix lightProj = DirectX::XMMatrixOrthographicLH(1.f, 1.f, -0.5f, 0.5f);	//should be a 1x1x1 cube?
 		Vector3 lightDir = -SceneInfo.LightDirection;
@@ -1001,7 +1038,38 @@ void ragdoll::Scene::UpdateTransform(TransformComp& comp, const Guid& guid)
 		m_DirtyOnwards = false;
 }
 
-void ragdoll::Scene::AddOctantDebug(const Octant& octant, uint32_t level)
+void ragdoll::Scene::HaltonSequence(Vector2 RenderRes, Vector2 TargetRes)
+{
+	constexpr uint32_t BasePhaseCount = 8;
+	TotalPhaseCount = BasePhaseCount * powf((float)TargetRes.x / (float)RenderRes.x, 2);
+	PhaseIndex = 0;
+	constexpr int32_t BaseX = 2;
+	constexpr int32_t BaseY = 3;
+	JitterOffsetsX.resize(TotalPhaseCount);
+	JitterOffsetsY.resize(TotalPhaseCount);
+	for (int i = 1; i <= TotalPhaseCount; ++i)
+	{
+		double FractionX{ 1.0 }, ValueX{};
+		double FractionY{ 1.0 }, ValueY{};
+		uint32_t IndexX = i, IndexY = i;
+		while (IndexX > 0)
+		{
+			FractionX /= (float)BaseX;
+			ValueX += FractionX * (IndexX % BaseX);
+			IndexX /= BaseX;
+		}
+		while (IndexY)
+		{
+			FractionY /= (float)BaseY;
+			ValueY += FractionY * (IndexY % BaseY);
+			IndexY /= BaseY;
+		}
+		JitterOffsetsX[i - 1] = (ValueX - 0.5); //range [-0.5, 0.5]
+		JitterOffsetsY[i - 1] = (ValueY - 0.5); //range [-0.5, 0.5]
+	}
+}
+
+void ragdoll::Scene::AddOctantDebug(const Octant& octant, int32_t level)
 {
 	if (octant.bIsCulled)
 		return;

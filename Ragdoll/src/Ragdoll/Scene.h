@@ -101,6 +101,7 @@ namespace ragdoll {
 
 	struct SceneInformation {
 		Matrix MainCameraViewProj;
+		Matrix MainCameraViewProjWithAA;
 		Matrix PrevMainCameraViewProj;
 		Matrix InfiniteReverseZProj;
 		Matrix MainCameraView;
@@ -126,32 +127,18 @@ namespace ragdoll {
 		float ModulationFactor = 0.9f;
 		bool bIsCameraDirty{ true };
 		bool bFreezeFrustumCulling{ false };
+		bool bEnableDLSS{ true };
+		bool bEnableJitter{ true };
+		bool bEnableXeGTAONoise{ true };
+		uint32_t RenderWidth = 960;
+		uint32_t RenderHeight = 540;
+		uint32_t TargetWidth;
+		uint32_t TargetHeight;
+		bool bIsResolutionDirty{ false };
 	};
 
-	class Scene {
-		std::shared_ptr<EntityManager> EntityManagerRef;
-		std::shared_ptr<Window> PrimaryWindowRef;
-
-		std::shared_ptr<ImguiRenderer> ImguiInterface;
-
-		//Transforms
-		std::stack<Matrix> m_ModelStack;
-		//the root details
-		Guid m_RootEntity;
-		Guid m_RootSibling;
-		Guid m_FurthestSibling;	//cache for better performance
-		//state
-		bool m_DirtyOnwards{ false };
-
-		//Rendering
-		nvrhi::CommandListHandle CommandList;
-
-	public:
-		std::shared_ptr<Renderer> DeferredRenderer;
-		SceneConfig Config;
-		DebugInfo DebugInfo;
-		Octree StaticOctree;
-
+	struct SceneRenderTargets
+	{
 		//render targets
 		nvrhi::TextureHandle SceneColor;
 		nvrhi::TextureHandle SceneDepthZ;
@@ -179,10 +166,44 @@ namespace ragdoll {
 		//xegtao
 		nvrhi::TextureHandle DepthMips;
 		nvrhi::TextureHandle AOTerm;
-		nvrhi::TextureHandle Edges;
+		nvrhi::TextureHandle EdgeMap;
 		nvrhi::TextureHandle FinalAOTerm;
 		nvrhi::TextureHandle AOTermAccumulation;
 		nvrhi::TextureHandle AONormalized;
+		//final color
+		nvrhi::TextureHandle FinalColor;
+		nvrhi::TextureHandle UpscaledBuffer;
+	};
+
+	class Scene {
+		std::shared_ptr<EntityManager> EntityManagerRef;
+		std::shared_ptr<Window> PrimaryWindowRef;
+
+		std::shared_ptr<ImguiRenderer> ImguiInterface;
+
+		//Transforms
+		std::stack<Matrix> m_ModelStack;
+		//the root details
+		Guid m_RootEntity;
+		Guid m_RootSibling;
+		Guid m_FurthestSibling;	//cache for better performance
+		//state
+		bool m_DirtyOnwards{ false };
+
+		//Rendering
+		nvrhi::CommandListHandle CommandList;
+
+	public:
+		std::shared_ptr<Renderer> DeferredRenderer;
+		SceneConfig Config;
+		DebugInfo DebugInfo;
+		Octree StaticOctree;
+
+		std::vector<double> JitterOffsetsX;
+		std::vector<double> JitterOffsetsY;
+		uint32_t PhaseIndex{}, TotalPhaseCount{};
+
+		SceneRenderTargets RenderTargets;
 		//distance where the subfrusta are seperated
 		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
 
@@ -235,7 +256,10 @@ namespace ragdoll {
 		Matrix GetLocalModelMatrix(const TransformComp& trans);
 		void UpdateTransform(TransformComp& comp, const Guid& id);
 
+		// Halton Sequence
+		void HaltonSequence(Vector2 RenderRes, Vector2 TargetRes);	//assuming aspect ratio is same
+
 		//Debug
-		void AddOctantDebug(const Octant& octant, uint32_t level);
+		void AddOctantDebug(const Octant& octant, int32_t level);
 	};
 }

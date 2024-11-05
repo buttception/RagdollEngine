@@ -4,6 +4,7 @@
 namespace ragdoll {
 	struct InstanceGroupInfo;
 	struct SceneInformation;
+	struct SceneRenderTargets;
 }
 class DeferredLightPass {
 	struct ConstantBuffer {
@@ -16,21 +17,10 @@ class DeferredLightPass {
 		Vector3 CameraPosition;
 	}CBuffer;
 
-	nvrhi::FramebufferHandle RenderTarget{ nullptr };
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
-
-	nvrhi::TextureHandle AlbedoHandle;
-	nvrhi::TextureHandle NormalHandle;
-	nvrhi::TextureHandle RoughnessMetallicHandle;
-	nvrhi::TextureHandle AOHandle;
-	nvrhi::TextureHandle DepthHandle;
-	nvrhi::TextureHandle ShadowMask;
 
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
 
-	void SetRenderTarget(nvrhi::FramebufferHandle renderTarget);
-	void SetDependencies(nvrhi::TextureHandle albedo, nvrhi::TextureHandle normal, nvrhi::TextureHandle rm, nvrhi::TextureHandle ao, nvrhi::TextureHandle depth, nvrhi::TextureHandle shadowMask);
-
-	void LightPass(const ragdoll::SceneInformation& sceneInfo);
+	void LightPass(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets);
 };

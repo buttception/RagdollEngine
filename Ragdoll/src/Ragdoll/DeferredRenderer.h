@@ -14,12 +14,14 @@
 #include "RenderPasses/ToneMapPass.h"
 #include "RenderPasses/BloomPass.h"
 #include "RenderPasses/XeGTAOPass.h"
+#include "RenderPasses/FinalPass.h"
 
 namespace ragdoll {
 	class Window;
 	class FileManager;
 	class EntityManager;
 	class Scene;
+	struct SceneRenderTargets;
 	struct InstanceGroupInfo;
 }
 class DirectXDevice;
@@ -38,6 +40,7 @@ public:
 	std::shared_ptr<BloomPass> BloomPass;
 	std::shared_ptr<AutomaticExposurePass> AutomaticExposurePass;
 	std::shared_ptr<ToneMapPass> ToneMapPass;
+	std::shared_ptr<FinalPass> FinalPass;
 	std::shared_ptr<DebugPass> DebugPass;
 	std::shared_ptr<FramebufferViewer> FramebufferViewer;
 
@@ -55,6 +58,7 @@ public:
 		BLOOM,
 		EXPOSURE,
 		TONEMAP,
+		FINAL,
 		DEBUG,
 		FB_VIEWER,
 
@@ -63,31 +67,7 @@ public:
 
 	std::vector<nvrhi::CommandListHandle> CommandLists;
 
-	nvrhi::TextureHandle SkyTexture;
-	nvrhi::TextureHandle SkyThetaGammaTable;
-	nvrhi::TextureHandle SceneColor;
-	nvrhi::TextureHandle AlbedoHandle;
-	nvrhi::TextureHandle NormalHandle;
-	nvrhi::TextureHandle RoughnessMetallicHandle;
-	nvrhi::TextureHandle AOHandle;
-	nvrhi::TextureHandle VelocityBuffer;
-	nvrhi::TextureHandle DepthHandle;
-	nvrhi::FramebufferHandle GBuffer;
-	nvrhi::TextureHandle ShadowMap[4];
-	nvrhi::TextureHandle ShadowMask;
-	const std::vector<BloomMip>* Mips;
-	nvrhi::TextureHandle DeinterleavedDepth;
-	nvrhi::TextureHandle DeinterleavedNormals;
-	nvrhi::TextureHandle SSAOPong;
-	nvrhi::TextureHandle SSAOPing;
-	nvrhi::TextureHandle ImportanceMap;
-	nvrhi::TextureHandle ImportanceMapPong;
-	nvrhi::TextureHandle LoadCounter;
-	nvrhi::TextureHandle DepthMips;
-	nvrhi::TextureHandle AOTerm;
-	nvrhi::TextureHandle Edges;
-	nvrhi::TextureHandle FinalAOTermA;
-	nvrhi::TextureHandle AOTermAccumulation;
+	ragdoll::SceneRenderTargets* RenderTargets;
 	nvrhi::CommandListHandle CommandList;
 
 	//debug infos

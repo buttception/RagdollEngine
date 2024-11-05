@@ -30,7 +30,7 @@ project "Ragdoll"
 
 	libdirs
 	{
-		
+		"%{LibDirs.dlss}",
 	}
 
 	links
@@ -59,11 +59,14 @@ project "Ragdoll"
 		"%{IncludesDir.microprofile}",
 		"%{IncludesDir.cxxopts}",
 		"%{IncludesDir.taskflow}",
+		"%{IncludesDir.dlss}",
     }
 
 	prebuildcommands
 	{
-		"\"%{wks.location}Tools\\compileShader.bat\""
+		"xcopy /Y /E /I \"%{LibDirs.dlss}\\Windows_x86_64\\dev\\nvngx_dlss.dll\" \"%{cfg.targetdir}\"",
+		"xcopy /Y /E /I \"%{wks.location}\\assets\\cso\" \"%{cfg.targetdir}\\..\\assets\\cso\"",
+		"\"%{wks.location}Tools\\compileShader.bat\"",
 	}
 
 	filter "system:windows"
@@ -75,6 +78,10 @@ project "Ragdoll"
 		optimize "off"
 		symbols "on"
 		kind "ConsoleApp"
+		links
+		{
+			"Windows_x86_64/x86_64/nvsdk_ngx_s_dbg_iterator0.lib",
+		}
 
 	filter "configurations:Release"
 		defines "RAGDOLL_RELEASE"
@@ -83,4 +90,8 @@ project "Ragdoll"
 		symbols "off"
 		kind "WindowedApp"
 		entrypoint "mainCRTStartup"
+		links
+		{
+			"Windows_x86_64/x86_64/nvsdk_ngx_s.lib",
+		}
 	

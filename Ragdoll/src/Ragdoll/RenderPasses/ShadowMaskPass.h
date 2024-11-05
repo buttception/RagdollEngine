@@ -4,6 +4,7 @@
 namespace ragdoll {
 	struct InstanceGroupInfo;
 	struct SceneInformation;
+	struct SceneRenderTargets;
 }
 class ShadowMaskPass {
 	struct ConstantBuffer {
@@ -13,16 +14,10 @@ class ShadowMaskPass {
 		int EnableCascadeDebug;
 	}CBuffer;
 
-	nvrhi::FramebufferHandle RenderTarget;
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
-
-	nvrhi::TextureHandle ShadowMaps[4];
-	nvrhi::TextureHandle GBufferDepth;
 
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
 
-	void SetRenderTarget(nvrhi::FramebufferHandle renderTarget);
-	void SetDependencies(nvrhi::TextureHandle shadow[4], nvrhi::TextureHandle depth);
-	void DrawShadowMask(const ragdoll::SceneInformation& sceneInfo);
+	void DrawShadowMask(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets);
 };

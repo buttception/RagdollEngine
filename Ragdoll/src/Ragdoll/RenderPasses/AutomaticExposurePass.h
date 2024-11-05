@@ -5,6 +5,7 @@
 namespace ragdoll {
 	struct InstanceGroupInfo;
 	struct SceneInformation;
+	struct SceneRenderTargets;
 }
 class AutomaticExposurePass {
 	struct LuminanceHistogramCBuffer {
@@ -22,8 +23,6 @@ class AutomaticExposurePass {
 
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
 
-	nvrhi::TextureHandle SceneColor;
-
 	nvrhi::BufferHandle LuminanceHistogramHandle;
 
 public:
@@ -31,6 +30,5 @@ public:
 	nvrhi::BufferHandle AdaptedLuminanceHandle;
 
 	void Init(nvrhi::CommandListHandle cmdList);
-	void SetDependencies(nvrhi::TextureHandle sceneColor);
-	nvrhi::BufferHandle GetAdaptedLuminance(float _dt);
+	nvrhi::BufferHandle GetAdaptedLuminance(float _dt, ragdoll::SceneRenderTargets* targets);
 };

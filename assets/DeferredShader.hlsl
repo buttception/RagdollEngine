@@ -3,6 +3,7 @@
 
 cbuffer g_Const : register(b0) {
 	float4x4 viewProjMatrix;
+	float4x4 viewProjMatrixWithAA;
 	float4x4 prevViewProjMatrix;
 	int instanceOffset;
 };
@@ -47,7 +48,7 @@ void gbuffer_vs(
 	InstanceData data = InstanceDatas[inInstanceId + instanceOffset];
 	outFragPos = mul(float4(inPos, 1), data.worldMatrix); 
 	outPrevFragPos = mul(float4(inPos, 1), data.prevWorldMatrix);
-	outPos = mul(outFragPos, viewProjMatrix);
+	outPos = mul(outFragPos, viewProjMatrixWithAA);
 
 	float binormalSign = inNormal.x > 0.0f ? -1.0f : 1.0f;
 	outNormal = normalize(mul(inNormal, transpose((float3x3)data.invWorldMatrix)));
@@ -104,9 +105,11 @@ void gbuffer_ps(
 	outRoughnessMetallic = float2(roughness, metallic);
 	float4 clipPos = mul(inFragPos, viewProjMatrix);
 	float4 ndcPos = clipPos / clipPos.w;
+	ndcPos.xy = ScreenPosToViewportUV(ndcPos.xy);
 	float4 prevClipPos = mul(inPrevFragPos, prevViewProjMatrix);
 	float4 prevNdcPos = prevClipPos / prevClipPos.w;
-	outVelocity = ndcPos.xy - prevNdcPos.xy;
+	prevNdcPos.xy = ScreenPosToViewportUV(prevNdcPos.xy);
+	outVelocity = (prevNdcPos.xy - ndcPos.xy) * float2(1280, 720);
 }
 
 cbuffer g_LightConst : register(b1) {

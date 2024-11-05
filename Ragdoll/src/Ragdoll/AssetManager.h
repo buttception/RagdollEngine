@@ -36,8 +36,8 @@ struct VertexBufferInfo
 
 struct Submesh 
 {
-	int32_t VertexBufferIndex;
-	int32_t MaterialIndex;
+	size_t VertexBufferIndex;
+	size_t MaterialIndex;
 };
 
 struct Mesh
@@ -86,7 +86,7 @@ struct std::hash<Bytes> {
 static auto hash = std::hash<Bytes>();
 
 template<typename T>
-uint32_t HashBytes(T* ptr) {
+size_t HashBytes(T* ptr) {
 	return hash(std::make_pair(ptr, sizeof(T)));
 }
 
@@ -112,9 +112,9 @@ public:
 	std::vector<nvrhi::SamplerHandle> Samplers;
 	nvrhi::SamplerHandle ShadowSampler;
 
-	std::unordered_map<uint32_t, nvrhi::GraphicsPipelineHandle> GPSOs;
-	std::unordered_map<uint32_t, nvrhi::ComputePipelineHandle> CPSOs;
-	std::unordered_map<uint32_t, nvrhi::BindingLayoutHandle> BindingLayouts;
+	std::unordered_map<size_t, nvrhi::GraphicsPipelineHandle> GPSOs;
+	std::unordered_map<size_t, nvrhi::ComputePipelineHandle> CPSOs;
+	std::unordered_map<size_t, nvrhi::BindingLayoutHandle> BindingLayouts;
 
 	std::unordered_map<std::string, nvrhi::ShaderHandle> Shaders;
 
@@ -132,7 +132,7 @@ public:
 	nvrhi::DescriptorTableHandle DescriptorTable;
 	nvrhi::BindingLayoutHandle BindlessLayoutHandle;
 
-	int32_t AddImage(Image img);
+	size_t AddImage(Image img);
 	nvrhi::GraphicsPipelineHandle GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb);
 	nvrhi::ComputePipelineHandle GetComputePipeline(const nvrhi::ComputePipelineDesc& desc);
 	nvrhi::BindingLayoutHandle GetBindingLayout(const nvrhi::BindingSetDesc& desc);
@@ -140,7 +140,7 @@ public:
 
 	void Init(std::shared_ptr<ragdoll::FileManager> fm);
 	//this function will just add the vertices and indices, and populate the vector of objects
-	uint32_t AddVertices(const std::vector<Vertex>& newVertices, const std::vector<uint32_t>& newIndices);
+	size_t AddVertices(const std::vector<Vertex>& newVertices, const std::vector<uint32_t>& newIndices);
 	//this function will create the buffer handles and copy the data over
 	void UpdateVBOIBO();
 

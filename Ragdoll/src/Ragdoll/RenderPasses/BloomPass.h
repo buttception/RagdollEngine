@@ -3,6 +3,7 @@
 
 namespace ragdoll {
 	struct SceneInformation;
+	struct SceneRenderTargets;
 }
 struct BloomMip {
 	uint32_t Width, Height;
@@ -20,15 +21,10 @@ class BloomPass {
 
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
 
-	const std::vector<BloomMip>* Mips;
-	nvrhi::TextureHandle SceneColor;
-
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
 
-	void SetDependencies(nvrhi::TextureHandle sceneColor, const std::vector<BloomMip>* mips);
-
-	void Bloom(const ragdoll::SceneInformation& sceneInfo);
-	void DownSample();
-	void UpSample(float filterRadius, float bloomIntensity);
+	void Bloom(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets);
+	void DownSample(ragdoll::SceneRenderTargets* targets);
+	void UpSample(float filterRadius, float bloomIntensity, ragdoll::SceneRenderTargets* targets);
 };

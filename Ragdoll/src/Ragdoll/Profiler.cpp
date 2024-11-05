@@ -8,6 +8,14 @@ std::vector<bool> EnterCommandListSectionGpu::LogsInUse;
 std::mutex EnterCommandListSectionGpu::LogsMutex;
 uint32_t EnterCommandListSectionGpu::Queue = MicroProfileInitGpuQueue("Gpu Queue");
 
+void EnterCommandListSectionGpu::Reset()
+{
+	for (std::vector<bool>::reference it : LogsInUse)
+	{
+		it = false;
+	}
+}
+
 EnterCommandListSectionGpu::EnterCommandListSectionGpu(const char* name, nvrhi::CommandListHandle cmdList)
 {
 	CommandList = cmdList;
@@ -29,7 +37,7 @@ EnterCommandListSectionGpu::EnterCommandListSectionGpu(const char* name, nvrhi::
 			//not enuf logs get a new one
 			log = Logs.emplace_back(MicroProfileThreadLogGpuAlloc());
 			LogsInUse.emplace_back(true);
-			LogIndex = LogsInUse.size() - 1;
+			LogIndex = (int32_t)LogsInUse.size() - 1;
 		}
 	}
 
@@ -47,9 +55,4 @@ EnterCommandListSectionGpu::~EnterCommandListSectionGpu()
 	CommandList->Work = MICROPROFILE_GPU_END(Logs[LogIndex]);
 	//close the command list
 	CommandList->close();
-	{
-		std::lock_guard<std::mutex> lock(LogsMutex); //could be setting to false while others are searching
-		//free up the currently used log
-		LogsInUse[LogIndex] = false;
-	}
 }

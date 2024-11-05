@@ -1,5 +1,5 @@
 #include "ragdollpch.h"
-#include "SkyPass.h"
+#include "FinalPass.h"
 
 #include <nvrhi/utils.h>
 #include "Ragdoll/Profiler.h"
@@ -8,31 +8,24 @@
 #include "Ragdoll/Scene.h"
 #include "Ragdoll/DirectXDevice.h"
 
-void SkyPass::Init(nvrhi::CommandListHandle cmdList)
+void FinalPass::Init(nvrhi::CommandListHandle cmdList)
 {
 	CommandListRef = cmdList;
 }
 
-void SkyPass::DrawSky(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets * targets)
+void FinalPass::DrawQuad(ragdoll::SceneRenderTargets* targets, bool upscaled)
 {
-	RD_SCOPE(Render, SkyPass);
-	RD_GPU_SCOPE("SkyPass", CommandListRef);
-	//create a constant buffer here
-	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "Sky CBuffer", 1);
-	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
+	RD_SCOPE(Render, Final);
+	RD_GPU_SCOPE("FinalPass", CommandListRef);
 
 	nvrhi::FramebufferDesc desc = nvrhi::FramebufferDesc()
-		.addColorAttachment(targets->SceneColor)
-		.setDepthAttachment(targets->SceneDepthZ);
+		.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer());
 	nvrhi::FramebufferHandle pipelineFb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
-	CBuffer.InvViewProj = sceneInfo.MainCameraViewProj.Invert();
-	CBuffer.CameraPosition = sceneInfo.MainCameraPosition;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-		nvrhi::BindingSetItem::Texture_SRV(0, targets->SkyTexture),
-		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Trilinear_Clamp])
+		nvrhi::BindingSetItem::Texture_SRV(0, upscaled ? targets->UpscaledBuffer : targets->FinalColor),
+		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp])
 	};
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
 	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(bindingSetDesc, BindingLayoutHandle);
@@ -41,14 +34,13 @@ void SkyPass::DrawSky(const ragdoll::SceneInformation& sceneInfo, ragdoll::Scene
 	PipelineDesc.addBindingLayout(BindingLayoutHandle);
 	PipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
 	nvrhi::ShaderHandle VertexShader = AssetManager::GetInstance()->GetShader("Fullscreen.vs.cso");
-	nvrhi::ShaderHandle PixelShader = AssetManager::GetInstance()->GetShader("Sky.ps.cso");
+	nvrhi::ShaderHandle PixelShader = AssetManager::GetInstance()->GetShader("Fullscreen.ps.cso");
 	PipelineDesc.setVertexShader(VertexShader);
 	PipelineDesc.setFragmentShader(PixelShader);
 
-	PipelineDesc.renderState.depthStencilState.depthTestEnable = true;
+	PipelineDesc.renderState.depthStencilState.depthTestEnable = false;
 	PipelineDesc.renderState.depthStencilState.stencilEnable = false;
 	PipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
-	PipelineDesc.renderState.depthStencilState.depthFunc = nvrhi::ComparisonFunc::GreaterOrEqual;
 	PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
 	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 
@@ -59,8 +51,7 @@ void SkyPass::DrawSky(const ragdoll::SceneInformation& sceneInfo, ragdoll::Scene
 	state.addBindingSet(BindingSetHandle);
 	state.addBindingSet(AssetManager::GetInstance()->DescriptorTable);
 
-	CommandListRef->beginMarker("Sky Pass");
-	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
+	CommandListRef->beginMarker("Final Pass");
 	CommandListRef->setGraphicsState(state);
 
 	nvrhi::DrawArguments args;

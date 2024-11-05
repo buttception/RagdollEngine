@@ -3,6 +3,7 @@
 
 namespace ragdoll {
 	struct SceneInformation;
+	struct SceneRenderTargets;
 }
 class ToneMapPass {
 	struct ConstantBuffer {
@@ -11,16 +12,10 @@ class ToneMapPass {
 		int32_t UseFixedExposure{ 0 };
 	}CBuffer;
 
-	nvrhi::FramebufferHandle RenderTarget{ nullptr };
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
-
-	nvrhi::TextureHandle Target;
 
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
 
-	void SetRenderTarget(nvrhi::FramebufferHandle renderTarget);
-	void SetDependencies(nvrhi::TextureHandle SceneColor);
-
-	void ToneMap(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle exposureHandle);
+	void ToneMap(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle exposureHandle, ragdoll::SceneRenderTargets* targets);
 };

@@ -89,10 +89,10 @@ void ImguiRenderer::Init(DirectXDevice* dx)
 void ImguiRenderer::BeginFrame()
 {
 	ImGuiIO& io = ImGui::GetIO();
-	io.DeltaTime = m_DirectXTest->m_PrimaryWindow->GetFrameTime();
+	io.DeltaTime = (float)m_DirectXTest->m_PrimaryWindow->GetFrameTime();
 	io.MouseDrawCursor = false;
-	io.DisplaySize.x = m_DirectXTest->m_PrimaryWindow->GetBufferWidth();
-	io.DisplaySize.y = m_DirectXTest->m_PrimaryWindow->GetBufferHeight();
+	io.DisplaySize.x = (float)m_DirectXTest->m_PrimaryWindow->GetBufferWidth();
+	io.DisplaySize.y = (float)m_DirectXTest->m_PrimaryWindow->GetBufferHeight();
 	
 	ImGui::NewFrame();
 }
@@ -251,6 +251,39 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		AssetManager::GetInstance()->RecompileShaders();
 	}
 	
+	const char* resolutions[] = {
+		{"960x540"},
+		{"1280x720"},
+		{"1600x900"},
+		{"1920x1080"}
+	};
+	static int32_t selectedItem{};
+	if(ImGui::Combo("Resolution", &selectedItem, resolutions, 4))
+	{
+		switch (selectedItem)
+		{
+		case 0:
+			SceneInfo.RenderWidth = 960;
+			SceneInfo.RenderHeight = 540;
+			break;
+		case 1:
+			SceneInfo.RenderWidth = 1280;
+			SceneInfo.RenderHeight = 720;
+			break;
+		case 2:
+			SceneInfo.RenderWidth = 1600;
+			SceneInfo.RenderHeight = 900;
+			break;
+		case 3:
+			SceneInfo.RenderWidth = 1920;
+			SceneInfo.RenderHeight = 1080;
+			break;
+		}
+		SceneInfo.bIsResolutionDirty = true;
+	}
+	ImGui::Checkbox("Enable DLSS", &SceneInfo.bEnableDLSS);
+	ImGui::Checkbox("Enable Jitter", &SceneInfo.bEnableJitter);
+	ImGui::Checkbox("Enable XeGTAO Noise", &SceneInfo.bEnableXeGTAONoise);
 	ImGui::SliderFloat("Filter Radius", &SceneInfo.FilterRadius, 0.001f, 1.f);
 	ImGui::SliderFloat("Bloom Intensity", &SceneInfo.BloomIntensity, 0.f, 1.f);
 	ImGui::SliderFloat("Gamma", &SceneInfo.Gamma, 0.5f, 3.f);

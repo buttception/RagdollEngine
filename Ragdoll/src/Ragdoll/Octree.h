@@ -55,11 +55,11 @@ struct Octant {
 struct Octree {
 	inline static Vector3 Max{ 100.f, 100.f, 100.f };
 	inline static Vector3 Min{ -100.f, -100.f, -100.f };
-	static uint32_t TotalProxies;
+	static size_t TotalProxies;
 	static uint32_t MaxDepth;
 	Octant Octant;
 
 	void Init();
-	void AddProxy(const DirectX::BoundingBox& box, uint32_t index);
+	void AddProxy(const DirectX::BoundingBox& box, size_t index);
 	void Clear();
 };

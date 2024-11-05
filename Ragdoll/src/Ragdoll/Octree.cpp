@@ -1,7 +1,7 @@
 #include "ragdollpch.h"
 #include "Octree.h"
 
-uint32_t Octree::TotalProxies = 0;
+size_t Octree::TotalProxies = 0;
 uint32_t Octree::MaxDepth = 0;
 
 void Octree::Init()
@@ -11,7 +11,7 @@ void Octree::Init()
 	Octant.Subdivide();
 }
 
-bool InsertProxy(Octant& octant, const DirectX::BoundingBox& box, uint32_t index) {
+bool InsertProxy(Octant& octant, const DirectX::BoundingBox& box, size_t index) {
 	//check if within this octant first
 	DirectX::ContainmentType result = octant.Box.Contains(box);
 	if (result == DirectX::ContainmentType::INTERSECTS){
@@ -45,7 +45,7 @@ bool InsertProxy(Octant& octant, const DirectX::BoundingBox& box, uint32_t index
 	return false;
 }
 
-void Octree::AddProxy(const DirectX::BoundingBox& box, uint32_t index)
+void Octree::AddProxy(const DirectX::BoundingBox& box, size_t index)
 {
 	//add the proxy into the octree
 	InsertProxy(Octant, box, index);

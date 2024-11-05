@@ -15,28 +15,28 @@ AssetManager* AssetManager::GetInstance()
 	return s_Instance.get();
 }
 
-int32_t AssetManager::AddImage(Image img)
+size_t AssetManager::AddImage(Image img)
 {
-	DirectXDevice::GetInstance()->m_NvrhiDevice->writeDescriptorTable(DescriptorTable, nvrhi::BindingSetItem::Texture_SRV(Images.size(), img.TextureHandle));
+	DirectXDevice::GetInstance()->m_NvrhiDevice->writeDescriptorTable(DescriptorTable, nvrhi::BindingSetItem::Texture_SRV(static_cast<uint32_t>(Images.size()), img.TextureHandle));
 	Images.emplace_back(img);
 	return Images.size() - 1;
 }
 
-uint32_t HashString(const std::string& str) {
+size_t HashString(const std::string& str) {
 	return hash(std::make_pair(str.c_str(), str.length()));
 }
 
-uint32_t Hash(const nvrhi::GraphicsPipelineDesc& desc) {
+size_t Hash(const nvrhi::GraphicsPipelineDesc& desc) {
 	struct GraphicsPipelineAbstraction
 	{
 		//5 shaders debug name hashes
-		uint32_t VSHash{}, HSHash{}, DSHash{}, GSHash{}, PSHash{};
+		size_t VSHash{}, HSHash{}, DSHash{}, GSHash{}, PSHash{};
 		//hash the states
-		uint32_t RenderStateHash{};
-		uint32_t PrimTypeHash{};
-		uint32_t ShadingRateStateHash{};
+		size_t RenderStateHash{};
+		size_t PrimTypeHash{};
+		size_t ShadingRateStateHash{};
 		//hash the bindings
-		uint32_t BindingsHash[nvrhi::c_MaxBindingLayouts]{ {}, };
+		size_t BindingsHash[nvrhi::c_MaxBindingLayouts]{ {}, };
 		//no need for the input layout as everyone uses the same due to the instance pass
 	}obj;
 	//hashing all the shaders debug name
@@ -61,12 +61,12 @@ uint32_t Hash(const nvrhi::GraphicsPipelineDesc& desc) {
 	return HashBytes(&obj);
 }
 
-uint32_t Hash(const nvrhi::ComputePipelineDesc& desc) {
+size_t Hash(const nvrhi::ComputePipelineDesc& desc) {
 	struct ComputePipelineAbstraction {
 		//shader
-		uint32_t CSHash{};
+		size_t CSHash{};
 		//binding hash
-		uint32_t BindingsHash[nvrhi::c_MaxBindingLayouts]{ {}, };
+		size_t BindingsHash[nvrhi::c_MaxBindingLayouts]{ {}, };
 	}obj;
 	if (desc.CS)
 		obj.CSHash = HashString(desc.CS->getDesc().debugName);
@@ -79,7 +79,7 @@ uint32_t Hash(const nvrhi::ComputePipelineDesc& desc) {
 nvrhi::GraphicsPipelineHandle AssetManager::GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb)
 {
 	std::lock_guard<std::mutex> LockGuard(Mutex);
-	uint32_t hash = Hash(desc);
+	size_t hash = Hash(desc);
 	if (GPSOs.contains(hash))
 		return GPSOs.at(hash);
 	RD_CORE_INFO("GPSO created");
@@ -88,7 +88,7 @@ nvrhi::GraphicsPipelineHandle AssetManager::GetGraphicsPipeline(const nvrhi::Gra
 
 nvrhi::ComputePipelineHandle AssetManager::GetComputePipeline(const nvrhi::ComputePipelineDesc& desc)
 {
-	uint32_t hash = Hash(desc);
+	size_t hash = Hash(desc);
 	if (CPSOs.contains(hash))
 		return CPSOs.at(hash);
 	{
@@ -116,7 +116,7 @@ nvrhi::BindingLayoutHandle AssetManager::GetBindingLayout(const nvrhi::BindingSe
 	nvrhi::BindingLayoutDesc layoutDesc;
 	layoutDesc.visibility = nvrhi::ShaderType::All;
 	ConvertSetToLayout(desc.bindings, layoutDesc.bindings);
-	uint32_t hash = HashBytes(&layoutDesc);
+	size_t hash = HashBytes(&layoutDesc);
 	if (BindingLayouts.contains(hash))
 		return BindingLayouts.at(hash);
 	{
@@ -169,7 +169,7 @@ void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
 		vTangentAttrib,
 		vTexcoordAttrib,
 	};
-	InstancedInputLayoutHandle = Device->createInputLayout(InstancedVertexAttributes.data(), InstancedVertexAttributes.size(), nullptr);
+	InstancedInputLayoutHandle = Device->createInputLayout(InstancedVertexAttributes.data(), static_cast<uint32_t>(InstancedVertexAttributes.size()), nullptr);
 
 	//create a default texture
 	CommandList->open();
@@ -311,10 +311,10 @@ void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
 	Device->executeCommandList(CommandList);
 }
 
-uint32_t AssetManager::AddVertices(const std::vector<Vertex>& newVertices, const std::vector<uint32_t>& newIndices)
+size_t AssetManager::AddVertices(const std::vector<Vertex>& newVertices, const std::vector<uint32_t>& newIndices)
 {
-	uint32_t vCurrOffset = Vertices.size();
-	uint32_t iCurrOffset = Indices.size();
+	uint32_t vCurrOffset = (uint32_t)Vertices.size();
+	uint32_t iCurrOffset = (uint32_t)Indices.size();
 	Vertices.resize(Vertices.size() + newVertices.size());
 	Indices.resize(Indices.size() + newIndices.size());
 	memcpy(Vertices.data() + vCurrOffset, newVertices.data(), newVertices.size() * sizeof(Vertex));
@@ -323,8 +323,8 @@ uint32_t AssetManager::AddVertices(const std::vector<Vertex>& newVertices, const
 	VertexBufferInfo info;
 	info.VBOffset = vCurrOffset;
 	info.IBOffset = iCurrOffset;
-	info.VerticesCount = newVertices.size();
-	info.IndicesCount = newIndices.size();
+	info.VerticesCount = (uint32_t)newVertices.size();
+	info.IndicesCount = (uint32_t)newIndices.size();
 	VertexBufferInfos.emplace_back(info);
 	return VertexBufferInfos.size() - 1;
 }
@@ -366,7 +366,6 @@ void AssetManager::UpdateVBOIBO()
 	}
 	CommandList->close();
 	DirectXDevice::GetInstance()->m_NvrhiDevice->executeCommandList(CommandList);
-	MicroProfileFlip(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer);
 }
 
 nvrhi::ShaderHandle AssetManager::GetShader(const std::string& shaderFilename)

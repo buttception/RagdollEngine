@@ -42,12 +42,7 @@ void AutomaticExposurePass::Init(nvrhi::CommandListHandle cmdList)
 
 }
 
-void AutomaticExposurePass::SetDependencies(nvrhi::TextureHandle sceneColor)
-{
-	SceneColor = sceneColor;
-}
-
-nvrhi::BufferHandle AutomaticExposurePass::GetAdaptedLuminance(float _dt)
+nvrhi::BufferHandle AutomaticExposurePass::GetAdaptedLuminance(float _dt, ragdoll::SceneRenderTargets* targets)
 {
 	RD_SCOPE(Render, AutomaticExposure);
 	RD_GPU_SCOPE("AutomaticExposure", CommandListRef);
@@ -55,9 +50,9 @@ nvrhi::BufferHandle AutomaticExposurePass::GetAdaptedLuminance(float _dt)
 	float maxLuminance = 8.5;
 
 	//create a constant buffer here
-	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(class LuminanceHistogramCBuffer), "Luminance Histo CBuffer", 1);
+	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(struct LuminanceHistogramCBuffer), "Luminance Histo CBuffer", 1);
 	nvrhi::BufferHandle LuminanceHistogramCBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(cBufDesc);
-	cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(class LuminanceAverageCBuffer), "Luminance Avg CBuffer", 1);
+	cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(struct LuminanceAverageCBuffer), "Luminance Avg CBuffer", 1);
 	nvrhi::BufferHandle LuminanceAverageCBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(cBufDesc);
 
 	//binding layout and sets
@@ -65,7 +60,7 @@ nvrhi::BufferHandle AutomaticExposurePass::GetAdaptedLuminance(float _dt)
 	histoSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, LuminanceHistogramCBufferHandle),
 		nvrhi::BindingSetItem::TypedBuffer_UAV(0, LuminanceHistogramHandle),
-		nvrhi::BindingSetItem::Texture_SRV(0, SceneColor)
+		nvrhi::BindingSetItem::Texture_SRV(0, targets->SceneColor)
 	};
 	nvrhi::BindingLayoutHandle LuminanceHistogramBindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(histoSetDesc);
 	nvrhi::BindingSetHandle LuminanceHistogramBindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(histoSetDesc, LuminanceHistogramBindingLayoutHandle);
@@ -94,21 +89,21 @@ nvrhi::BufferHandle AutomaticExposurePass::GetAdaptedLuminance(float _dt)
 	nvrhi::ComputeState state;
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(LuminanceHistogramPipelineDesc);
 	state.bindings = { LuminanceHistogramBindingSetHandle };
-	LuminanceHistogramCBuffer.Width = SceneColor->getDesc().width;
-	LuminanceHistogramCBuffer.Height = SceneColor->getDesc().height;
+	LuminanceHistogramCBuffer.Width = targets->SceneColor->getDesc().width;
+	LuminanceHistogramCBuffer.Height = targets->SceneColor->getDesc().height;
 	LuminanceHistogramCBuffer.MinLogLuminance = minLuminance;
 	LuminanceHistogramCBuffer.InvLogLuminanceRange = 1.f / (maxLuminance - minLuminance);
-	CommandListRef->writeBuffer(LuminanceHistogramCBufferHandle, &LuminanceHistogramCBuffer, sizeof(class LuminanceHistogramCBuffer));
+	CommandListRef->writeBuffer(LuminanceHistogramCBufferHandle, &LuminanceHistogramCBuffer, sizeof(struct LuminanceHistogramCBuffer));
 	CommandListRef->setComputeState(state);
-	CommandListRef->dispatch(SceneColor->getDesc().width / 16 + 1, SceneColor->getDesc().height / 16 + 1, 1);
+	CommandListRef->dispatch(targets->SceneColor->getDesc().width / 16 + 1, targets->SceneColor->getDesc().height / 16 + 1, 1);
 
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(LuminanceAveragePipelineDesc);
 	state.bindings = { LuminanceAverageBindingSetHandle };
 	LuminanceAverageCBuffer.MinLogLuminance = minLuminance;
 	LuminanceAverageCBuffer.LogLuminanceRange = maxLuminance - minLuminance;
-	LuminanceAverageCBuffer.NumPixels = SceneColor->getDesc().width * SceneColor->getDesc().height;
+	LuminanceAverageCBuffer.NumPixels = (float)targets->SceneColor->getDesc().width * targets->SceneColor->getDesc().height;
 	LuminanceAverageCBuffer.TimeCoeff = 1.f - exp(-_dt * 1.1f);
-	CommandListRef->writeBuffer(LuminanceAverageCBufferHandle, &LuminanceAverageCBuffer, sizeof(class LuminanceAverageCBuffer));
+	CommandListRef->writeBuffer(LuminanceAverageCBufferHandle, &LuminanceAverageCBuffer, sizeof(struct LuminanceAverageCBuffer));
 	CommandListRef->setComputeState(state);
 	CommandListRef->dispatch(1, 1, 1);
 
