@@ -21,7 +21,7 @@ class XeGTAOPass {
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
 
-	void UpdateConstants(const uint32_t width, const uint32_t height, const Matrix& projMatrix);
+	void UpdateConstants(const uint32_t width, const uint32_t height, const Matrix& projMatrix, const ragdoll::SceneInformation& sceneInfo);
 
 	void GenerateAO(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets);
 

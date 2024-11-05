@@ -11,26 +11,9 @@
 void DeferredLightPass::Init(nvrhi::CommandListHandle cmdList)
 {
 	CommandListRef = cmdList;
-
-	RD_ASSERT(RenderTarget == nullptr, "Render Target Framebuffer not set");
 }
 
-void DeferredLightPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
-{
-	RenderTarget = renderTarget;
-}
-
-void DeferredLightPass::SetDependencies(nvrhi::TextureHandle albedo, nvrhi::TextureHandle normal, nvrhi::TextureHandle rm, nvrhi::TextureHandle ao, nvrhi::TextureHandle depth, nvrhi::TextureHandle shadowMask)
-{
-	AlbedoHandle = albedo;
-	NormalHandle = normal;
-	RoughnessMetallicHandle = rm;
-	AONormalized = ao;
-	SceneDepthZ = depth;
-	ShadowMask = shadowMask;
-}
-
-void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
+void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets)
 {
 	RD_SCOPE(Render, LightPass);
 	RD_GPU_SCOPE("LightPass", CommandListRef);
@@ -38,7 +21,9 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "DeferredLight CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 
-	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
+	nvrhi::FramebufferDesc desc = nvrhi::FramebufferDesc()
+		.addColorAttachment(targets->SceneColor);
+	nvrhi::FramebufferHandle pipelineFb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
 	CBuffer.InvViewProj = sceneInfo.MainCameraViewProj.Invert();
 	CBuffer.LightDiffuseColor = sceneInfo.LightDiffuseColor;
 	CBuffer.SceneAmbientColor = sceneInfo.SceneAmbientColor;
@@ -49,12 +34,12 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(1, ConstantBufferHandle),
-		nvrhi::BindingSetItem::Texture_SRV(0, AlbedoHandle),
-		nvrhi::BindingSetItem::Texture_SRV(1, NormalHandle),
-		nvrhi::BindingSetItem::Texture_SRV(2, RoughnessMetallicHandle),
-		nvrhi::BindingSetItem::Texture_SRV(3, AONormalized),
-		nvrhi::BindingSetItem::Texture_SRV(4, SceneDepthZ),
-		nvrhi::BindingSetItem::Texture_SRV(5, ShadowMask)
+		nvrhi::BindingSetItem::Texture_SRV(0, targets->GBufferAlbedo),
+		nvrhi::BindingSetItem::Texture_SRV(1, targets->GBufferNormal),
+		nvrhi::BindingSetItem::Texture_SRV(2, targets->GBufferRM),
+		nvrhi::BindingSetItem::Texture_SRV(3, targets->AONormalized),
+		nvrhi::BindingSetItem::Texture_SRV(4, targets->SceneDepthZ),
+		nvrhi::BindingSetItem::Texture_SRV(5, targets->ShadowMask)
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
 	{
@@ -78,7 +63,7 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo)
 	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 
 	nvrhi::GraphicsState state;
-	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, RenderTarget);
+	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, pipelineFb);
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 	state.addBindingSet(BindingSetHandle);

@@ -128,10 +128,13 @@ namespace ragdoll {
 		bool bIsCameraDirty{ true };
 		bool bFreezeFrustumCulling{ false };
 		bool bEnableDLSS{ true };
+		bool bEnableJitter{ true };
+		bool bEnableXeGTAONoise{ true };
 		uint32_t RenderWidth = 960;
 		uint32_t RenderHeight = 540;
 		uint32_t TargetWidth;
 		uint32_t TargetHeight;
+		bool bIsResolutionDirty{ false };
 	};
 
 	struct SceneRenderTargets

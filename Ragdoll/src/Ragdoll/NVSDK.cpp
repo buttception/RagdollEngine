@@ -45,30 +45,46 @@ void NVSDK::Init(ID3D12Device* device, Vector2 RenderRes, Vector2 TargetRes)
 
 	//get optimal settings for dlss
 	float Sharpness = 0.f;
-	res = NGX_DLSS_GET_OPTIMAL_SETTINGS(Parameters, 1920, 1080, NVSDK_NGX_PerfQuality_Value_MaxQuality, &RenderWidth, &RenderHeight, &MaxWidth, &MaxHeight, &MinWidth, &MinHeight, &Sharpness);
+	res = NGX_DLSS_GET_OPTIMAL_SETTINGS(Parameters, 1920, 1080, NVSDK_NGX_PerfQuality_Value_MaxQuality, &OptimalRenderWidth, &OptimalRenderHeight, &MaxWidth, &MaxHeight, &MinWidth, &MinHeight, &Sharpness);
+	RenderWidth = (uint32_t)RenderRes.x;
+	RenderHeight = (uint32_t)RenderRes.y;
 	RD_ASSERT(res != NVSDK_NGX_Result_Success, "NGSDK: Failed to get optimal settings");
 
 	//create the dlss feature
 	//for now hard coded window size is 1280x720, then dlss it to 1920x1080 for easier resolution comp
 	NVSDK_NGX_DLSS_Create_Params createParams{};
-	createParams.Feature.InWidth = 960;
-	createParams.Feature.InHeight = 540;
-	createParams.Feature.InTargetWidth = 1920;
-	createParams.Feature.InTargetHeight = 1080;
-	createParams.Feature.InPerfQualityValue = NVSDK_NGX_PerfQuality_Value_MaxQuality;
-	createParams.InFeatureCreateFlags |= NVSDK_NGX_DLSS_Feature_Flags_DepthInverted;
-	createParams.InFeatureCreateFlags |= NVSDK_NGX_DLSS_Feature_Flags_DoSharpening;
-	createParams.InFeatureCreateFlags |= NVSDK_NGX_DLSS_Feature_Flags_MVLowRes;
+	createParams.Feature.InWidth = RenderWidth;
+	createParams.Feature.InHeight = RenderHeight;
+	createParams.Feature.InTargetWidth = (uint32_t)TargetRes.x;
+	createParams.Feature.InTargetHeight = (uint32_t)TargetRes.y;
+	if (RenderWidth == (uint32_t)TargetRes.x && RenderHeight == (uint32_t)TargetRes.y)
+	{
+		createParams.InFeatureCreateFlags |= NVSDK_NGX_PerfQuality_Value_DLAA;
+		bIsDLAA = true;
+	}
+	else
+	{
+		createParams.Feature.InPerfQualityValue = NVSDK_NGX_PerfQuality_Value_MaxQuality;
+		bIsDLAA = false;
+
+		createParams.InFeatureCreateFlags |= NVSDK_NGX_DLSS_Feature_Flags_DepthInverted;
+		createParams.InFeatureCreateFlags |= NVSDK_NGX_DLSS_Feature_Flags_DoSharpening;
+		createParams.InFeatureCreateFlags |= NVSDK_NGX_DLSS_Feature_Flags_MVLowRes;
+	}
 	if(!CommandList)
 		CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
-	CommandList->open();
-	ID3D12GraphicsCommandList* raw = CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList);
-	if(FeatureHandle)
-		NVSDK_NGX_D3D12_ReleaseFeature(FeatureHandle);
-	FeatureHandle = nullptr;
-	res = NGX_D3D12_CREATE_DLSS_EXT(raw, 1, 1, &FeatureHandle, Parameters, &createParams);
-	CommandList->close();
+	{
+		RD_SCOPE(Init, DLSS);
+		RD_GPU_SCOPE("DLSS", CommandList);
+		ID3D12GraphicsCommandList* raw = CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList);
+		if (FeatureHandle)
+			NVSDK_NGX_D3D12_ReleaseFeature(FeatureHandle);
+		FeatureHandle = nullptr;
+		res = NGX_D3D12_CREATE_DLSS_EXT(raw, 1, 1, &FeatureHandle, Parameters, &createParams);
+	}
+	MICROPROFILE_GPU_SUBMIT(EnterCommandListSectionGpu::Queue, CommandList->Work);
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
+
 	RD_ASSERT(res != NVSDK_NGX_Result_Success, "NGSDK: Failed to create DLSS feature");
 	RD_CORE_INFO("NVSDK: DLSS feature created");
 }
@@ -86,10 +102,13 @@ void NVSDK::Evaluate(nvrhi::TextureHandle InColor, nvrhi::TextureHandle OutColor
 		evalParams.pInDepth = InDepth->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
 		evalParams.pInMotionVectors = InMotionVector->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
 
-		evalParams.InJitterOffsetX = scene->JitterOffsetsX[scene->PhaseIndex];
-		evalParams.InJitterOffsetY = -scene->JitterOffsetsY[scene->PhaseIndex];
-		evalParams.InRenderSubrectDimensions.Width = 960;
-		evalParams.InRenderSubrectDimensions.Height = 540;
+		if (scene->SceneInfo.bEnableJitter)
+		{
+			evalParams.InJitterOffsetX = scene->JitterOffsetsX[scene->PhaseIndex];
+			evalParams.InJitterOffsetY = -scene->JitterOffsetsY[scene->PhaseIndex];
+		}
+		evalParams.InRenderSubrectDimensions.Width = RenderWidth;
+		evalParams.InRenderSubrectDimensions.Height = RenderHeight;
 
 		NVSDK_NGX_Result res = NGX_D3D12_EVALUATE_DLSS_EXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList), FeatureHandle, Parameters, &evalParams);
 		RD_ASSERT(res != NVSDK_NGX_Result_Success, "NGSDK: Failed to evaluate DLSS feature");

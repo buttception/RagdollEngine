@@ -137,8 +137,11 @@ void ragdoll::Scene::Update(float _dt)
 		PhaseIndex = ++PhaseIndex == TotalPhaseCount ? 0 : PhaseIndex;
 		//jitter the projection
 		Matrix Proj = SceneInfo.InfiniteReverseZProj;
-		Proj.m[2][0] += JitterOffsetsX[PhaseIndex] / (double)SceneInfo.RenderWidth;
-		Proj.m[2][1] += JitterOffsetsY[PhaseIndex] / (double)SceneInfo.RenderHeight;
+		if (SceneInfo.bEnableJitter)
+		{
+			Proj.m[2][0] += JitterOffsetsX[PhaseIndex] / (double)SceneInfo.RenderWidth;
+			Proj.m[2][1] += JitterOffsetsY[PhaseIndex] / (double)SceneInfo.RenderHeight;
+		}
 		SceneInfo.MainCameraViewProjWithAA = SceneInfo.MainCameraView * Proj;
 
 		ImguiInterface->DrawSettings(DebugInfo, SceneInfo, Config);
@@ -154,6 +157,14 @@ void ragdoll::Scene::Update(float _dt)
 		BuildDebugInstances(StaticDebugInstanceDatas);
 	}
 
+	if (SceneInfo.bIsResolutionDirty)
+	{
+		HaltonSequence(Vector2(SceneInfo.RenderWidth, SceneInfo.RenderHeight), Vector2(SceneInfo.TargetWidth, SceneInfo.TargetHeight));
+		NVSDK::Init(DirectXDevice::GetInstance()->m_Device12, Vector2(SceneInfo.RenderWidth, SceneInfo.RenderHeight), Vector2(SceneInfo.TargetWidth, SceneInfo.TargetHeight));
+		CreateRenderTargets();
+		SceneInfo.bIsResolutionDirty = false;
+	}
+
 	DeferredRenderer->Render(this, _dt, ImguiInterface);
 
 	DirectXDevice::GetInstance()->Present();
@@ -163,6 +174,7 @@ void ragdoll::Scene::Update(float _dt)
 
 void ragdoll::Scene::Shutdown()
 {
+	NVSDK::Release();
 	ImguiInterface->Shutdown();
 	ImguiInterface = nullptr;
 	DeferredRenderer->Shutdown();
@@ -354,8 +366,9 @@ void ragdoll::Scene::CreateRenderTargets()
 
 	uint32_t width = SceneInfo.RenderWidth;
 	uint32_t height = SceneInfo.RenderHeight;
+	RenderTargets.DownsampledImages.resize(RenderTargets.MipCount);
 	for (size_t i = 0; i < RenderTargets.MipCount; ++i) {
-		BloomMip& mip = RenderTargets.DownsampledImages.emplace_back();
+		BloomMip& mip = RenderTargets.DownsampledImages[i];
 		mip.Width = width; mip.Height = height;
 		nvrhi::TextureDesc desc;
 		desc.width = mip.Width;

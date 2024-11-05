@@ -137,7 +137,7 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_MASK]);
 
 	Taskflow.emplace([this, &scene]() {
-		DeferredLightPass->LightPass(scene->SceneInfo);
+		DeferredLightPass->LightPass(scene->SceneInfo, RenderTargets);
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::LIGHT]);
 
@@ -241,12 +241,7 @@ void Renderer::CreateResource()
 	XeGTAOPass = std::make_shared<class XeGTAOPass>();
 	XeGTAOPass->Init(CommandLists[(int)Pass::AO]);
 
-	nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(RenderTargets->SceneColor);
-	nvrhi::FramebufferHandle fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
 	DeferredLightPass = std::make_shared<class DeferredLightPass>();
-	DeferredLightPass->SetRenderTarget(fb);
-	DeferredLightPass->SetDependencies(RenderTargets->GBufferAlbedo, RenderTargets->GBufferNormal, RenderTargets->GBufferRM, RenderTargets->AONormalized, RenderTargets->SceneDepthZ, RenderTargets->ShadowMask);
 	DeferredLightPass->Init(CommandLists[(int)Pass::LIGHT]);
 
 	SkyPass = std::make_shared<class SkyPass>();
@@ -255,9 +250,6 @@ void Renderer::CreateResource()
 	BloomPass = std::make_shared<class BloomPass>();
 	BloomPass->Init(CommandLists[(int)Pass::BLOOM]);
 
-	fbDesc = nvrhi::FramebufferDesc()
-		.addColorAttachment(RenderTargets->SceneColor);
-	fb = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
 	AutomaticExposurePass = std::make_shared<class AutomaticExposurePass>();
 	AutomaticExposurePass->Init(CommandLists[(int)Pass::EXPOSURE]);
 

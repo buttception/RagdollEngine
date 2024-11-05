@@ -14,8 +14,10 @@ public:
 	static void Evaluate(nvrhi::TextureHandle InColor, nvrhi::TextureHandle OutColor, nvrhi::TextureHandle InDepth, nvrhi::TextureHandle InMotionVector, ragdoll::Scene* scene);
 	static void Release();
 
-	static inline uint32_t RenderWidth{}, RenderHeight{}, MaxWidth{}, MaxHeight{}, MinWidth{}, MinHeight{};
+	static inline uint32_t OptimalRenderWidth{}, OptimalRenderHeight{}, MaxWidth{}, MaxHeight{}, MinWidth{}, MinHeight{};
 	static inline float Sharpness{};
+	static inline uint32_t RenderWidth{}, RenderHeight{};
+	static inline bool bIsDLAA;
 
 private:
 	static void LoggingCallback(const char* message, NVSDK_NGX_Logging_Level loggingLevel, NVSDK_NGX_Feature sourceComponent);

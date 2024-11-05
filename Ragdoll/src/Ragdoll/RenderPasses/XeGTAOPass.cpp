@@ -18,11 +18,12 @@ void XeGTAOPass::Init(nvrhi::CommandListHandle cmdList)
 	CommandListRef = cmdList;
 }
 
-void XeGTAOPass::UpdateConstants(const uint32_t width, const uint32_t height, const Matrix& projMatrix)
+void XeGTAOPass::UpdateConstants(const uint32_t width, const uint32_t height, const Matrix& projMatrix, const ragdoll::SceneInformation& sceneInfo)
 {
 	static uint32_t framecounter = 0;
 	XeGTAO::GTAOUpdateConstants(CBuffer, width, height, Settings, &projMatrix._11, true, framecounter);
-	framecounter++;
+	if(sceneInfo.bEnableXeGTAONoise)
+		framecounter++;
 }
 
 void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets)
@@ -31,7 +32,7 @@ void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo, ragdoll:
 	RD_GPU_SCOPE("XeGTAO", CommandListRef);
 
 	CommandListRef->beginMarker("XeGTAO");
-	UpdateConstants(targets->SceneDepthZ->getDesc().width, targets->SceneDepthZ->getDesc().height, sceneInfo.InfiniteReverseZProj);
+	UpdateConstants(targets->SceneDepthZ->getDesc().width, targets->SceneDepthZ->getDesc().height, sceneInfo.InfiniteReverseZProj, sceneInfo);
 	//cbuffer shared amongst all
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(XeGTAO::GTAOConstants), "XeGTAO CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
