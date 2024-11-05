@@ -171,26 +171,29 @@ void ImguiRenderer::DrawControl(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneInf
 
 	//hardcoded handling of movement now
 	if (!ImGui::IsAnyItemFocused() && !ImGui::IsAnyItemActive()) {
+		float speed = data.cameraSpeed;
+		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_LeftShift))
+			speed *= 3.f;
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_W))
 		{
 			SceneInfo.bIsCameraDirty = true;
-			data.cameraPos += cameraDir * data.cameraSpeed * _dt;
+			data.cameraPos += cameraDir * speed * _dt;
 		}
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_S))
 		{
 			SceneInfo.bIsCameraDirty = true;
-			data.cameraPos -= cameraDir * data.cameraSpeed * _dt;
+			data.cameraPos -= cameraDir * speed * _dt;
 		}
 		Vector3 cameraRight = cameraDir.Cross(Vector3(0.f, 1.f, 0.f));
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_A))
 		{
 			SceneInfo.bIsCameraDirty = true;
-			data.cameraPos += cameraRight * data.cameraSpeed * _dt;
+			data.cameraPos += cameraRight * speed * _dt;
 		}
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_D))
 		{
 			SceneInfo.bIsCameraDirty = true;
-			data.cameraPos -= cameraRight * data.cameraSpeed * _dt;
+			data.cameraPos -= cameraRight * speed * _dt;
 		}
 		if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
 		{
@@ -200,6 +203,17 @@ void ImguiRenderer::DrawControl(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneInf
 			data.cameraPitch += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * _dt;
 			data.cameraPitch = data.cameraPitch > DirectX::XM_PIDIV2 - 0.1f ? DirectX::XM_PIDIV2 - 0.1f : data.cameraPitch;
 			data.cameraPitch = data.cameraPitch < -DirectX::XM_PIDIV2 + 0.1f ? -DirectX::XM_PIDIV2 + 0.1f : data.cameraPitch;
+		}
+		Vector3 cameraUp = cameraRight.Cross(cameraDir);
+		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_Space))
+		{
+			SceneInfo.bIsCameraDirty = true;
+			data.cameraPos += cameraUp * speed * _dt;
+		}
+		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_LeftCtrl))
+		{
+			SceneInfo.bIsCameraDirty = true;
+			data.cameraPos -= cameraUp * speed * _dt;
 		}
 	}
 	cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));

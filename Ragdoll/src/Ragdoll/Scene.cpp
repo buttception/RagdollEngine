@@ -357,7 +357,7 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "SkyThetaGammaTable";
 	RenderTargets.SkyThetaGammaTable = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
-	texDesc.width = texDesc.height = 2000;
+	texDesc.width = texDesc.height = 2048;
 	texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	texDesc.isUAV = true;
 	texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
