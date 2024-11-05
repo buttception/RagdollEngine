@@ -3,6 +3,7 @@
 
 namespace ragdoll {
 	struct SceneInformation;
+	struct SceneRenderTargets;
 }
 class CACAOPass {
 	struct ConstantBuffer {
@@ -70,48 +71,17 @@ class CACAOPass {
 
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
 
-	struct Textures//exist for me to faster set dependencies
-	{
-		nvrhi::TextureHandle DepthBuffer;
-		nvrhi::TextureHandle GBufferNormals;
-
-		nvrhi::TextureHandle LoadCounter;	//1x1x1 r32uint
-		nvrhi::TextureHandle DeinterleavedDepthMips;
-		nvrhi::TextureHandle DeinterleavedNormals;
-		nvrhi::TextureHandle SSAOPong; //r8g8unorm
-		nvrhi::TextureHandle SSAOPing; //r8g8unorm
-		nvrhi::TextureHandle ImportanceMap;	//r8unorm
-		nvrhi::TextureHandle ImportanceMapPong;	//r8unorm half size
-		nvrhi::TextureHandle GBufferAO;
-	};
-
-	//inputs
-	nvrhi::TextureHandle DepthBuffer;
-	nvrhi::TextureHandle GBufferNormals;
-
-	//outputs
-	nvrhi::TextureHandle LoadCounter;
-	nvrhi::TextureHandle DeinterleavedDepthMips;
-	nvrhi::TextureHandle DeinterleavedNormals;
-	nvrhi::TextureHandle SSAOPong; //r8g8unorm
-	nvrhi::TextureHandle SSAOPing; //r8g8unorm
-	nvrhi::TextureHandle ImportanceMap;	//r8unorm
-	nvrhi::TextureHandle ImportanceMapPong;	//r8unorm half size
-	nvrhi::TextureHandle GBufferAO;
-
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
 
-	void SetDependencies(Textures dependencies);
-
-	void GenerateAO(const ragdoll::SceneInformation& sceneInfo);
-	void PrepareDepth(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
-	void PrepareNormal(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
-	void PrepareObscurance(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
-	void PrepareImportance(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
-	void PrepareImportanceA(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
-	void PrepareImportanceB(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
-	void SSAOPass(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
-	void BlurSSAO(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
-	void ApplySSAO(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer);
+	void GenerateAO(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets);
+	void PrepareDepth(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer, ragdoll::SceneRenderTargets* targets);
+	void PrepareNormal(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer, ragdoll::SceneRenderTargets* targets);
+	void PrepareObscurance(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer, ragdoll::SceneRenderTargets* targets);
+	void PrepareImportance(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer, ragdoll::SceneRenderTargets* targets);
+	void PrepareImportanceA(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer, ragdoll::SceneRenderTargets* targets);
+	void PrepareImportanceB(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer, ragdoll::SceneRenderTargets* targets);
+	void SSAOPass(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer, ragdoll::SceneRenderTargets* targets);
+	void BlurSSAO(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer, ragdoll::SceneRenderTargets* targets);
+	void ApplySSAO(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle CBuffer, ragdoll::SceneRenderTargets* targets);
 };

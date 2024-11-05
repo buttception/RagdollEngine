@@ -13,17 +13,7 @@ void SkyPass::Init(nvrhi::CommandListHandle cmdList)
 	CommandListRef = cmdList;
 }
 
-void SkyPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
-{
-	RenderTarget = renderTarget;
-}
-
-void SkyPass::SetDependencies(nvrhi::TextureHandle sky)
-{
-	SkyTexture = sky;
-}
-
-void SkyPass::DrawSky(const ragdoll::SceneInformation& sceneInfo)
+void SkyPass::DrawSky(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets * targets)
 {
 	RD_SCOPE(Render, SkyPass);
 	RD_GPU_SCOPE("SkyPass", CommandListRef);
@@ -31,14 +21,17 @@ void SkyPass::DrawSky(const ragdoll::SceneInformation& sceneInfo)
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "Sky CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 
-	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
+	nvrhi::FramebufferDesc desc = nvrhi::FramebufferDesc()
+		.addColorAttachment(targets->SceneColor)
+		.setDepthAttachment(targets->SceneDepthZ);
+	nvrhi::FramebufferHandle pipelineFb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
 	CBuffer.InvViewProj = sceneInfo.MainCameraViewProj.Invert();
 	CBuffer.CameraPosition = sceneInfo.MainCameraPosition;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-		nvrhi::BindingSetItem::Texture_SRV(0, SkyTexture),
+		nvrhi::BindingSetItem::Texture_SRV(0, targets->SkyTexture),
 		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Trilinear_Clamp])
 	};
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
@@ -60,7 +53,7 @@ void SkyPass::DrawSky(const ragdoll::SceneInformation& sceneInfo)
 	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 
 	nvrhi::GraphicsState state;
-	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, RenderTarget);
+	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, pipelineFb);
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 	state.addBindingSet(BindingSetHandle);

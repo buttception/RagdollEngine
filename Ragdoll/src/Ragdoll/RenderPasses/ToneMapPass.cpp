@@ -11,28 +11,19 @@
 void ToneMapPass::Init(nvrhi::CommandListHandle cmdList)
 {
 	CommandListRef = cmdList;
-
-	RD_ASSERT(RenderTarget == nullptr, "Render Target Framebuffer not set");
 }
 
-void ToneMapPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
-{
-	RenderTarget = renderTarget;
-}
-
-void ToneMapPass::SetDependencies(nvrhi::TextureHandle SceneColor)
-{
-	Target = SceneColor;
-}
-
-void ToneMapPass::ToneMap(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle exposureHandle)
+void ToneMapPass::ToneMap(const ragdoll::SceneInformation& sceneInfo, nvrhi::BufferHandle exposureHandle, ragdoll::SceneRenderTargets* targets)
 {
 	RD_SCOPE(Render, Tonemap);
 	RD_GPU_SCOPE("Tonemap", CommandListRef);
 	//create cbuffer
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ToneMap CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
-	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
+
+	nvrhi::FramebufferDesc desc = nvrhi::FramebufferDesc()
+		.addColorAttachment(targets->FinalColor);
+	nvrhi::FramebufferHandle pipelineFb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
 	CBuffer.Exposure = sceneInfo.Exposure;
 	CBuffer.Gamma = sceneInfo.Gamma;
 	CBuffer.UseFixedExposure = sceneInfo.UseFixedExposure;
@@ -41,7 +32,7 @@ void ToneMapPass::ToneMap(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buf
 	bindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[5]),
-		nvrhi::BindingSetItem::Texture_SRV(0, Target),
+		nvrhi::BindingSetItem::Texture_SRV(0, targets->SceneColor),
 		nvrhi::BindingSetItem::TypedBuffer_UAV(0, exposureHandle)
 	};
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
@@ -61,7 +52,7 @@ void ToneMapPass::ToneMap(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buf
 	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 
 	nvrhi::GraphicsState state;
-	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, RenderTarget);
+	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, pipelineFb);
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 	state.addBindingSet(BindingSetHandle);

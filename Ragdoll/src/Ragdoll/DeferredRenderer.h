@@ -21,6 +21,7 @@ namespace ragdoll {
 	class FileManager;
 	class EntityManager;
 	class Scene;
+	struct SceneRenderTargets;
 	struct InstanceGroupInfo;
 }
 class DirectXDevice;
@@ -66,33 +67,7 @@ public:
 
 	std::vector<nvrhi::CommandListHandle> CommandLists;
 
-	nvrhi::TextureHandle SkyTexture;
-	nvrhi::TextureHandle SkyThetaGammaTable;
-	nvrhi::TextureHandle SceneColor;
-	nvrhi::TextureHandle AlbedoHandle;
-	nvrhi::TextureHandle NormalHandle;
-	nvrhi::TextureHandle RoughnessMetallicHandle;
-	nvrhi::TextureHandle AOHandle;
-	nvrhi::TextureHandle VelocityBuffer;
-	nvrhi::TextureHandle DepthHandle;
-	nvrhi::FramebufferHandle GBuffer;
-	nvrhi::TextureHandle ShadowMap[4];
-	nvrhi::TextureHandle ShadowMask;
-	const std::vector<BloomMip>* Mips;
-	nvrhi::TextureHandle DeinterleavedDepth;
-	nvrhi::TextureHandle DeinterleavedNormals;
-	nvrhi::TextureHandle SSAOPong;
-	nvrhi::TextureHandle SSAOPing;
-	nvrhi::TextureHandle ImportanceMap;
-	nvrhi::TextureHandle ImportanceMapPong;
-	nvrhi::TextureHandle LoadCounter;
-	nvrhi::TextureHandle DepthMips;
-	nvrhi::TextureHandle AOTerm;
-	nvrhi::TextureHandle Edges;
-	nvrhi::TextureHandle FinalAOTermA;
-	nvrhi::TextureHandle AOTermAccumulation;
-	nvrhi::TextureHandle FinalColor;
-	nvrhi::TextureHandle UpscaledBuffer;
+	ragdoll::SceneRenderTargets* RenderTargets;
 	nvrhi::CommandListHandle CommandList;
 
 	//debug infos

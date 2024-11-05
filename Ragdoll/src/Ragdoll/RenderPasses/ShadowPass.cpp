@@ -14,25 +14,18 @@ void ShadowPass::Init(nvrhi::CommandListHandle cmdList0, nvrhi::CommandListHandl
 	CommandListRef[1] = cmdList1;
 	CommandListRef[2] = cmdList2;
 	CommandListRef[3] = cmdList3;
-
-	RD_ASSERT(RenderTarget == nullptr, "Render Target Framebuffer not set");
 }
 
-void ShadowPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget[4])
-{
-	for (int i = 0; i < 4; ++i)
-	{
-		RenderTarget[i] = renderTarget[i];
-	}
-}
-
-void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo, uint32_t cascadeIndex)
+void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo, uint32_t cascadeIndex, ragdoll::SceneRenderTargets* targets)
 {
 	RD_SCOPE(Render, ShadowPass);
 	RD_GPU_SCOPE("ShadowPass", CommandListRef[cascadeIndex]);
 	if (infos.empty())
 		return;
-	nvrhi::FramebufferHandle pipelineFb = RenderTarget[cascadeIndex];
+
+	nvrhi::FramebufferDesc desc = nvrhi::FramebufferDesc()
+		.setDepthAttachment(targets->ShadowMap[cascadeIndex]);
+	nvrhi::FramebufferHandle pipelineFb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
 
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ShadowPass CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
@@ -59,7 +52,7 @@ void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, std::vecto
 	PipelineDesc.inputLayout = AssetManager::GetInstance()->InstancedInputLayoutHandle;
 
 	nvrhi::GraphicsState state;
-	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, RenderTarget[cascadeIndex]);
+	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, pipelineFb);
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect({ 2000.f, 2000.f });
 	state.indexBuffer = { AssetManager::GetInstance()->IBO, nvrhi::Format::R32_UINT, 0 };

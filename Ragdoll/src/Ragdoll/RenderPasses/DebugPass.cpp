@@ -11,16 +11,9 @@
 void DebugPass::Init(nvrhi::CommandListHandle cmdList)
 {
 	CommandListRef = cmdList;
-
-	RD_ASSERT(RenderTarget == nullptr, "Render Target Framebuffer not set");
 }
 
-void DebugPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
-{
-	RenderTarget = renderTarget;
-}
-
-void DebugPass::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, size_t instanceCount, const ragdoll::SceneInformation& sceneInfo)
+void DebugPass::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, size_t instanceCount, const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets)
 {
 	RD_SCOPE(Render, Debug);
 	RD_GPU_SCOPE("Debug", CommandListRef);
@@ -31,7 +24,10 @@ void DebugPass::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, size_t ins
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "DebugPass CBuffer", 1);
 	nvrhi::BufferHandle	ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 
-	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
+	nvrhi::FramebufferDesc desc = nvrhi::FramebufferDesc()
+		.addColorAttachment(targets->FinalColor)
+		.setDepthAttachment(targets->SceneDepthZ);
+	nvrhi::FramebufferHandle pipelineFb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
 	CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
@@ -56,7 +52,7 @@ void DebugPass::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, size_t ins
 	PipelineDesc.primType = nvrhi::PrimitiveType::LineList;
 
 	nvrhi::GraphicsState state;
-	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, RenderTarget);
+	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, pipelineFb);
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 	state.addBindingSet(BindingSetHandle);

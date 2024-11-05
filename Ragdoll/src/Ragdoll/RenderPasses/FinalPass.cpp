@@ -13,26 +13,18 @@ void FinalPass::Init(nvrhi::CommandListHandle cmdList)
 	CommandListRef = cmdList;
 }
 
-void FinalPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
-{
-	RenderTarget = renderTarget;
-}
-
-void FinalPass::SetDependencies(nvrhi::TextureHandle final)
-{
-	FinalColor = final;
-}
-
-void FinalPass::DrawQuad()
+void FinalPass::DrawQuad(ragdoll::SceneRenderTargets* targets, bool upscaled)
 {
 	RD_SCOPE(Render, Final);
 	RD_GPU_SCOPE("FinalPass", CommandListRef);
 
-	nvrhi::FramebufferHandle pipelineFb = RenderTarget;
+	nvrhi::FramebufferDesc desc = nvrhi::FramebufferDesc()
+		.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer());
+	nvrhi::FramebufferHandle pipelineFb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
-		nvrhi::BindingSetItem::Texture_SRV(0, FinalColor),
+		nvrhi::BindingSetItem::Texture_SRV(0, upscaled ? targets->UpscaledBuffer : targets->FinalColor),
 		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp])
 	};
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
@@ -53,7 +45,7 @@ void FinalPass::DrawQuad()
 	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 
 	nvrhi::GraphicsState state;
-	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, RenderTarget);
+	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, pipelineFb);
 	state.framebuffer = pipelineFb;
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 	state.addBindingSet(BindingSetHandle);

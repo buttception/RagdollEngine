@@ -4,6 +4,7 @@
 namespace ragdoll {
 	struct InstanceGroupInfo;
 	struct SceneInformation;
+	struct SceneRenderTargets;
 }
 class DeferredLightPass {
 	struct ConstantBuffer {
@@ -22,8 +23,8 @@ class DeferredLightPass {
 	nvrhi::TextureHandle AlbedoHandle;
 	nvrhi::TextureHandle NormalHandle;
 	nvrhi::TextureHandle RoughnessMetallicHandle;
-	nvrhi::TextureHandle AOHandle;
-	nvrhi::TextureHandle DepthHandle;
+	nvrhi::TextureHandle AONormalized;
+	nvrhi::TextureHandle SceneDepthZ;
 	nvrhi::TextureHandle ShadowMask;
 
 public:

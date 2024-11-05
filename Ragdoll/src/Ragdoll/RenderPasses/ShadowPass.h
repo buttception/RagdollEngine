@@ -4,6 +4,7 @@
 namespace ragdoll {
 	struct InstanceGroupInfo;
 	struct SceneInformation;
+	struct SceneRenderTargets;
 }
 class ShadowPass {
 	struct ConstantBuffer {
@@ -12,13 +13,10 @@ class ShadowPass {
 		uint32_t CascadeIndex;
 	}CBuffer[4];
 
-	nvrhi::FramebufferHandle RenderTarget[4]{ nullptr, };
 	nvrhi::CommandListHandle CommandListRef[4]{ nullptr };
 
 public:
 	void Init(nvrhi::CommandListHandle cmdList0, nvrhi::CommandListHandle cmdList1, nvrhi::CommandListHandle cmdList2, nvrhi::CommandListHandle cmdList3);
 
-	void SetRenderTarget(nvrhi::FramebufferHandle renderTarget[4]);
-
-	void DrawAllInstances(nvrhi::BufferHandle instanceBuffer, std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo, uint32_t cascadeIndex);
+	void DrawAllInstances(nvrhi::BufferHandle instanceBuffer, std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo, uint32_t cascadeIndex, ragdoll::SceneRenderTargets* targets);
 };

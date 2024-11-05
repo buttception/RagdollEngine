@@ -5,6 +5,7 @@
 namespace ragdoll {
 	struct InstanceGroupInfo;
 	struct SceneInformation;
+	struct SceneRenderTargets;
 }
 class DebugPass {
 	struct ConstantBuffer {
@@ -13,13 +14,10 @@ class DebugPass {
 		uint32_t InstanceOffset;
 	}CBuffer;
 
-	nvrhi::FramebufferHandle RenderTarget{ nullptr };
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
 
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
 
-	void SetRenderTarget(nvrhi::FramebufferHandle renderTarget);
-
-	void DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, size_t instanceCount, const ragdoll::SceneInformation& sceneInfo);
+	void DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, size_t instanceCount, const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets);
 };

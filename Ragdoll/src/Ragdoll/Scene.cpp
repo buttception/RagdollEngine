@@ -105,25 +105,25 @@ void ragdoll::Scene::Update(float _dt)
 		switch (item) {
 		case 1:
 			DebugInfo.CompCount = 2;
-			DebugInfo.DbgTarget = GBufferNormal;
+			DebugInfo.DbgTarget = RenderTargets.GBufferNormal;
 			DebugInfo.Add = Vector4::Zero;
 			DebugInfo.Mul = Vector4::One;
 			break;
 		case 2:
 			DebugInfo.CompCount = 2;
-			DebugInfo.DbgTarget = GBufferRM;
+			DebugInfo.DbgTarget = RenderTargets.GBufferRM;
 			DebugInfo.Add = Vector4::Zero;
 			DebugInfo.Mul = Vector4::One;
 			break;
 		case 3:
 			DebugInfo.CompCount = 3;
-			DebugInfo.DbgTarget = VelocityBuffer;
+			DebugInfo.DbgTarget = RenderTargets.VelocityBuffer;
 			DebugInfo.Add = Vector4::Zero;
 			DebugInfo.Mul = Vector4::One;
 			break;
 		case 4:
 			DebugInfo.CompCount = 1;
-			DebugInfo.DbgTarget = AONormalized;
+			DebugInfo.DbgTarget = RenderTargets.AONormalized;
 			DebugInfo.Add = Vector4::Zero;
 			DebugInfo.Mul = Vector4::One;
 			break;
@@ -281,14 +281,14 @@ void ragdoll::Scene::CreateRenderTargets()
 	depthBufferDesc.debugName = "SceneDepthZ";
 	depthBufferDesc.clearValue = 0.f;
 	depthBufferDesc.useClearValue = true;
-	SceneDepthZ = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
+	RenderTargets.SceneDepthZ = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
 
 	depthBufferDesc.width = 2000;
 	depthBufferDesc.height = 2000;
 	for (int i = 0; i < 4; ++i)
 	{
 		depthBufferDesc.debugName = "ShadowMap" + std::to_string(i);
-		ShadowMap[i] = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
+		RenderTargets.ShadowMap[i] = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
 	}
 
 	nvrhi::TextureDesc texDesc;
@@ -304,12 +304,12 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.clearValue = 1.f;
 	texDesc.format = nvrhi::Format::R8_UNORM;
 	texDesc.debugName = "AONormalized";
-	AONormalized = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.AONormalized = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	
 	texDesc.clearValue = 0.f;
 	texDesc.format = nvrhi::Format::RG8_UNORM;
 	texDesc.debugName = "GBufferRM";
-	GBufferRM = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.GBufferRM = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.sampleCount = 1;
 	texDesc.isTypeless = false;
@@ -317,45 +317,45 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.initialState = nvrhi::ResourceStates::RenderTarget;
 	texDesc.format = nvrhi::Format::RGBA8_UNORM;
 	texDesc.debugName = "GBufferAlbedo";
-	GBufferAlbedo = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.GBufferAlbedo = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
 	texDesc.debugName = "SceneColor";
-	SceneColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.SceneColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::RGBA8_UNORM;
 	texDesc.debugName = "FinalColor";
-	FinalColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.FinalColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::RG16_UNORM;
 	texDesc.debugName = "GBufferNormal";
-	GBufferNormal = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.GBufferNormal = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::RG16_FLOAT;
 	texDesc.debugName = "VelocityBuffer";
-	VelocityBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.VelocityBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::RGBA8_UNORM;
 	texDesc.debugName = "ShadowMask";
-	ShadowMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.ShadowMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.width = 64;
 	texDesc.height = 2;
 	texDesc.format = nvrhi::Format::RGBA8_UNORM;
 	texDesc.debugName = "SkyThetaGammaTable";
-	SkyThetaGammaTable = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.SkyThetaGammaTable = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.width = texDesc.height = 2000;
 	texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	texDesc.isUAV = true;
 	texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
 	texDesc.debugName = "SkyTexture";
-	SkyTexture = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.SkyTexture = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	uint32_t width = SceneInfo.RenderWidth;
 	uint32_t height = SceneInfo.RenderHeight;
-	for (size_t i = 0; i < MipCount; ++i) {
-		BloomMip& mip = DownsampledImages.emplace_back();
+	for (size_t i = 0; i < RenderTargets.MipCount; ++i) {
+		BloomMip& mip = RenderTargets.DownsampledImages.emplace_back();
 		mip.Width = width; mip.Height = height;
 		nvrhi::TextureDesc desc;
 		desc.width = mip.Width;
@@ -380,18 +380,18 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.dimension = nvrhi::TextureDimension::Texture2DArray;
 	texDesc.arraySize = 4;
 	texDesc.mipLevels = 5;
-	DeinterleavedDepth = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.DeinterleavedDepth = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::RGBA8_SNORM;
 	texDesc.debugName = "DeinterleavedNormals";
 	texDesc.mipLevels = 1;
-	DeinterleavedNormals = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.DeinterleavedNormals = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::RG8_UNORM;
 	texDesc.debugName = "SSAOBufferPong";
-	SSAOBufferPong = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.SSAOBufferPong = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	texDesc.debugName = "SSAOBufferPing";
-	SSAOBufferPing = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.SSAOBufferPing = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::R8_UNORM;
 	texDesc.debugName = "ImportanceMap";
@@ -399,15 +399,15 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.arraySize = 1;
 	texDesc.width = SceneInfo.RenderWidth / 4 + SceneInfo.RenderWidth % 4;
 	texDesc.height = SceneInfo.RenderHeight / 4 + SceneInfo.RenderHeight % 4;
-	ImportanceMap = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.ImportanceMap = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	texDesc.debugName = "ImportanceMapPong";
-	ImportanceMapPong = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.ImportanceMapPong = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::R32_UINT;
 	texDesc.debugName = "LoadCounter";
 	texDesc.width = texDesc.height = 1;
 	texDesc.dimension = nvrhi::TextureDimension::Texture1D;
-	LoadCounter = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.LoadCounter = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc = nvrhi::TextureDesc();
 	texDesc.width = SceneInfo.RenderWidth;
@@ -419,27 +419,27 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "DepthMips";
 	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
 	texDesc.mipLevels = 5;
-	DepthMips = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.DepthMips = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::R8_UINT;
 	texDesc.debugName = "AOTerm";
 	texDesc.mipLevels = 1;
-	AOTerm = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.AOTerm = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	texDesc.debugName = "FinalAOTerm";
-	FinalAOTerm = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.FinalAOTerm = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	texDesc.format = nvrhi::Format::R8_UNORM;
 	texDesc.debugName = "AOTermAccumulation";
-	AOTermAccumulation = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.AOTermAccumulation = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::R8_UNORM;
 	texDesc.debugName = "EdgeMap";
-	Edges = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.EdgeMap = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.width = PrimaryWindowRef->GetWidth();
 	texDesc.height = PrimaryWindowRef->GetHeight();
 	texDesc.format = nvrhi::Format::RGBA8_UNORM;
 	texDesc.debugName = "UpscaledBuffer";
-	UpscaledBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.UpscaledBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 }
 
 void ragdoll::Scene::UpdateTransforms()

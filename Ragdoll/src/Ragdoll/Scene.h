@@ -134,33 +134,8 @@ namespace ragdoll {
 		uint32_t TargetHeight;
 	};
 
-	class Scene {
-		std::shared_ptr<EntityManager> EntityManagerRef;
-		std::shared_ptr<Window> PrimaryWindowRef;
-
-		std::shared_ptr<ImguiRenderer> ImguiInterface;
-
-		//Transforms
-		std::stack<Matrix> m_ModelStack;
-		//the root details
-		Guid m_RootEntity;
-		Guid m_RootSibling;
-		Guid m_FurthestSibling;	//cache for better performance
-		//state
-		bool m_DirtyOnwards{ false };
-
-		//Rendering
-		nvrhi::CommandListHandle CommandList;
-
-	public:
-		std::shared_ptr<Renderer> DeferredRenderer;
-		SceneConfig Config;
-		DebugInfo DebugInfo;
-		Octree StaticOctree;
-
-		std::vector<double> JitterOffsetsX;
-		std::vector<double> JitterOffsetsY;
-		uint32_t PhaseIndex{}, TotalPhaseCount{};
+	struct SceneRenderTargets
+	{
 		//render targets
 		nvrhi::TextureHandle SceneColor;
 		nvrhi::TextureHandle SceneDepthZ;
@@ -188,13 +163,44 @@ namespace ragdoll {
 		//xegtao
 		nvrhi::TextureHandle DepthMips;
 		nvrhi::TextureHandle AOTerm;
-		nvrhi::TextureHandle Edges;
+		nvrhi::TextureHandle EdgeMap;
 		nvrhi::TextureHandle FinalAOTerm;
 		nvrhi::TextureHandle AOTermAccumulation;
 		nvrhi::TextureHandle AONormalized;
 		//final color
 		nvrhi::TextureHandle FinalColor;
 		nvrhi::TextureHandle UpscaledBuffer;
+	};
+
+	class Scene {
+		std::shared_ptr<EntityManager> EntityManagerRef;
+		std::shared_ptr<Window> PrimaryWindowRef;
+
+		std::shared_ptr<ImguiRenderer> ImguiInterface;
+
+		//Transforms
+		std::stack<Matrix> m_ModelStack;
+		//the root details
+		Guid m_RootEntity;
+		Guid m_RootSibling;
+		Guid m_FurthestSibling;	//cache for better performance
+		//state
+		bool m_DirtyOnwards{ false };
+
+		//Rendering
+		nvrhi::CommandListHandle CommandList;
+
+	public:
+		std::shared_ptr<Renderer> DeferredRenderer;
+		SceneConfig Config;
+		DebugInfo DebugInfo;
+		Octree StaticOctree;
+
+		std::vector<double> JitterOffsetsX;
+		std::vector<double> JitterOffsetsY;
+		uint32_t PhaseIndex{}, TotalPhaseCount{};
+
+		SceneRenderTargets RenderTargets;
 		//distance where the subfrusta are seperated
 		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
 

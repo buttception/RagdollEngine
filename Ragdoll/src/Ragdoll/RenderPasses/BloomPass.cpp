@@ -13,29 +13,23 @@ void BloomPass::Init(nvrhi::CommandListHandle cmdList)
 	CommandListRef = cmdList;
 }
 
-void BloomPass::SetDependencies(nvrhi::TextureHandle sceneColor, const std::vector<BloomMip>* mips)
-{
-	Mips = mips;
-	SceneColor = sceneColor;
-}
-
-void BloomPass::Bloom(const ragdoll::SceneInformation& sceneInfo)
+void BloomPass::Bloom(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets)
 {
 	RD_SCOPE(Render, Bloom);
 	RD_GPU_SCOPE("Bloom", CommandListRef);
-	DownSample();
-	UpSample(sceneInfo.FilterRadius, sceneInfo.BloomIntensity);
+	DownSample(targets);
+	UpSample(sceneInfo.FilterRadius, sceneInfo.BloomIntensity, targets);
 }
 
-void BloomPass::DownSample()
+void BloomPass::DownSample(ragdoll::SceneRenderTargets* targets)
 {
 	RD_SCOPE(Render, DownSample);
 	CommandListRef->beginMarker("Down Sample Pass");
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBufferDS), "DownSample CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 
-	nvrhi::TextureHandle Source = SceneColor;
-	for (const BloomMip& mip : *Mips) {
+	nvrhi::TextureHandle Source = targets->SceneColor;
+	for (const BloomMip& mip : targets->DownsampledImages) {
 		RD_SCOPE(Render, DownSampleMip);
 		//create the target
 		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
@@ -87,18 +81,18 @@ void BloomPass::DownSample()
 	CommandListRef->endMarker();
 }
 
-void BloomPass::UpSample(float filterRadius, float bloomIntensity)
+void BloomPass::UpSample(float filterRadius, float bloomIntensity, ragdoll::SceneRenderTargets* targets)
 {
 	RD_SCOPE(Render, UpSample);
 	CommandListRef->beginMarker("Up Sample Pass");
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBufferUS), "UpSample CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 
-	for (size_t i = Mips->size() - 1; i > 0; --i) {
+	for (size_t i = targets->DownsampledImages.size() - 1; i > 0; --i) {
 		RD_SCOPE(Render, UpSampleMip);
 		//MICROPROFILE_SCOPEGPUI("Bloom Up Sample GPU", MP_LIGHTYELLOW1);
-		nvrhi::TextureHandle Source = Mips->operator[](i).Image;
-		nvrhi::TextureHandle Target = Mips->operator[](i - 1).Image;
+		nvrhi::TextureHandle Source = targets->DownsampledImages[i].Image;
+		nvrhi::TextureHandle Target = targets->DownsampledImages[i - 1].Image;
 		//create the target
 		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
 			.addColorAttachment(Target);
@@ -109,7 +103,7 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity)
 			nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 			nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[3]),
 			nvrhi::BindingSetItem::Texture_SRV(0, Source),
-			nvrhi::BindingSetItem::Texture_SRV(1, SceneColor),
+			nvrhi::BindingSetItem::Texture_SRV(1, targets->SceneColor),
 		};
 		nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
 		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(bindingSetDesc, BindingLayoutHandle);
@@ -149,13 +143,13 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity)
 		//copy the first mip into scene color
 		//create the target
 		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
-			.addColorAttachment(SceneColor);
+			.addColorAttachment(targets->SceneColor);
 		nvrhi::FramebufferHandle TargetFB = DirectXDevice::GetNativeDevice()->createFramebuffer(fbDesc);
 		//create the binding set and layout
 		nvrhi::BindingSetDesc bindingSetDesc;
 		bindingSetDesc.bindings = {
 			nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[5]),
-			nvrhi::BindingSetItem::Texture_SRV(0, Mips->operator[](0).Image),
+			nvrhi::BindingSetItem::Texture_SRV(0, targets->DownsampledImages[0].Image),
 		};
 		nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
 		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(bindingSetDesc, BindingLayoutHandle);

@@ -17,13 +17,7 @@ void SkyGeneratePass::Init(nvrhi::CommandListHandle cmdList)
 	SunSky = std::make_shared<FSunSkyPreetham>();
 }
 
-void SkyGeneratePass::SetDependencies(nvrhi::TextureHandle sky, nvrhi::TextureHandle table)
-{
-	SkyTexture = sky;
-	ThetaGammaTable = table;
-}
-
-void SkyGeneratePass::GenerateSky(const ragdoll::SceneInformation& sceneInfo)
+void SkyGeneratePass::GenerateSky(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets)
 {
 	RD_SCOPE(Render, GenerateSky);
 	RD_GPU_SCOPE("GenerateSky", CommandListRef);
@@ -33,7 +27,7 @@ void SkyGeneratePass::GenerateSky(const ragdoll::SceneInformation& sceneInfo)
 	SunSky->Update(lightDir, 2.5f, 0.f, 0.f);
 	Table->FindThetaGammaTables(*SunSky);
 	//write to the table textures
-	CommandListRef->writeTexture(ThetaGammaTable, 0, 0, Table->Data, Table->kTableSize * sizeof(uint32_t));
+	CommandListRef->writeTexture(targets->SkyThetaGammaTable, 0, 0, Table->Data, Table->kTableSize * sizeof(uint32_t));
 	//dispatch cs to make the sky texture
 	nvrhi::BufferDesc cBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "Sky CBuffer", 1);
 	nvrhi::BufferHandle cBufHandle = DirectXDevice::GetNativeDevice()->createBuffer(cBufDesc);
@@ -41,8 +35,8 @@ void SkyGeneratePass::GenerateSky(const ragdoll::SceneInformation& sceneInfo)
 	nvrhi::BindingSetDesc setDesc;
 	setDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, cBufHandle),
-		nvrhi::BindingSetItem::Texture_SRV(0, ThetaGammaTable),
-		nvrhi::BindingSetItem::Texture_UAV(0, SkyTexture)
+		nvrhi::BindingSetItem::Texture_SRV(0, targets->SkyThetaGammaTable),
+		nvrhi::BindingSetItem::Texture_UAV(0, targets->SkyTexture)
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
 	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
@@ -55,8 +49,8 @@ void SkyGeneratePass::GenerateSky(const ragdoll::SceneInformation& sceneInfo)
 	nvrhi::ComputeState state;
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
 	state.bindings = { setHandle };
-	CBuffer.width = SkyTexture->getDesc().width;
-	CBuffer.height = SkyTexture->getDesc().height;
+	CBuffer.width = targets->SkyTexture->getDesc().width;
+	CBuffer.height = targets->SkyTexture->getDesc().height;
 	CBuffer.sun = lightDir;
 	CBuffer.PerezInvDen = SunSky->mPerezInvDen;
 	CBuffer.maxTheta = Table->mMaxTheta;
@@ -67,6 +61,6 @@ void SkyGeneratePass::GenerateSky(const ragdoll::SceneInformation& sceneInfo)
 		CBuffer.scalar = sceneInfo.SkyDimmer * 1e-04f;
 	CommandListRef->writeBuffer(cBufHandle, &CBuffer, sizeof(ConstantBuffer));
 	CommandListRef->setComputeState(state);
-	CommandListRef->dispatch(SkyTexture->getDesc().width / 16 + 1, SkyTexture->getDesc().height / 16 + 1, 1);
+	CommandListRef->dispatch(targets->SkyTexture->getDesc().width / 16 + 1, targets->SkyTexture->getDesc().height / 16 + 1, 1);
 	CommandListRef->endMarker();
 }

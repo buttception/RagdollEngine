@@ -13,12 +13,7 @@ void GBufferPass::Init(nvrhi::CommandListHandle cmdList)
 	CommandListRef = cmdList;
 }
 
-void GBufferPass::SetRenderTarget(nvrhi::FramebufferHandle renderTarget)
-{
-	RenderTarget = renderTarget;
-}
-
-void GBufferPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo)
+void GBufferPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets)
 {
 	RD_SCOPE(Render, GBufferPass);
 	RD_GPU_SCOPE("GBufferPass", CommandListRef);
@@ -61,9 +56,15 @@ void GBufferPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 		PipelineDesc.inputLayout = AssetManager::GetInstance()->InstancedInputLayoutHandle;
 
 		//create and set the state
-		nvrhi::FramebufferHandle pipelineFb = RenderTarget;
+		nvrhi::FramebufferDesc desc = nvrhi::FramebufferDesc()
+			.addColorAttachment(targets->GBufferAlbedo)
+			.addColorAttachment(targets->GBufferNormal)
+			.addColorAttachment(targets->GBufferRM)
+			.addColorAttachment(targets->VelocityBuffer)
+			.setDepthAttachment(targets->SceneDepthZ);
+		nvrhi::FramebufferHandle pipelineFb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
 		nvrhi::GraphicsState state;
-		state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, RenderTarget);
+		state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, pipelineFb);
 		state.framebuffer = pipelineFb;
 		state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 		state.indexBuffer = { AssetManager::GetInstance()->IBO, nvrhi::Format::R32_UINT, 0 };
