@@ -57,7 +57,6 @@ void FramebufferViewer::DrawTarget(nvrhi::TextureHandle texture, Vector4 add, Ve
 	CBuffer.Mul = mul;
 	CBuffer.ComponentCount = numComp;
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
-	CommandListRef->beginTrackingTextureState(texture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 	CommandListRef->setGraphicsState(state);
 
 	nvrhi::DrawArguments args;

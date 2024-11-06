@@ -41,7 +41,7 @@ void IntelTAAPass::TemporalAA(ragdoll::SceneRenderTargets* targets, Vector2 jitt
 	setDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(1, ConstantBufferHandle),
 		nvrhi::BindingSetItem::Texture_SRV(0, targets->VelocityBuffer),
-		nvrhi::BindingSetItem::Texture_SRV(1, targets->SceneColor),
+		nvrhi::BindingSetItem::Texture_SRV(1, targets->FinalColor),
 		nvrhi::BindingSetItem::Texture_SRV(2, SrcTemporal),
 		nvrhi::BindingSetItem::Texture_SRV(3, targets->CurrDepthBuffer),
 		nvrhi::BindingSetItem::Texture_SRV(4, targets->PrevDepthBuffer),
@@ -60,8 +60,6 @@ void IntelTAAPass::TemporalAA(ragdoll::SceneRenderTargets* targets, Vector2 jitt
 	nvrhi::ComputeState state;
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
 	state.bindings = { setHandle };
-	CommandListRef->beginTrackingTextureState(SrcTemporal, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-	CommandListRef->beginTrackingTextureState(DesTemporal, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 	CommandListRef->setComputeState(state);
 	CommandListRef->dispatch((targets->SceneColor->getDesc().width + 8 - 1) / 8, (targets->SceneColor->getDesc().height + 8 - 1) / 8, 1);
 	CommandListRef->endMarker();

@@ -133,7 +133,7 @@ void ragdoll::Scene::Update(float _dt)
 			break;
 		case 5:
 			DebugInfo.CompCount = 4;
-			DebugInfo.DbgTarget = DeferredRenderer->bIsOddFrame ? RenderTargets.TemporalColor1 : RenderTargets.TemporalColor0;;
+			DebugInfo.DbgTarget = DeferredRenderer->bIsOddFrame ? RenderTargets.TemporalColor0 : RenderTargets.TemporalColor1;;
 			DebugInfo.Add = Vector4::Zero;
 			DebugInfo.Mul = Vector4::One;
 			break;
@@ -337,7 +337,6 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "GBufferRM";
 	RenderTargets.GBufferRM = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
-	texDesc.keepInitialState = false;
 	texDesc.format = nvrhi::Format::RGBA16_FLOAT;
 
 	texDesc.debugName = "TemporalColor0";
