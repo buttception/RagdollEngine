@@ -165,6 +165,11 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 		ToneMapPass->ToneMap(scene->SceneInfo, exposure, RenderTargets);
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::TONEMAP]);
+	
+	Taskflow.emplace([this, &scene]() {
+		IntelTAAPass->TemporalAA(RenderTargets, Vector2(scene->JitterOffsetsX[scene->PhaseIndex], scene->JitterOffsetsY[scene->PhaseIndex]));
+		});
+	activeList.emplace_back(CommandLists[(int)Pass::TAA]);
 
 	Taskflow.emplace([this, &scene]() {
 		DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo, RenderTargets);
@@ -174,7 +179,7 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 	if (scene->DebugInfo.DbgTarget)
 	{
 		Taskflow.emplace([this, &scene]() {
-			FramebufferViewer->DrawTarget(scene->DebugInfo.DbgTarget, scene->DebugInfo.Add, scene->DebugInfo.Mul, scene->DebugInfo.CompCount);
+			FramebufferViewer->DrawTarget(scene->DebugInfo.DbgTarget, scene->DebugInfo.Add, scene->DebugInfo.Mul, scene->DebugInfo.CompCount, RenderTargets);
 		});
 		activeList.emplace_back(CommandLists[(int)Pass::FB_VIEWER]);
 	}
@@ -259,6 +264,9 @@ void Renderer::CreateResource()
 
 	ToneMapPass = std::make_shared<class ToneMapPass>();
 	ToneMapPass->Init(CommandLists[(int)Pass::TONEMAP]);
+
+	IntelTAAPass = std::make_shared<class IntelTAAPass>();
+	IntelTAAPass->Init(CommandLists[(int)Pass::TAA]);
 
 	FinalPass = std::make_shared<class FinalPass>();
 	FinalPass->Init(CommandLists[(int)Pass::FINAL]);

@@ -251,8 +251,9 @@ int32_t ImguiRenderer::DrawFBViewer()
 		"ORM",
 		"Velocity",
 		"AO",
+		"Temporal Color",
 	};
-	ImGui::Combo("Texture View", &selectedItem, items, 5);
+	ImGui::Combo("Texture View", &selectedItem, items, IM_ARRAYSIZE(items));
 	ImGui::End();
 	return selectedItem;
 }

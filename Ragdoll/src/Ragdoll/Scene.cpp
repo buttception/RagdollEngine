@@ -131,6 +131,12 @@ void ragdoll::Scene::Update(float _dt)
 			DebugInfo.Add = Vector4::Zero;
 			DebugInfo.Mul = Vector4::One;
 			break;
+		case 5:
+			DebugInfo.CompCount = 4;
+			DebugInfo.DbgTarget = DeferredRenderer->bIsOddFrame ? RenderTargets.TemporalColor1 : RenderTargets.TemporalColor0;;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One;
+			break;
 		case 0:
 		default:
 			DebugInfo.DbgTarget = nullptr;
@@ -331,6 +337,16 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "GBufferRM";
 	RenderTargets.GBufferRM = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
+	texDesc.keepInitialState = false;
+	texDesc.format = nvrhi::Format::RGBA16_FLOAT;
+
+	texDesc.debugName = "TemporalColor0";
+	RenderTargets.TemporalColor0 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "TemporalColor1";
+	RenderTargets.TemporalColor1 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.keepInitialState = true;
+
 	texDesc.sampleCount = 1;
 	texDesc.isTypeless = false;
 	texDesc.isUAV = false;
@@ -342,8 +358,6 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
 	texDesc.debugName = "SceneColor";
 	RenderTargets.SceneColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-	texDesc.debugName = "TemporalColor";
-	RenderTargets.TemporalColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::RGBA8_UNORM;
 	texDesc.debugName = "FinalColor";

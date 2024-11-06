@@ -142,8 +142,8 @@ namespace ragdoll {
 	{
 		//render targets
 		nvrhi::TextureHandle SceneColor;
-		nvrhi::TextureHandle TemporalColor;	//temporal buffer
-		//nvrhi::TextureHandle SceneDepthZ;
+		nvrhi::TextureHandle TemporalColor0;	//temporal buffer
+		nvrhi::TextureHandle TemporalColor1;	//temporal buffer
 		nvrhi::TextureHandle CurrDepthBuffer;
 		nvrhi::TextureHandle PrevDepthBuffer;
 		nvrhi::TextureHandle SceneDepthZ0;
