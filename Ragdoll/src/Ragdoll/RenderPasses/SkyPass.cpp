@@ -23,7 +23,7 @@ void SkyPass::DrawSky(const ragdoll::SceneInformation& sceneInfo, ragdoll::Scene
 
 	nvrhi::FramebufferDesc desc = nvrhi::FramebufferDesc()
 		.addColorAttachment(targets->SceneColor)
-		.setDepthAttachment(targets->SceneDepthZ);
+		.setDepthAttachment(targets->CurrDepthBuffer);
 	nvrhi::FramebufferHandle pipelineFb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
 	CBuffer.InvViewProj = sceneInfo.MainCameraViewProj.Invert();
 	CBuffer.CameraPosition = sceneInfo.MainCameraPosition;

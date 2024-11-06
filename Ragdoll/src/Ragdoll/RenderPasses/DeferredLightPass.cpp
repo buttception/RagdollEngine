@@ -38,7 +38,7 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo, ra
 		nvrhi::BindingSetItem::Texture_SRV(1, targets->GBufferNormal),
 		nvrhi::BindingSetItem::Texture_SRV(2, targets->GBufferRM),
 		nvrhi::BindingSetItem::Texture_SRV(3, targets->AONormalized),
-		nvrhi::BindingSetItem::Texture_SRV(4, targets->SceneDepthZ),
+		nvrhi::BindingSetItem::Texture_SRV(4, targets->CurrDepthBuffer),
 		nvrhi::BindingSetItem::Texture_SRV(5, targets->ShadowMask)
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)

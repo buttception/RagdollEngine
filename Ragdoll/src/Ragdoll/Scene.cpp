@@ -46,7 +46,11 @@ ragdoll::Scene::Scene(Application* app)
 
 	HaltonSequence(Vector2(SceneInfo.RenderWidth, SceneInfo.RenderHeight), Vector2(SceneInfo.TargetWidth, SceneInfo.TargetHeight));
 
-	NVSDK::Init(DirectXDevice::GetInstance()->m_Device12, Vector2(SceneInfo.RenderWidth, SceneInfo.RenderHeight), Vector2(SceneInfo.TargetWidth, SceneInfo.TargetHeight));
+	Config.bInitDLSS = app->Config.bInitDLSS;
+	if (Config.bInitDLSS)
+		NVSDK::Init(DirectXDevice::GetInstance()->m_Device12, Vector2(SceneInfo.RenderWidth, SceneInfo.RenderHeight), Vector2(SceneInfo.TargetWidth, SceneInfo.TargetHeight));
+	else
+		SceneInfo.bEnableDLSS = false;
 }
 
 void ragdoll::Scene::Update(float _dt)
@@ -160,7 +164,8 @@ void ragdoll::Scene::Update(float _dt)
 	if (SceneInfo.bIsResolutionDirty)
 	{
 		HaltonSequence(Vector2(SceneInfo.RenderWidth, SceneInfo.RenderHeight), Vector2(SceneInfo.TargetWidth, SceneInfo.TargetHeight));
-		NVSDK::Init(DirectXDevice::GetInstance()->m_Device12, Vector2(SceneInfo.RenderWidth, SceneInfo.RenderHeight), Vector2(SceneInfo.TargetWidth, SceneInfo.TargetHeight));
+		if(Config.bInitDLSS)
+			NVSDK::Init(DirectXDevice::GetInstance()->m_Device12, Vector2(SceneInfo.RenderWidth, SceneInfo.RenderHeight), Vector2(SceneInfo.TargetWidth, SceneInfo.TargetHeight));
 		CreateRenderTargets();
 		SceneInfo.bIsResolutionDirty = false;
 	}
@@ -174,7 +179,8 @@ void ragdoll::Scene::Update(float _dt)
 
 void ragdoll::Scene::Shutdown()
 {
-	NVSDK::Release();
+	if(Config.bInitDLSS)
+		NVSDK::Release();
 	ImguiInterface->Shutdown();
 	ImguiInterface = nullptr;
 	DeferredRenderer->Shutdown();
@@ -290,10 +296,12 @@ void ragdoll::Scene::CreateRenderTargets()
 	depthBufferDesc.mipLevels = 1;
 	depthBufferDesc.format = nvrhi::Format::D32;
 	depthBufferDesc.isTypeless = true;
-	depthBufferDesc.debugName = "SceneDepthZ";
+	depthBufferDesc.debugName = "SceneDepthZ0";
 	depthBufferDesc.clearValue = 0.f;
 	depthBufferDesc.useClearValue = true;
-	RenderTargets.SceneDepthZ = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
+	RenderTargets.SceneDepthZ0 = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
+	depthBufferDesc.debugName = "SceneDepthZ1";
+	RenderTargets.SceneDepthZ1 = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
 
 	depthBufferDesc.width = 2000;
 	depthBufferDesc.height = 2000;
@@ -334,6 +342,8 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
 	texDesc.debugName = "SceneColor";
 	RenderTargets.SceneColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "TemporalColor";
+	RenderTargets.TemporalColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::RGBA8_UNORM;
 	texDesc.debugName = "FinalColor";

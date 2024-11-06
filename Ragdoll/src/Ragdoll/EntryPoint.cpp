@@ -52,12 +52,14 @@ int main(int argc, char* argv[])
 		("scene", "glTF scene to load", cxxopts::value<std::string>())
 		("dbgOctree", "Draw Octree debug")
 		("dbgBoxes", "Draw Bounding Box")
+		("dlss", "Enable DLSS")
 		;
 	auto result = options.parse(argc, argv);
 	ragdoll::Application::ApplicationConfig config;
 	config.bCreateCustomMeshes = result["custom"].as_optional<bool>().value_or(false);
 	config.bDrawDebugOctree = result["dbgOctree"].as_optional<bool>().value_or(false);
 	config.bDrawDebugBoundingBoxes = result["dbgBoxes"].as_optional<bool>().value_or(false);
+	config.bInitDLSS = result["dlss"].as_optional<bool>().value_or(false);
 	config.glTfSampleSceneToLoad = result["sample"].as_optional<std::string>().value_or("");
 	config.glTfSceneToLoad = result["scene"].as_optional<std::string>().value_or("");
 

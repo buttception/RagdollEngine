@@ -295,7 +295,8 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		}
 		SceneInfo.bIsResolutionDirty = true;
 	}
-	ImGui::Checkbox("Enable DLSS", &SceneInfo.bEnableDLSS);
+	if(Config.bInitDLSS)
+		ImGui::Checkbox("Enable DLSS", &SceneInfo.bEnableDLSS);
 	ImGui::Checkbox("Enable Jitter", &SceneInfo.bEnableJitter);
 	ImGui::Checkbox("Enable XeGTAO Noise", &SceneInfo.bEnableXeGTAONoise);
 	ImGui::SliderFloat("Filter Radius", &SceneInfo.FilterRadius, 0.001f, 1.f);

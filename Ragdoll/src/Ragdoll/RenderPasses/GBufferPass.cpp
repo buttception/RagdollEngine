@@ -61,7 +61,7 @@ void GBufferPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 			.addColorAttachment(targets->GBufferNormal)
 			.addColorAttachment(targets->GBufferRM)
 			.addColorAttachment(targets->VelocityBuffer)
-			.setDepthAttachment(targets->SceneDepthZ);
+			.setDepthAttachment(targets->CurrDepthBuffer);
 		nvrhi::FramebufferHandle pipelineFb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
 		nvrhi::GraphicsState state;
 		state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, pipelineFb);

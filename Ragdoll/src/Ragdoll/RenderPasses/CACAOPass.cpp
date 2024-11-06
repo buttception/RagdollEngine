@@ -22,7 +22,7 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo, ragdoll::
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "CACAO CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 	
-	CBuffer.DepthBufferDimensions = Vector2((float)targets->SceneDepthZ->getDesc().width, (float)targets->SceneDepthZ->getDesc().height);
+	CBuffer.DepthBufferDimensions = Vector2((float)targets->CurrDepthBuffer->getDesc().width, (float)targets->CurrDepthBuffer->getDesc().height);
 	CBuffer.DepthBufferInverseDimensions = Vector2(1.f, 1.f) / CBuffer.DepthBufferDimensions;
 	CBuffer.DeinterleavedDepthBufferDimensions = Vector2((float)targets->DeinterleavedDepth->getDesc().width, (float)targets->DeinterleavedDepth->getDesc().height);
 	CBuffer.DeinterleavedDepthBufferInverseDimensions = Vector2(1.f, 1.f) / CBuffer.DeinterleavedDepthBufferDimensions;
@@ -57,7 +57,7 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo, ragdoll::
 	CBuffer.NDCToViewMul.y = CBuffer.CameraTanHalfFOV.y * -2.0f;
 	CBuffer.NDCToViewAdd.x = CBuffer.CameraTanHalfFOV.x * -1.0f;
 	CBuffer.NDCToViewAdd.y = CBuffer.CameraTanHalfFOV.y * 1.0f;
-	const float ratio = ((float)targets->AONormalized->getDesc().width) / ((float)targets->SceneDepthZ->getDesc().width);
+	const float ratio = ((float)targets->AONormalized->getDesc().width) / ((float)targets->CurrDepthBuffer->getDesc().width);
 	const float border = (1.0f - ratio) / 2.0f;
 	CBuffer.DepthBufferUVToViewMul.x = CBuffer.NDCToViewMul.x / ratio;
 	CBuffer.DepthBufferUVToViewAdd.x = CBuffer.NDCToViewAdd.x - CBuffer.NDCToViewMul.x * border / ratio;
@@ -149,7 +149,7 @@ void CACAOPass::PrepareDepth(const ragdoll::SceneInformation& sceneInfo, nvrhi::
 	nvrhi::BindingSetDesc setDesc;
 	setDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, CBuffer),
-		nvrhi::BindingSetItem::Texture_SRV(1, targets->SceneDepthZ),
+		nvrhi::BindingSetItem::Texture_SRV(1, targets->CurrDepthBuffer),
 		//nvrhi::BindingSetItem::Texture_SRV(10, LoadCounter),
 		//nvrhi::BindingSetItem::Texture_SRV(3, DeinterleavedDepth),
 		//nvrhi::BindingSetItem::Texture_SRV(4, DeinterleavedNormals),

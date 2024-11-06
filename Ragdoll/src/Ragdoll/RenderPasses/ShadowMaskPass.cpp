@@ -40,7 +40,7 @@ void ShadowMaskPass::DrawShadowMask(const ragdoll::SceneInformation& sceneInfo, 
 		nvrhi::BindingSetItem::Texture_SRV(1, targets->ShadowMap[1]),
 		nvrhi::BindingSetItem::Texture_SRV(2, targets->ShadowMap[2]),
 		nvrhi::BindingSetItem::Texture_SRV(3, targets->ShadowMap[3]),
-		nvrhi::BindingSetItem::Texture_SRV(4, targets->SceneDepthZ),
+		nvrhi::BindingSetItem::Texture_SRV(4, targets->CurrDepthBuffer),
 		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[5]),
 		nvrhi::BindingSetItem::Sampler(1, AssetManager::GetInstance()->ShadowSampler)
 		

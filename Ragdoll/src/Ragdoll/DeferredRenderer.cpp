@@ -40,7 +40,7 @@ void Renderer::BeginFrame()
 	auto bgCol = PrimaryWindowRef->GetBackgroundColor();
 	nvrhi::Color col = nvrhi::Color(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
 	CommandList->beginMarker("ClearGBuffer");
-	CommandList->clearDepthStencilTexture(RenderTargets->SceneDepthZ, nvrhi::AllSubresources, true, 0.f, false, 0);
+	CommandList->clearDepthStencilTexture(RenderTargets->CurrDepthBuffer, nvrhi::AllSubresources, true, 0.f, false, 0);
 	for (int i = 0; i < 4; ++i)
 	{
 		CommandList->clearDepthStencilTexture(RenderTargets->ShadowMap[i], nvrhi::AllSubresources, true, 0.f, false, 0);
@@ -60,6 +60,10 @@ void Renderer::BeginFrame()
 
 void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRenderer> imgui)
 {
+	//swaps the depth buffer being drawn to
+	bIsOddFrame = !bIsOddFrame;
+	RenderTargets->CurrDepthBuffer = bIsOddFrame ? RenderTargets->SceneDepthZ0 : RenderTargets->SceneDepthZ1;
+	RenderTargets->PrevDepthBuffer = !bIsOddFrame ? RenderTargets->SceneDepthZ0 : RenderTargets->SceneDepthZ1;
 	{
 		//this process is long because it is waiting for the gpu to be done first
 		RD_SCOPE(Render, Readback);
@@ -197,10 +201,10 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 		DirectXDevice::GetNativeDevice()->executeCommandLists(activeList.data(), activeList.size());
 	}
 
-	if (scene->SceneInfo.bEnableDLSS && !scene->DebugInfo.DbgTarget)
+	if (scene->Config.bInitDLSS && scene->SceneInfo.bEnableDLSS && !scene->DebugInfo.DbgTarget)
 	{
 		//DLSS pass
-		NVSDK::Evaluate(RenderTargets->FinalColor, RenderTargets->UpscaledBuffer, RenderTargets->SceneDepthZ, RenderTargets->VelocityBuffer, scene);
+		NVSDK::Evaluate(RenderTargets->FinalColor, RenderTargets->UpscaledBuffer, RenderTargets->CurrDepthBuffer, RenderTargets->VelocityBuffer, scene);
 
 		FinalPass->DrawQuad(RenderTargets, true);
 		MICROPROFILE_GPU_SUBMIT(EnterCommandListSectionGpu::Queue, CommandLists[(int)Pass::FINAL]->Work);
