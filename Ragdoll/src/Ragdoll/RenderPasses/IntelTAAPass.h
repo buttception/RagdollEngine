@@ -14,6 +14,7 @@ class IntelTAAPass {
         uint32_t        FrameNumber;
         uint32_t        DebugFlags;
     } ConstantBuffer;
+    Vector3 InlineConstants;
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
 
 public:

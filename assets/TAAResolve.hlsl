@@ -335,6 +335,12 @@ void main( uint3 inDispatchIdx : SV_DispatchThreadID, uint3 inGroupID : SV_Group
 
     // Store the final pixel colour
     OutTexture[ inDispatchIdx.xy ] = finalColour.rgba;
+
+    //Edit(Dev): testing code to visualize changes
+#if 0
+    float test = isOnEdge ? 0.f : 1.f;
+    OutTexture[ inDispatchIdx.xy ] = float4(test.xxx,1.f);
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -675,8 +681,8 @@ fp16_t GetDepthConfidenceFactor( ui16_t2 inST, fp16_t3 inVelocity, fp16_t inCurr
     fp16_t depthDiffFactor = fp16_t( 1.f );
     if ( AllowDepthThreshold() )
     {
-        const fp16_t prevDepth = GetPreviousDepth( GetUV( inST + inVelocity.xy + CBData.Jitter.xy ) );
-        const fp16_t currentDepth = inCurrentFrameDepth + inVelocity.z;
+        const fp16_t prevDepth = GetPreviousDepth( GetUV( inST + inVelocity.xy - CBData.Jitter.xy ) );
+        const fp16_t currentDepth = inCurrentFrameDepth;
 #if 1 == NEEDS_EDGE_DETECTION
         depthDiffFactor = false == inIsOnEdge ? step( currentDepth, prevDepth ) : depthDiffFactor;
 #else

@@ -78,6 +78,7 @@ void GBufferPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std
 		CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
 		CBuffer.ViewProjWithAA = sceneInfo.MainCameraViewProjWithAA;
 		CBuffer.PrevViewProj = sceneInfo.PrevMainCameraViewProj;
+		CBuffer.RenderResolution = Vector2((float)sceneInfo.RenderWidth, (float)sceneInfo.RenderHeight);
 		CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
 
 		CommandListRef->setGraphicsState(state);

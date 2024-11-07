@@ -42,14 +42,6 @@ void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo, ragdoll:
 	OtherBuffer.viewMatrix = sceneInfo.MainCameraView;
 	OtherBuffer.prevViewProjMatrix = sceneInfo.PrevMainCameraViewProj;
 	OtherBuffer.InvViewProjMatrix = sceneInfo.MainCameraViewProj.Invert();
-	static bool firstFrame = true;
-	if (firstFrame)
-	{
-		firstFrame = false;
-		OtherBuffer.modulationFactor = 0.f;
-	}
-	else
-		OtherBuffer.modulationFactor = sceneInfo.ModulationFactor;
 	nvrhi::BufferHandle MatrixHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 	CommandListRef->writeBuffer(MatrixHandle, &OtherBuffer, sizeof(ConstantBuffer));
 	{

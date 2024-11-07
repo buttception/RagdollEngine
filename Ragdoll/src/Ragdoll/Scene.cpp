@@ -59,51 +59,6 @@ void ragdoll::Scene::Update(float _dt)
 		RD_SCOPE(Render, ImGuiBuildData)
 		ImguiInterface->BeginFrame();
 
-		if (ImguiInterface->DrawSpawn(DebugInfo, SceneInfo, Config))
-		{
-			//spawn more shits temp
-			const static Vector3 t_range{ 50.f, 50.f, 50.f };
-			const static Vector3 t_min = { -25.f, -25.f, -25.f };
-			const static Vector3 s_range{ 0.2f, 0.2f, 0.2f };
-			const static Vector3 s_min{ 0.3f, 0.3f, 0.3f };
-			static int32_t currentGeomCount{};
-
-			for (int i = 0; i < 500; ++i) {
-				MICROPROFILE_SCOPEI("Creation", "Entity Create", MP_GREEN);
-				currentGeomCount++;
-				Vector3 pos{
-					t_min.x + (std::rand() / (float)RAND_MAX) * t_range.x,
-					t_min.y + (std::rand() / (float)RAND_MAX) * t_range.y,
-					t_min.z + (std::rand() / (float)RAND_MAX) * t_range.z,
-				};
-				Vector3 scale{
-					s_min.x + (std::rand() / (float)RAND_MAX) * s_range.x,
-					s_min.y + (std::rand() / (float)RAND_MAX) * s_range.y,
-					s_min.z + (std::rand() / (float)RAND_MAX) * s_range.z,
-				};
-				Vector3 eulerRotate{
-					std::rand() / (float)RAND_MAX * DirectX::XM_2PI,
-					std::rand() / (float)RAND_MAX * DirectX::XM_2PI,
-					std::rand() / (float)RAND_MAX * DirectX::XM_2PI
-				};
-				entt::entity ent;
-				ent = EntityManagerRef->CreateEntity();
-				auto tcomp = EntityManagerRef->AddComponent<TransformComp>(ent);
-				tcomp->m_LocalPosition = pos;
-				tcomp->m_LocalScale = scale;
-				tcomp->m_LocalRotation = Quaternion::CreateFromYawPitchRoll(eulerRotate.y, eulerRotate.x, eulerRotate.z);
-				AddEntityAtRootLevel(EntityManagerRef->GetGuid(ent));
-				auto rcomp = EntityManagerRef->AddComponent<RenderableComp>(ent);
-				rcomp->meshIndex = (int32_t)(std::rand() / (float)RAND_MAX * 25);
-			}
-			{
-				RD_SCOPE(Entity, Create);
-				UpdateTransforms();			//update all the dirty transforms
-				PopulateStaticProxies();	//create all the proxies to iterate
-				ResetTransformDirtyFlags();	//reset the dirty flags
-				SceneInfo.bIsCameraDirty = true;
-			}
-		}
 		int item = ImguiInterface->DrawFBViewer();
 		
 		switch (item) {
@@ -143,7 +98,8 @@ void ragdoll::Scene::Update(float _dt)
 		}
 		SceneInfo.Luminance = DeferredRenderer->AdaptedLuminance;
 
-		ImguiInterface->DrawControl(DebugInfo, SceneInfo, Config, _dt);
+		ImguiInterface->DrawSettings(DebugInfo, SceneInfo, Config, _dt);
+
 		PhaseIndex = ++PhaseIndex == TotalPhaseCount ? 0 : PhaseIndex;
 		//jitter the projection
 		Matrix Proj = SceneInfo.InfiniteReverseZProj;
@@ -154,7 +110,6 @@ void ragdoll::Scene::Update(float _dt)
 		}
 		SceneInfo.MainCameraViewProjWithAA = SceneInfo.MainCameraView * Proj;
 
-		ImguiInterface->DrawSettings(DebugInfo, SceneInfo, Config);
 	}
 
 	if (SceneInfo.bIsCameraDirty)
@@ -337,8 +292,11 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "GBufferRM";
 	RenderTargets.GBufferRM = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
-	texDesc.format = nvrhi::Format::RGBA16_FLOAT;
+	texDesc.format = nvrhi::Format::RGBA8_UNORM;
+	texDesc.debugName = "FinalColor";
+	RenderTargets.FinalColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
+	texDesc.format = nvrhi::Format::RGBA16_FLOAT;
 	texDesc.debugName = "TemporalColor0";
 	RenderTargets.TemporalColor0 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	texDesc.debugName = "TemporalColor1";
@@ -357,10 +315,6 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.format = nvrhi::Format::R11G11B10_FLOAT;
 	texDesc.debugName = "SceneColor";
 	RenderTargets.SceneColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-
-	texDesc.format = nvrhi::Format::RGBA8_UNORM;
-	texDesc.debugName = "FinalColor";
-	RenderTargets.FinalColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::RG16_UNORM;
 	texDesc.debugName = "GBufferNormal";

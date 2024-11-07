@@ -166,10 +166,13 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::TONEMAP]);
 	
-	Taskflow.emplace([this, &scene]() {
-		IntelTAAPass->TemporalAA(RenderTargets, Vector2(scene->JitterOffsetsX[scene->PhaseIndex], scene->JitterOffsetsY[scene->PhaseIndex]));
-		});
-	activeList.emplace_back(CommandLists[(int)Pass::TAA]);
+	if (scene->SceneInfo.bEnableIntelTAA)
+	{
+		Taskflow.emplace([this, &scene]() {
+			IntelTAAPass->TemporalAA(RenderTargets, Vector2(scene->JitterOffsetsX[scene->PhaseIndex], scene->JitterOffsetsY[scene->PhaseIndex]));
+			});
+		activeList.emplace_back(CommandLists[(int)Pass::TAA]);
+	}
 
 	Taskflow.emplace([this, &scene]() {
 		DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo, RenderTargets);
@@ -197,7 +200,7 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 	});
 
 	SExecutor::Executor.run(Taskflow).wait();
-	//submit the logs in the order of execution
+	//submit the logs in the order of executions
 	{
 		RD_SCOPE(Render, ExecuteCommandList);
 		MICROPROFILE_GPU_SUBMIT(EnterCommandListSectionGpu::Queue, CommandList->Work);

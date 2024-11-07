@@ -4,7 +4,12 @@
 
 cbuffer g_Const : register(b0) {
     float4x4 InvViewProjMatrix;
+    float4x4 ViewProj;
+    float4x4 PrevViewProj;
 	float3 CameraPosition;
+    float3 PrevCameraPosition;
+    float2 RenderResolution;
+    int DrawVelocityOnSky;
 };
 
 Texture2D SkyTexture : register(t0);
@@ -13,7 +18,8 @@ sampler Sampler : register(s0);
 void main_ps(
 	in float4 inPos : SV_Position,
 	in float2 inTexcoord : TEXCOORD0,
-	out float3 outColor : SV_Target0
+	out float3 outColor : SV_Target0,
+    out float2 outVelocity : SV_Target1
 )
 {
     //get whr the pixel is in the sky
@@ -31,4 +37,16 @@ void main_ps(
 
     // Assign the sampled color to the output
     outColor = skyColor;
+
+    if(DrawVelocityOnSky == 1)
+    {
+        float3 delta = PrevCameraPosition - CameraPosition;
+        float4 clipPos = mul(float4(fragPos, 1.f), ViewProj);
+        float4 ndcPos = clipPos / clipPos.w;
+        ndcPos.xy = ScreenPosToViewportUV(ndcPos.xy);
+        float4 prevClipPos = mul(float4(fragPos - delta, 1.f), PrevViewProj);
+        float4 prevNdcPos = prevClipPos / prevClipPos.w;
+        prevNdcPos.xy = ScreenPosToViewportUV(prevNdcPos.xy);
+        outVelocity = (prevNdcPos.xy - ndcPos.xy) * float2(RenderResolution.x, RenderResolution.y);
+    }
 }

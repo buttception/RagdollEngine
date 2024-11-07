@@ -125,10 +125,10 @@ namespace ragdoll {
 		float BloomIntensity = 0.04f;
 		bool UseCACAO = false;
 		bool UseXeGTAO = true;
-		float ModulationFactor = 0.9f;
 		bool bIsCameraDirty{ true };
 		bool bFreezeFrustumCulling{ false };
 		bool bEnableDLSS{ true };
+		bool bEnableIntelTAA{ false };
 		bool bEnableJitter{ true };
 		bool bEnableXeGTAONoise{ true };
 		uint32_t RenderWidth = 960;
