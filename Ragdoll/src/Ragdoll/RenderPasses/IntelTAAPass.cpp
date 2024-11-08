@@ -33,6 +33,14 @@ void IntelTAAPass::TemporalAA(ragdoll::SceneRenderTargets* targets, Vector2 jitt
 		ConstantBuffer.Resolution.w = 1.f / resolution.y;
 		ConstantBuffer.JitterX = jitter.x;
 		ConstantBuffer.JitterY = jitter.y;
+		const uint32_t allowLongestVelocityVector = 0;
+		const uint32_t allowNeighbourhoodSampling = 0;
+		const uint32_t allowYCoCg = 0;
+		const uint32_t allowVarianceClipping = 0;
+		const uint32_t allowBicubicFilter = 0;
+		const uint32_t allowDepthThreshold = 0;
+		const uint32_t markNoHistoryPixels = 0;
+		ConstantBuffer.DebugFlags = allowLongestVelocityVector << 6 | allowNeighbourhoodSampling << 5 | allowYCoCg << 4 | allowVarianceClipping << 3 | allowBicubicFilter << 2 | allowDepthThreshold << 1 | markNoHistoryPixels;
 
 		nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FTAAResolve), "Temporal AA CBuffer", 1);
 		nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);

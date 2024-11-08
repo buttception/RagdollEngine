@@ -19,11 +19,11 @@ void main_ps(
 	in float4 inPos : SV_Position,
 	in float2 inTexcoord : TEXCOORD0,
 	out float3 outColor : SV_Target0,
-    out float2 outVelocity : SV_Target1
+    out float3 outVelocity : SV_Target1
 )
 {
     //get whr the pixel is in the sky
-    float Depth = 0.5f;
+    float Depth = 0.01f;
     //this frag pos is relative the camera but in world coordinate
 	float3 fragPos = DepthToWorld(Depth, inTexcoord, InvViewProjMatrix);
     //get the direction of the fragment from the camera
@@ -40,13 +40,6 @@ void main_ps(
 
     if(DrawVelocityOnSky == 1)
     {
-        float3 delta = PrevCameraPosition - CameraPosition;
-        float4 clipPos = mul(float4(fragPos, 1.f), ViewProj);
-        float4 ndcPos = clipPos / clipPos.w;
-        ndcPos.xy = ScreenPosToViewportUV(ndcPos.xy);
-        float4 prevClipPos = mul(float4(fragPos - delta, 1.f), PrevViewProj);
-        float4 prevNdcPos = prevClipPos / prevClipPos.w;
-        prevNdcPos.xy = ScreenPosToViewportUV(prevNdcPos.xy);
-        outVelocity = (prevNdcPos.xy - ndcPos.xy) * float2(RenderResolution.x, RenderResolution.y);
+        outVelocity = float3(1000.f,1000.f,1000.f);
     }
 }

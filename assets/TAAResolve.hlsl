@@ -698,14 +698,7 @@ fp16_t4 GetFinalColour( fp16_t3 inCurrentColour, fp16_t3 inHistoryColour, fp16_t
 {
     // Calculate a new confidence factor for the next frame. The value is between [0.5f, 1.f).
     const fp16_t newWeight = saturate( fp16_t( 1.f ) / ( fp16_t( 2.f ) - inWeight ) );
-#if 0 == USE_TONE_MAPPED_COLOUR_ONLY_IN_FINAL
     fp16_t4 toReturn = fp16_t4( lerp( inCurrentColour, inHistoryColour, inWeight ), newWeight );
-#if 0 == KEEP_HISTORY_TONE_MAPPED
-    toReturn = fp16_t4( InverseReinhard( toReturn.rgb ), toReturn.a );
-#endif
-#else
-    fp16_t4 toReturn = fp16_t4( InverseReinhard( lerp( Reinhard( inCurrentColour ), Reinhard( inHistoryColour ), inWeight ) ), newWeight );
-#endif
     return toReturn;
 }
 
