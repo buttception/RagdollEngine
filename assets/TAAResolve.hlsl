@@ -307,8 +307,11 @@ void main( uint3 inDispatchIdx : SV_DispatchThreadID, uint3 inGroupID : SV_Group
 
     // do we have a valid history?
     const fp16_t uvWeight = fp16_t( ( all( prevFrameScreenUV >= float2( 0.f, 0.f ) ) && all( prevFrameScreenUV < float2( 1.f, 1.f ) ) ) ? 1.0f : 0.f );
-    const bool hasValidHistory = ( velocityConfidenceFactor * depthDiffFactor * uvWeight ) > 0.f;
+    bool hasValidHistory = ( velocityConfidenceFactor * depthDiffFactor * uvWeight ) > 0.f;
     fp16_t4 finalColour = fp16_t4( 1.f.xxxx );
+
+    //edit check if depth is valid
+    hasValidHistory = depth == 0.f ? false : true;
 
     if ( true == hasValidHistory )
     {

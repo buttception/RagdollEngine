@@ -4,12 +4,7 @@
 
 cbuffer g_Const : register(b0) {
     float4x4 InvViewProjMatrix;
-    float4x4 ViewProj;
-    float4x4 PrevViewProj;
 	float3 CameraPosition;
-    float3 PrevCameraPosition;
-    float2 RenderResolution;
-    int DrawVelocityOnSky;
 };
 
 Texture2D SkyTexture : register(t0);
@@ -37,9 +32,4 @@ void main_ps(
 
     // Assign the sampled color to the output
     outColor = skyColor;
-
-    if(DrawVelocityOnSky == 1)
-    {
-        outVelocity = float3(1000.f,1000.f,1000.f);
-    }
 }

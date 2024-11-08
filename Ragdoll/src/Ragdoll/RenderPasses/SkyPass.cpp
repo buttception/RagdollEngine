@@ -27,13 +27,7 @@ void SkyPass::DrawSky(const ragdoll::SceneInformation& sceneInfo, ragdoll::Scene
 		.setDepthAttachment(targets->CurrDepthBuffer);
 	nvrhi::FramebufferHandle pipelineFb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
 	CBuffer.InvViewProj = sceneInfo.MainCameraViewProj.Invert();
-	CBuffer.PrevCameraPosition = CBuffer.CameraPosition;
 	CBuffer.CameraPosition = sceneInfo.MainCameraPosition;
-	CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
-	CBuffer.PrevViewProj = sceneInfo.PrevMainCameraViewProj;
-	CBuffer.RenderResolution.x = (float)sceneInfo.RenderWidth;
-	CBuffer.RenderResolution.y = (float)sceneInfo.RenderHeight;
-	CBuffer.DrawVelocityOnSky = sceneInfo.bEnableIntelTAA;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {

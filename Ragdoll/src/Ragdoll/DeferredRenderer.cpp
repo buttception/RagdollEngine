@@ -186,13 +186,14 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 		});
 		activeList.emplace_back(CommandLists[(int)Pass::FB_VIEWER]);
 	}
-	
-	if (!scene->SceneInfo.bEnableDLSS)
-	{
-		Taskflow.emplace([this]() {
-			FinalPass->DrawQuad(RenderTargets, false);
-			});
-		activeList.emplace_back(CommandLists[(int)Pass::FINAL]);
+	else {
+		if (!scene->SceneInfo.bEnableDLSS)
+		{
+			Taskflow.emplace([this]() {
+				FinalPass->DrawQuad(RenderTargets, false);
+				});
+			activeList.emplace_back(CommandLists[(int)Pass::FINAL]);
+		}
 	}
 
 	Taskflow.emplace([&imgui]() {

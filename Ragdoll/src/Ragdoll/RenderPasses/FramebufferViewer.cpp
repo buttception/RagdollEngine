@@ -44,8 +44,8 @@ void FramebufferViewer::DrawTarget(nvrhi::TextureHandle texture, Vector4 add, Ve
 	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 
 	nvrhi::GraphicsState state;
-	nvrhi::FramebufferDesc desc;
-	desc.colorAttachments = { { targets->FinalColor } };
+	nvrhi::FramebufferDesc desc = nvrhi::FramebufferDesc()
+		.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer());
 	nvrhi::FramebufferHandle RenderTarget = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
 	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, RenderTarget);
 	state.framebuffer = RenderTarget;
