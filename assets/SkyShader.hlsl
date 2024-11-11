@@ -13,8 +13,7 @@ sampler Sampler : register(s0);
 void main_ps(
 	in float4 inPos : SV_Position,
 	in float2 inTexcoord : TEXCOORD0,
-	out float3 outColor : SV_Target0,
-    out float3 outVelocity : SV_Target1
+	out float3 outColor : SV_Target0
 )
 {
     //get whr the pixel is in the sky

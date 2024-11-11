@@ -302,6 +302,10 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "TemporalColor1";
 	RenderTargets.TemporalColor1 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
+	texDesc.format = nvrhi::Format::RGBA16_FLOAT;
+	texDesc.debugName = "VelocityBuffer";
+	RenderTargets.VelocityBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
 	texDesc.keepInitialState = true;
 
 	texDesc.sampleCount = 1;
@@ -316,13 +320,9 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "SceneColor";
 	RenderTargets.SceneColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
-	texDesc.format = nvrhi::Format::RG16_UNORM;
+	texDesc.format = nvrhi::Format::RGBA16_UNORM;
 	texDesc.debugName = "GBufferNormal";
 	RenderTargets.GBufferNormal = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-
-	texDesc.format = nvrhi::Format::RG16_FLOAT;
-	texDesc.debugName = "VelocityBuffer";
-	RenderTargets.VelocityBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::RGBA8_UNORM;
 	texDesc.debugName = "ShadowMask";

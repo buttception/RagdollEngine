@@ -169,7 +169,7 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 	if (scene->SceneInfo.bEnableIntelTAA)
 	{
 		Taskflow.emplace([this, &scene]() {
-			IntelTAAPass->TemporalAA(RenderTargets, Vector2(scene->JitterOffsetsX[scene->PhaseIndex], scene->JitterOffsetsY[scene->PhaseIndex]));
+			IntelTAAPass->TemporalAA(RenderTargets, scene->SceneInfo, Vector2(scene->JitterOffsetsX[scene->PhaseIndex], scene->JitterOffsetsY[scene->PhaseIndex]));
 			});
 		activeList.emplace_back(CommandLists[(int)Pass::TAA]);
 	}

@@ -13,7 +13,7 @@ void IntelTAAPass::Init(nvrhi::CommandListHandle cmdList)
 	CommandListRef = cmdList;
 }
 
-void IntelTAAPass::TemporalAA(ragdoll::SceneRenderTargets* targets, Vector2 jitter)
+void IntelTAAPass::TemporalAA(ragdoll::SceneRenderTargets* targets, ragdoll::SceneInformation sceneInfo, Vector2 jitter)
 {
 	RD_SCOPE(Render, TemporalAA);
 	RD_GPU_SCOPE("TemporalAA", CommandListRef);
@@ -24,7 +24,67 @@ void IntelTAAPass::TemporalAA(ragdoll::SceneRenderTargets* targets, Vector2 jitt
 	nvrhi::TextureHandle SrcTemporal, DesTemporal;
 	SrcTemporal = !FrameIndexMod2 ? targets->TemporalColor0 : targets->TemporalColor1;
 	DesTemporal = FrameIndexMod2 ? targets->TemporalColor0 : targets->TemporalColor1;
+
 	CommandListRef->beginMarker("TemporalAA");
+	//generate the motion vectors
+	{
+		CommandListRef->beginMarker("MotionVector");
+		Matrix Reprojection = sceneInfo.PrevMainCameraViewProj * sceneInfo.MainCameraViewProj.Invert();
+
+		float RcpHalfDimX = 2.0f / resolution.x;
+		float RcpHalfDimY = 2.0f / resolution.y;
+
+		Matrix preMult = Matrix(
+			Vector4(RcpHalfDimX, 0.0f, 0.0f, -1.0f),
+			Vector4(0.0f, -RcpHalfDimY, 0.0f, 1.0f),
+			Vector4(0.0f, 0.0f, 1.0f, 0.0f),
+			Vector4(0.0f, 0.0f, 0.0f, 1.0f)
+		);
+
+		Matrix postMult = Matrix(
+			Vector4(1.0f / RcpHalfDimX, 0.0f, 0.0f, 1.0f / RcpHalfDimX),
+			Vector4(0.0f, -1.0f / RcpHalfDimY, 0.0f, 1.0f / RcpHalfDimY),
+			Vector4(0.0f, 0.0f, 1.0f, 0.0f),
+			Vector4(0.0f, 0.0f, 0.0f, 1.0f)
+		);
+		postMult = preMult.Invert();
+
+		MotionConstant.CurToPrevXForm = postMult * Reprojection * preMult;
+		//debug
+		MotionConstant.premult = preMult;
+		MotionConstant.postmult = postMult;
+		MotionConstant.prev = sceneInfo.PrevMainCameraViewProj;
+		MotionConstant.curr = sceneInfo.MainCameraViewProj.Invert();
+		MotionConstant.res = Vector2((float)sceneInfo.RenderWidth, (float)sceneInfo.RenderHeight);
+		MotionConstant.near_p = sceneInfo.CameraNear;
+
+		nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(CBuffer), "Motion CBuffer", 1);
+		nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
+		CommandListRef->writeBuffer(ConstantBufferHandle, &MotionConstant, sizeof(CBuffer));
+
+		nvrhi::BindingSetDesc setDesc;
+		setDesc.bindings = {
+			nvrhi::BindingSetItem::ConstantBuffer(1, ConstantBufferHandle),
+			nvrhi::BindingSetItem::Texture_SRV(0, targets->CurrDepthBuffer),
+			nvrhi::BindingSetItem::Texture_UAV(0, targets->VelocityBuffer),
+		};
+		nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
+		nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
+
+		nvrhi::ComputePipelineDesc PipelineDesc;
+		PipelineDesc.bindingLayouts = { layoutHandle };
+		nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("TAAVelocity.cs.cso");
+		PipelineDesc.CS = shader;
+
+		nvrhi::ComputeState state;
+		state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
+		state.bindings = { setHandle };
+		CommandListRef->setComputeState(state);
+		CommandListRef->dispatch((targets->CurrDepthBuffer->getDesc().width + 8 - 1) / 8, (targets->CurrDepthBuffer->getDesc().height + 8 - 1) / 8, 1);
+
+		CommandListRef->endMarker();
+	}
+
 	{
 		CommandListRef->beginMarker("Resolve");
 		ConstantBuffer.Resolution.x = resolution.x;
