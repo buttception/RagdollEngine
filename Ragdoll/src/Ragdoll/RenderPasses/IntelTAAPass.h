@@ -21,10 +21,12 @@ class IntelTAAPass {
         Matrix CurToPrevXForm;
         Matrix premult;
         Matrix postmult;
-        Matrix prev;
-        Matrix curr;
+        Matrix prevViewProj;
+        Matrix viewProjInverse;
         Vector2 res;
         float near_p;
+        float JitterX;
+        float JitterY;
     } MotionConstant;
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
 

@@ -33,13 +33,15 @@ void IntelTAAPass::TemporalAA(ragdoll::SceneRenderTargets* targets, ragdoll::Sce
 
 		float RcpHalfDimX = 2.0f / resolution.x;
 		float RcpHalfDimY = 2.0f / resolution.y;
+		float RcpZMagic = sceneInfo.CameraNear;
 
 		Matrix preMult = Matrix(
 			Vector4(RcpHalfDimX, 0.0f, 0.0f, -1.0f),
 			Vector4(0.0f, -RcpHalfDimY, 0.0f, 1.0f),
-			Vector4(0.0f, 0.0f, 1.0f, 0.0f),
+			Vector4(0.0f, 0.0f, 1.f, 0.0f),
 			Vector4(0.0f, 0.0f, 0.0f, 1.0f)
 		);
+		preMult = Matrix::CreateScale(RcpHalfDimX, -RcpHalfDimY, 1.f) * Matrix::CreateTranslation(-1.f, 1.f, 0.f);
 
 		Matrix postMult = Matrix(
 			Vector4(1.0f / RcpHalfDimX, 0.0f, 0.0f, 1.0f / RcpHalfDimX),
@@ -47,16 +49,19 @@ void IntelTAAPass::TemporalAA(ragdoll::SceneRenderTargets* targets, ragdoll::Sce
 			Vector4(0.0f, 0.0f, 1.0f, 0.0f),
 			Vector4(0.0f, 0.0f, 0.0f, 1.0f)
 		);
-		postMult = preMult.Invert();
+		postMult = Matrix::CreateScale(1.f / RcpHalfDimX, 1.f / RcpHalfDimY, 1.f) * Matrix::CreateTranslation(1.f /RcpHalfDimX, 1.f / RcpHalfDimY, 0.f);
 
-		MotionConstant.CurToPrevXForm = postMult * Reprojection * preMult;
+		MotionConstant.CurToPrevXForm = postMult * sceneInfo.PrevMainCameraViewProj * sceneInfo.MainCameraViewProj.Invert() * preMult;
+		MotionConstant.CurToPrevXForm = preMult * sceneInfo.MainCameraViewProj.Invert() * sceneInfo.PrevMainCameraViewProj * postMult;
 		//debug
 		MotionConstant.premult = preMult;
 		MotionConstant.postmult = postMult;
-		MotionConstant.prev = sceneInfo.PrevMainCameraViewProj;
-		MotionConstant.curr = sceneInfo.MainCameraViewProj.Invert();
+		MotionConstant.prevViewProj = sceneInfo.PrevMainCameraViewProj;
+		MotionConstant.viewProjInverse = sceneInfo.MainCameraViewProj.Invert();
 		MotionConstant.res = Vector2((float)sceneInfo.RenderWidth, (float)sceneInfo.RenderHeight);
 		MotionConstant.near_p = sceneInfo.CameraNear;
+		MotionConstant.JitterX = jitter.x;
+		MotionConstant.JitterY = jitter.y;
 
 		nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(CBuffer), "Motion CBuffer", 1);
 		nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
@@ -93,13 +98,13 @@ void IntelTAAPass::TemporalAA(ragdoll::SceneRenderTargets* targets, ragdoll::Sce
 		ConstantBuffer.Resolution.w = 1.f / resolution.y;
 		ConstantBuffer.JitterX = jitter.x;
 		ConstantBuffer.JitterY = jitter.y;
-		const uint32_t allowLongestVelocityVector = 0;
-		const uint32_t allowNeighbourhoodSampling = 0;
-		const uint32_t allowYCoCg = 0;
-		const uint32_t allowVarianceClipping = 0;
-		const uint32_t allowBicubicFilter = 0;
-		const uint32_t allowDepthThreshold = 0;
-		const uint32_t markNoHistoryPixels = 0;
+		const uint32_t allowLongestVelocityVector = 1;
+		const uint32_t allowNeighbourhoodSampling = 1;
+		const uint32_t allowYCoCg = 1;
+		const uint32_t allowVarianceClipping = 1;
+		const uint32_t allowBicubicFilter = 1;
+		const uint32_t allowDepthThreshold = 1;
+		const uint32_t markNoHistoryPixels = 1;
 		ConstantBuffer.DebugFlags = allowLongestVelocityVector << 6 | allowNeighbourhoodSampling << 5 | allowYCoCg << 4 | allowVarianceClipping << 3 | allowBicubicFilter << 2 | allowDepthThreshold << 1 | markNoHistoryPixels;
 
 		nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FTAAResolve), "Temporal AA CBuffer", 1);

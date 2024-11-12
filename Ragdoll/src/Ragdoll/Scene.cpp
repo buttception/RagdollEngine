@@ -57,10 +57,10 @@ void ragdoll::Scene::Update(float _dt)
 {
 	{
 		RD_SCOPE(Render, ImGuiBuildData)
-		ImguiInterface->BeginFrame();
+			ImguiInterface->BeginFrame();
 
 		int item = ImguiInterface->DrawFBViewer();
-		
+
 		switch (item) {
 		case 1:
 			DebugInfo.CompCount = 2;

@@ -81,7 +81,7 @@ typedef uint16_t4 ui16_t4;
 
 //Edit(Dev): do not need to pack it into uint anymore
 // in current MiniEngine's format
-Texture2D<float2> VelocityBuffer : register( t0 );
+Texture2D<float3> VelocityBuffer : register( t0 );
 
 // Current colour buffer - rgb used
 Texture2D<fp16_t3> ColourTexture : register( t1 );
@@ -310,9 +310,6 @@ void main( uint3 inDispatchIdx : SV_DispatchThreadID, uint3 inGroupID : SV_Group
     const bool hasValidHistory = ( velocityConfidenceFactor * depthDiffFactor * uvWeight ) > 0.f;
     fp16_t4 finalColour = fp16_t4( 1.f.xxxx );
 
-    //edit check if depth is valid
-    //hasValidHistory = depth == 0.f ? false : true;
-
     if ( true == hasValidHistory )
     {
         // sample history
@@ -424,17 +421,10 @@ void StoreCurrentColourToSLM( ui16_t2 inGroupStartThread, i16_t2 inGroupThreadID
         const fp16_t4 greens = ColourTexture.GatherGreen( MinMagLinearMipPointClamp, uv );
         const fp16_t4 blues = ColourTexture.GatherBlue( MinMagLinearMipPointClamp, uv );
 
-#if 0 == USE_TONE_MAPPED_COLOUR_ONLY_IN_FINAL
-        TGSM_Colour[ linearTGSMIndexOfTopLeft                           ] = Reinhard( fp16_t3( reds.w, greens.w, blues.w ) );
-        TGSM_Colour[ linearTGSMIndexOfTopLeft + 1                       ] = Reinhard( fp16_t3( reds.z, greens.z, blues.z ) );
-        TGSM_Colour[ linearTGSMIndexOfTopLeft + TGSM_CACHE_WIDTH        ] = Reinhard( fp16_t3( reds.x, greens.x, blues.x ) );
-        TGSM_Colour[ linearTGSMIndexOfTopLeft + TGSM_CACHE_WIDTH + 1    ] = Reinhard( fp16_t3( reds.y, greens.y, blues.y ) );
-#else
         TGSM_Colour[ linearTGSMIndexOfTopLeft                           ] = fp16_t3( reds.w, greens.w, blues.w );
         TGSM_Colour[ linearTGSMIndexOfTopLeft + 1                       ] = fp16_t3( reds.z, greens.z, blues.z );
         TGSM_Colour[ linearTGSMIndexOfTopLeft + TGSM_CACHE_WIDTH        ] = fp16_t3( reds.x, greens.x, blues.x );
         TGSM_Colour[ linearTGSMIndexOfTopLeft + TGSM_CACHE_WIDTH + 1    ] = fp16_t3( reds.y, greens.y, blues.y );
-#endif
     }
     GroupMemoryBarrierWithGroupSync();
 #endif
@@ -449,11 +439,7 @@ fp16_t3 GetCurrentColour( FRAME_COLOUR_ST inST )
 #else
     inST = clamp( inST, i16_t2( 0, 0 ), i16_t2( CBData.Resolution.xy ) );
     const fp16_t3 colour = ColourTexture.Load( ui16_t3( inST, 0 ) ).rgb;
-#if 0 == USE_TONE_MAPPED_COLOUR_ONLY_IN_FINAL
-    return Reinhard( colour );
-#else
     return colour;
-#endif
 #endif
 }
 
@@ -581,9 +567,6 @@ fp16_t4 GetHistory( fp32_t2 inHistoryUV, fp32_t2 inHistoryST, bool inIsOnEdge )
         toReturn = fp16_t4( HistoryTexture.SampleLevel( MinMagLinearMipPointClamp, inHistoryUV, 0 ) );
     }
 
-#if ( 0  == KEEP_HISTORY_TONE_MAPPED ) && ( 0 == USE_TONE_MAPPED_COLOUR_ONLY_IN_FINAL )
-    toReturn = fp16_t4( Reinhard( toReturn.rgb ), toReturn.a );
-#endif
     return toReturn;
 }
 
@@ -591,7 +574,7 @@ fp16_t4 GetHistory( fp32_t2 inHistoryUV, fp32_t2 inHistoryST, bool inIsOnEdge )
 fp16_t3 GetVelocity( i16_t2 inScreenST )
 {
     //Edit(Dev): velocity buffer dont have z in my implementation
-    fp32_t3 toReturn = fp32_t3(VelocityBuffer[ inScreenST ], 0.f);
+    fp32_t3 toReturn = VelocityBuffer[ inScreenST ];
 
     if ( AllowLongestVelocityVector() )
     {
@@ -608,7 +591,7 @@ fp16_t3 GetVelocity( i16_t2 inScreenST )
         for ( uint i = 0; i < numberOfSamples; ++i )
         {
             //Edit(Dev): removed velocity unpack
-            const fp32_t3 velocity = fp32_t3(VelocityBuffer[ inScreenST + offsets[ i ] ], 0.f );
+            const fp32_t3 velocity = VelocityBuffer[ inScreenST + offsets[ i ] ];
             const fp32_t sampleLengthSq = dot( velocity.xy, velocity.xy );
             if ( sampleLengthSq > currentLengthSq )
             {
@@ -679,7 +662,7 @@ fp16_t GetDepthConfidenceFactor( ui16_t2 inST, fp16_t3 inVelocity, fp16_t inCurr
     if ( AllowDepthThreshold() )
     {
         const fp16_t prevDepth = GetPreviousDepth( GetUV( inST + inVelocity.xy - CBData.Jitter.xy ) );
-        const fp16_t currentDepth = inCurrentFrameDepth;
+        const fp16_t currentDepth = inCurrentFrameDepth + inVelocity.z;
 #if 1 == NEEDS_EDGE_DETECTION
         depthDiffFactor = false == inIsOnEdge ? step( currentDepth, prevDepth ) : depthDiffFactor;
 #else
