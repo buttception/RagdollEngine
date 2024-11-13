@@ -380,6 +380,7 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		SceneInfo.InfiniteReverseZProj._44 = 0.f;
 		SceneInfo.InfiniteReverseZProj._43 = data.cameraNear;
 		SceneInfo.InfiniteReverseZProj._34 = 1.f;
+		//SceneInfo.InfiniteReverseZProj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraWidth / data.cameraHeight, data.cameraFar, data.cameraNear);
 
 		if (!SceneInfo.bFreezeFrustumCulling)
 			CameraProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraWidth / data.cameraHeight, data.cameraNear, data.cameraFar);

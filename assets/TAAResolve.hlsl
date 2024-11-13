@@ -13,9 +13,26 @@
 // SOFTWARE.
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-//Edit(Dev): removing dependencies on mini engine
 // These dependencies come from the MiniEngine
 //#include "PixelPacking_Velocity.hlsli"
+float3 Unpack_R11G11B10_FLOAT( uint rgb )
+{
+    float r = f16tof32((rgb << 4 ) & 0x7FF0);
+    float g = f16tof32((rgb >> 7 ) & 0x7FF0);
+    float b = f16tof32((rgb >> 17) & 0x7FE0);
+    return float3(r, g, b);
+}
+
+uint Pack_R11G11B10_FLOAT( float3 rgb )
+{
+    // Clamp upper bound so that it doesn't accidentally round up to INF 
+    // Exponent=15, Mantissa=1.11111
+    rgb = min(rgb, asfloat(0x477C0000));  
+    uint r = ((f32tof16(rgb.x) + 8) >> 4) & 0x000007FF;
+    uint g = ((f32tof16(rgb.y) + 8) << 7) & 0x003FF800;
+    uint b = ((f32tof16(rgb.z) + 16) << 17) & 0xFFC00000;
+    return r | g | b;
+}
 //#include "PixelPacking_R11G11B10.hlsli"
 //#include "TemporalRS.hlsli"
 
@@ -79,9 +96,8 @@ typedef uint16_t4 ui16_t4;
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-//Edit(Dev): do not need to pack it into uint anymore
 // in current MiniEngine's format
-Texture2D<float3> VelocityBuffer : register( t0 );
+Texture2D<float4> VelocityBuffer : register( t0 );
 
 // Current colour buffer - rgb used
 Texture2D<fp16_t3> ColourTexture : register( t1 );
@@ -267,7 +283,6 @@ void StoreCurrentColourToSLM( ui16_t2 inGroupStartThread, i16_t2 inGroupThreadID
 
 float3 DebugColourNoHistory();
 
-//Edit(Dev): there is no more miniengine
 // The root signature comes from the MiniEngine
 //[RootSignature( Temporal_RootSig )]
 [numthreads( NUM_THREADS_X, NUM_THREADS_Y, 1 )]
@@ -334,7 +349,8 @@ void main( uint3 inDispatchIdx : SV_DispatchThreadID, uint3 inGroupID : SV_Group
     }
 
     // Store the final pixel colour
-    OutTexture[ inDispatchIdx.xy ] = finalColour.rgba;
+    OutTexture[inDispatchIdx.xy] = finalColour.rgba;
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -400,9 +416,8 @@ fp16_t3 InverseReinhard( fp16_t3 inRGB )
     return inRGB / ( fp16_t( 1.f ) - LuminanceRec709( inRGB ) );
 }
 
-//Edit(Dev): color is now a float3 so no more packed uint
 #if 1 == USE_TGSM
-groupshared float3 TGSM_Colour[ TGSM_CACHE_WIDTH * TGSM_CACHE_HEIGHT ]; // 8 x 8 + 1 pixel border that gives 10 x 10
+groupshared uint TGSM_Colour[ TGSM_CACHE_WIDTH * TGSM_CACHE_HEIGHT ]; // 8 x 8 + 1 pixel border that gives 10 x 10
 #endif
 
 // Precache current colours to SLM
@@ -421,10 +436,17 @@ void StoreCurrentColourToSLM( ui16_t2 inGroupStartThread, i16_t2 inGroupThreadID
         const fp16_t4 greens = ColourTexture.GatherGreen( MinMagLinearMipPointClamp, uv );
         const fp16_t4 blues = ColourTexture.GatherBlue( MinMagLinearMipPointClamp, uv );
 
-        TGSM_Colour[ linearTGSMIndexOfTopLeft                           ] = fp16_t3( reds.w, greens.w, blues.w );
-        TGSM_Colour[ linearTGSMIndexOfTopLeft + 1                       ] = fp16_t3( reds.z, greens.z, blues.z );
-        TGSM_Colour[ linearTGSMIndexOfTopLeft + TGSM_CACHE_WIDTH        ] = fp16_t3( reds.x, greens.x, blues.x );
-        TGSM_Colour[ linearTGSMIndexOfTopLeft + TGSM_CACHE_WIDTH + 1    ] = fp16_t3( reds.y, greens.y, blues.y );
+#if 0 == USE_TONE_MAPPED_COLOUR_ONLY_IN_FINAL
+        TGSM_Colour[ linearTGSMIndexOfTopLeft                           ] = Pack_R11G11B10_FLOAT( Reinhard( fp16_t3( reds.w, greens.w, blues.w ) ) );
+        TGSM_Colour[ linearTGSMIndexOfTopLeft + 1                       ] = Pack_R11G11B10_FLOAT( Reinhard( fp16_t3( reds.z, greens.z, blues.z ) ) );
+        TGSM_Colour[ linearTGSMIndexOfTopLeft + TGSM_CACHE_WIDTH        ] = Pack_R11G11B10_FLOAT( Reinhard( fp16_t3( reds.x, greens.x, blues.x ) ) );
+        TGSM_Colour[ linearTGSMIndexOfTopLeft + TGSM_CACHE_WIDTH + 1    ] = Pack_R11G11B10_FLOAT( Reinhard( fp16_t3( reds.y, greens.y, blues.y ) ) );
+#else
+        TGSM_Colour[ linearTGSMIndexOfTopLeft                           ] = Pack_R11G11B10_FLOAT( fp16_t3( reds.w, greens.w, blues.w ) );
+        TGSM_Colour[ linearTGSMIndexOfTopLeft + 1                       ] = Pack_R11G11B10_FLOAT( fp16_t3( reds.z, greens.z, blues.z ) );
+        TGSM_Colour[ linearTGSMIndexOfTopLeft + TGSM_CACHE_WIDTH        ] = Pack_R11G11B10_FLOAT( fp16_t3( reds.x, greens.x, blues.x ) );
+        TGSM_Colour[ linearTGSMIndexOfTopLeft + TGSM_CACHE_WIDTH + 1    ] = Pack_R11G11B10_FLOAT( fp16_t3( reds.y, greens.y, blues.y ) );
+#endif
     }
     GroupMemoryBarrierWithGroupSync();
 #endif
@@ -434,12 +456,15 @@ void StoreCurrentColourToSLM( ui16_t2 inGroupStartThread, i16_t2 inGroupThreadID
 fp16_t3 GetCurrentColour( FRAME_COLOUR_ST inST )
 {
 #if 1 == USE_TGSM
-//Edit(Dev): removed unpacking of shared buffer
-    return fp16_t3( TGSM_Colour[ inST ] );
+    return fp16_t3( Unpack_R11G11B10_FLOAT( TGSM_Colour[ inST ] ) );
 #else
     inST = clamp( inST, i16_t2( 0, 0 ), i16_t2( CBData.Resolution.xy ) );
     const fp16_t3 colour = ColourTexture.Load( ui16_t3( inST, 0 ) ).rgb;
+#if 0 == USE_TONE_MAPPED_COLOUR_ONLY_IN_FINAL
+    return Reinhard( colour );
+#else
     return colour;
+#endif
 #endif
 }
 
@@ -567,14 +592,16 @@ fp16_t4 GetHistory( fp32_t2 inHistoryUV, fp32_t2 inHistoryST, bool inIsOnEdge )
         toReturn = fp16_t4( HistoryTexture.SampleLevel( MinMagLinearMipPointClamp, inHistoryUV, 0 ) );
     }
 
+#if ( 0  == KEEP_HISTORY_TONE_MAPPED ) && ( 0 == USE_TONE_MAPPED_COLOUR_ONLY_IN_FINAL )
+    toReturn = fp16_t4( Reinhard( toReturn.rgb ), toReturn.a );
+#endif
     return toReturn;
 }
 
 // get velocity and expected depth diff for the current pixel
 fp16_t3 GetVelocity( i16_t2 inScreenST )
 {
-    //Edit(Dev): velocity buffer dont have z in my implementation
-    fp32_t3 toReturn = VelocityBuffer[ inScreenST ];
+    fp32_t3 toReturn = VelocityBuffer[inScreenST].xyz;
 
     if ( AllowLongestVelocityVector() )
     {
@@ -590,8 +617,8 @@ fp16_t3 GetVelocity( i16_t2 inScreenST )
         [unroll]
         for ( uint i = 0; i < numberOfSamples; ++i )
         {
-            //Edit(Dev): removed velocity unpack
-            const fp32_t3 velocity = VelocityBuffer[ inScreenST + offsets[ i ] ];
+            fp32_t3 velocity = VelocityBuffer[inScreenST].xyz;
+            
             const fp32_t sampleLengthSq = dot( velocity.xy, velocity.xy );
             if ( sampleLengthSq > currentLengthSq )
             {
@@ -661,7 +688,7 @@ fp16_t GetDepthConfidenceFactor( ui16_t2 inST, fp16_t3 inVelocity, fp16_t inCurr
     fp16_t depthDiffFactor = fp16_t( 1.f );
     if ( AllowDepthThreshold() )
     {
-        const fp16_t prevDepth = GetPreviousDepth( GetUV( inST + inVelocity.xy - CBData.Jitter.xy ) );
+        const fp16_t prevDepth = GetPreviousDepth( GetUV( inST + inVelocity.xy + CBData.Jitter.xy ) );
         const fp16_t currentDepth = inCurrentFrameDepth + inVelocity.z;
 #if 1 == NEEDS_EDGE_DETECTION
         depthDiffFactor = false == inIsOnEdge ? step( currentDepth, prevDepth ) : depthDiffFactor;
@@ -678,7 +705,14 @@ fp16_t4 GetFinalColour( fp16_t3 inCurrentColour, fp16_t3 inHistoryColour, fp16_t
 {
     // Calculate a new confidence factor for the next frame. The value is between [0.5f, 1.f).
     const fp16_t newWeight = saturate( fp16_t( 1.f ) / ( fp16_t( 2.f ) - inWeight ) );
+#if 0 == USE_TONE_MAPPED_COLOUR_ONLY_IN_FINAL
     fp16_t4 toReturn = fp16_t4( lerp( inCurrentColour, inHistoryColour, inWeight ), newWeight );
+#if 0 == KEEP_HISTORY_TONE_MAPPED
+    toReturn = fp16_t4( InverseReinhard( toReturn.rgb ), toReturn.a );
+#endif
+#else
+    fp16_t4 toReturn = fp16_t4( InverseReinhard( lerp( Reinhard( inCurrentColour ), Reinhard( inHistoryColour ), inWeight ) ), newWeight );
+#endif
     return toReturn;
 }
 

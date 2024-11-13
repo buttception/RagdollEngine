@@ -104,7 +104,7 @@ void IntelTAAPass::TemporalAA(ragdoll::SceneRenderTargets* targets, ragdoll::Sce
 		const uint32_t allowVarianceClipping = 1;
 		const uint32_t allowBicubicFilter = 1;
 		const uint32_t allowDepthThreshold = 1;
-		const uint32_t markNoHistoryPixels = 1;
+		const uint32_t markNoHistoryPixels = 0;
 		ConstantBuffer.DebugFlags = allowLongestVelocityVector << 6 | allowNeighbourhoodSampling << 5 | allowYCoCg << 4 | allowVarianceClipping << 3 | allowBicubicFilter << 2 | allowDepthThreshold << 1 | markNoHistoryPixels;
 
 		nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FTAAResolve), "Temporal AA CBuffer", 1);
