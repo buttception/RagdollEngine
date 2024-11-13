@@ -5,6 +5,7 @@ cbuffer g_Const : register(b0) {
 	float4x4 viewProjMatrix;
 	float4x4 viewProjMatrixWithAA;
 	float4x4 prevViewProjMatrix;
+	float2 RenderResolution;
 	int instanceOffset;
 };
 
@@ -109,7 +110,8 @@ void gbuffer_ps(
 	float4 prevClipPos = mul(inPrevFragPos, prevViewProjMatrix);
 	float4 prevNdcPos = prevClipPos / prevClipPos.w;
 	prevNdcPos.xy = ScreenPosToViewportUV(prevNdcPos.xy);
-	outVelocity = (prevNdcPos.xy - ndcPos.xy) * float2(1280, 720);
+	//no need div by 2 because i moved it back to viewport so its [0,1]
+	outVelocity = (prevNdcPos.xy - ndcPos.xy) * float2(RenderResolution.x, RenderResolution.y);
 }
 
 cbuffer g_LightConst : register(b1) {

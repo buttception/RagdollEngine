@@ -26,10 +26,9 @@ public:
 
 	void Init(DirectXDevice* dx);
 	void BeginFrame();
-	bool DrawSpawn(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneInformation& SceneInfo, ragdoll::SceneConfig& Config);
-	void DrawControl(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneInformation& SceneInfo, ragdoll::SceneConfig& Config, float _dt);
+	bool DrawSpawn(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneInformation& SceneInfo, ragdoll::SceneConfig& Config); 
 	int32_t DrawFBViewer();
-	void DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneInformation& SceneInfo, ragdoll::SceneConfig& Config);
+	void DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneInformation& SceneInfo, ragdoll::SceneConfig& Config, float _dt);
 	void Render();
 	void BackbufferResizing();
 	void Shutdown();

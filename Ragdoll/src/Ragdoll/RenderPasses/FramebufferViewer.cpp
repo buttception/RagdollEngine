@@ -13,7 +13,7 @@ void FramebufferViewer::Init(nvrhi::CommandListHandle cmdList)
 	CommandListRef = cmdList;
 }
 
-void FramebufferViewer::DrawTarget(nvrhi::TextureHandle texture, Vector4 add, Vector4 mul, uint32_t numComp)
+void FramebufferViewer::DrawTarget(nvrhi::TextureHandle texture, Vector4 add, Vector4 mul, uint32_t numComp, ragdoll::SceneRenderTargets* targets)
 {
 	RD_SCOPE(Render, FBView);
 	RD_GPU_SCOPE("FBView", CommandListRef);
@@ -44,8 +44,8 @@ void FramebufferViewer::DrawTarget(nvrhi::TextureHandle texture, Vector4 add, Ve
 	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 
 	nvrhi::GraphicsState state;
-	nvrhi::FramebufferDesc desc;
-	desc.colorAttachments = { { DirectXDevice::GetInstance()->GetCurrentBackbuffer() } };
+	nvrhi::FramebufferDesc desc = nvrhi::FramebufferDesc()
+		.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer());
 	nvrhi::FramebufferHandle RenderTarget = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
 	state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, RenderTarget);
 	state.framebuffer = RenderTarget;

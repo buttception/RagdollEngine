@@ -89,6 +89,7 @@ namespace ragdoll {
 		bool bIsThereCustomMeshes{ false };
 		bool bDrawOctree{ false };
 		bool bDrawBoxes{ false };
+		bool bInitDLSS{ false };
 		int32_t DrawOctreeLevelMin{ 0 };
 		int32_t DrawOctreeLevelMax{ 0 };
 	};
@@ -124,10 +125,10 @@ namespace ragdoll {
 		float BloomIntensity = 0.04f;
 		bool UseCACAO = false;
 		bool UseXeGTAO = true;
-		float ModulationFactor = 0.9f;
 		bool bIsCameraDirty{ true };
 		bool bFreezeFrustumCulling{ false };
 		bool bEnableDLSS{ true };
+		bool bEnableIntelTAA{ false };
 		bool bEnableJitter{ true };
 		bool bEnableXeGTAONoise{ true };
 		uint32_t RenderWidth = 960;
@@ -141,7 +142,12 @@ namespace ragdoll {
 	{
 		//render targets
 		nvrhi::TextureHandle SceneColor;
-		nvrhi::TextureHandle SceneDepthZ;
+		nvrhi::TextureHandle TemporalColor0;	//temporal buffer
+		nvrhi::TextureHandle TemporalColor1;	//temporal buffer
+		nvrhi::TextureHandle CurrDepthBuffer;
+		nvrhi::TextureHandle PrevDepthBuffer;
+		nvrhi::TextureHandle SceneDepthZ0;
+		nvrhi::TextureHandle SceneDepthZ1;	//temporal buffer
 		nvrhi::TextureHandle GBufferAlbedo;
 		nvrhi::TextureHandle GBufferNormal;
 		nvrhi::TextureHandle GBufferRM;

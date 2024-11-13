@@ -12,6 +12,7 @@ class GBufferPass {
 		Matrix ViewProj;
 		Matrix ViewProjWithAA;
 		Matrix PrevViewProj;
+		Vector2 RenderResolution;
 		int InstanceOffset{ 0 };
 	}CBuffer;
 

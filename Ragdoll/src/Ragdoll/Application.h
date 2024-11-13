@@ -61,6 +61,7 @@ namespace ragdoll
 			bool bCreateCustomMeshes{ false };
 			bool bDrawDebugOctree{ false };
 			bool bDrawDebugBoundingBoxes{ false };
+			bool bInitDLSS{ false };
 		};
 
 		std::shared_ptr<Window> m_PrimaryWindow;

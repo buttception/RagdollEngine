@@ -9,7 +9,7 @@ namespace ragdoll {
 class SkyPass {
 	struct ConstantBuffer {
 		Matrix InvViewProj;
-		Vector3 CameraPosition;
+		Vector3 CameraPosition{};
 	}CBuffer;
 
 	nvrhi::CommandListHandle CommandListRef{ nullptr };

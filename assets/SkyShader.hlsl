@@ -17,7 +17,7 @@ void main_ps(
 )
 {
     //get whr the pixel is in the sky
-    float Depth = 0.5f;
+    float Depth = 0.01f;
     //this frag pos is relative the camera but in world coordinate
 	float3 fragPos = DepthToWorld(Depth, inTexcoord, InvViewProjMatrix);
     //get the direction of the fragment from the camera

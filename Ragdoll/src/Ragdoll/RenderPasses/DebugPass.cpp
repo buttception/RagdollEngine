@@ -26,7 +26,7 @@ void DebugPass::DrawBoundingBoxes(nvrhi::BufferHandle instanceBuffer, size_t ins
 
 	nvrhi::FramebufferDesc desc = nvrhi::FramebufferDesc()
 		.addColorAttachment(targets->FinalColor)
-		.setDepthAttachment(targets->SceneDepthZ);
+		.setDepthAttachment(targets->CurrDepthBuffer);
 	nvrhi::FramebufferHandle pipelineFb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
 	CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
 

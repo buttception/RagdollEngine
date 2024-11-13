@@ -370,6 +370,7 @@ void AssetManager::UpdateVBOIBO()
 
 nvrhi::ShaderHandle AssetManager::GetShader(const std::string& shaderFilename)
 {
+	std::lock_guard<std::mutex> LockGuard(Mutex);
 	if (Shaders.contains(shaderFilename)) {
 		return Shaders.at(shaderFilename);
 	}

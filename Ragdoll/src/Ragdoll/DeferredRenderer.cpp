@@ -40,7 +40,7 @@ void Renderer::BeginFrame()
 	auto bgCol = PrimaryWindowRef->GetBackgroundColor();
 	nvrhi::Color col = nvrhi::Color(bgCol.x, bgCol.y, bgCol.z, bgCol.w);
 	CommandList->beginMarker("ClearGBuffer");
-	CommandList->clearDepthStencilTexture(RenderTargets->SceneDepthZ, nvrhi::AllSubresources, true, 0.f, false, 0);
+	CommandList->clearDepthStencilTexture(RenderTargets->CurrDepthBuffer, nvrhi::AllSubresources, true, 0.f, false, 0);
 	for (int i = 0; i < 4; ++i)
 	{
 		CommandList->clearDepthStencilTexture(RenderTargets->ShadowMap[i], nvrhi::AllSubresources, true, 0.f, false, 0);
@@ -60,6 +60,10 @@ void Renderer::BeginFrame()
 
 void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRenderer> imgui)
 {
+	//swaps the depth buffer being drawn to
+	bIsOddFrame = !bIsOddFrame;
+	RenderTargets->CurrDepthBuffer = bIsOddFrame ? RenderTargets->SceneDepthZ0 : RenderTargets->SceneDepthZ1;
+	RenderTargets->PrevDepthBuffer = !bIsOddFrame ? RenderTargets->SceneDepthZ0 : RenderTargets->SceneDepthZ1;
 	{
 		//this process is long because it is waiting for the gpu to be done first
 		RD_SCOPE(Render, Readback);
@@ -161,6 +165,14 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 		ToneMapPass->ToneMap(scene->SceneInfo, exposure, RenderTargets);
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::TONEMAP]);
+	
+	if (scene->SceneInfo.bEnableIntelTAA)
+	{
+		Taskflow.emplace([this, &scene]() {
+			IntelTAAPass->TemporalAA(RenderTargets, scene->SceneInfo, Vector2(scene->JitterOffsetsX[scene->PhaseIndex], scene->JitterOffsetsY[scene->PhaseIndex]));
+			});
+		activeList.emplace_back(CommandLists[(int)Pass::TAA]);
+	}
 
 	Taskflow.emplace([this, &scene]() {
 		DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo, RenderTargets);
@@ -170,17 +182,18 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 	if (scene->DebugInfo.DbgTarget)
 	{
 		Taskflow.emplace([this, &scene]() {
-			FramebufferViewer->DrawTarget(scene->DebugInfo.DbgTarget, scene->DebugInfo.Add, scene->DebugInfo.Mul, scene->DebugInfo.CompCount);
+			FramebufferViewer->DrawTarget(scene->DebugInfo.DbgTarget, scene->DebugInfo.Add, scene->DebugInfo.Mul, scene->DebugInfo.CompCount, RenderTargets);
 		});
 		activeList.emplace_back(CommandLists[(int)Pass::FB_VIEWER]);
 	}
-	
-	if (!scene->SceneInfo.bEnableDLSS)
-	{
-		Taskflow.emplace([this]() {
-			FinalPass->DrawQuad(RenderTargets, false);
-			});
-		activeList.emplace_back(CommandLists[(int)Pass::FINAL]);
+	else {
+		if (!scene->SceneInfo.bEnableDLSS)
+		{
+			Taskflow.emplace([this]() {
+				FinalPass->DrawQuad(RenderTargets, false);
+				});
+			activeList.emplace_back(CommandLists[(int)Pass::FINAL]);
+		}
 	}
 
 	Taskflow.emplace([&imgui]() {
@@ -188,7 +201,7 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 	});
 
 	SExecutor::Executor.run(Taskflow).wait();
-	//submit the logs in the order of execution
+	//submit the logs in the order of executions
 	{
 		RD_SCOPE(Render, ExecuteCommandList);
 		MICROPROFILE_GPU_SUBMIT(EnterCommandListSectionGpu::Queue, CommandList->Work);
@@ -197,10 +210,10 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 		DirectXDevice::GetNativeDevice()->executeCommandLists(activeList.data(), activeList.size());
 	}
 
-	if (scene->SceneInfo.bEnableDLSS && !scene->DebugInfo.DbgTarget)
+	if (scene->Config.bInitDLSS && scene->SceneInfo.bEnableDLSS && !scene->DebugInfo.DbgTarget)
 	{
 		//DLSS pass
-		NVSDK::Evaluate(RenderTargets->FinalColor, RenderTargets->UpscaledBuffer, RenderTargets->SceneDepthZ, RenderTargets->VelocityBuffer, scene);
+		NVSDK::Evaluate(RenderTargets->FinalColor, RenderTargets->UpscaledBuffer, RenderTargets->CurrDepthBuffer, RenderTargets->VelocityBuffer, scene);
 
 		FinalPass->DrawQuad(RenderTargets, true);
 		MICROPROFILE_GPU_SUBMIT(EnterCommandListSectionGpu::Queue, CommandLists[(int)Pass::FINAL]->Work);
@@ -255,6 +268,9 @@ void Renderer::CreateResource()
 
 	ToneMapPass = std::make_shared<class ToneMapPass>();
 	ToneMapPass->Init(CommandLists[(int)Pass::TONEMAP]);
+
+	IntelTAAPass = std::make_shared<class IntelTAAPass>();
+	IntelTAAPass->Init(CommandLists[(int)Pass::TAA]);
 
 	FinalPass = std::make_shared<class FinalPass>();
 	FinalPass->Init(CommandLists[(int)Pass::FINAL]);

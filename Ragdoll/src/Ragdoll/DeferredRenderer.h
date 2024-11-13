@@ -15,6 +15,7 @@
 #include "RenderPasses/BloomPass.h"
 #include "RenderPasses/XeGTAOPass.h"
 #include "RenderPasses/FinalPass.h"
+#include "RenderPasses/IntelTAAPass.h"
 
 namespace ragdoll {
 	class Window;
@@ -40,6 +41,7 @@ public:
 	std::shared_ptr<BloomPass> BloomPass;
 	std::shared_ptr<AutomaticExposurePass> AutomaticExposurePass;
 	std::shared_ptr<ToneMapPass> ToneMapPass;
+	std::shared_ptr<IntelTAAPass> IntelTAAPass;
 	std::shared_ptr<FinalPass> FinalPass;
 	std::shared_ptr<DebugPass> DebugPass;
 	std::shared_ptr<FramebufferViewer> FramebufferViewer;
@@ -58,6 +60,7 @@ public:
 		BLOOM,
 		EXPOSURE,
 		TONEMAP,
+		TAA,
 		FINAL,
 		DEBUG,
 		FB_VIEWER,
@@ -72,6 +75,7 @@ public:
 
 	//debug infos
 	float AdaptedLuminance;
+	bool bIsOddFrame{ false };
 
 	void Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene);
 	void Shutdown();

@@ -32,7 +32,7 @@ void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo, ragdoll:
 	RD_GPU_SCOPE("XeGTAO", CommandListRef);
 
 	CommandListRef->beginMarker("XeGTAO");
-	UpdateConstants(targets->SceneDepthZ->getDesc().width, targets->SceneDepthZ->getDesc().height, sceneInfo.InfiniteReverseZProj, sceneInfo);
+	UpdateConstants(targets->CurrDepthBuffer->getDesc().width, targets->CurrDepthBuffer->getDesc().height, sceneInfo.InfiniteReverseZProj, sceneInfo);
 	//cbuffer shared amongst all
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(XeGTAO::GTAOConstants), "XeGTAO CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
@@ -42,14 +42,6 @@ void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo, ragdoll:
 	OtherBuffer.viewMatrix = sceneInfo.MainCameraView;
 	OtherBuffer.prevViewProjMatrix = sceneInfo.PrevMainCameraViewProj;
 	OtherBuffer.InvViewProjMatrix = sceneInfo.MainCameraViewProj.Invert();
-	static bool firstFrame = true;
-	if (firstFrame)
-	{
-		firstFrame = false;
-		OtherBuffer.modulationFactor = 0.f;
-	}
-	else
-		OtherBuffer.modulationFactor = sceneInfo.ModulationFactor;
 	nvrhi::BufferHandle MatrixHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 	CommandListRef->writeBuffer(MatrixHandle, &OtherBuffer, sizeof(ConstantBuffer));
 	{
@@ -81,7 +73,7 @@ void XeGTAOPass::GenerateDepthMips(const ragdoll::SceneInformation& sceneInfo, n
 	setDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, BufferHandle),
 		nvrhi::BindingSetItem::ConstantBuffer(1, matrix),
-		nvrhi::BindingSetItem::Texture_SRV(0, targets->SceneDepthZ),
+		nvrhi::BindingSetItem::Texture_SRV(0, targets->CurrDepthBuffer),
 		nvrhi::BindingSetItem::Texture_UAV(0, targets->DepthMips, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet{0,1,0,1}),
 		nvrhi::BindingSetItem::Texture_UAV(1, targets->DepthMips, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet{1,1,0,1}),
 		nvrhi::BindingSetItem::Texture_UAV(2, targets->DepthMips, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet{2,1,0,1}),
@@ -188,7 +180,7 @@ void XeGTAOPass::Compose(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 		nvrhi::BindingSetItem::ConstantBuffer(1, matrix),
 		nvrhi::BindingSetItem::Texture_SRV(0, targets->FinalAOTerm ),
 		nvrhi::BindingSetItem::Texture_SRV(1, targets->VelocityBuffer),
-		nvrhi::BindingSetItem::Texture_SRV(2, targets->SceneDepthZ),
+		nvrhi::BindingSetItem::Texture_SRV(2, targets->CurrDepthBuffer),
 		nvrhi::BindingSetItem::Texture_SRV(3, targets->AOTermAccumulation),
 		nvrhi::BindingSetItem::Texture_UAV(1, targets->AONormalized),
 		nvrhi::BindingSetItem::Sampler(10, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
