@@ -55,7 +55,6 @@ ragdoll::Scene::Scene(Application* app)
 
 void ragdoll::Scene::Update(float _dt)
 {
-	_dt = 0.005f;
 	{
 		RD_SCOPE(Render, ImGuiBuildData)
 			ImguiInterface->BeginFrame();

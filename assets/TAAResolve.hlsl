@@ -41,6 +41,9 @@ uint Pack_R11G11B10_FLOAT( float3 rgb )
 // Defines to toggle HW features
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#if defined (__INTELLISENSE__)
+#define USE_TONE_MAPPED_COLOUR_ONLY_IN_FINAL 1
+#endif
 
 // Whether to use real 16-bit floats
 // Use only with DXIL with SM6.2 and "-enable-16bit-types" as a compiler option

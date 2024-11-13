@@ -96,8 +96,8 @@ void IntelTAAPass::TemporalAA(ragdoll::SceneRenderTargets* targets, ragdoll::Sce
 		ConstantBuffer.Resolution.y = resolution.y;
 		ConstantBuffer.Resolution.z = 1.f / resolution.x;
 		ConstantBuffer.Resolution.w = 1.f / resolution.y;
-		ConstantBuffer.JitterX = jitter.x;
-		ConstantBuffer.JitterY = jitter.y;
+		ConstantBuffer.JitterX = 0;
+		ConstantBuffer.JitterY = 0;
 		const uint32_t allowLongestVelocityVector = 1;
 		const uint32_t allowNeighbourhoodSampling = 1;
 		const uint32_t allowYCoCg = 1;
