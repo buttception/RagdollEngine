@@ -16,6 +16,7 @@
 #include "RenderPasses/XeGTAOPass.h"
 #include "RenderPasses/FinalPass.h"
 #include "RenderPasses/IntelTAAPass.h"
+#include "RenderPasses/FSRPass.h"
 
 namespace ragdoll {
 	class Window;
@@ -42,6 +43,7 @@ public:
 	std::shared_ptr<AutomaticExposurePass> AutomaticExposurePass;
 	std::shared_ptr<ToneMapPass> ToneMapPass;
 	std::shared_ptr<IntelTAAPass> IntelTAAPass;
+	std::shared_ptr<FSRPass> FSRPass;
 	std::shared_ptr<FinalPass> FinalPass;
 	std::shared_ptr<DebugPass> DebugPass;
 	std::shared_ptr<FramebufferViewer> FramebufferViewer;

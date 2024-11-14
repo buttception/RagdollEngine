@@ -23,6 +23,8 @@ void Renderer::Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 	//get the textures needed
 	RenderTargets = &scene->RenderTargets;
 	CreateResource();
+
+	FSRPass->Init({ (float)scene->SceneInfo.RenderWidth, (float)scene->SceneInfo.RenderHeight }, { (float)scene->SceneInfo.TargetWidth, (float)scene->SceneInfo.TargetHeight }, true);
 }
 
 void Renderer::Shutdown()
@@ -271,6 +273,8 @@ void Renderer::CreateResource()
 
 	IntelTAAPass = std::make_shared<class IntelTAAPass>();
 	IntelTAAPass->Init(CommandLists[(int)Pass::TAA]);
+
+	FSRPass = std::make_shared<class FSRPass>();
 
 	FinalPass = std::make_shared<class FinalPass>();
 	FinalPass->Init(CommandLists[(int)Pass::FINAL]);

@@ -20,6 +20,9 @@ ragdoll::Scene::Scene(Application* app)
 	EntityManagerRef = app->m_EntityManager;
 	PrimaryWindowRef = app->m_PrimaryWindow;
 
+	SceneInfo.TargetWidth = PrimaryWindowRef->GetWidth();
+	SceneInfo.TargetHeight = PrimaryWindowRef->GetHeight();
+
 	{
 		MICROPROFILE_SCOPEI("Render", "Create Render Target", MP_YELLOW);
 		CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
@@ -40,9 +43,6 @@ ragdoll::Scene::Scene(Application* app)
 	Config.bDrawOctree = app->Config.bDrawDebugOctree;
 	ImguiInterface = std::make_shared<ImguiRenderer>();
 	ImguiInterface->Init(DirectXDevice::GetInstance());
-
-	SceneInfo.TargetWidth = PrimaryWindowRef->GetWidth();
-	SceneInfo.TargetHeight = PrimaryWindowRef->GetHeight();
 
 	HaltonSequence(Vector2(SceneInfo.RenderWidth, SceneInfo.RenderHeight), Vector2(SceneInfo.TargetWidth, SceneInfo.TargetHeight));
 

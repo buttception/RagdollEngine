@@ -33,6 +33,7 @@ project "Ragdoll"
 	libdirs
 	{
 		"%{LibDirs.dlss}",
+		"%{LibDirs.ffx}",
 	}
 
 	links
@@ -41,6 +42,7 @@ project "Ragdoll"
 		"imgui",
 		"d3d12",
 		"dxgi",
+		"amd_fidelityfx_dx12.lib",
 	}
 	
 	vpaths 
@@ -62,11 +64,14 @@ project "Ragdoll"
 		"%{IncludesDir.cxxopts}",
 		"%{IncludesDir.taskflow}",
 		"%{IncludesDir.dlss}",
+		"%{IncludesDir.ffxapi}",
+		"%{IncludesDir.ffxsdk}",
     }
 
 	postbuildcommands
 	{
 		"xcopy /Y /E /I \"%{LibDirs.dlss}\\Windows_x86_64\\dev\\nvngx_dlss.dll\" \"%{cfg.targetdir}\"",
+		"xcopy /Y /E /I \"%{LibDirs.ffx}\\amd_fidelityfx_dx12.dll\" \"%{cfg.targetdir}\"",
 		"xcopy /Y /E /I \"%{wks.location}\\assets\\cso\" \"%{cfg.targetdir}\\..\\assets\\cso\"",
 		"\"%{wks.location}Tools\\compileShader.bat\"",
 	}
