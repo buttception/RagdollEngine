@@ -33,5 +33,5 @@ class IntelTAAPass {
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
 
-	void TemporalAA(ragdoll::SceneRenderTargets* targets, ragdoll::SceneInformation sceneInfo, Vector2 jitter);
+	void TemporalAA(ragdoll::SceneRenderTargets* targets, const ragdoll::SceneInformation& sceneInfo, Vector2 jitter);
 };

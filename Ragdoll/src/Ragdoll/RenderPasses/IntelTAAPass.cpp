@@ -13,7 +13,7 @@ void IntelTAAPass::Init(nvrhi::CommandListHandle cmdList)
 	CommandListRef = cmdList;
 }
 
-void IntelTAAPass::TemporalAA(ragdoll::SceneRenderTargets* targets, ragdoll::SceneInformation sceneInfo, Vector2 jitter)
+void IntelTAAPass::TemporalAA(ragdoll::SceneRenderTargets* targets, const ragdoll::SceneInformation& sceneInfo, Vector2 jitter)
 {
 	RD_SCOPE(Render, TemporalAA);
 	RD_GPU_SCOPE("TemporalAA", CommandListRef);

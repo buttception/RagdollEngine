@@ -371,6 +371,7 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		SceneInfo.CameraFov = data.cameraFov;
 		SceneInfo.CameraAspect = data.cameraWidth / data.cameraHeight;
 		SceneInfo.CameraNear = data.cameraNear;
+		SceneInfo.CameraFar = data.cameraFar;
 
 		//make a infinite z inverse projection matrix
 		float e = 1 / tanf(DirectX::XMConvertToRadians(data.cameraFov) / 2.f);

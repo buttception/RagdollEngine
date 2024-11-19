@@ -8,6 +8,10 @@ Editor/compilers/
 Launcher/intermediates/
 Launcher/compilers/
 Launcher/assets/
+Ragdoll/ffx/bin
+Ragdoll/ffx/media
+Ragdoll/ffx/media-cache
+Ragdoll/ffx/sdk/bin
 
 #Files
 *.sln

@@ -23,8 +23,6 @@ void Renderer::Init(std::shared_ptr<ragdoll::Window> win, ragdoll::Scene* scene)
 	//get the textures needed
 	RenderTargets = &scene->RenderTargets;
 	CreateResource();
-
-	FSRPass->Init({ (float)scene->SceneInfo.RenderWidth, (float)scene->SceneInfo.RenderHeight }, { (float)scene->SceneInfo.TargetWidth, (float)scene->SceneInfo.TargetHeight }, true);
 }
 
 void Renderer::Shutdown()
@@ -170,8 +168,9 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 	
 	if (scene->SceneInfo.bEnableIntelTAA)
 	{
-		Taskflow.emplace([this, &scene]() {
-			IntelTAAPass->TemporalAA(RenderTargets, scene->SceneInfo, Vector2(scene->JitterOffsetsX[scene->PhaseIndex], scene->JitterOffsetsY[scene->PhaseIndex]));
+		Taskflow.emplace([this, &scene, _dt]() {
+			//IntelTAAPass->TemporalAA(RenderTargets, scene->SceneInfo, Vector2(scene->JitterOffsetsX[scene->PhaseIndex], scene->JitterOffsetsY[scene->PhaseIndex]));
+			FSRPass->Upscale(scene->SceneInfo, RenderTargets, _dt);
 			});
 		activeList.emplace_back(CommandLists[(int)Pass::TAA]);
 	}
@@ -275,6 +274,7 @@ void Renderer::CreateResource()
 	IntelTAAPass->Init(CommandLists[(int)Pass::TAA]);
 
 	FSRPass = std::make_shared<class FSRPass>();
+	FSRPass->Init(CommandLists[(int)Pass::TAA]);
 
 	FinalPass = std::make_shared<class FinalPass>();
 	FinalPass->Init(CommandLists[(int)Pass::FINAL]);

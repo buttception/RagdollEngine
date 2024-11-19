@@ -9,9 +9,6 @@ IncludesDir["imgui"] = "%{wks.location}\\Ragdoll\\dependencies\\imgui"
 IncludesDir["cxxopts"] = "%{wks.location}\\Ragdoll\\dependencies\\cxxopts\\include"
 IncludesDir["taskflow"] = "%{wks.location}\\Ragdoll\\dependencies\\taskflow\\taskflow"
 IncludesDir["dlss"] = "%{wks.location}\\Ragdoll\\dependencies\\dlss\\include"
-IncludesDir["ffxapi"] = "%{wks.location}\\Ragdoll\\ffx\\ffx-api\\include"
-IncludesDir["ffxsdk"] = "%{wks.location}\\Ragdoll\\ffx\\sdk\\include"
 
 LibDirs = {}
 LibDirs["dlss"] = "%{wks.location}\\Ragdoll\\dependencies\\dlss\\lib\\"
-LibDirs["ffx"] = "%{wks.location}\\Ragdoll\\ffx\\PrebuiltSignedDLL"

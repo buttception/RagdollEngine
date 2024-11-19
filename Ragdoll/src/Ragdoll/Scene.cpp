@@ -107,9 +107,15 @@ void ragdoll::Scene::Update(float _dt)
 		{
 			Proj.m[2][0] += JitterOffsetsX[PhaseIndex] / (double)SceneInfo.RenderWidth;
 			Proj.m[2][1] += JitterOffsetsY[PhaseIndex] / (double)SceneInfo.RenderHeight;
+			SceneInfo.JitterX = JitterOffsetsX[PhaseIndex];
+			SceneInfo.JitterY = JitterOffsetsY[PhaseIndex];
+		}
+		else
+		{
+			SceneInfo.JitterX = 0.f;
+			SceneInfo.JitterY = 0.f;
 		}
 		SceneInfo.MainCameraViewProjWithAA = SceneInfo.MainCameraView * Proj;
-
 	}
 
 	if (SceneInfo.bIsCameraDirty)
@@ -286,6 +292,17 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.format = nvrhi::Format::R8_UNORM;
 	texDesc.debugName = "AONormalized";
 	RenderTargets.AONormalized = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.debugName = "ShadingChange";
+	RenderTargets.ShadingChange = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "Accumulation0";
+	RenderTargets.Accumulation0 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "Accumulation1";
+	RenderTargets.Accumulation1 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "InputReactivity";
+	RenderTargets.InputReactiveMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "InputTC";
+	RenderTargets.InputTCMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	
 	texDesc.clearValue = 0.f;
 	texDesc.format = nvrhi::Format::RG8_UNORM;
@@ -306,9 +323,45 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "VelocityBuffer";
 	RenderTargets.VelocityBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
-	texDesc.keepInitialState = true;
+	texDesc.format = nvrhi::Format::R32_UINT;
+	texDesc.debugName = "RecontDepth";
+	RenderTargets.RecontDepth = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::R32_FLOAT;
+	texDesc.debugName = "DilatedDepth";
+	RenderTargets.DilatedDepth = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::R16_FLOAT;
+	texDesc.debugName = "FarthestDepth";
+	RenderTargets.FarthestDepth = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::RG16_FLOAT;
+	texDesc.debugName = "DilatedMotionVectors";
+	RenderTargets.DilatedMotionVectors = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::R16_FLOAT;
+	texDesc.debugName = "Luminance0";
+	RenderTargets.Luminance0 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "Luminance1";
+	RenderTargets.Luminance1 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::R16_FLOAT;
+	texDesc.debugName = "FarthestDepthMip";
+	RenderTargets.FarthestDepthMip = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::RGBA8_UNORM;
+	texDesc.debugName = "DilatedReactiveMask";
+	RenderTargets.DilatedReactiveMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.width = SceneInfo.TargetWidth;
+	texDesc.height = SceneInfo.TargetHeight;
+	texDesc.format = nvrhi::Format::R8_UNORM;
+	texDesc.debugName = "NewLock";
+	RenderTargets.NewLock = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.sampleCount = 1;
+	texDesc.width = SceneInfo.RenderWidth;
+	texDesc.height = SceneInfo.RenderHeight;
 	texDesc.isTypeless = false;
 	texDesc.isUAV = false;
 	texDesc.initialState = nvrhi::ResourceStates::RenderTarget;
@@ -430,6 +483,42 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.format = nvrhi::Format::RGBA8_UNORM;
 	texDesc.debugName = "UpscaledBuffer";
 	RenderTargets.UpscaledBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc = nvrhi::TextureDesc();
+	texDesc.width = 1;
+	texDesc.height = 1;
+	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
+	texDesc.keepInitialState = true;
+	texDesc.useClearValue = true;
+	texDesc.initialState = nvrhi::ResourceStates::Common;
+	texDesc.isUAV = true;
+	texDesc.isRenderTarget = true;
+	texDesc.format = nvrhi::Format::RGBA32_FLOAT;
+	texDesc.debugName = "FrameInfo";
+	RenderTargets.FrameInfo = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "SpdAtomic";
+	texDesc.format = nvrhi::Format::R32_UINT;
+	RenderTargets.SpdAtomic = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	
+	texDesc.width = SceneInfo.RenderWidth;
+	texDesc.height = SceneInfo.RenderHeight;
+	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
+	texDesc.debugName = "SpdMips";
+	int levels = 0;
+	{
+		int32_t tempWidth = SceneInfo.RenderWidth;
+		int32_t tempHeight = SceneInfo.RenderHeight;
+		while (true) {
+			tempWidth = std::max(1, tempWidth / 2);
+			tempHeight = std::max(1, tempHeight / 2);
+			levels++;
+			if (tempWidth == 1 && tempHeight == 1)
+				break;
+		}
+	}
+	texDesc.mipLevels = levels;
+	texDesc.format = nvrhi::Format::RG16_FLOAT;
+	RenderTargets.SpdMips = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 }
 
 void ragdoll::Scene::UpdateTransforms()
