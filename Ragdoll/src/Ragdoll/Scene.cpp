@@ -344,6 +344,14 @@ void ragdoll::Scene::CreateRenderTargets()
 	RenderTargets.Luminance0 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	texDesc.debugName = "Luminance1";
 	RenderTargets.Luminance1 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "Luma Instability";
+	RenderTargets.LumaInstability = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::RGBA16_FLOAT;
+	texDesc.debugName = "Luminance History0";
+	RenderTargets.LuminanceHistory0 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "Luminance History1";
+	RenderTargets.LuminanceHistory1 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::R16_FLOAT;
 	texDesc.debugName = "FarthestDepthMip";
@@ -357,7 +365,7 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.height = SceneInfo.TargetHeight;
 	texDesc.format = nvrhi::Format::R8_UNORM;
 	texDesc.debugName = "NewLock";
-	RenderTargets.NewLock = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.NewLocks = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.sampleCount = 1;
 	texDesc.width = SceneInfo.RenderWidth;
@@ -481,8 +489,13 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.width = PrimaryWindowRef->GetWidth();
 	texDesc.height = PrimaryWindowRef->GetHeight();
 	texDesc.format = nvrhi::Format::RGBA8_UNORM;
-	texDesc.debugName = "UpscaledBuffer";
-	RenderTargets.UpscaledBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "Presentation";
+	RenderTargets.PresentationBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.format = nvrhi::Format::RGBA16_FLOAT;
+	texDesc.debugName = "UpscaledBuffer0";
+	RenderTargets.UpscaledBuffer0 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "UpscaledBuffer1";
+	RenderTargets.UpscaledBuffer1 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc = nvrhi::TextureDesc();
 	texDesc.width = 1;

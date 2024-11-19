@@ -52,8 +52,10 @@ class FSRPass {
         uint32_t                    rcasConfig[4];
     } RcasConstants;
 
-    int32_t DispatchX;
-    int32_t DispatchY;
+    int32_t DispatchSrcX;
+    int32_t DispatchSrcY;
+    int32_t DispatchDstX;
+    int32_t DispatchDstY;
     uint32_t DispatchThreadGroupCountXY[2];
 	nvrhi::CommandListHandle CommandListRef;
 
@@ -68,6 +70,9 @@ private:
     void ComputeShadingChangePyramid(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets, nvrhi::BufferHandle ConstantBuffer);
     void ComputeShadingChange(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets, nvrhi::BufferHandle ConstantBuffer);
     void ComputeReactivity(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets, nvrhi::BufferHandle ConstantBuffer);
+    void ComputeLumaInstability(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets, nvrhi::BufferHandle ConstantBuffer);
+    void Accumulate(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets, nvrhi::BufferHandle ConstantBuffer);
+    void RCAS(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets, nvrhi::BufferHandle ConstantBuffer);
 
     void UpdateConstants(const ragdoll::SceneInformation& sceneInfo, float _dt);
 };

@@ -116,36 +116,32 @@ void FSRPass::Upscale(const ragdoll::SceneInformation& sceneInfo, ragdoll::Scene
 	RD_GPU_SCOPE("FSR", CommandListRef);
 	CommandListRef->beginMarker("FSR");
 	const int32_t threadGroupWorkRegionDim = 8;
-	DispatchX = (sceneInfo.RenderWidth + (threadGroupWorkRegionDim - 1)) / threadGroupWorkRegionDim;
-	DispatchY = (sceneInfo.RenderHeight + (threadGroupWorkRegionDim - 1)) / threadGroupWorkRegionDim;
+	DispatchSrcX = (sceneInfo.RenderWidth + (threadGroupWorkRegionDim - 1)) / threadGroupWorkRegionDim;
+	DispatchSrcY = (sceneInfo.RenderHeight + (threadGroupWorkRegionDim - 1)) / threadGroupWorkRegionDim;
+	DispatchDstX = (sceneInfo.TargetWidth + (threadGroupWorkRegionDim - 1)) / threadGroupWorkRegionDim;
+	DispatchDstY = (sceneInfo.TargetHeight + (threadGroupWorkRegionDim - 1)) / threadGroupWorkRegionDim;
 
 	UpdateConstants(sceneInfo, _dt);
-
-	static bool oddFrame = false;
-	if (oddFrame) {
-		targets->CurrLuminance = targets->Luminance1;
-		targets->PrevLuminance = targets->Luminance0;
-		targets->CurrAccumulation = targets->Accumulation1;
-		targets->PrevAccumulation = targets->Accumulation0;
-	}
-	else {
-		targets->CurrLuminance = targets->Luminance0;
-		targets->PrevLuminance = targets->Luminance1;
-		targets->CurrAccumulation = targets->Accumulation0;
-		targets->PrevAccumulation = targets->Accumulation1;
-	}
-	oddFrame = true;
 
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(Fsr3UpscalerConstants), "FSR CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 	CommandListRef->writeBuffer(ConstantBufferHandle, &Constants, sizeof(Fsr3UpscalerConstants));
 
 	CommandListRef->clearTextureUInt(targets->RecontDepth, nvrhi::AllSubresources, 0);
+	CommandListRef->clearTextureUInt(targets->SpdAtomic, nvrhi::AllSubresources, 0);
+	CommandListRef->clearTextureFloat(targets->LumaInstability, nvrhi::AllSubresources, 0);
+	CommandListRef->clearTextureFloat(targets->ShadingChange, nvrhi::AllSubresources, 0);
+	CommandListRef->clearTextureFloat (targets->FarthestDepthMip, nvrhi::AllSubresources, 0);
+	CommandListRef->clearTextureFloat(targets->DilatedReactiveMask, nvrhi::AllSubresources, 0);
+	CommandListRef->clearTextureFloat(targets->SpdMips, nvrhi::AllSubresources, 0);
 	PrepareInputs(sceneInfo, targets, ConstantBufferHandle);
 	ComputeLuminancePyramid(sceneInfo, targets, ConstantBufferHandle);
 	ComputeShadingChangePyramid(sceneInfo, targets, ConstantBufferHandle);
 	ComputeShadingChange(sceneInfo, targets, ConstantBufferHandle);
 	ComputeReactivity(sceneInfo, targets, ConstantBufferHandle);
+	ComputeLumaInstability(sceneInfo, targets, ConstantBufferHandle);
+	Accumulate(sceneInfo, targets, ConstantBufferHandle);
+	//RCAS(sceneInfo, targets, ConstantBufferHandle);
 
 	CommandListRef->endMarker();
 }
@@ -177,7 +173,7 @@ void FSRPass::PrepareInputs(const ragdoll::SceneInformation& sceneInfo, ragdoll:
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
 	state.bindings = { setHandle };
 	CommandListRef->setComputeState(state);
-	CommandListRef->dispatch(DispatchX, DispatchY, 1);
+	CommandListRef->dispatch(DispatchSrcX, DispatchSrcY, 1);
 	CommandListRef->endMarker();
 }
 
@@ -329,7 +325,7 @@ void FSRPass::ComputeReactivity(const ragdoll::SceneInformation& sceneInfo, ragd
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
 		nvrhi::BindingSetItem::Texture_SRV(3, targets->InputReactiveMask),
 		nvrhi::BindingSetItem::Texture_SRV(4, targets->InputTCMask),
-		nvrhi::BindingSetItem::Texture_SRV(5, targets->CurrAccumulation),
+		nvrhi::BindingSetItem::Texture_SRV(5, targets->PrevAccumulation),
 		nvrhi::BindingSetItem::Texture_SRV(6, targets->ShadingChange),
 		nvrhi::BindingSetItem::Texture_SRV(7, targets->CurrLuminance),
 		nvrhi::BindingSetItem::Texture_SRV(0, targets->RecontDepth),
@@ -337,7 +333,7 @@ void FSRPass::ComputeReactivity(const ragdoll::SceneInformation& sceneInfo, ragd
 		nvrhi::BindingSetItem::Texture_SRV(2, targets->DilatedDepth),
 		nvrhi::BindingSetItem::Texture_SRV(8, targets->FrameInfo),
 		nvrhi::BindingSetItem::Texture_UAV(2, targets->CurrAccumulation),
-		nvrhi::BindingSetItem::Texture_UAV(1, targets->NewLock),
+		nvrhi::BindingSetItem::Texture_UAV(1, targets->NewLocks),
 		nvrhi::BindingSetItem::Texture_UAV(0, targets->DilatedReactiveMask),
 		nvrhi::BindingSetItem::Sampler(1, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp])
 	};
@@ -353,7 +349,105 @@ void FSRPass::ComputeReactivity(const ragdoll::SceneInformation& sceneInfo, ragd
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
 	state.bindings = { setHandle };
 	CommandListRef->setComputeState(state);
-	CommandListRef->dispatch(DispatchX, DispatchY, 1);
+	CommandListRef->dispatch(DispatchSrcX, DispatchSrcY, 1);
+	CommandListRef->endMarker();
+}
+
+void FSRPass::ComputeLumaInstability(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets, nvrhi::BufferHandle ConstantBuffer)
+{
+	CommandListRef->beginMarker("Luma Instability");
+
+	nvrhi::BindingSetDesc setDesc;
+	setDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(4, targets->PrevLuminanceHistory),
+		nvrhi::BindingSetItem::Texture_SRV(6, targets->CurrLuminance),
+		nvrhi::BindingSetItem::Texture_SRV(2, targets->DilatedMotionVectors),
+		nvrhi::BindingSetItem::Texture_SRV(0, targets->FrameInfo),
+		nvrhi::BindingSetItem::Texture_SRV(1, targets->DilatedReactiveMask),
+		nvrhi::BindingSetItem::Texture_UAV(0, targets->CurrLuminanceHistory),
+		nvrhi::BindingSetItem::Texture_UAV(1, targets->LumaInstability),
+		nvrhi::BindingSetItem::Sampler(1, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp])
+	};
+	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
+
+	nvrhi::ComputePipelineDesc PipelineDesc;
+	PipelineDesc.bindingLayouts = { layoutHandle };
+	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("fsrLumaInstability.cs.cso");
+	PipelineDesc.CS = shader;
+
+	nvrhi::ComputeState state;
+	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
+	state.bindings = { setHandle };
+	CommandListRef->setComputeState(state);
+	CommandListRef->dispatch(DispatchSrcX, DispatchSrcY, 1);
+	CommandListRef->endMarker();
+}
+
+void FSRPass::Accumulate(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets, nvrhi::BufferHandle ConstantBuffer)
+{
+	CommandListRef->beginMarker("Accumulate");
+
+	nvrhi::BindingSetDesc setDesc;
+	setDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(8, targets->FinalColor),
+		nvrhi::BindingSetItem::Texture_SRV(3, targets->PrevUpscaledBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(5, targets->FarthestDepthMip),
+		nvrhi::BindingSetItem::Texture_SRV(7, targets->LumaInstability),
+		nvrhi::BindingSetItem::Texture_SRV(2, targets->DilatedMotionVectors),
+		nvrhi::BindingSetItem::Texture_SRV(0, targets->FrameInfo),
+		nvrhi::BindingSetItem::Texture_SRV(1, targets->DilatedReactiveMask),
+		nvrhi::BindingSetItem::Texture_UAV(0, targets->CurrUpscaledBuffer),
+		nvrhi::BindingSetItem::Texture_UAV(1, targets->PresentationBuffer),
+		nvrhi::BindingSetItem::Texture_UAV(2, targets->NewLocks),
+		nvrhi::BindingSetItem::Sampler(1, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp])
+	};
+	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
+
+	nvrhi::ComputePipelineDesc PipelineDesc;
+	PipelineDesc.bindingLayouts = { layoutHandle };
+	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("fsrAccumulate.cs.cso");
+	PipelineDesc.CS = shader;
+
+	nvrhi::ComputeState state;
+	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
+	state.bindings = { setHandle };
+	CommandListRef->setComputeState(state);
+	CommandListRef->dispatch(DispatchDstX, DispatchDstY, 1);
+	CommandListRef->endMarker();
+}
+
+void FSRPass::RCAS(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets, nvrhi::BufferHandle ConstantBuffer)
+{
+	CommandListRef->beginMarker("RCAS");
+
+	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(Fsr3UpscalerRcasConstants), "RCAS CBuffer", 1);
+	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
+	CommandListRef->writeBuffer(ConstantBufferHandle, &RcasConstants, sizeof(Fsr3UpscalerRcasConstants));
+
+	nvrhi::BindingSetDesc setDesc;
+	setDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(1, ConstantBufferHandle),
+		nvrhi::BindingSetItem::Texture_SRV(0, targets->CurrUpscaledBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(1, targets->FrameInfo),
+		nvrhi::BindingSetItem::Texture_UAV(0, targets->PresentationBuffer),
+	};
+	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
+
+	nvrhi::ComputePipelineDesc PipelineDesc;
+	PipelineDesc.bindingLayouts = { layoutHandle };
+	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("fsrRcas.cs.cso");
+	PipelineDesc.CS = shader;
+
+	nvrhi::ComputeState state;
+	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
+	state.bindings = { setHandle };
+	CommandListRef->setComputeState(state);
+	CommandListRef->dispatch(DispatchSrcX, DispatchSrcY, 1);
 	CommandListRef->endMarker();
 }
 

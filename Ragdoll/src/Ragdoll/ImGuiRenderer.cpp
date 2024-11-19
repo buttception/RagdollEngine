@@ -193,6 +193,7 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 				if (SceneInfo.bEnableDLSS)
 				{
 					SceneInfo.bEnableIntelTAA = false;
+					SceneInfo.bEnableFSR = false;
 				}
 			}
 		if (ImGui::Checkbox("Enable Intel TAA", &SceneInfo.bEnableIntelTAA))
@@ -200,6 +201,15 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 			if (SceneInfo.bEnableIntelTAA)
 			{
 				SceneInfo.bEnableDLSS = false;
+				SceneInfo.bEnableFSR = false;
+			}
+		}
+		if (ImGui::Checkbox("Enable FSR", &SceneInfo.bEnableFSR))
+		{
+			if (SceneInfo.bEnableFSR)
+			{
+				SceneInfo.bEnableDLSS = false;
+				SceneInfo.bEnableIntelTAA = false;
 			}
 		}
 

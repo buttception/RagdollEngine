@@ -130,6 +130,7 @@ namespace ragdoll {
 		bool bFreezeFrustumCulling{ false };
 		bool bEnableDLSS{ true };
 		bool bEnableIntelTAA{ false };
+		bool bEnableFSR{ false };
 		bool bEnableJitter{ true };
 		bool bEnableXeGTAONoise{ true };
 		uint32_t RenderWidth = 960;
@@ -164,7 +165,12 @@ namespace ragdoll {
 		nvrhi::TextureHandle Luminance1;
 		nvrhi::TextureHandle CurrLuminance;
 		nvrhi::TextureHandle PrevLuminance;
-		nvrhi::TextureHandle NewLock;
+		nvrhi::TextureHandle LuminanceHistory0;
+		nvrhi::TextureHandle LuminanceHistory1;
+		nvrhi::TextureHandle CurrLuminanceHistory;
+		nvrhi::TextureHandle PrevLuminanceHistory;
+		nvrhi::TextureHandle LumaInstability;
+		nvrhi::TextureHandle NewLocks;
 		nvrhi::TextureHandle InputReactiveMask;
 		nvrhi::TextureHandle InputTCMask;
 		nvrhi::TextureHandle DilatedReactiveMask;
@@ -203,7 +209,11 @@ namespace ragdoll {
 		nvrhi::TextureHandle AONormalized;
 		//final color
 		nvrhi::TextureHandle FinalColor;
-		nvrhi::TextureHandle UpscaledBuffer;
+		nvrhi::TextureHandle UpscaledBuffer0;
+		nvrhi::TextureHandle UpscaledBuffer1;
+		nvrhi::TextureHandle CurrUpscaledBuffer;
+		nvrhi::TextureHandle PrevUpscaledBuffer;
+		nvrhi::TextureHandle PresentationBuffer;
 	};
 
 	class Scene {
