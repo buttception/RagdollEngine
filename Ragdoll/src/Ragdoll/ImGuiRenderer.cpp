@@ -184,6 +184,10 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		SceneInfo.bIsResolutionDirty = true;
 	}
 
+	static bool firstFrame = true;
+	if(!firstFrame)
+		SceneInfo.bResetAccumulation = false;
+	firstFrame = false;
 	if (ImGui::TreeNode("Anti Aliasing & Super Sampling"))
 	{
 		ImGui::Checkbox("Enable Jitter", &SceneInfo.bEnableJitter);
@@ -194,6 +198,7 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 				{
 					SceneInfo.bEnableIntelTAA = false;
 					SceneInfo.bEnableFSR = false;
+					SceneInfo.bResetAccumulation = true;
 				}
 			}
 		if (ImGui::Checkbox("Enable Intel TAA", &SceneInfo.bEnableIntelTAA))
@@ -202,6 +207,7 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 			{
 				SceneInfo.bEnableDLSS = false;
 				SceneInfo.bEnableFSR = false;
+				SceneInfo.bResetAccumulation = true;
 			}
 		}
 		if (ImGui::Checkbox("Enable FSR", &SceneInfo.bEnableFSR))
@@ -210,6 +216,7 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 			{
 				SceneInfo.bEnableDLSS = false;
 				SceneInfo.bEnableIntelTAA = false;
+				SceneInfo.bResetAccumulation = true;
 			}
 		}
 

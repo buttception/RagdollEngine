@@ -73,6 +73,7 @@ private:
     void ComputeLumaInstability(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets, nvrhi::BufferHandle ConstantBuffer);
     void Accumulate(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets, nvrhi::BufferHandle ConstantBuffer);
     void RCAS(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets, nvrhi::BufferHandle ConstantBuffer);
+    void Debug(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets, nvrhi::BufferHandle ConstantBuffer);
 
     void UpdateConstants(const ragdoll::SceneInformation& sceneInfo, float _dt);
 };

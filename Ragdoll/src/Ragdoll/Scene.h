@@ -131,6 +131,7 @@ namespace ragdoll {
 		bool bEnableDLSS{ true };
 		bool bEnableIntelTAA{ false };
 		bool bEnableFSR{ false };
+		bool bResetAccumulation{ true };
 		bool bEnableJitter{ true };
 		bool bEnableXeGTAONoise{ true };
 		uint32_t RenderWidth = 960;

@@ -344,14 +344,6 @@ void ragdoll::Scene::CreateRenderTargets()
 	RenderTargets.Luminance0 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	texDesc.debugName = "Luminance1";
 	RenderTargets.Luminance1 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-	texDesc.debugName = "Luma Instability";
-	RenderTargets.LumaInstability = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-
-	texDesc.format = nvrhi::Format::RGBA16_FLOAT;
-	texDesc.debugName = "Luminance History0";
-	RenderTargets.LuminanceHistory0 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-	texDesc.debugName = "Luminance History1";
-	RenderTargets.LuminanceHistory1 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.format = nvrhi::Format::R16_FLOAT;
 	texDesc.debugName = "FarthestDepthMip";
@@ -366,6 +358,14 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.format = nvrhi::Format::R8_UNORM;
 	texDesc.debugName = "NewLock";
 	RenderTargets.NewLocks = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.format = nvrhi::Format::R16_FLOAT;
+	texDesc.debugName = "Luma Instability";
+	RenderTargets.LumaInstability = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.format = nvrhi::Format::RGBA16_FLOAT;
+	texDesc.debugName = "Luminance History0";
+	RenderTargets.LuminanceHistory0 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	texDesc.debugName = "Luminance History1";
+	RenderTargets.LuminanceHistory1 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.sampleCount = 1;
 	texDesc.width = SceneInfo.RenderWidth;

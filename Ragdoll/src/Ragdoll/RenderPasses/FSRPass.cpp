@@ -129,11 +129,14 @@ void FSRPass::Upscale(const ragdoll::SceneInformation& sceneInfo, ragdoll::Scene
 
 	CommandListRef->clearTextureUInt(targets->RecontDepth, nvrhi::AllSubresources, 0);
 	CommandListRef->clearTextureUInt(targets->SpdAtomic, nvrhi::AllSubresources, 0);
-	CommandListRef->clearTextureFloat(targets->LumaInstability, nvrhi::AllSubresources, 0);
-	CommandListRef->clearTextureFloat(targets->ShadingChange, nvrhi::AllSubresources, 0);
-	CommandListRef->clearTextureFloat (targets->FarthestDepthMip, nvrhi::AllSubresources, 0);
-	CommandListRef->clearTextureFloat(targets->DilatedReactiveMask, nvrhi::AllSubresources, 0);
-	CommandListRef->clearTextureFloat(targets->SpdMips, nvrhi::AllSubresources, 0);
+	CommandListRef->clearTextureFloat(targets->SpdMips, nvrhi::TextureSubresourceSet{ 0, 1, 0, 1 }, 0);
+
+	if (sceneInfo.bResetAccumulation)
+	{
+		CommandListRef->clearTextureFloat(targets->PrevAccumulation, nvrhi::AllSubresources, 0);
+		CommandListRef->clearTextureFloat(targets->SpdMips, nvrhi::AllSubresources, 0);
+		CommandListRef->clearTextureFloat(targets->FrameInfo, nvrhi::AllSubresources, { -1.f, 1.f, 0.f, 0.f });
+	}
 	PrepareInputs(sceneInfo, targets, ConstantBufferHandle);
 	ComputeLuminancePyramid(sceneInfo, targets, ConstantBufferHandle);
 	ComputeShadingChangePyramid(sceneInfo, targets, ConstantBufferHandle);
@@ -141,7 +144,10 @@ void FSRPass::Upscale(const ragdoll::SceneInformation& sceneInfo, ragdoll::Scene
 	ComputeReactivity(sceneInfo, targets, ConstantBufferHandle);
 	ComputeLumaInstability(sceneInfo, targets, ConstantBufferHandle);
 	Accumulate(sceneInfo, targets, ConstantBufferHandle);
-	//RCAS(sceneInfo, targets, ConstantBufferHandle);
+	RCAS(sceneInfo, targets, ConstantBufferHandle);
+#if 1
+	Debug(sceneInfo, targets, ConstantBufferHandle);
+#endif
 
 	CommandListRef->endMarker();
 }
@@ -153,7 +159,7 @@ void FSRPass::PrepareInputs(const ragdoll::SceneInformation& sceneInfo, ragdoll:
 	setDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
 		nvrhi::BindingSetItem::Texture_SRV(1, targets->CurrDepthBuffer),
-		nvrhi::BindingSetItem::Texture_SRV(2, targets->FinalColor),
+		nvrhi::BindingSetItem::Texture_SRV(2, targets->SceneColor),
 		nvrhi::BindingSetItem::Texture_SRV(0, targets->VelocityBuffer),
 		nvrhi::BindingSetItem::Texture_UAV(3, targets->FarthestDepth),
 		nvrhi::BindingSetItem::Texture_UAV(4, targets->CurrLuminance),
@@ -392,7 +398,7 @@ void FSRPass::Accumulate(const ragdoll::SceneInformation& sceneInfo, ragdoll::Sc
 	nvrhi::BindingSetDesc setDesc;
 	setDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
-		nvrhi::BindingSetItem::Texture_SRV(8, targets->FinalColor),
+		nvrhi::BindingSetItem::Texture_SRV(8, targets->SceneColor),
 		nvrhi::BindingSetItem::Texture_SRV(3, targets->PrevUpscaledBuffer),
 		nvrhi::BindingSetItem::Texture_SRV(5, targets->FarthestDepthMip),
 		nvrhi::BindingSetItem::Texture_SRV(7, targets->LumaInstability),
@@ -400,7 +406,6 @@ void FSRPass::Accumulate(const ragdoll::SceneInformation& sceneInfo, ragdoll::Sc
 		nvrhi::BindingSetItem::Texture_SRV(0, targets->FrameInfo),
 		nvrhi::BindingSetItem::Texture_SRV(1, targets->DilatedReactiveMask),
 		nvrhi::BindingSetItem::Texture_UAV(0, targets->CurrUpscaledBuffer),
-		nvrhi::BindingSetItem::Texture_UAV(1, targets->PresentationBuffer),
 		nvrhi::BindingSetItem::Texture_UAV(2, targets->NewLocks),
 		nvrhi::BindingSetItem::Sampler(1, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp])
 	};
@@ -423,6 +428,10 @@ void FSRPass::Accumulate(const ragdoll::SceneInformation& sceneInfo, ragdoll::Sc
 void FSRPass::RCAS(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets, nvrhi::BufferHandle ConstantBuffer)
 {
 	CommandListRef->beginMarker("RCAS");
+
+	const int32_t threadGroupWorkRegionDimRCAS = 16;
+	const int32_t dispatchX = (sceneInfo.TargetWidth + (threadGroupWorkRegionDimRCAS - 1)) / threadGroupWorkRegionDimRCAS;
+	const int32_t dispatchY = (sceneInfo.TargetHeight + (threadGroupWorkRegionDimRCAS - 1)) / threadGroupWorkRegionDimRCAS;
 
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(Fsr3UpscalerRcasConstants), "RCAS CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
@@ -447,7 +456,37 @@ void FSRPass::RCAS(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRen
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
 	state.bindings = { setHandle };
 	CommandListRef->setComputeState(state);
-	CommandListRef->dispatch(DispatchSrcX, DispatchSrcY, 1);
+	CommandListRef->dispatch(dispatchX, dispatchY, 1);
+	CommandListRef->endMarker();
+}
+
+void FSRPass::Debug(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets, nvrhi::BufferHandle ConstantBuffer)
+{
+	CommandListRef->beginMarker("Debug");
+
+	nvrhi::BindingSetDesc setDesc;
+	setDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(3, targets->CurrUpscaledBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(1, targets->DilatedMotionVectors),
+		nvrhi::BindingSetItem::Texture_SRV(2, targets->DilatedDepth),
+		nvrhi::BindingSetItem::Texture_SRV(0, targets->DilatedReactiveMask),
+		nvrhi::BindingSetItem::Texture_UAV(0, targets->PresentationBuffer),
+		nvrhi::BindingSetItem::Sampler(1, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp]),
+	};
+	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
+	nvrhi::BindingSetHandle setHandle = DirectXDevice::GetInstance()->CreateBindingSet(setDesc, layoutHandle);
+
+	nvrhi::ComputePipelineDesc PipelineDesc;
+	PipelineDesc.bindingLayouts = { layoutHandle };
+	nvrhi::ShaderHandle shader = AssetManager::GetInstance()->GetShader("fsrDebug.cs.cso");
+	PipelineDesc.CS = shader;
+
+	nvrhi::ComputeState state;
+	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
+	state.bindings = { setHandle };
+	CommandListRef->setComputeState(state);
+	CommandListRef->dispatch(DispatchDstX, DispatchDstY, 1);
 	CommandListRef->endMarker();
 }
 
@@ -542,15 +581,16 @@ void FSRPass::UpdateConstants(const ragdoll::SceneInformation& sceneInfo, float 
 	Constants.downscaleFactor[0] = float(Constants.renderSize[0]) / Constants.upscaleSize[0];
 	Constants.downscaleFactor[1] = float(Constants.renderSize[1]) / Constants.upscaleSize[1];
 
-	Constants.motionVectorScale[0] = 1.f;
-	Constants.motionVectorScale[1] = 1.f;
+	Constants.motionVectorScale[0] = 1.f / sceneInfo.RenderWidth;
+	Constants.motionVectorScale[1] = 1.f / sceneInfo.RenderHeight;
+	//Constants.motionVectorScale[0] = 1.f;
+	//Constants.motionVectorScale[1] = 1.f;
 
-	float paramSharpness = 1.f;
+	float paramSharpness = 0.8f;
 	float sharpenessRemapped = (-2.0f * paramSharpness) + 2.0f;
 	// Transform from stops to linear value.
 	float sharpness = exp2(-sharpenessRemapped);
 	Vector2 hSharp = { sharpness, sharpness };
-
 	RcasConstants.rcasConfig[0] = ffxAsUInt32(sharpness);
 	RcasConstants.rcasConfig[1] = ffxPackHalf2x16(hSharp);
 	RcasConstants.rcasConfig[2] = 0;
