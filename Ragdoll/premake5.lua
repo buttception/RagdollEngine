@@ -32,7 +32,7 @@ project "Ragdoll"
 
 	libdirs
 	{
-		"%{LibDirs.dlss}",
+		"%{LibDirs.dlss}"
 	}
 
 	links
@@ -40,7 +40,7 @@ project "Ragdoll"
 		"GLFW",
 		"imgui",
 		"d3d12",
-		"dxgi",
+		"dxgi"
 	}
 	
 	vpaths 

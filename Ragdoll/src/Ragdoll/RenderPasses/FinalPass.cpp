@@ -24,7 +24,7 @@ void FinalPass::DrawQuad(ragdoll::SceneRenderTargets* targets, bool upscaled)
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
-		nvrhi::BindingSetItem::Texture_SRV(0, upscaled ? targets->UpscaledBuffer : targets->FinalColor),
+		nvrhi::BindingSetItem::Texture_SRV(0, upscaled ? targets->PresentationBuffer : targets->FinalColor),
 		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp])
 	};
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);

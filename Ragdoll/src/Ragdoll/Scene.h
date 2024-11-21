@@ -114,6 +114,7 @@ namespace ragdoll {
 		float LightIntensity = 1.f;
 		float CameraFov;
 		float CameraNear;
+		float CameraFar;
 		float CameraAspect;
 		int32_t EnableCascadeDebug{ 0 };
 		float Gamma = 1.f;
@@ -129,12 +130,16 @@ namespace ragdoll {
 		bool bFreezeFrustumCulling{ false };
 		bool bEnableDLSS{ true };
 		bool bEnableIntelTAA{ false };
+		bool bEnableFSR{ false };
+		bool bResetAccumulation{ true };
 		bool bEnableJitter{ true };
 		bool bEnableXeGTAONoise{ true };
 		uint32_t RenderWidth = 960;
 		uint32_t RenderHeight = 540;
 		uint32_t TargetWidth;
 		uint32_t TargetHeight;
+		float JitterX;
+		float JitterY;
 		bool bIsResolutionDirty{ false };
 	};
 
@@ -142,16 +147,43 @@ namespace ragdoll {
 	{
 		//render targets
 		nvrhi::TextureHandle SceneColor;
-		nvrhi::TextureHandle TemporalColor0;	//temporal buffer
-		nvrhi::TextureHandle TemporalColor1;	//temporal buffer
 		nvrhi::TextureHandle CurrDepthBuffer;
 		nvrhi::TextureHandle PrevDepthBuffer;
 		nvrhi::TextureHandle SceneDepthZ0;
-		nvrhi::TextureHandle SceneDepthZ1;	//temporal buffer
 		nvrhi::TextureHandle GBufferAlbedo;
 		nvrhi::TextureHandle GBufferNormal;
 		nvrhi::TextureHandle GBufferRM;
 		nvrhi::TextureHandle VelocityBuffer;
+		//TAA / fsr
+		nvrhi::TextureHandle TemporalColor0;	//temporal buffer
+		nvrhi::TextureHandle TemporalColor1;	//temporal buffer
+		nvrhi::TextureHandle SceneDepthZ1;	//temporal buffer
+		nvrhi::TextureHandle RecontDepth;
+		nvrhi::TextureHandle DilatedDepth;
+		nvrhi::TextureHandle FarthestDepth;
+		nvrhi::TextureHandle DilatedMotionVectors;
+		nvrhi::TextureHandle Luminance0;
+		nvrhi::TextureHandle Luminance1;
+		nvrhi::TextureHandle CurrLuminance;
+		nvrhi::TextureHandle PrevLuminance;
+		nvrhi::TextureHandle LuminanceHistory0;
+		nvrhi::TextureHandle LuminanceHistory1;
+		nvrhi::TextureHandle CurrLuminanceHistory;
+		nvrhi::TextureHandle PrevLuminanceHistory;
+		nvrhi::TextureHandle LumaInstability;
+		nvrhi::TextureHandle NewLocks;
+		nvrhi::TextureHandle InputReactiveMask;
+		nvrhi::TextureHandle InputTCMask;
+		nvrhi::TextureHandle DilatedReactiveMask;
+		nvrhi::TextureHandle Accumulation0;
+		nvrhi::TextureHandle Accumulation1;
+		nvrhi::TextureHandle CurrAccumulation;
+		nvrhi::TextureHandle PrevAccumulation;
+		nvrhi::TextureHandle FarthestDepthMip;
+		nvrhi::TextureHandle FrameInfo;
+		nvrhi::TextureHandle SpdMips;
+		nvrhi::TextureHandle SpdAtomic;
+		nvrhi::TextureHandle ShadingChange;
 		//shadows
 		nvrhi::TextureHandle ShadowMap[4];
 		nvrhi::TextureHandle ShadowMask;
@@ -170,7 +202,7 @@ namespace ragdoll {
 		nvrhi::TextureHandle ImportanceMapPong;
 		nvrhi::TextureHandle LoadCounter;
 		//xegtao
-		nvrhi::TextureHandle DepthMips;
+		nvrhi::TextureHandle DepthMip;
 		nvrhi::TextureHandle AOTerm;
 		nvrhi::TextureHandle EdgeMap;
 		nvrhi::TextureHandle FinalAOTerm;
@@ -178,7 +210,11 @@ namespace ragdoll {
 		nvrhi::TextureHandle AONormalized;
 		//final color
 		nvrhi::TextureHandle FinalColor;
-		nvrhi::TextureHandle UpscaledBuffer;
+		nvrhi::TextureHandle UpscaledBuffer0;
+		nvrhi::TextureHandle UpscaledBuffer1;
+		nvrhi::TextureHandle CurrUpscaledBuffer;
+		nvrhi::TextureHandle PrevUpscaledBuffer;
+		nvrhi::TextureHandle PresentationBuffer;
 	};
 
 	class Scene {

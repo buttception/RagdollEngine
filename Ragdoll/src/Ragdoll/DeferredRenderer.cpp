@@ -62,8 +62,32 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 {
 	//swaps the depth buffer being drawn to
 	bIsOddFrame = !bIsOddFrame;
-	RenderTargets->CurrDepthBuffer = bIsOddFrame ? RenderTargets->SceneDepthZ0 : RenderTargets->SceneDepthZ1;
-	RenderTargets->PrevDepthBuffer = !bIsOddFrame ? RenderTargets->SceneDepthZ0 : RenderTargets->SceneDepthZ1;
+	if (bIsOddFrame)
+	{
+		RenderTargets->CurrDepthBuffer = RenderTargets->SceneDepthZ1;
+		RenderTargets->PrevDepthBuffer = RenderTargets->SceneDepthZ0;
+		RenderTargets->CurrUpscaledBuffer = RenderTargets->UpscaledBuffer1;
+		RenderTargets->PrevUpscaledBuffer = RenderTargets->UpscaledBuffer0;
+		RenderTargets->CurrLuminance = RenderTargets->Luminance1;
+		RenderTargets->PrevLuminance = RenderTargets->Luminance0;
+		RenderTargets->CurrAccumulation = RenderTargets->Accumulation1;
+		RenderTargets->PrevAccumulation = RenderTargets->Accumulation0;
+		RenderTargets->CurrLuminanceHistory = RenderTargets->LuminanceHistory1;
+		RenderTargets->PrevLuminanceHistory = RenderTargets->LuminanceHistory0;
+	}
+	else
+	{
+		RenderTargets->CurrDepthBuffer = RenderTargets->SceneDepthZ0;
+		RenderTargets->PrevDepthBuffer = RenderTargets->SceneDepthZ1;
+		RenderTargets->CurrUpscaledBuffer = RenderTargets->UpscaledBuffer0;
+		RenderTargets->PrevUpscaledBuffer = RenderTargets->UpscaledBuffer1;
+		RenderTargets->CurrLuminance = RenderTargets->Luminance0;
+		RenderTargets->PrevLuminance = RenderTargets->Luminance1;
+		RenderTargets->CurrAccumulation = RenderTargets->Accumulation0;
+		RenderTargets->PrevAccumulation = RenderTargets->Accumulation1;
+		RenderTargets->CurrLuminanceHistory = RenderTargets->LuminanceHistory0;
+		RenderTargets->PrevLuminanceHistory = RenderTargets->LuminanceHistory1;
+	}
 	{
 		//this process is long because it is waiting for the gpu to be done first
 		RD_SCOPE(Render, Readback);
@@ -157,18 +181,27 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 
 	Taskflow.emplace([this, _dt]() {
 		AutomaticExposurePass->GetAdaptedLuminance(_dt, RenderTargets);
-	});
+		});
 	activeList.emplace_back(CommandLists[(int)Pass::EXPOSURE]);
 
 	nvrhi::BufferHandle exposure = AutomaticExposurePass->AdaptedLuminanceHandle;
 	Taskflow.emplace([this, &scene, exposure]() {
 		ToneMapPass->ToneMap(scene->SceneInfo, exposure, RenderTargets);
-	});
+		});
+
 	activeList.emplace_back(CommandLists[(int)Pass::TONEMAP]);
+
+	if (scene->SceneInfo.bEnableFSR)
+	{
+		Taskflow.emplace([this, &scene, _dt]() {
+			FSRPass->Upscale(scene->SceneInfo, RenderTargets, _dt);
+			});
+		activeList.emplace_back(CommandLists[(int)Pass::TAA]);
+	}
 	
 	if (scene->SceneInfo.bEnableIntelTAA)
 	{
-		Taskflow.emplace([this, &scene]() {
+		Taskflow.emplace([this, &scene, _dt]() {
 			IntelTAAPass->TemporalAA(RenderTargets, scene->SceneInfo, Vector2(scene->JitterOffsetsX[scene->PhaseIndex], scene->JitterOffsetsY[scene->PhaseIndex]));
 			});
 		activeList.emplace_back(CommandLists[(int)Pass::TAA]);
@@ -187,10 +220,17 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 		activeList.emplace_back(CommandLists[(int)Pass::FB_VIEWER]);
 	}
 	else {
-		if (!scene->SceneInfo.bEnableDLSS)
+		if (!scene->SceneInfo.bEnableDLSS && !scene->SceneInfo.bEnableFSR)
 		{
 			Taskflow.emplace([this]() {
 				FinalPass->DrawQuad(RenderTargets, false);
+				});
+			activeList.emplace_back(CommandLists[(int)Pass::FINAL]);
+		}
+		else if (scene->SceneInfo.bEnableFSR)
+		{
+			Taskflow.emplace([this]() {
+				FinalPass->DrawQuad(RenderTargets, true);
 				});
 			activeList.emplace_back(CommandLists[(int)Pass::FINAL]);
 		}
@@ -213,7 +253,7 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 	if (scene->Config.bInitDLSS && scene->SceneInfo.bEnableDLSS && !scene->DebugInfo.DbgTarget)
 	{
 		//DLSS pass
-		NVSDK::Evaluate(RenderTargets->FinalColor, RenderTargets->UpscaledBuffer, RenderTargets->CurrDepthBuffer, RenderTargets->VelocityBuffer, scene);
+		NVSDK::Evaluate(RenderTargets->FinalColor, RenderTargets->PresentationBuffer, RenderTargets->CurrDepthBuffer, RenderTargets->VelocityBuffer, scene);
 
 		FinalPass->DrawQuad(RenderTargets, true);
 		MICROPROFILE_GPU_SUBMIT(EnterCommandListSectionGpu::Queue, CommandLists[(int)Pass::FINAL]->Work);
@@ -271,6 +311,9 @@ void Renderer::CreateResource()
 
 	IntelTAAPass = std::make_shared<class IntelTAAPass>();
 	IntelTAAPass->Init(CommandLists[(int)Pass::TAA]);
+
+	FSRPass = std::make_shared<class FSRPass>();
+	FSRPass->Init(CommandLists[(int)Pass::TAA]);
 
 	FinalPass = std::make_shared<class FinalPass>();
 	FinalPass->Init(CommandLists[(int)Pass::FINAL]);
