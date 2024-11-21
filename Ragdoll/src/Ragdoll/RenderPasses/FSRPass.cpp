@@ -144,7 +144,7 @@ void FSRPass::Upscale(const ragdoll::SceneInformation& sceneInfo, ragdoll::Scene
 	ComputeReactivity(sceneInfo, targets, ConstantBufferHandle);
 	ComputeLumaInstability(sceneInfo, targets, ConstantBufferHandle);
 	Accumulate(sceneInfo, targets, ConstantBufferHandle);
-	//RCAS(sceneInfo, targets, ConstantBufferHandle);
+	RCAS(sceneInfo, targets, ConstantBufferHandle);
 #if 1
 	Debug(sceneInfo, targets, ConstantBufferHandle);
 #endif
@@ -441,8 +441,8 @@ void FSRPass::RCAS(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRen
 	nvrhi::BindingSetDesc setDesc;
 	setDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(1, ConstantBufferHandle),
-		nvrhi::BindingSetItem::Texture_SRV(0, targets->CurrUpscaledBuffer),
-		nvrhi::BindingSetItem::Texture_SRV(1, targets->FrameInfo),
+		nvrhi::BindingSetItem::Texture_SRV(1, targets->CurrUpscaledBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(0, targets->FrameInfo),
 		nvrhi::BindingSetItem::Texture_UAV(0, targets->PresentationBuffer),
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
