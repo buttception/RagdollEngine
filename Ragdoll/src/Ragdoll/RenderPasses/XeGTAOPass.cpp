@@ -74,11 +74,11 @@ void XeGTAOPass::GenerateDepthMips(const ragdoll::SceneInformation& sceneInfo, n
 		nvrhi::BindingSetItem::ConstantBuffer(0, BufferHandle),
 		nvrhi::BindingSetItem::ConstantBuffer(1, matrix),
 		nvrhi::BindingSetItem::Texture_SRV(0, targets->CurrDepthBuffer),
-		nvrhi::BindingSetItem::Texture_UAV(0, targets->DepthMips, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet{0,1,0,1}),
-		nvrhi::BindingSetItem::Texture_UAV(1, targets->DepthMips, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet{1,1,0,1}),
-		nvrhi::BindingSetItem::Texture_UAV(2, targets->DepthMips, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet{2,1,0,1}),
-		nvrhi::BindingSetItem::Texture_UAV(3, targets->DepthMips, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet{3,1,0,1}),
-		nvrhi::BindingSetItem::Texture_UAV(4, targets->DepthMips, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet{4,1,0,1}),
+		nvrhi::BindingSetItem::Texture_UAV(0, targets->DepthMip, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet{0,1,0,1}),
+		nvrhi::BindingSetItem::Texture_UAV(1, targets->DepthMip, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet{1,1,0,1}),
+		nvrhi::BindingSetItem::Texture_UAV(2, targets->DepthMip, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet{2,1,0,1}),
+		nvrhi::BindingSetItem::Texture_UAV(3, targets->DepthMip, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet{3,1,0,1}),
+		nvrhi::BindingSetItem::Texture_UAV(4, targets->DepthMip, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet{4,1,0,1}),
 		nvrhi::BindingSetItem::Sampler(10, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp])
 	};
 	nvrhi::BindingLayoutHandle layoutHandle = AssetManager::GetInstance()->GetBindingLayout(setDesc);
@@ -93,7 +93,7 @@ void XeGTAOPass::GenerateDepthMips(const ragdoll::SceneInformation& sceneInfo, n
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
 	state.bindings = { setHandle };
 	CommandListRef->setComputeState(state);
-	CommandListRef->dispatch(GET_BATCH_DIMENSION_DEPTH(targets->DepthMips->getDesc().width, targets->DepthMips->getDesc().height));
+	CommandListRef->dispatch(GET_BATCH_DIMENSION_DEPTH(targets->DepthMip->getDesc().width, targets->DepthMip->getDesc().height));
 	CommandListRef->endMarker();
 }
 
@@ -106,7 +106,7 @@ void XeGTAOPass::MainPass(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buf
 	setDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, BufferHandle),
 		nvrhi::BindingSetItem::ConstantBuffer(1, matrix),
-		nvrhi::BindingSetItem::Texture_SRV(0, targets->DepthMips),
+		nvrhi::BindingSetItem::Texture_SRV(0, targets->DepthMip),
 		nvrhi::BindingSetItem::Texture_SRV(1, targets->GBufferNormal),
 		nvrhi::BindingSetItem::Texture_UAV(0, targets->AOTerm),
 		nvrhi::BindingSetItem::Texture_UAV(1, targets->EdgeMap),
@@ -124,7 +124,7 @@ void XeGTAOPass::MainPass(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buf
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
 	state.bindings = { setHandle };
 	CommandListRef->setComputeState(state);
-	CommandListRef->dispatch(GET_BATCH_DIMENSION_AO(targets->DepthMips->getDesc().width, targets->DepthMips->getDesc().height));
+	CommandListRef->dispatch(GET_BATCH_DIMENSION_AO(targets->DepthMip->getDesc().width, targets->DepthMip->getDesc().height));
 	CommandListRef->endMarker();
 }
 
@@ -164,7 +164,7 @@ void XeGTAOPass::Denoise(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 		state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
 		state.bindings = { setHandle };
 		CommandListRef->setComputeState(state);
-		CommandListRef->dispatch(GET_BATCH_DIMENSION_NOISE(targets->DepthMips->getDesc().width, targets->DepthMips->getDesc().height));
+		CommandListRef->dispatch(GET_BATCH_DIMENSION_NOISE(targets->DepthMip->getDesc().width, targets->DepthMip->getDesc().height));
 	}
 	CommandListRef->endMarker();
 }
@@ -197,7 +197,7 @@ void XeGTAOPass::Compose(const ragdoll::SceneInformation& sceneInfo, nvrhi::Buff
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
 	state.bindings = { setHandle };
 	CommandListRef->setComputeState(state);
-	CommandListRef->dispatch(GET_BATCH_DIMENSION_COMPOSE(targets->DepthMips->getDesc().width, targets->DepthMips->getDesc().height));
+	CommandListRef->dispatch(GET_BATCH_DIMENSION_COMPOSE(targets->DepthMip->getDesc().width, targets->DepthMip->getDesc().height));
 	CommandListRef->copyTexture(targets->AOTermAccumulation, nvrhi::TextureSlice().resolve(targets->AOTermAccumulation->getDesc()), targets->AONormalized, nvrhi::TextureSlice().resolve(targets->AONormalized->getDesc()));
 
 	CommandListRef->endMarker();

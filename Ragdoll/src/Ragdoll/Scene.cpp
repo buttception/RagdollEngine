@@ -293,8 +293,6 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "AONormalized";
 	RenderTargets.AONormalized = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
-	texDesc.debugName = "ShadingChange";
-	RenderTargets.ShadingChange = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	texDesc.debugName = "Accumulation0";
 	RenderTargets.Accumulation0 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	texDesc.debugName = "Accumulation1";
@@ -339,33 +337,41 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "DilatedMotionVectors";
 	RenderTargets.DilatedMotionVectors = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
+	texDesc.format = nvrhi::Format::RGBA8_UNORM;
+	texDesc.debugName = "DilatedReactiveMask";
+	RenderTargets.DilatedReactiveMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
 	texDesc.format = nvrhi::Format::R16_FLOAT;
 	texDesc.debugName = "Luminance0";
 	RenderTargets.Luminance0 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	texDesc.debugName = "Luminance1";
 	RenderTargets.Luminance1 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-
-	texDesc.format = nvrhi::Format::R16_FLOAT;
-	texDesc.debugName = "FarthestDepthMip";
-	RenderTargets.FarthestDepthMip = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-
-	texDesc.format = nvrhi::Format::RGBA8_UNORM;
-	texDesc.debugName = "DilatedReactiveMask";
-	RenderTargets.DilatedReactiveMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-
-	texDesc.width = SceneInfo.TargetWidth;
-	texDesc.height = SceneInfo.TargetHeight;
-	texDesc.format = nvrhi::Format::R8_UNORM;
-	texDesc.debugName = "NewLock";
-	RenderTargets.NewLocks = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-	texDesc.format = nvrhi::Format::R16_FLOAT;
 	texDesc.debugName = "Luma Instability";
 	RenderTargets.LumaInstability = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
 	texDesc.format = nvrhi::Format::RGBA16_FLOAT;
 	texDesc.debugName = "Luminance History0";
 	RenderTargets.LuminanceHistory0 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	texDesc.debugName = "Luminance History1";
 	RenderTargets.LuminanceHistory1 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.width = SceneInfo.TargetWidth;
+	texDesc.height = SceneInfo.TargetHeight;
+
+	texDesc.format = nvrhi::Format::R8_UNORM;
+	texDesc.debugName = "NewLock";
+	RenderTargets.NewLocks = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.width = SceneInfo.RenderWidth / 2;
+	texDesc.height = SceneInfo.RenderHeight / 2;
+
+	texDesc.format = nvrhi::Format::R8_UNORM;
+	texDesc.debugName = "ShadingChange";
+	RenderTargets.ShadingChange = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.format = nvrhi::Format::R16_FLOAT;
+	texDesc.debugName = "FarthestDepthMip";
+	RenderTargets.FarthestDepthMip = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.sampleCount = 1;
 	texDesc.width = SceneInfo.RenderWidth;
@@ -467,10 +473,13 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	texDesc.isUAV = true;
 	texDesc.keepInitialState = true;
-	texDesc.debugName = "DepthMips";
+	texDesc.debugName = "DepthMip";
 	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
 	texDesc.mipLevels = 5;
-	RenderTargets.DepthMips = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+	RenderTargets.DepthMip = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	texDesc.width = SceneInfo.RenderWidth;
+	texDesc.height = SceneInfo.RenderHeight;
 
 	texDesc.format = nvrhi::Format::R8_UINT;
 	texDesc.debugName = "AOTerm";
@@ -513,8 +522,8 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.format = nvrhi::Format::R32_UINT;
 	RenderTargets.SpdAtomic = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 	
-	texDesc.width = SceneInfo.RenderWidth;
-	texDesc.height = SceneInfo.RenderHeight;
+	texDesc.width = SceneInfo.RenderWidth / 2;
+	texDesc.height = SceneInfo.RenderHeight / 2;
 	texDesc.dimension = nvrhi::TextureDimension::Texture2D;
 	texDesc.debugName = "SpdMips";
 	int levels = 0;

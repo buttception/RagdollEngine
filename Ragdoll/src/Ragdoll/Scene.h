@@ -202,7 +202,7 @@ namespace ragdoll {
 		nvrhi::TextureHandle ImportanceMapPong;
 		nvrhi::TextureHandle LoadCounter;
 		//xegtao
-		nvrhi::TextureHandle DepthMips;
+		nvrhi::TextureHandle DepthMip;
 		nvrhi::TextureHandle AOTerm;
 		nvrhi::TextureHandle EdgeMap;
 		nvrhi::TextureHandle FinalAOTerm;

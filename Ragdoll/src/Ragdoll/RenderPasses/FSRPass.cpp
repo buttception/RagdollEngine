@@ -144,7 +144,7 @@ void FSRPass::Upscale(const ragdoll::SceneInformation& sceneInfo, ragdoll::Scene
 	ComputeReactivity(sceneInfo, targets, ConstantBufferHandle);
 	ComputeLumaInstability(sceneInfo, targets, ConstantBufferHandle);
 	Accumulate(sceneInfo, targets, ConstantBufferHandle);
-	RCAS(sceneInfo, targets, ConstantBufferHandle);
+	//RCAS(sceneInfo, targets, ConstantBufferHandle);
 #if 1
 	Debug(sceneInfo, targets, ConstantBufferHandle);
 #endif
@@ -406,6 +406,7 @@ void FSRPass::Accumulate(const ragdoll::SceneInformation& sceneInfo, ragdoll::Sc
 		nvrhi::BindingSetItem::Texture_SRV(0, targets->FrameInfo),
 		nvrhi::BindingSetItem::Texture_SRV(1, targets->DilatedReactiveMask),
 		nvrhi::BindingSetItem::Texture_UAV(0, targets->CurrUpscaledBuffer),
+		nvrhi::BindingSetItem::Texture_UAV(1, targets->PresentationBuffer),
 		nvrhi::BindingSetItem::Texture_UAV(2, targets->NewLocks),
 		nvrhi::BindingSetItem::Sampler(1, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp])
 	};
@@ -501,8 +502,8 @@ void FSRPass::UpdateConstants(const ragdoll::SceneInformation& sceneInfo, float 
 	Constants.previousFrameRenderSize[1] = Constants.renderSize[1];
 	Constants.renderSize[0] = sceneInfo.RenderWidth;
 	Constants.renderSize[1] = sceneInfo.RenderHeight;
-	Constants.maxRenderSize[0] = sceneInfo.TargetWidth;
-	Constants.maxRenderSize[1] = sceneInfo.TargetHeight;
+	Constants.maxRenderSize[0] = sceneInfo.RenderWidth;
+	Constants.maxRenderSize[1] = sceneInfo.RenderHeight;
 	Constants.previousFrameUpscaleSize[0] = Constants.upscaleSize[0];
 	Constants.previousFrameUpscaleSize[1] = Constants.upscaleSize[1];
 	Constants.upscaleSize[0] = sceneInfo.TargetWidth;
@@ -580,6 +581,8 @@ void FSRPass::UpdateConstants(const ragdoll::SceneInformation& sceneInfo, float 
 
 	Constants.downscaleFactor[0] = float(Constants.renderSize[0]) / Constants.upscaleSize[0];
 	Constants.downscaleFactor[1] = float(Constants.renderSize[1]) / Constants.upscaleSize[1];
+	//Constants.downscaleFactor[0] = 1.f;
+	//Constants.downscaleFactor[1] = 1.f;
 
 	Constants.motionVectorScale[0] = 1.f / sceneInfo.RenderWidth;
 	Constants.motionVectorScale[1] = 1.f / sceneInfo.RenderHeight;
