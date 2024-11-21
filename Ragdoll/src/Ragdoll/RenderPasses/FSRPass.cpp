@@ -146,7 +146,7 @@ void FSRPass::Upscale(const ragdoll::SceneInformation& sceneInfo, ragdoll::Scene
 	Accumulate(sceneInfo, targets, ConstantBufferHandle);
 	RCAS(sceneInfo, targets, ConstantBufferHandle);
 #if 1
-	Debug(sceneInfo, targets, ConstantBufferHandle);
+	//Debug(sceneInfo, targets, ConstantBufferHandle);
 #endif
 
 	CommandListRef->endMarker();
@@ -159,7 +159,7 @@ void FSRPass::PrepareInputs(const ragdoll::SceneInformation& sceneInfo, ragdoll:
 	setDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
 		nvrhi::BindingSetItem::Texture_SRV(1, targets->CurrDepthBuffer),
-		nvrhi::BindingSetItem::Texture_SRV(2, targets->SceneColor),
+		nvrhi::BindingSetItem::Texture_SRV(2, targets->FinalColor),
 		nvrhi::BindingSetItem::Texture_SRV(0, targets->VelocityBuffer),
 		nvrhi::BindingSetItem::Texture_UAV(3, targets->FarthestDepth),
 		nvrhi::BindingSetItem::Texture_UAV(4, targets->CurrLuminance),
@@ -398,7 +398,7 @@ void FSRPass::Accumulate(const ragdoll::SceneInformation& sceneInfo, ragdoll::Sc
 	nvrhi::BindingSetDesc setDesc;
 	setDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBuffer),
-		nvrhi::BindingSetItem::Texture_SRV(8, targets->SceneColor),
+		nvrhi::BindingSetItem::Texture_SRV(8, targets->FinalColor),
 		nvrhi::BindingSetItem::Texture_SRV(3, targets->PrevUpscaledBuffer),
 		nvrhi::BindingSetItem::Texture_SRV(5, targets->FarthestDepthMip),
 		nvrhi::BindingSetItem::Texture_SRV(7, targets->LumaInstability),

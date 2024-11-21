@@ -179,25 +179,24 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::BLOOM]);
 
+	Taskflow.emplace([this, _dt]() {
+		AutomaticExposurePass->GetAdaptedLuminance(_dt, RenderTargets);
+		});
+	activeList.emplace_back(CommandLists[(int)Pass::EXPOSURE]);
+
+	nvrhi::BufferHandle exposure = AutomaticExposurePass->AdaptedLuminanceHandle;
+	Taskflow.emplace([this, &scene, exposure]() {
+		ToneMapPass->ToneMap(scene->SceneInfo, exposure, RenderTargets);
+		});
+
+	activeList.emplace_back(CommandLists[(int)Pass::TONEMAP]);
+
 	if (scene->SceneInfo.bEnableFSR)
 	{
 		Taskflow.emplace([this, &scene, _dt]() {
 			FSRPass->Upscale(scene->SceneInfo, RenderTargets, _dt);
 			});
 		activeList.emplace_back(CommandLists[(int)Pass::TAA]);
-	}
-	else
-	{
-		Taskflow.emplace([this, _dt]() {
-			AutomaticExposurePass->GetAdaptedLuminance(_dt, RenderTargets);
-			});
-		activeList.emplace_back(CommandLists[(int)Pass::EXPOSURE]);
-
-		nvrhi::BufferHandle exposure = AutomaticExposurePass->AdaptedLuminanceHandle;
-		Taskflow.emplace([this, &scene, exposure]() {
-			ToneMapPass->ToneMap(scene->SceneInfo, exposure, RenderTargets);
-			});
-		activeList.emplace_back(CommandLists[(int)Pass::TONEMAP]);
 	}
 	
 	if (scene->SceneInfo.bEnableIntelTAA)
