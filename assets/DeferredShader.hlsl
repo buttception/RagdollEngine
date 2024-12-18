@@ -52,8 +52,10 @@ void gbuffer_vs(
 	outPos = mul(outFragPos, viewProjMatrixWithAA);
 
 	float binormalSign = inNormal.x > 0.0f ? -1.0f : 1.0f;
-	outNormal = normalize(mul(inNormal, transpose((float3x3)data.invWorldMatrix)));
-	outTangent = normalize(mul(inTangent, transpose((float3x3)data.invWorldMatrix)));
+	//outNormal = normalize(mul(inNormal, transpose((float3x3)data.invWorldMatrix)));
+    outNormal = normalize(mul(inNormal, Adjugate(data.worldMatrix)));
+	//outTangent = normalize(mul(inTangent, transpose((float3x3)data.invWorldMatrix)));
+    outTangent = normalize(mul(inTangent, Adjugate(data.worldMatrix)));
 	//still need so we can sample the normal properly
 	outBinormal = normalize(cross(outTangent, outNormal)) * binormalSign;
 	outTexcoord = inTexcoord;
