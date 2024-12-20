@@ -10,6 +10,7 @@
 #include "Ragdoll/Components/TransformComp.h"
 #include "Ragdoll/Components/RenderableComp.h"
 #include "Scene.h"
+#include "GPUScene.h"
 #include "GeometryBuilder.h"
 #include "ImGuiRenderer.h"
 #include "NVSDK.h"
@@ -58,7 +59,7 @@ void Renderer::BeginFrame()
 	CommandList->endMarker();
 }
 
-void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRenderer> imgui)
+void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float _dt, std::shared_ptr<ImguiRenderer> imgui)
 {
 	//swaps the depth buffer being drawn to
 	bIsOddFrame = !bIsOddFrame;
@@ -122,8 +123,8 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::SKY_GENERATE]);
 
-	Taskflow.emplace([this, &scene]() {
-		GBufferPass->DrawAllInstances(scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo, RenderTargets);
+	Taskflow.emplace([this, &scene, GPUScene]() {
+		GBufferPass->DrawAllInstances(GPUScene, scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo, RenderTargets);
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::GBUFFER]);
 

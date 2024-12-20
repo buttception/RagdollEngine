@@ -5,6 +5,7 @@ namespace ragdoll {
 	struct InstanceGroupInfo;
 	struct SceneInformation;
 	struct SceneRenderTargets;
+	class FGPUScene;
 }
 class GBufferPass {
 	struct ConstantBuffer {
@@ -21,5 +22,5 @@ class GBufferPass {
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
 
-	void DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets);
+	void DrawAllInstances(ragdoll::FGPUScene* GPUScene, nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets);
 };

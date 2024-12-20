@@ -13,6 +13,7 @@ namespace ragdoll {
 	class TransformSystem;
 	class Application;
 	class Window;
+	class FGPUScene;
 
 	struct Proxy {
 		Matrix ModelToWorld;
@@ -237,6 +238,7 @@ namespace ragdoll {
 
 	public:
 		std::shared_ptr<Renderer> DeferredRenderer;
+		std::shared_ptr<FGPUScene> GPUScene;
 		SceneConfig Config;
 		DebugInfo DebugInfo;
 		Octree StaticOctree;

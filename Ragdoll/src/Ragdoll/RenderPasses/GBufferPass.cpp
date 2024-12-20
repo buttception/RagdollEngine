@@ -6,6 +6,7 @@
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
+#include "Ragdoll/GPUScene.h"
 #include "Ragdoll/DirectXDevice.h"
 
 void GBufferPass::Init(nvrhi::CommandListHandle cmdList)
@@ -13,10 +14,12 @@ void GBufferPass::Init(nvrhi::CommandListHandle cmdList)
 	CommandListRef = cmdList;
 }
 
-void GBufferPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets)
+void GBufferPass::DrawAllInstances(ragdoll::FGPUScene* GPUScene, nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets)
 {
 	RD_SCOPE(Render, GBufferPass);
 	RD_GPU_SCOPE("GBufferPass", CommandListRef);
+	//new gpu scene stuff
+	GPUScene->InstanceCull(CommandListRef, sceneInfo.MainCameraViewProj, sceneInfo.MainCameraPosition);
 	if (!infos.empty())
 	{
 		MICROPROFILE_SCOPEI("Render", "Draw All Instances", MP_BLUEVIOLET);

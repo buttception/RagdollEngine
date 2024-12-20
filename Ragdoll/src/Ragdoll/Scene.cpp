@@ -13,6 +13,7 @@
 #include "DeferredRenderer.h"
 #include "Graphics/Window/Window.h"
 #include "NVSDK.h"
+#include "GPUScene.h"
 
 ragdoll::Scene::Scene(Application* app)
 {
@@ -33,6 +34,7 @@ ragdoll::Scene::Scene(Application* app)
 		MICROPROFILE_SCOPEI("Render", "Create Renderer", MP_YELLOW);
 		DeferredRenderer = std::make_shared<class Renderer>();
 		DeferredRenderer->Init(app->m_PrimaryWindow, this);
+		GPUScene = std::make_shared<FGPUScene>();
 	}
 	if (app->Config.bCreateCustomMeshes)
 	{
@@ -56,8 +58,8 @@ ragdoll::Scene::Scene(Application* app)
 void ragdoll::Scene::Update(float _dt)
 {
 	{
-		RD_SCOPE(Render, ImGuiBuildData)
-			ImguiInterface->BeginFrame();
+		RD_SCOPE(Render, ImGuiBuildData);
+		ImguiInterface->BeginFrame();
 
 		int item = ImguiInterface->DrawFBViewer();
 
@@ -137,7 +139,7 @@ void ragdoll::Scene::Update(float _dt)
 		SceneInfo.bIsResolutionDirty = false;
 	}
 
-	DeferredRenderer->Render(this, _dt, ImguiInterface);
+	DeferredRenderer->Render(this, GPUScene.get(), _dt, ImguiInterface);
 
 	DirectXDevice::GetInstance()->Present();
 
