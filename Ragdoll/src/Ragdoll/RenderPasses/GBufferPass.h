@@ -14,7 +14,7 @@ class GBufferPass {
 		Matrix ViewProjWithAA;
 		Matrix PrevViewProj;
 		Vector2 RenderResolution;
-		int InstanceOffset{ 0 };
+		uint32_t MeshIndex{ 0 };
 	}CBuffer;
 
 	nvrhi::CommandListHandle CommandListRef{ nullptr };

@@ -31,7 +31,9 @@ void GBufferPass::DrawAllInstances(ragdoll::FGPUScene* GPUScene, uint32_t ProxyC
 		nvrhi::BindingSetDesc BindingSetDesc;
 		BindingSetDesc.bindings = {
 			nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-			nvrhi::BindingSetItem::StructuredBuffer_SRV(0, instanceBuffer),
+			nvrhi::BindingSetItem::StructuredBuffer_SRV(0, GPUScene->InstanceBuffer),
+			nvrhi::BindingSetItem::StructuredBuffer_SRV(1, GPUScene->InstanceOffsetBuffer),
+			nvrhi::BindingSetItem::StructuredBuffer_SRV(2, GPUScene->InstanceIdBuffer),
 		};
 		for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
 		{
@@ -74,6 +76,7 @@ void GBufferPass::DrawAllInstances(ragdoll::FGPUScene* GPUScene, uint32_t ProxyC
 		state.vertexBuffers = {
 			{ AssetManager::GetInstance()->VBO }
 		};
+		state.indirectParams = GPUScene->IndirectDrawArgsBuffer;
 		state.addBindingSet(BindingSetHandle);
 		state.addBindingSet(AssetManager::GetInstance()->DescriptorTable);
 
@@ -86,21 +89,14 @@ void GBufferPass::DrawAllInstances(ragdoll::FGPUScene* GPUScene, uint32_t ProxyC
 
 		CommandListRef->setGraphicsState(state);
 
-		uint32_t instanceCount = 0;
-		for (const ragdoll::InstanceGroupInfo& info : infos)
+		for (int MeshIndex = 0; MeshIndex < AssetManager::GetInstance()->VertexBufferInfos.size(); ++MeshIndex)
 		{
 			MICROPROFILE_SCOPEI("Render", "Each instance", MP_CADETBLUE);
-			const VertexBufferInfo& buffer = AssetManager::GetInstance()->VertexBufferInfos[info.VertexBufferIndex];
-			nvrhi::DrawArguments args;
-			args.vertexCount = buffer.IndicesCount;
-			args.startVertexLocation = buffer.VBOffset;
-			args.startIndexLocation = buffer.IBOffset;
-			args.instanceCount = info.InstanceCount;
+			CBuffer.MeshIndex = MeshIndex;
 			CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
-			CommandListRef->drawIndexed(args);
-			CBuffer.InstanceOffset += info.InstanceCount;
+			CommandListRef->drawIndexedIndirect(MeshIndex * sizeof(nvrhi::DrawIndexedIndirectArguments));
 		}
-		CBuffer.InstanceOffset = 0;
+		CBuffer.MeshIndex = 0;
 
 		CommandListRef->endMarker();
 	}

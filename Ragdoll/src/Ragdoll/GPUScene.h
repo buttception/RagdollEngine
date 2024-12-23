@@ -5,6 +5,8 @@
 namespace ragdoll
 {
 	class FGPUScene {
+		nvrhi::BufferHandle VolatileConstantBuffer{};
+	public:
 		//TODO: upload mesh data as well, so can derive boudning box with the instance buffer
 		//InstanceBuffer (only transforms)
 		//MaterialBuffer (only material data)
@@ -17,8 +19,6 @@ namespace ragdoll
 		//buffer of all the instances bounding boxes in world
 		nvrhi::BufferHandle InstanceBoundingBoxBuffer{};	//in world space, TODO: remove wen i derive the boxes in gpu scene instead
 
-		nvrhi::BufferHandle VolatileConstantBuffer{};
-	public:
 		void Update(Scene* Scene);
 		//will sort the proxies before making a instance buffer copy and uploading to gpu
 		void UpdateInstanceBuffer(std::vector<Proxy>& Proxies);

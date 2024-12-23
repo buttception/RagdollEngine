@@ -68,7 +68,7 @@ void ragdoll::FGPUScene::UpdateInstanceBuffer(std::vector<Proxy>& Proxies)
 		Args[i].instanceCount = 0;
 		Args[i].startIndexLocation = info.IBOffset;
 		Args[i].baseVertexLocation = info.VBOffset;
-		Args[i].startIndexLocation = 0;
+		Args[i].startInstanceLocation = 0;
 	}
 	//get all the bounding boxes and upload onto gpu
 	std::vector<DirectX::BoundingBox> BoundingBoxes;
@@ -266,6 +266,7 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	IndirectDrawArgsBufferDesc.canHaveUAVs = true;
 	IndirectDrawArgsBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	IndirectDrawArgsBufferDesc.keepInitialState = true;
+	IndirectDrawArgsBufferDesc.isDrawIndirectArgs = true;
 	IndirectDrawArgsBuffer = DirectXDevice::GetNativeDevice()->createBuffer(IndirectDrawArgsBufferDesc);
 
 	//create the instance offset buffer
