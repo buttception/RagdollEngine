@@ -283,7 +283,6 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		ImGui::SliderFloat("Camera Rotation Speed (Degrees)", &data.cameraRotationSpeed, 5.f, 100.f);
 
 		data.cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
-		SceneInfo.MainCameraPosition = data.cameraPos;
 
 		ImGui::TreePop();
 	}
@@ -408,6 +407,7 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		SceneInfo.MainCameraViewProj = SceneInfo.MainCameraView * SceneInfo.InfiniteReverseZProj;
 		if (!SceneInfo.bFreezeFrustumCulling)
 			CameraViewProjection = SceneInfo.MainCameraViewProj;
+		SceneInfo.MainCameraPosition = data.cameraPos;
 	}
 }
 

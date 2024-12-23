@@ -22,5 +22,5 @@ class GBufferPass {
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
 
-	void DrawAllInstances(ragdoll::FGPUScene* GPUScene, nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets);
+	void DrawAllInstances(ragdoll::FGPUScene* GPUScene, uint32_t ProxyCount, nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets);
 };

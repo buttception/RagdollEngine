@@ -123,8 +123,9 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::SKY_GENERATE]);
 
-	Taskflow.emplace([this, &scene, GPUScene]() {
-		GBufferPass->DrawAllInstances(GPUScene, scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo, RenderTargets);
+	uint32_t ProxyCount = scene->StaticProxies.size();
+	Taskflow.emplace([this, &scene, GPUScene, ProxyCount]() {
+		GBufferPass->DrawAllInstances(GPUScene, ProxyCount, scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo, RenderTargets);
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::GBUFFER]);
 

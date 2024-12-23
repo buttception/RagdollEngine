@@ -14,12 +14,12 @@ void GBufferPass::Init(nvrhi::CommandListHandle cmdList)
 	CommandListRef = cmdList;
 }
 
-void GBufferPass::DrawAllInstances(ragdoll::FGPUScene* GPUScene, nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets)
+void GBufferPass::DrawAllInstances(ragdoll::FGPUScene* GPUScene, uint32_t ProxyCount, nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets)
 {
 	RD_SCOPE(Render, GBufferPass);
 	RD_GPU_SCOPE("GBufferPass", CommandListRef);
 	//new gpu scene stuff
-	GPUScene->InstanceCull(CommandListRef, sceneInfo.MainCameraViewProj, sceneInfo.MainCameraPosition);
+	GPUScene->InstanceCull(CommandListRef, sceneInfo.MainCameraViewProj, sceneInfo.MainCameraPosition, ProxyCount);
 	if (!infos.empty())
 	{
 		MICROPROFILE_SCOPEI("Render", "Draw All Instances", MP_BLUEVIOLET);

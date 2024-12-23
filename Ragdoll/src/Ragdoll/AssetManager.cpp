@@ -128,8 +128,8 @@ nvrhi::BindingLayoutHandle AssetManager::GetBindingLayout(const nvrhi::BindingSe
 
 void AssetManager::RecompileShaders()
 {
-	std::filesystem::path Path = FileManagerRef->GetRoot().parent_path() / "Tools";
-	system(("call " + Path.string() + "\\compileShader.bat < NUL").c_str());
+	std::filesystem::path Path = "\"" + (FileManagerRef->GetRoot().parent_path() / "Tools\\compileShader.bat\" < NUL").string();
+	system(("call " + Path.string()).c_str());
 	Shaders.clear();
 	GPSOs.clear();
 	CPSOs.clear();
