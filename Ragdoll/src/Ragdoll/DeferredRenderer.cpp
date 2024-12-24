@@ -125,7 +125,14 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 
 	uint32_t ProxyCount = scene->StaticProxies.size();
 	Taskflow.emplace([this, &scene, GPUScene, ProxyCount]() {
-		GBufferPass->DrawAllInstances(GPUScene, ProxyCount, scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo, RenderTargets);
+		GBufferPass->DrawAllInstances(
+			GPUScene,
+			ProxyCount,
+			scene->StaticInstanceBufferHandle,	//deprecated
+			scene->StaticInstanceGroupInfos,	//deprecated
+			scene->SceneInfo,
+			scene->DebugInfo,
+			RenderTargets);
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::GBUFFER]);
 

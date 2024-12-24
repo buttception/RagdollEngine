@@ -640,6 +640,7 @@ void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const 
 		//build the camera frustum
 		DirectX::BoundingFrustum frustum;
 		DirectX::BoundingFrustum::CreateFromMatrix(frustum, cameraProjection);
+		//move the frustum from view space to world space
 		frustum.Transform(frustum, cameraView.Invert());
 		CullOctant(StaticOctree.Octant, frustum, result);
 	}
@@ -811,6 +812,7 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 	for (int i = 0; i < StaticProxies.size(); ++i) {
 		if (Config.bDrawBoxes) {
 			InstanceData debugData;
+			//bounding box is already in world, create world matrix from it to transform a 2x2 cube in model space for debug renderer
 			Vector3 translate = StaticProxies[i].BoundingBox.Center;
 			Vector3 scale = StaticProxies[i].BoundingBox.Extents;
 			Matrix matrix = Matrix::CreateScale(scale);

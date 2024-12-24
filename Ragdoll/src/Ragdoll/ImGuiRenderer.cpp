@@ -133,7 +133,7 @@ int32_t ImguiRenderer::DrawFBViewer()
 void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneInformation& SceneInfo, ragdoll::SceneConfig& Config, float _dt)
 {
 	static struct Data {
-		Vector3 cameraPos = { 0.f, 1.f, 5.f };
+		Vector3 cameraPos = { 0.f, 0.f, 0.f };
 		Vector3 cameraDir = { 0.f, 0.f, 1.f };
 		float cameraYaw = DirectX::XM_PI;
 		float cameraPitch = 0.f;
@@ -289,8 +289,16 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 
 	if (ImGui::TreeNode("Debug"))
 	{
-		if (ImGui::Checkbox("Freeze Culling Matrix", &SceneInfo.bFreezeFrustumCulling))
+		if (ImGui::Checkbox("Freeze Culling Matrix", &DebugInfo.bFreezeFrustumCulling))
+		{
+			if (DebugInfo.bFreezeFrustumCulling)
+			{
+				DebugInfo.FrozenViewProjection = SceneInfo.MainCameraViewProj;
+				DebugInfo.FrozenCameraPosition = SceneInfo.MainCameraPosition;
+				DebugInfo.FrozenView = SceneInfo.MainCameraView;
+			}
 			SceneInfo.bIsCameraDirty = true;
+		}
 		if (ImGui::Checkbox("Show Octree", &Config.bDrawOctree))
 			SceneInfo.bIsCameraDirty = true;
 		if (Config.bDrawOctree) {
@@ -398,15 +406,12 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		SceneInfo.InfiniteReverseZProj._43 = data.cameraNear;
 		SceneInfo.InfiniteReverseZProj._34 = 1.f;
 
-		if (!SceneInfo.bFreezeFrustumCulling)
-			CameraProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraWidth / data.cameraHeight, data.cameraNear, data.cameraFar);
+		CameraProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraWidth / data.cameraHeight, data.cameraNear, data.cameraFar);
 
 		SceneInfo.MainCameraView = DirectX::XMMatrixLookAtLH(data.cameraPos, data.cameraPos + data.cameraDir, Vector3(0.f, 1.f, 0.f));
-		if (!SceneInfo.bFreezeFrustumCulling)
-			CameraView = SceneInfo.MainCameraView;
+		CameraView = SceneInfo.MainCameraView;
 		SceneInfo.MainCameraViewProj = SceneInfo.MainCameraView * SceneInfo.InfiniteReverseZProj;
-		if (!SceneInfo.bFreezeFrustumCulling)
-			CameraViewProjection = SceneInfo.MainCameraViewProj;
+		CameraViewProjection = SceneInfo.MainCameraViewProj;
 		SceneInfo.MainCameraPosition = data.cameraPos;
 	}
 }

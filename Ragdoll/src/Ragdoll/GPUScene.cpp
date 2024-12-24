@@ -159,18 +159,18 @@ void ExtractFrustumPlanes(Vector4 OutPlanes[6], const Matrix& ViewProjectionMatr
 	}
 }
 
-void ragdoll::FGPUScene::InstanceCull(nvrhi::CommandListHandle CommandList, const Matrix& ViewProjection, const Vector3& CameraPosition, uint32_t ProxyCount)
+void ragdoll::FGPUScene::InstanceCull(nvrhi::CommandListHandle CommandList, const Matrix& ViewProjection, const Matrix& View, uint32_t ProxyCount)
 {
 	struct ConstantBuffer
 	{
+		Matrix ViewMatrix;
 		Vector4 FrustumPlanes[6];
-		Vector3 CameraPosition;
 		uint32_t ProxyCount;
 		uint32_t MeshCount;
 	} ConstantBuffer;
 	CommandList->beginMarker("Instance Culling");
 	ExtractFrustumPlanes(ConstantBuffer.FrustumPlanes, ViewProjection);
-	ConstantBuffer.CameraPosition = CameraPosition;//create a constant buffer here
+	ConstantBuffer.ViewMatrix = View;//create a constant buffer here
 	ConstantBuffer.ProxyCount = ProxyCount;
 	ConstantBuffer.MeshCount = AssetManager::GetInstance()->VertexBufferInfos.size();
 	nvrhi::BufferDesc ConstBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(struct ConstantBuffer), "Instance Culling Buffer", 1);
@@ -179,13 +179,13 @@ void ragdoll::FGPUScene::InstanceCull(nvrhi::CommandListHandle CommandList, cons
 	//reset the indirect draw args first
 	ResetBuffers(CommandList);
 	//frustum cull the scene
-	FrustumCullScene(CommandList, ViewProjection, CameraPosition, ProxyCount);
+	FrustumCullScene(CommandList, ProxyCount);
 	//pack the instance ids
 	PackInstanceIds(CommandList);
 	CommandList->endMarker();
 }
 
-void ragdoll::FGPUScene::FrustumCullScene(nvrhi::CommandListHandle CommandList, const Matrix& ViewProjection, const Vector3& CameraPosition, uint32_t ProxyCount)
+void ragdoll::FGPUScene::FrustumCullScene(nvrhi::CommandListHandle CommandList, uint32_t ProxyCount)
 {
 	//binding layout and sets
 	nvrhi::BindingSetDesc CullingSetDesc;

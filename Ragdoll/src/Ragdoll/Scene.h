@@ -84,6 +84,10 @@ namespace ragdoll {
 		uint32_t CompCount;
 		Vector4 Add;
 		Vector4 Mul;
+		bool bFreezeFrustumCulling{ false };
+		Matrix FrozenViewProjection;
+		Matrix FrozenView;
+		Vector3 FrozenCameraPosition;
 	};
 
 	struct SceneConfig {
@@ -128,7 +132,6 @@ namespace ragdoll {
 		bool UseCACAO = false;
 		bool UseXeGTAO = true;
 		bool bIsCameraDirty{ true };
-		bool bFreezeFrustumCulling{ false };
 		bool bEnableDLSS{ true };
 		bool bEnableIntelTAA{ false };
 		bool bEnableFSR{ false };

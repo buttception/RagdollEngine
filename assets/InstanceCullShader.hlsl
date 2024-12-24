@@ -41,8 +41,8 @@ struct BoundingBox
 
 cbuffer g_Const : register(b0)
 {
+    float4x4 ViewMatrix;
     float4 FrustumPlanes[6];
-    float3 CameraPosition;
     uint ProxyCount;
     uint MeshCount;
 }
@@ -71,18 +71,20 @@ void FrustumCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, 
     }
     //each thread will cull 1 proxy
     BoundingBox BBox = BoundingBoxInput[DTid.x];
+    //view planes are in view space, move all corners to view space
     float3 Corners[8] =
     {
-        BBox.Center + float3(-BBox.Extent.x, -BBox.Extent.y, -BBox.Extent.z) - CameraPosition,
-        BBox.Center + float3(-BBox.Extent.x, -BBox.Extent.y, BBox.Extent.z) - CameraPosition,
-        BBox.Center + float3(-BBox.Extent.x, BBox.Extent.y, -BBox.Extent.z) - CameraPosition,
-        BBox.Center + float3(-BBox.Extent.x, BBox.Extent.y, BBox.Extent.z) - CameraPosition,
-        BBox.Center + float3(BBox.Extent.x, -BBox.Extent.y, -BBox.Extent.z) - CameraPosition,
-        BBox.Center + float3(BBox.Extent.x, -BBox.Extent.y, BBox.Extent.z) - CameraPosition,
-        BBox.Center + float3(BBox.Extent.x, BBox.Extent.y, -BBox.Extent.z) - CameraPosition,
-        BBox.Center + float3(BBox.Extent.x, BBox.Extent.y, BBox.Extent.z) - CameraPosition
+        mul(float4(BBox.Center + float3(-BBox.Extent.x, -BBox.Extent.y, -BBox.Extent.z), 1.f), ViewMatrix).xyz,
+        mul(float4(BBox.Center + float3(-BBox.Extent.x, -BBox.Extent.y, BBox.Extent.z), 1.f), ViewMatrix).xyz,
+        mul(float4(BBox.Center + float3(-BBox.Extent.x, BBox.Extent.y, -BBox.Extent.z), 1.f), ViewMatrix).xyz,
+        mul(float4(BBox.Center + float3(-BBox.Extent.x, BBox.Extent.y, BBox.Extent.z), 1.f), ViewMatrix).xyz,
+        mul(float4(BBox.Center + float3(BBox.Extent.x, -BBox.Extent.y, -BBox.Extent.z), 1.f), ViewMatrix).xyz,
+        mul(float4(BBox.Center + float3(BBox.Extent.x, -BBox.Extent.y, BBox.Extent.z), 1.f), ViewMatrix).xyz,
+        mul(float4(BBox.Center + float3(BBox.Extent.x, BBox.Extent.y, -BBox.Extent.z), 1.f), ViewMatrix).xyz,
+        mul(float4(BBox.Center + float3(BBox.Extent.x, BBox.Extent.y, BBox.Extent.z), 1.f), ViewMatrix).xyz
     };
     uint VisibilityMask = 0;
+    //only check the first 5 planes as the 6th plane is at infinity
     [unroll]
     for (int i = 0; i < 6; ++i)
     {
@@ -93,6 +95,7 @@ void FrustumCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, 
             VisibilityMask |= (dot(FrustumPlanes[i].xyz, Corners[j]) + FrustumPlanes[i].w) >= 0.f ? 1 : 0;
         }
     }
+    //if the mask is 0, all points are outside the frustum
     InstanceIdBufferOutput[DTid.x] = VisibilityMask != 0 ? DTid.x : -1;
 }
 

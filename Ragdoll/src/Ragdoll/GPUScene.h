@@ -22,13 +22,13 @@ namespace ragdoll
 		void Update(Scene* Scene);
 		//will sort the proxies before making a instance buffer copy and uploading to gpu
 		void UpdateInstanceBuffer(std::vector<Proxy>& Proxies);
-		void InstanceCull(nvrhi::CommandListHandle CommandList, const Matrix& ViewProjection, const Vector3& CameraPosition, uint32_t ProxyCount);
+		void InstanceCull(nvrhi::CommandListHandle CommandList, const Matrix& ViewProjection, const Matrix& View, uint32_t ProxyCount);
 
 	private:
 		void CreateBuffers(const std::vector<Proxy>& Proxies);
 		void ResetBuffers(nvrhi::CommandListHandle CommandList);
 		//cull the scene then update the instance id buffer and indirect draw args buffer
-		void FrustumCullScene(nvrhi::CommandListHandle Commandlist, const Matrix& ViewProjection, const Vector3& CameraPosition, uint32_t ProxyCount);
+		void FrustumCullScene(nvrhi::CommandListHandle Commandlist, uint32_t ProxyCount);
 		//pack the instance id buffers and populate the instance count value in the indirect draw args buffer
 		void PackInstanceIds(nvrhi::CommandListHandle CommandList);
 	};
