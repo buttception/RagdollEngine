@@ -26,7 +26,6 @@ public:
 	void DrawAllInstances(
 		ragdoll::FGPUScene* GPUScene,
 		uint32_t ProxyCount,
-		nvrhi::BufferHandle instanceBuffer,
 		const ragdoll::SceneInformation& sceneInfo,
 		const ragdoll::DebugInfo& debugInfo,
 		ragdoll::SceneRenderTargets* targets);

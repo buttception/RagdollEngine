@@ -194,23 +194,23 @@ void ragdoll::FGPUScene::InstanceCull(nvrhi::CommandListHandle CommandList, cons
 	ConstantBuffer.InfiniteZEnabled = InfiniteZEnabled;
 	ConstantBuffer.MeshCount = AssetManager::GetInstance()->VertexBufferInfos.size();
 	nvrhi::BufferDesc ConstBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(struct ConstantBuffer), "Instance Culling Buffer", 1);
-	VolatileConstantBuffer = DirectXDevice::GetNativeDevice()->createBuffer(ConstBufferDesc);
+	nvrhi::BufferHandle VolatileConstantBuffer = DirectXDevice::GetNativeDevice()->createBuffer(ConstBufferDesc);
 	CommandList->writeBuffer(VolatileConstantBuffer, &ConstantBuffer, sizeof(struct ConstantBuffer));
 	//reset the indirect draw args first
-	ResetBuffers(CommandList);
+	ResetBuffers(CommandList, VolatileConstantBuffer);
 	//frustum cull the scene
-	FrustumCullScene(CommandList, ProxyCount);
+	FrustumCullScene(CommandList, VolatileConstantBuffer, ProxyCount);
 	//pack the instance ids
-	PackInstanceIds(CommandList);
+	PackInstanceIds(CommandList, VolatileConstantBuffer);
 	CommandList->endMarker();
 }
 
-void ragdoll::FGPUScene::FrustumCullScene(nvrhi::CommandListHandle CommandList, uint32_t ProxyCount)
+void ragdoll::FGPUScene::FrustumCullScene(nvrhi::CommandListHandle CommandList, nvrhi::BufferHandle ConstantBufferHandle, uint32_t ProxyCount)
 {
 	//binding layout and sets
 	nvrhi::BindingSetDesc CullingSetDesc;
 	CullingSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(0, VolatileConstantBuffer),
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_DATA_BUFFER_SRV_SLOT, InstanceBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_BOUNDING_BOX_BUFFER_SRV_SLOT, InstanceBoundingBoxBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_ID_BUFFER_UAV_SLOT, InstanceIdBuffer),
@@ -233,12 +233,12 @@ void ragdoll::FGPUScene::FrustumCullScene(nvrhi::CommandListHandle CommandList, 
 	CommandList->endMarker();
 }
 
-void ragdoll::FGPUScene::PackInstanceIds(nvrhi::CommandListHandle CommandList)
+void ragdoll::FGPUScene::PackInstanceIds(nvrhi::CommandListHandle CommandList, nvrhi::BufferHandle ConstantBufferHandle)
 {
 	//binding layout and sets
 	nvrhi::BindingSetDesc PackIdsSetDesc;
 	PackIdsSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(0, VolatileConstantBuffer),
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_OFFSET_BUFFER_SRV_SLOT, InstanceOffsetBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_UAV(INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT, IndirectDrawArgsBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_ID_BUFFER_UAV_SLOT, InstanceIdBuffer),
@@ -295,12 +295,12 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	InstanceOffsetBuffer = DirectXDevice::GetNativeDevice()->createBuffer(InstanceOffsetBufferDesc);
 }
 
-void ragdoll::FGPUScene::ResetBuffers(nvrhi::CommandListHandle CommandList)
+void ragdoll::FGPUScene::ResetBuffers(nvrhi::CommandListHandle CommandList, nvrhi::BufferHandle ConstantBufferHandle)
 {
 	//binding layout and sets
 	nvrhi::BindingSetDesc ResetSetDesc;
 	ResetSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(0, VolatileConstantBuffer),
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 		nvrhi::BindingSetItem::StructuredBuffer_UAV(INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT, IndirectDrawArgsBuffer)
 	};
 	nvrhi::BindingLayoutHandle ResetLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(ResetSetDesc);

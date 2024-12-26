@@ -720,7 +720,7 @@ void ragdoll::Scene::BuildStaticCascadeMapInstances()
 		{
 			MICROPROFILE_SCOPEI("Scene", "Culling Octree Cascades", MP_VIOLETRED1);
 			DirectX::BoundingOrientedBox box;
-			Vector3 scale = { SceneInfo.CascadeInfo[cascadeIndex].width, SceneInfo.CascadeInfo[cascadeIndex].height, 1000.f };
+			Vector3 scale = { SceneInfo.CascadeInfos[cascadeIndex].width, SceneInfo.CascadeInfos[cascadeIndex].height, 1000.f };
 			Matrix matrix = Matrix::CreateScale(scale);
 			Vector3 forward = -SceneInfo.LightDirection;
 			Vector3 worldUp = { 0.f, 1.f, 0.f };
@@ -736,14 +736,14 @@ void ragdoll::Scene::BuildStaticCascadeMapInstances()
 				DirectX::XMVectorSet(0.f, 0.f, 0.f, 1.f)
 			);
 			matrix *= rotationMatrix;
-			matrix *= Matrix::CreateTranslation(SceneInfo.CascadeInfo[cascadeIndex].center);
+			matrix *= Matrix::CreateTranslation(SceneInfo.CascadeInfos[cascadeIndex].center);
 			box.Transform(box, matrix);
-			CullOctantForCascade(StaticOctree.Octant, box, result, SceneInfo.CascadeInfo[cascadeIndex].center, -SceneInfo.LightDirection, back, front);
+			CullOctantForCascade(StaticOctree.Octant, box, result, SceneInfo.CascadeInfos[cascadeIndex].center, -SceneInfo.LightDirection, back, front);
 		}
 		if (result.empty())	//all culled
 			return;
-		SceneInfo.CascadeInfo[cascadeIndex].nearZ = back;
-		SceneInfo.CascadeInfo[cascadeIndex].farZ = front;
+		SceneInfo.CascadeInfos[cascadeIndex].nearZ = back;
+		SceneInfo.CascadeInfos[cascadeIndex].farZ = front;
 		//sort the results
 		std::sort(result.begin(), result.end(), [&](const uint32_t& lhs, const uint32_t& rhs) {
 			return StaticProxies[lhs].BufferIndex != StaticProxies[rhs].BufferIndex ? StaticProxies[lhs].BufferIndex < StaticProxies[rhs].BufferIndex : StaticProxies[lhs].MaterialIndex < StaticProxies[rhs].MaterialIndex;
@@ -839,9 +839,9 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 			{1.f, 0.f, 1.f, 1.f}
 		};
 		InstanceData debugData;
-		Vector3 scale = { SceneInfo.CascadeInfo[SceneInfo.EnableCascadeDebug - 1].width,
-			SceneInfo.CascadeInfo[SceneInfo.EnableCascadeDebug - 1].height,
-			abs(SceneInfo.CascadeInfo[SceneInfo.EnableCascadeDebug - 1].farZ - SceneInfo.CascadeInfo[SceneInfo.EnableCascadeDebug - 1].nearZ) };
+		Vector3 scale = { SceneInfo.CascadeInfos[SceneInfo.EnableCascadeDebug - 1].width,
+			SceneInfo.CascadeInfos[SceneInfo.EnableCascadeDebug - 1].height,
+			abs(SceneInfo.CascadeInfos[SceneInfo.EnableCascadeDebug - 1].farZ - SceneInfo.CascadeInfos[SceneInfo.EnableCascadeDebug - 1].nearZ) };
 		Matrix matrix = Matrix::CreateScale(scale);
 		DirectX::XMVECTOR forward = DirectX::XMVector3Normalize(-SceneInfo.LightDirection);
 		DirectX::XMVECTOR worldUp = DirectX::XMVectorSet(0.f, 1.f, 0.f, 0.f);
@@ -854,7 +854,7 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 			DirectX::XMVectorSet(0.f, 0.f, 0.f, 1.f)
 		);
 		matrix *= rotationMatrix;
-		matrix *= Matrix::CreateTranslation(SceneInfo.CascadeInfo[SceneInfo.EnableCascadeDebug - 1].center);
+		matrix *= Matrix::CreateTranslation(SceneInfo.CascadeInfos[SceneInfo.EnableCascadeDebug - 1].center);
 		debugData.ModelToWorld = matrix;
 		debugData.bIsLit = false;
 		debugData.Color = colors[SceneInfo.EnableCascadeDebug - 1];
@@ -987,8 +987,8 @@ void ragdoll::Scene::UpdateShadowCascadesExtents()
 		if (fabsf(lightDir.Dot(up)) > 0.99f) {
 			up = { 1.f, 0.f, 0.f };
 		}
-		SceneInfo.CascadeInfo[i - 1].view = DirectX::XMMatrixLookAtLH(center, center + lightDir, up);
-		Matrix lightViewProj = SceneInfo.CascadeInfo[i - 1].view * lightProj;
+		SceneInfo.CascadeInfos[i - 1].view = DirectX::XMMatrixLookAtLH(center, center + lightDir, up);
+		Matrix lightViewProj = SceneInfo.CascadeInfos[i - 1].view * lightProj;
 		//get the furthest extents of the corners for the left right top and bottom values
 		Vector3 min = { FLT_MAX, FLT_MAX, FLT_MAX };
 		Vector3 max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
@@ -1003,8 +1003,8 @@ void ragdoll::Scene::UpdateShadowCascadesExtents()
 		float x = max.x - min.x;
 		float y = max.y - min.y;
 		float length = x < y ? y : x;
-		SceneInfo.CascadeInfo[i - 1].center = center;
-		SceneInfo.CascadeInfo[i - 1].width = SceneInfo.CascadeInfo[i - 1].height = length;
+		SceneInfo.CascadeInfos[i - 1].center = center;
+		SceneInfo.CascadeInfos[i - 1].width = SceneInfo.CascadeInfos[i - 1].height = length;
 	}
 }
 
@@ -1012,8 +1012,8 @@ void ragdoll::Scene::UpdateShadowLightMatrices()
 {
 	for (int i = 0; i < 4; ++i) {
 		//reverse z
-		SceneInfo.CascadeInfo[i].proj = DirectX::XMMatrixOrthographicLH(SceneInfo.CascadeInfo[i].width, SceneInfo.CascadeInfo[i].height, SceneInfo.CascadeInfo[i].farZ, SceneInfo.CascadeInfo[i].nearZ);
-		SceneInfo.CascadeInfo[i].viewProj = SceneInfo.CascadeInfo[i].view * SceneInfo.CascadeInfo[i].proj;
+		SceneInfo.CascadeInfos[i].proj = DirectX::XMMatrixOrthographicLH(SceneInfo.CascadeInfos[i].width, SceneInfo.CascadeInfos[i].height, SceneInfo.CascadeInfos[i].farZ, SceneInfo.CascadeInfos[i].nearZ);
+		SceneInfo.CascadeInfos[i].viewProj = SceneInfo.CascadeInfos[i].view * SceneInfo.CascadeInfos[i].proj;
 	}
 }
 

@@ -315,9 +315,9 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 				for (int i = 0; i < 4; ++i) {
 					if (ImGui::TreeNode(("Cascade" + std::to_string(i)).c_str(), "Casecade %d", i))
 					{
-						ImGui::Text("Position: %1.f, %1.f, %1.f", SceneInfo.CascadeInfo[i].center.x, SceneInfo.CascadeInfo[i].center.y, SceneInfo.CascadeInfo[i].center.z);
-						ImGui::Text("Dimension: %.2f, %.2f", SceneInfo.CascadeInfo[i].width, SceneInfo.CascadeInfo[i].height);
-						ImGui::Text("NearFar: %.2f, %.2f", SceneInfo.CascadeInfo[i].nearZ, SceneInfo.CascadeInfo[i].farZ);
+						ImGui::Text("Position: %1.f, %1.f, %1.f", SceneInfo.CascadeInfos[i].center.x, SceneInfo.CascadeInfos[i].center.y, SceneInfo.CascadeInfos[i].center.z);
+						ImGui::Text("Dimension: %.2f, %.2f", SceneInfo.CascadeInfos[i].width, SceneInfo.CascadeInfos[i].height);
+						ImGui::Text("NearFar: %.2f, %.2f", SceneInfo.CascadeInfos[i].nearZ, SceneInfo.CascadeInfos[i].farZ);
 						ImGui::TreePop();
 					}
 				}

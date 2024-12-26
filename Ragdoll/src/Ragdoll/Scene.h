@@ -111,7 +111,7 @@ namespace ragdoll {
 		Matrix PrevMainCameraViewProj;
 		Matrix InfiniteReverseZProj;
 		Matrix MainCameraView;
-		CascadeInfo CascadeInfo[4];
+		CascadeInfo CascadeInfos[4];
 		Vector3 MainCameraPosition;
 		Vector4 LightDiffuseColor = { 1.f, 1.f, 1.f, 1.f };
 		Vector4 SceneAmbientColor = { 0.2f, 0.2f, 0.2f, 1.f };

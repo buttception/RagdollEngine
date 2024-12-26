@@ -128,8 +128,6 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 		GBufferPass->DrawAllInstances(
 			GPUScene,
 			ProxyCount,
-			scene->StaticInstanceBufferHandle,	//deprecated
-			scene->StaticInstanceGroupInfos,	//deprecated
 			scene->SceneInfo,
 			scene->DebugInfo,
 			RenderTargets);
@@ -151,21 +149,21 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 		activeList.emplace_back(CommandLists[(int)Pass::AO]);
 	}
 
-	Taskflow.emplace([this, &scene]() {
-		ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles[0], scene->StaticCascadeInstanceInfos[0], scene->SceneInfo, 0, RenderTargets);
+	Taskflow.emplace([this, &scene, GPUScene]() {
+		ShadowPass->DrawAllInstances(0, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
 	});
+	Taskflow.emplace([this, &scene, GPUScene]() {
+		ShadowPass->DrawAllInstances(1, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
+		});
+	Taskflow.emplace([this, &scene, GPUScene]() {
+		ShadowPass->DrawAllInstances(2, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
+		});
+	Taskflow.emplace([this, &scene, GPUScene]() {
+		ShadowPass->DrawAllInstances(3, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
+		});
 	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH0]);
-	Taskflow.emplace([this, &scene]() {
-		ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles[1], scene->StaticCascadeInstanceInfos[1], scene->SceneInfo, 1, RenderTargets);
-		});
 	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH1]);
-	Taskflow.emplace([this, &scene]() {
-		ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles[2], scene->StaticCascadeInstanceInfos[2], scene->SceneInfo, 2, RenderTargets);
-		});
 	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH2]);
-	Taskflow.emplace([this, &scene]() {
-		ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles[3], scene->StaticCascadeInstanceInfos[3], scene->SceneInfo, 3, RenderTargets);
-		});
 	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH3]);
 
 	Taskflow.emplace([this, &scene]() {

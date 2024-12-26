@@ -2,6 +2,7 @@ cbuffer g_Const : register(b0) {
     float4x4 LightViewProj;
 	uint InstanceOffset;
 	uint CascadeIndex;
+    uint MeshIndex;
 };
 
 struct InstanceData{
@@ -23,6 +24,8 @@ struct InstanceData{
 };
 
 StructuredBuffer<InstanceData> InstanceDatas : register(t0);
+StructuredBuffer<uint> InstanceOffsetBufferInput : register(t1);
+StructuredBuffer<int> InstanceIdBufferInput : register(t2);
 
 void directional_vs(
 	in float3 inPos : POSITION,
@@ -33,7 +36,7 @@ void directional_vs(
 	out float4 outPos : SV_Position
 )
 {
-	InstanceData data = InstanceDatas[inInstanceId + InstanceOffset];
+    InstanceData data = InstanceDatas[InstanceIdBufferInput[inInstanceId + InstanceOffsetBufferInput[MeshIndex]]];
 	float4 worldPos = mul(float4(inPos, 1), data.worldMatrix);
 	outPos = mul(worldPos, LightViewProj);
 }
