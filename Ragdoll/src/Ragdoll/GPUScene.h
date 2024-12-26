@@ -22,7 +22,7 @@ namespace ragdoll
 		void Update(Scene* Scene);
 		//will sort the proxies before making a instance buffer copy and uploading to gpu
 		void UpdateInstanceBuffer(std::vector<Proxy>& Proxies);
-		void InstanceCull(nvrhi::CommandListHandle CommandList, const Matrix& ViewProjection, const Matrix& View, uint32_t ProxyCount);
+		void InstanceCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled);
 
 	private:
 		void CreateBuffers(const std::vector<Proxy>& Proxies);

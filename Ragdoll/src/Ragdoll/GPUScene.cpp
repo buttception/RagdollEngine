@@ -13,6 +13,14 @@
 #define INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT 0
 #define INSTANCE_ID_BUFFER_UAV_SLOT 1
 
+struct FBoundingBox
+{
+	Vector3 Center;
+	float pad0;
+	Vector3 Extents;
+	float pad1;
+};
+
 void ragdoll::FGPUScene::Update(Scene* Scene)
 {
 	if (InstanceBuffer == nullptr)
@@ -71,11 +79,12 @@ void ragdoll::FGPUScene::UpdateInstanceBuffer(std::vector<Proxy>& Proxies)
 		Args[i].startInstanceLocation = 0;
 	}
 	//get all the bounding boxes and upload onto gpu
-	std::vector<DirectX::BoundingBox> BoundingBoxes;
+	std::vector<FBoundingBox> BoundingBoxes;
 	BoundingBoxes.resize(Proxies.size());
 	for (int i = 0; i < Proxies.size(); ++i)
 	{
-		BoundingBoxes[i] = Proxies[i].BoundingBox;
+		BoundingBoxes[i].Center = Proxies[i].BoundingBox.Center;
+		BoundingBoxes[i].Extents = Proxies[i].BoundingBox.Extents;
 	}
 
 	//get command list from render in the future for multi threading
@@ -94,61 +103,62 @@ void ragdoll::FGPUScene::UpdateInstanceBuffer(std::vector<Proxy>& Proxies)
 	CommandList->endMarker();
 	CommandList->beginMarker("Writing Bounding Box Data");
 	CommandList->beginTrackingBufferState(InstanceBoundingBoxBuffer, nvrhi::ResourceStates::CopyDest);
-	CommandList->writeBuffer(InstanceBoundingBoxBuffer, BoundingBoxes.data(), sizeof(DirectX::BoundingBox) * BoundingBoxes.size());
+	CommandList->writeBuffer(InstanceBoundingBoxBuffer, BoundingBoxes.data(), sizeof(FBoundingBox) * BoundingBoxes.size());
 	CommandList->setPermanentBufferState(InstanceBoundingBoxBuffer, nvrhi::ResourceStates::ShaderResource);
 	CommandList->endMarker();
 	CommandList->close();
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 }
 
-void ExtractFrustumPlanes(Vector4 OutPlanes[6], const Matrix& ViewProjectionMatrix)
+void ExtractFrustumPlanes(Vector4 OutPlanes[6], const Matrix& Projection, const Matrix& View)
 {
+	Matrix ViewProjection = View * Projection;
 	// Left plane
 	OutPlanes[0] = Vector4(
-		ViewProjectionMatrix.m[0][3] + ViewProjectionMatrix.m[0][0],
-		ViewProjectionMatrix.m[1][3] + ViewProjectionMatrix.m[1][0],
-		ViewProjectionMatrix.m[2][3] + ViewProjectionMatrix.m[2][0],
-		ViewProjectionMatrix.m[3][3] + ViewProjectionMatrix.m[3][0]
+		ViewProjection.m[0][3] + ViewProjection.m[0][0],
+		ViewProjection.m[1][3] + ViewProjection.m[1][0],
+		ViewProjection.m[2][3] + ViewProjection.m[2][0],
+		ViewProjection.m[3][3] + ViewProjection.m[3][0]
 	);
 
 	// Right plane
 	OutPlanes[1] = Vector4(
-		ViewProjectionMatrix.m[0][3] - ViewProjectionMatrix.m[0][0],
-		ViewProjectionMatrix.m[1][3] - ViewProjectionMatrix.m[1][0],
-		ViewProjectionMatrix.m[2][3] - ViewProjectionMatrix.m[2][0],
-		ViewProjectionMatrix.m[3][3] - ViewProjectionMatrix.m[3][0]
+		ViewProjection.m[0][3] - ViewProjection.m[0][0],
+		ViewProjection.m[1][3] - ViewProjection.m[1][0],
+		ViewProjection.m[2][3] - ViewProjection.m[2][0],
+		ViewProjection.m[3][3] - ViewProjection.m[3][0]
 	);
 
 	// Bottom plane
 	OutPlanes[2] = Vector4(
-		ViewProjectionMatrix.m[0][3] + ViewProjectionMatrix.m[0][1],
-		ViewProjectionMatrix.m[1][3] + ViewProjectionMatrix.m[1][1],
-		ViewProjectionMatrix.m[2][3] + ViewProjectionMatrix.m[2][1],
-		ViewProjectionMatrix.m[3][3] + ViewProjectionMatrix.m[3][1]
+		ViewProjection.m[0][3] + ViewProjection.m[0][1],
+		ViewProjection.m[1][3] + ViewProjection.m[1][1],
+		ViewProjection.m[2][3] + ViewProjection.m[2][1],
+		ViewProjection.m[3][3] + ViewProjection.m[3][1]
 	);
 
 	// Top plane
 	OutPlanes[3] = Vector4(
-		ViewProjectionMatrix.m[0][3] - ViewProjectionMatrix.m[0][1],
-		ViewProjectionMatrix.m[1][3] - ViewProjectionMatrix.m[1][1],
-		ViewProjectionMatrix.m[2][3] - ViewProjectionMatrix.m[2][1],
-		ViewProjectionMatrix.m[3][3] - ViewProjectionMatrix.m[3][1]
+		ViewProjection.m[0][3] - ViewProjection.m[0][1],
+		ViewProjection.m[1][3] - ViewProjection.m[1][1],
+		ViewProjection.m[2][3] - ViewProjection.m[2][1],
+		ViewProjection.m[3][3] - ViewProjection.m[3][1]
 	);
 
 	// Near plane
 	OutPlanes[4] = Vector4(
-		ViewProjectionMatrix.m[0][3] + ViewProjectionMatrix.m[0][2],
-		ViewProjectionMatrix.m[1][3] + ViewProjectionMatrix.m[1][2],
-		ViewProjectionMatrix.m[2][3] + ViewProjectionMatrix.m[2][2],
-		ViewProjectionMatrix.m[3][3] + ViewProjectionMatrix.m[3][2]
+		ViewProjection.m[0][3] + ViewProjection.m[0][2],
+		ViewProjection.m[1][3] + ViewProjection.m[1][2],
+		ViewProjection.m[2][3] + ViewProjection.m[2][2],
+		ViewProjection.m[3][3] + ViewProjection.m[3][2]
 	);
 
 	// Far plane
 	OutPlanes[5] = Vector4(
-		ViewProjectionMatrix.m[0][3] - ViewProjectionMatrix.m[0][2],
-		ViewProjectionMatrix.m[1][3] - ViewProjectionMatrix.m[1][2],
-		ViewProjectionMatrix.m[2][3] - ViewProjectionMatrix.m[2][2],
-		ViewProjectionMatrix.m[3][3] - ViewProjectionMatrix.m[3][2]
+		ViewProjection.m[0][3] - ViewProjection.m[0][2],
+		ViewProjection.m[1][3] - ViewProjection.m[1][2],
+		ViewProjection.m[2][3] - ViewProjection.m[2][2],
+		ViewProjection.m[3][3] - ViewProjection.m[3][2]
 	);
 
 	// Normalize the planes
@@ -157,9 +167,17 @@ void ExtractFrustumPlanes(Vector4 OutPlanes[6], const Matrix& ViewProjectionMatr
 		float Length = Vector3(OutPlanes[i].x, OutPlanes[i].y, OutPlanes[i].z).Length();
 		OutPlanes[i] /= Length;
 	}
+
+	/*Matrix InverseTransposeView = View.Invert();
+	for (int i = 0; i < 6; ++i)
+	{
+		OutPlanes[i] = Vector4::Transform(OutPlanes[i], InverseTransposeView);
+		float Length = Vector3(OutPlanes[i].x, OutPlanes[i].y, OutPlanes[i].z).Length();
+		OutPlanes[i] /= Length;
+	}*/
 }
 
-void ragdoll::FGPUScene::InstanceCull(nvrhi::CommandListHandle CommandList, const Matrix& ViewProjection, const Matrix& View, uint32_t ProxyCount)
+void ragdoll::FGPUScene::InstanceCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled)
 {
 	struct ConstantBuffer
 	{
@@ -167,11 +185,13 @@ void ragdoll::FGPUScene::InstanceCull(nvrhi::CommandListHandle CommandList, cons
 		Vector4 FrustumPlanes[6];
 		uint32_t ProxyCount;
 		uint32_t MeshCount;
+		uint32_t InfiniteZEnabled;
 	} ConstantBuffer;
 	CommandList->beginMarker("Instance Culling");
-	ExtractFrustumPlanes(ConstantBuffer.FrustumPlanes, ViewProjection);
+	ExtractFrustumPlanes(ConstantBuffer.FrustumPlanes, Projection, View);
 	ConstantBuffer.ViewMatrix = View;//create a constant buffer here
 	ConstantBuffer.ProxyCount = ProxyCount;
+	ConstantBuffer.InfiniteZEnabled = InfiniteZEnabled;
 	ConstantBuffer.MeshCount = AssetManager::GetInstance()->VertexBufferInfos.size();
 	nvrhi::BufferDesc ConstBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(struct ConstantBuffer), "Instance Culling Buffer", 1);
 	VolatileConstantBuffer = DirectXDevice::GetNativeDevice()->createBuffer(ConstBufferDesc);
@@ -256,8 +276,8 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	InstanceIdBufferDesc.keepInitialState = true;
 	InstanceIdBuffer = DirectXDevice::GetNativeDevice()->createBuffer(InstanceIdBufferDesc);	  //worst case size
 	//bounding box buffer
-	nvrhi::BufferDesc InstanceBoundingBoxBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(DirectX::BoundingBox) * Proxies.size(), "InstanceBoundingBoxBuffer");
-	InstanceBoundingBoxBufferDesc.structStride = sizeof(DirectX::BoundingBox);
+	nvrhi::BufferDesc InstanceBoundingBoxBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(FBoundingBox) * Proxies.size(), "InstanceBoundingBoxBuffer");
+	InstanceBoundingBoxBufferDesc.structStride = sizeof(FBoundingBox);
 	InstanceBoundingBoxBuffer = DirectXDevice::GetNativeDevice()->createBuffer(InstanceBoundingBoxBufferDesc);	  //worst case size
 	
 	//create the indirect draw args buffer

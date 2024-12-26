@@ -27,7 +27,6 @@ public:
 		ragdoll::FGPUScene* GPUScene,
 		uint32_t ProxyCount,
 		nvrhi::BufferHandle instanceBuffer,
-		const std::vector<ragdoll::InstanceGroupInfo>& infos,
 		const ragdoll::SceneInformation& sceneInfo,
 		const ragdoll::DebugInfo& debugInfo,
 		ragdoll::SceneRenderTargets* targets);

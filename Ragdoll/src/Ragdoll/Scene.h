@@ -85,7 +85,7 @@ namespace ragdoll {
 		Vector4 Add;
 		Vector4 Mul;
 		bool bFreezeFrustumCulling{ false };
-		Matrix FrozenViewProjection;
+		Matrix FrozenProjection;
 		Matrix FrozenView;
 		Vector3 FrozenCameraPosition;
 	};

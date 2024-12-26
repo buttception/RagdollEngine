@@ -133,9 +133,9 @@ int32_t ImguiRenderer::DrawFBViewer()
 void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneInformation& SceneInfo, ragdoll::SceneConfig& Config, float _dt)
 {
 	static struct Data {
-		Vector3 cameraPos = { 0.f, 0.f, 0.f };
+		Vector3 cameraPos = { 0.f, 1.f, 0.f };
 		Vector3 cameraDir = { 0.f, 0.f, 1.f };
-		float cameraYaw = DirectX::XM_PI;
+		float cameraYaw = 0.f;
 		float cameraPitch = 0.f;
 		float cameraFov = 90.f;
 		float cameraNear = 0.01f;
@@ -293,7 +293,7 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		{
 			if (DebugInfo.bFreezeFrustumCulling)
 			{
-				DebugInfo.FrozenViewProjection = SceneInfo.MainCameraViewProj;
+				DebugInfo.FrozenProjection = SceneInfo.InfiniteReverseZProj;
 				DebugInfo.FrozenCameraPosition = SceneInfo.MainCameraPosition;
 				DebugInfo.FrozenView = SceneInfo.MainCameraView;
 			}
