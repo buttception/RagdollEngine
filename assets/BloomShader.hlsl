@@ -3,7 +3,10 @@ Texture2D Source : register(t0);
 Texture2D SceneColor : register(t1);
 sampler Sampler : register(s0);
 
-cbuffer g_Const : register(b0) {
+cbuffer g_Const : register(b0)
+{
+    uint Width;
+    uint Height;
     float FilterRadius;
     float BloomIntensity;
 };

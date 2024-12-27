@@ -308,7 +308,7 @@ void Renderer::CreateResource()
 	SkyPass->Init(CommandLists[(int)Pass::SKY]);
 	
 	BloomPass = std::make_shared<class BloomPass>();
-	BloomPass->Init(CommandLists[(int)Pass::BLOOM]);
+	BloomPass->Init(CommandLists[(int)Pass::BLOOM], RenderTargets);
 
 	AutomaticExposurePass = std::make_shared<class AutomaticExposurePass>();
 	AutomaticExposurePass->Init(CommandLists[(int)Pass::EXPOSURE]);
