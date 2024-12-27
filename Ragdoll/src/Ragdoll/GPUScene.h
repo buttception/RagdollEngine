@@ -5,6 +5,8 @@
 namespace ragdoll
 {
 	class FGPUScene {
+		nvrhi::BindingSetHandle BindingSetHandle;
+		nvrhi::BufferHandle ConstantBufferHandle;
 	public:
 		//TODO: upload mesh data as well, so can derive boudning box with the instance buffer
 		//InstanceBuffer (only transforms)
@@ -25,10 +27,10 @@ namespace ragdoll
 
 	private:
 		void CreateBuffers(const std::vector<Proxy>& Proxies);
-		void ResetBuffers(nvrhi::CommandListHandle CommandList, nvrhi::BufferHandle ConstantBufferHandle);
+		void ResetBuffers(nvrhi::CommandListHandle CommandList, nvrhi::BufferHandle ConstantBufferHandle, nvrhi::BindingSetHandle BindingSetHandle);
 		//cull the scene then update the instance id buffer and indirect draw args buffer
-		void FrustumCullScene(nvrhi::CommandListHandle Commandlist, nvrhi::BufferHandle ConstantBufferHandle, uint32_t ProxyCount);
+		void FrustumCullScene(nvrhi::CommandListHandle Commandlist, nvrhi::BufferHandle ConstantBufferHandle, nvrhi::BindingSetHandle BindingSetHandle, uint32_t ProxyCount);
 		//pack the instance id buffers and populate the instance count value in the indirect draw args buffer
-		void PackInstanceIds(nvrhi::CommandListHandle CommandList, nvrhi::BufferHandle ConstantBufferHandle);
+		void PackInstanceIds(nvrhi::CommandListHandle CommandList, nvrhi::BufferHandle ConstantBufferHandle, nvrhi::BindingSetHandle BindingSetHandle);
 	};
 }

@@ -124,9 +124,9 @@ void ragdoll::Scene::Update(float _dt)
 	{
 		DebugInfo.CulledOctantsCount = 0;
 		UpdateShadowCascadesExtents();
-		BuildStaticCascadeMapInstances();
+		//BuildStaticCascadeMapInstances();
 		UpdateShadowLightMatrices();
-		BuildStaticInstances(ImguiInterface->CameraProjection, ImguiInterface->CameraView, StaticInstanceDatas, StaticInstanceGroupInfos);
+		//BuildStaticInstances(ImguiInterface->CameraProjection, ImguiInterface->CameraView, StaticInstanceDatas, StaticInstanceGroupInfos);
 		BuildDebugInstances(StaticDebugInstanceDatas);
 	}
 
@@ -580,8 +580,8 @@ void ragdoll::Scene::AddEntityAtRootLevel(Guid entityId)
 
 void ragdoll::Scene::PopulateStaticProxies()
 {
-	//assuming the world transform has already been updated
-	StaticOctree.Clear();
+	//clear the current proxies
+	StaticProxies.clear();
 	//iterate through all the transforms and renderable
 	auto EcsView = EntityManagerRef->GetRegistry().view<RenderableComp, TransformComp>();
 	for (const entt::entity& ent : EcsView) {
@@ -621,187 +621,6 @@ void ragdoll::Scene::PopulateStaticProxies()
 			Proxy.BufferIndex = (int32_t)submesh.VertexBufferIndex;
 			Proxy.MaterialIndex = (int32_t)submesh.MaterialIndex;
 			AssetManager::GetInstance()->VertexBufferInfos[Proxy.BufferIndex].BestFitBox.Transform(Proxy.BoundingBox, tComp->m_ModelToWorld);
-			StaticOctree.AddProxy(Proxy.BoundingBox, StaticProxies.size() - 1);
-		}
-	}
-}
-
-void ragdoll::Scene::BuildStaticInstances(const Matrix& cameraProjection, const Matrix& cameraView, std::vector<InstanceData>& instances, std::vector<InstanceGroupInfo>& instancesGrpInfo)
-{
-	MICROPROFILE_SCOPEI("Scene", "Build Static", MP_RED);
-	//clear the old information
-	instances.clear();
-	instancesGrpInfo.clear();
-
-	//cull the octree
-	std::vector<uint32_t> result;
-	{
-		MICROPROFILE_SCOPEI("Scene", "Culling Octree", MP_VIOLETRED1);
-		//build the camera frustum
-		DirectX::BoundingFrustum frustum;
-		DirectX::BoundingFrustum::CreateFromMatrix(frustum, cameraProjection);
-		//move the frustum from view space to world space
-		frustum.Transform(frustum, cameraView.Invert());
-		CullOctant(StaticOctree.Octant, frustum, result);
-	}
-	if (result.empty())	//all culled
-		return;
-	//sort the results
-	std::sort(result.begin(), result.end(), [&](const uint32_t& lhs, const uint32_t& rhs) {
-		return StaticProxies[lhs].BufferIndex != StaticProxies[rhs].BufferIndex ? StaticProxies[lhs].BufferIndex < StaticProxies[rhs].BufferIndex : StaticProxies[lhs].MaterialIndex < StaticProxies[rhs].MaterialIndex;
-		});
-	//build the structured buffer
-	int32_t CurrBufferIndex{ -1 };
-	CurrBufferIndex = StaticProxies[result[0]].BufferIndex;
-
-	InstanceGroupInfo info;
-	info.VertexBufferIndex = CurrBufferIndex;
-	info.InstanceCount = 0;
-	{
-		MICROPROFILE_SCOPEI("Scene", "Building instance buffer", MP_PALEVIOLETRED);
-		for (int i = 0; i < result.size(); ++i) {
-			const Proxy& proxy = StaticProxies[result[i]];
-			//iterate till i get a different buffer id, meaning is a diff mesh
-			if (proxy.BufferIndex != CurrBufferIndex)
-			{
-				//add the current info
-				instancesGrpInfo.emplace_back(info);
-				//reset count
-				info.InstanceCount = 0;
-				//set new buffer index
-				info.VertexBufferIndex = CurrBufferIndex = proxy.BufferIndex;
-			}
-			//since already sorted by mesh, just add everything in
-			//set the instance data
-			instances.emplace_back();
-			instances.back() = proxy;
-			info.InstanceCount++;
-		}
-	}
-	//last info because i reached the end
-	instancesGrpInfo.emplace_back(info);
-
-	//if nothing was added because all instances failed the culling test
-	if (instances.empty())
-	{
-		instancesGrpInfo.clear();
-	}
-	else
-	{
-		MICROPROFILE_SCOPEI("Scene", "Building Global Instance Buffer", MP_ORANGERED);
-		CommandList->open();
-		//create the instance buffer handle
-		nvrhi::BufferDesc InstanceBufferDesc;
-		InstanceBufferDesc.byteSize = sizeof(InstanceData) * instances.size();
-		InstanceBufferDesc.debugName = "Global instance buffer";
-		InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
-		InstanceBufferDesc.structStride = sizeof(InstanceData);
-		StaticInstanceBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(InstanceBufferDesc);
-
-		//copy data over
-		CommandList->beginTrackingBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::CopyDest);
-		CommandList->writeBuffer(StaticInstanceBufferHandle, instances.data(), sizeof(InstanceData) * instances.size());
-		CommandList->setPermanentBufferState(StaticInstanceBufferHandle, nvrhi::ResourceStates::ShaderResource);
-		CommandList->close();
-		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
-	}
-}
-
-void ragdoll::Scene::BuildStaticCascadeMapInstances()
-{
-	//build instance buffers for all 4
-	for (int cascadeIndex = 0; cascadeIndex < 4; ++cascadeIndex)
-	{
-		StaticCascadeInstanceDatas[cascadeIndex].clear();
-		StaticCascadeInstanceInfos[cascadeIndex].clear();
-
-		std::vector<uint32_t> result;
-		float back{ FLT_MAX }, front{ -FLT_MAX };
-		{
-			MICROPROFILE_SCOPEI("Scene", "Culling Octree Cascades", MP_VIOLETRED1);
-			DirectX::BoundingOrientedBox box;
-			Vector3 scale = { SceneInfo.CascadeInfos[cascadeIndex].width, SceneInfo.CascadeInfos[cascadeIndex].height, 1000.f };
-			Matrix matrix = Matrix::CreateScale(scale);
-			Vector3 forward = -SceneInfo.LightDirection;
-			Vector3 worldUp = { 0.f, 1.f, 0.f };
-			if (fabsf(forward.Dot(worldUp)) > 0.99f) {
-				worldUp = { 1.f, 0.f, 0.f };
-			}
-			Vector3 right = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(worldUp, forward));
-			Vector3 up = DirectX::XMVector3Cross(forward, right);
-			Matrix rotationMatrix = DirectX::XMMATRIX(
-				right,         // Right vector (x-axis)
-				up,            // Up vector (y-axis)
-				forward,       // Forward vector (z-axis)
-				DirectX::XMVectorSet(0.f, 0.f, 0.f, 1.f)
-			);
-			matrix *= rotationMatrix;
-			matrix *= Matrix::CreateTranslation(SceneInfo.CascadeInfos[cascadeIndex].center);
-			box.Transform(box, matrix);
-			CullOctantForCascade(StaticOctree.Octant, box, result, SceneInfo.CascadeInfos[cascadeIndex].center, -SceneInfo.LightDirection, back, front);
-		}
-		if (result.empty())	//all culled
-			return;
-		SceneInfo.CascadeInfos[cascadeIndex].nearZ = back;
-		SceneInfo.CascadeInfos[cascadeIndex].farZ = front;
-		//sort the results
-		std::sort(result.begin(), result.end(), [&](const uint32_t& lhs, const uint32_t& rhs) {
-			return StaticProxies[lhs].BufferIndex != StaticProxies[rhs].BufferIndex ? StaticProxies[lhs].BufferIndex < StaticProxies[rhs].BufferIndex : StaticProxies[lhs].MaterialIndex < StaticProxies[rhs].MaterialIndex;
-			});
-		//build the structured buffer
-		int32_t CurrBufferIndex{ -1 };
-		CurrBufferIndex = StaticProxies[result[0]].BufferIndex;
-
-		InstanceGroupInfo info;
-		info.VertexBufferIndex = CurrBufferIndex;
-		info.InstanceCount = 0;
-		{
-			MICROPROFILE_SCOPEI("Scene", "Building instance buffer", MP_PALEVIOLETRED);
-			for (int i = 0; i < result.size(); ++i) {
-				const Proxy& proxy = StaticProxies[result[i]];
-				//iterate till i get a different buffer id, meaning is a diff mesh
-				if (proxy.BufferIndex != CurrBufferIndex)
-				{
-					//add the current info
-					StaticCascadeInstanceInfos[cascadeIndex].emplace_back(info);
-					//reset count
-					info.InstanceCount = 0;
-					//set new buffer index
-					info.VertexBufferIndex = CurrBufferIndex = proxy.BufferIndex;
-				}
-				//since already sorted by mesh, just add everything in
-				//set the instance data
-				StaticCascadeInstanceDatas[cascadeIndex].emplace_back();
-				StaticCascadeInstanceDatas[cascadeIndex].back() = proxy;
-				info.InstanceCount++;
-			}
-		}
-		//last info because i reached the end
-		StaticCascadeInstanceInfos[cascadeIndex].emplace_back(info);
-
-		//if nothing was added because all instances failed the culling test
-		if (StaticCascadeInstanceDatas[cascadeIndex].empty())
-		{
-			StaticCascadeInstanceInfos[cascadeIndex].clear();
-		}
-		else
-		{
-			MICROPROFILE_SCOPEI("Scene", "Building Global Instance Buffer", MP_ORANGERED);
-			CommandList->open();
-			//create the instance buffer handle
-			nvrhi::BufferDesc InstanceBufferDesc;
-			InstanceBufferDesc.byteSize = sizeof(InstanceData) * StaticCascadeInstanceDatas[cascadeIndex].size();
-			InstanceBufferDesc.debugName = "Global instance buffer";
-			InstanceBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
-			InstanceBufferDesc.structStride = sizeof(InstanceData);
-			StaticCascadeInstanceBufferHandles[cascadeIndex] = DirectXDevice::GetNativeDevice()->createBuffer(InstanceBufferDesc);
-
-			//copy data over
-			CommandList->beginTrackingBufferState(StaticCascadeInstanceBufferHandles[cascadeIndex], nvrhi::ResourceStates::CopyDest);
-			CommandList->writeBuffer(StaticCascadeInstanceBufferHandles[cascadeIndex], StaticCascadeInstanceDatas[cascadeIndex].data(), sizeof(InstanceData) * StaticCascadeInstanceDatas[cascadeIndex].size());
-			CommandList->setPermanentBufferState(StaticCascadeInstanceBufferHandles[cascadeIndex], nvrhi::ResourceStates::ShaderResource);
-			CommandList->close();
-			DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 		}
 	}
 }
@@ -822,12 +641,6 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 			debugData.Color = { 0.f, 1.f, 0.f, 1.f };
 			instances.emplace_back(debugData);
 		}
-	}
-
-	//adding the octants into the debug instance
-	if (Config.bDrawOctree) {
-		MICROPROFILE_SCOPEI("Scene", "Building octree debug instances", MP_RED4);
-		AddOctantDebug(StaticOctree.Octant, 0);
 	}
 
 	if (SceneInfo.EnableCascadeDebug) {
@@ -890,69 +703,6 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 		CommandList->setPermanentBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::ShaderResource);
 		CommandList->close();
 		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
-	}
-}
-
-void ragdoll::Scene::CullOctant(Octant& octant, const DirectX::BoundingFrustum& frustum, std::vector<uint32_t>& result)
-{
-	if (frustum.Contains(octant.Box) != DirectX::ContainmentType::DISJOINT)	//so if contains or intersects
-	{
-		octant.bIsCulled = false;
-		//if no children, all proxies go into the result buffer
-		if (octant.Octants.empty())
-		{
-			for (const Octant::Node& proxy : octant.Nodes) {
-				result.emplace_back(proxy.Index);
-			}
-		}
-		else {
-			//add all its children first
-			for (const Octant::Node& proxy : octant.Nodes) {
-				result.emplace_back(proxy.Index);
-			}
-			for (Octant& itOctant : octant.Octants) {
-				CullOctant(itOctant, frustum, result);
-			}
-		}
-	}
-	else {
-		octant.bIsCulled = false;
-		DebugInfo.CulledOctantsCount += 1;
-	}
-}
-
-void ragdoll::Scene::CullOctantForCascade(const Octant& octant, const DirectX::BoundingOrientedBox& oob, std::vector<uint32_t>& result, const Vector3& center, const Vector3& normal, float& back, float& front)
-{
-	if (oob.Contains(octant.Box) != DirectX::ContainmentType::DISJOINT)	//so if contains or intersects
-	{
-		//only if this octant have nodes, then consider min max
-		if (!octant.Nodes.empty())
-		{
-			//calculate the furthest
-			Vector3 corners[8];
-			octant.Box.GetCorners(corners);
-			for (int i = 0; i < 8; ++i) {
-				float d2 = (corners[i] - center).Dot(normal);
-				front = std::max(d2, front);
-				back = std::min(d2, back);
-			}
-		}
-		//if no children, all proxies go into the result buffer
-		if (octant.Octants.empty())
-		{
-			for (const Octant::Node& proxy : octant.Nodes) {
-				result.emplace_back(proxy.Index);
-			}
-		}
-		else {
-			//add all its children first
-			for (const Octant::Node& proxy : octant.Nodes) {
-				result.emplace_back(proxy.Index);
-			}
-			for (const Octant& itOctant : octant.Octants) {
-				CullOctantForCascade(itOctant, oob, result, center, normal, back, front);
-			}
-		}
 	}
 }
 

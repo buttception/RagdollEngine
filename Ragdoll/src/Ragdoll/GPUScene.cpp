@@ -5,6 +5,7 @@
 
 #include "DirectXDevice.h"
 #include "AssetManager.h"
+#include "Profiler.h"
 
 #define INSTANCE_DATA_BUFFER_SRV_SLOT 0
 #define INSTANCE_BOUNDING_BOX_BUFFER_SRV_SLOT 1
@@ -12,6 +13,15 @@
 
 #define INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT 0
 #define INSTANCE_ID_BUFFER_UAV_SLOT 1
+
+struct FConstantBuffer
+{
+	Matrix ViewMatrix{};
+	Vector4 FrustumPlanes[6]{};
+	uint32_t ProxyCount{};
+	uint32_t MeshCount{};
+	uint32_t InfiniteZEnabled{};
+};
 
 struct FBoundingBox
 {
@@ -87,6 +97,8 @@ void ragdoll::FGPUScene::UpdateInstanceBuffer(std::vector<Proxy>& Proxies)
 		BoundingBoxes[i].Extents = Proxies[i].BoundingBox.Extents;
 	}
 
+	FConstantBuffer ConstantBuffer;
+
 	//get command list from render in the future for multi threading
 	nvrhi::CommandListHandle CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
 	CommandList->open();
@@ -105,9 +117,23 @@ void ragdoll::FGPUScene::UpdateInstanceBuffer(std::vector<Proxy>& Proxies)
 	CommandList->beginTrackingBufferState(InstanceBoundingBoxBuffer, nvrhi::ResourceStates::CopyDest);
 	CommandList->writeBuffer(InstanceBoundingBoxBuffer, BoundingBoxes.data(), sizeof(FBoundingBox) * BoundingBoxes.size());
 	CommandList->setPermanentBufferState(InstanceBoundingBoxBuffer, nvrhi::ResourceStates::ShaderResource);
+	CommandList->writeBuffer(ConstantBufferHandle, &ConstantBuffer, sizeof(FConstantBuffer));
 	CommandList->endMarker();
 	CommandList->close();
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
+
+	//create the binding set
+	nvrhi::BindingSetDesc BindingSetDesc;
+	BindingSetDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_DATA_BUFFER_SRV_SLOT, InstanceBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_BOUNDING_BOX_BUFFER_SRV_SLOT, InstanceBoundingBoxBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_OFFSET_BUFFER_SRV_SLOT, InstanceOffsetBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT, IndirectDrawArgsBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_ID_BUFFER_UAV_SLOT, InstanceIdBuffer),
+	};
+	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
+	BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);
 }
 
 void ExtractFrustumPlanes(Vector4 OutPlanes[6], const Matrix& Projection, const Matrix& View)
@@ -167,95 +193,59 @@ void ExtractFrustumPlanes(Vector4 OutPlanes[6], const Matrix& Projection, const 
 		float Length = Vector3(OutPlanes[i].x, OutPlanes[i].y, OutPlanes[i].z).Length();
 		OutPlanes[i] /= Length;
 	}
-
-	/*Matrix InverseTransposeView = View.Invert();
-	for (int i = 0; i < 6; ++i)
-	{
-		OutPlanes[i] = Vector4::Transform(OutPlanes[i], InverseTransposeView);
-		float Length = Vector3(OutPlanes[i].x, OutPlanes[i].y, OutPlanes[i].z).Length();
-		OutPlanes[i] /= Length;
-	}*/
 }
 
 void ragdoll::FGPUScene::InstanceCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled)
 {
-	struct ConstantBuffer
-	{
-		Matrix ViewMatrix;
-		Vector4 FrustumPlanes[6];
-		uint32_t ProxyCount;
-		uint32_t MeshCount;
-		uint32_t InfiniteZEnabled;
-	} ConstantBuffer;
+	RD_SCOPE(Culling, Instance Culling);
 	CommandList->beginMarker("Instance Culling");
+	 FConstantBuffer ConstantBuffer;
 	ExtractFrustumPlanes(ConstantBuffer.FrustumPlanes, Projection, View);
 	ConstantBuffer.ViewMatrix = View;//create a constant buffer here
 	ConstantBuffer.ProxyCount = ProxyCount;
 	ConstantBuffer.InfiniteZEnabled = InfiniteZEnabled;
 	ConstantBuffer.MeshCount = AssetManager::GetInstance()->VertexBufferInfos.size();
-	nvrhi::BufferDesc ConstBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(struct ConstantBuffer), "Instance Culling Buffer", 1);
-	nvrhi::BufferHandle VolatileConstantBuffer = DirectXDevice::GetNativeDevice()->createBuffer(ConstBufferDesc);
-	CommandList->writeBuffer(VolatileConstantBuffer, &ConstantBuffer, sizeof(struct ConstantBuffer));
+	CommandList->writeBuffer(ConstantBufferHandle, &ConstantBuffer, sizeof(FConstantBuffer));
 	//reset the indirect draw args first
-	ResetBuffers(CommandList, VolatileConstantBuffer);
+	ResetBuffers(CommandList, ConstantBufferHandle, BindingSetHandle);
 	//frustum cull the scene
-	FrustumCullScene(CommandList, VolatileConstantBuffer, ProxyCount);
+	FrustumCullScene(CommandList, ConstantBufferHandle, BindingSetHandle, ProxyCount);
 	//pack the instance ids
-	PackInstanceIds(CommandList, VolatileConstantBuffer);
+	PackInstanceIds(CommandList, ConstantBufferHandle, BindingSetHandle);
 	CommandList->endMarker();
 }
 
-void ragdoll::FGPUScene::FrustumCullScene(nvrhi::CommandListHandle CommandList, nvrhi::BufferHandle ConstantBufferHandle, uint32_t ProxyCount)
+void ragdoll::FGPUScene::FrustumCullScene(nvrhi::CommandListHandle CommandList, nvrhi::BufferHandle ConstantBufferHandle, nvrhi::BindingSetHandle BindingSetHandle, uint32_t ProxyCount)
 {
-	//binding layout and sets
-	nvrhi::BindingSetDesc CullingSetDesc;
-	CullingSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_DATA_BUFFER_SRV_SLOT, InstanceBuffer),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_BOUNDING_BOX_BUFFER_SRV_SLOT, InstanceBoundingBoxBuffer),
-		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_ID_BUFFER_UAV_SLOT, InstanceIdBuffer),
-	};
-	nvrhi::BindingLayoutHandle CullingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(CullingSetDesc);
-	nvrhi::BindingSetHandle CullingBindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(CullingSetDesc, CullingLayoutHandle);
-
+	RD_SCOPE(Culling, Frustum Culling);
 	//pipeline descs
 	nvrhi::ComputePipelineDesc CullingPipelineDesc;
-	CullingPipelineDesc.bindingLayouts = { CullingLayoutHandle };
+	CullingPipelineDesc.bindingLayouts = { BindingSetHandle->getLayout() };
 	nvrhi::ShaderHandle CullingShader = AssetManager::GetInstance()->GetShader("InstanceCull.cs.cso");
 	CullingPipelineDesc.CS = CullingShader;
 
 	CommandList->beginMarker("Frustum Cull Scene");
 	nvrhi::ComputeState state;
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(CullingPipelineDesc);
-	state.bindings = { CullingBindingSetHandle };
+	state.bindings = { BindingSetHandle };
 	CommandList->setComputeState(state);
 	CommandList->dispatch(ProxyCount / 64 + 1, 1, 1);
 	CommandList->endMarker();
 }
 
-void ragdoll::FGPUScene::PackInstanceIds(nvrhi::CommandListHandle CommandList, nvrhi::BufferHandle ConstantBufferHandle)
+void ragdoll::FGPUScene::PackInstanceIds(nvrhi::CommandListHandle CommandList, nvrhi::BufferHandle ConstantBufferHandle, nvrhi::BindingSetHandle BindingSetHandle)
 {
-	//binding layout and sets
-	nvrhi::BindingSetDesc PackIdsSetDesc;
-	PackIdsSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_OFFSET_BUFFER_SRV_SLOT, InstanceOffsetBuffer),
-		nvrhi::BindingSetItem::StructuredBuffer_UAV(INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT, IndirectDrawArgsBuffer),
-		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_ID_BUFFER_UAV_SLOT, InstanceIdBuffer),
-	};
-	nvrhi::BindingLayoutHandle PackIdsLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(PackIdsSetDesc);
-	nvrhi::BindingSetHandle PackIdsBindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(PackIdsSetDesc, PackIdsLayoutHandle);
-
+	RD_SCOPE(Culling, Pack Ids);
 	//pipeline descs
 	nvrhi::ComputePipelineDesc PackIdsPipelineDesc;
-	PackIdsPipelineDesc.bindingLayouts = { PackIdsLayoutHandle };
+	PackIdsPipelineDesc.bindingLayouts = { BindingSetHandle->getLayout() };
 	nvrhi::ShaderHandle PackingShader = AssetManager::GetInstance()->GetShader("PackInstanceIds.cs.cso");
 	PackIdsPipelineDesc.CS = PackingShader;
 
 	CommandList->beginMarker("Pack Ids");
 	nvrhi::ComputeState state;
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(PackIdsPipelineDesc);
-	state.bindings = { PackIdsBindingSetHandle };
+	state.bindings = { BindingSetHandle };
 	CommandList->setComputeState(state);
 	CommandList->dispatch(AssetManager::GetInstance()->VertexBufferInfos.size() / 64 + 1, 1, 1);
 	CommandList->endMarker();
@@ -293,29 +283,25 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	nvrhi::BufferDesc InstanceOffsetBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(uint32_t) * AssetManager::GetInstance()->VertexBufferInfos.size(), "InstanceOffsetBuffer");
 	InstanceOffsetBufferDesc.structStride = sizeof(uint32_t);
 	InstanceOffsetBuffer = DirectXDevice::GetNativeDevice()->createBuffer(InstanceOffsetBufferDesc);
+
+	//create the binding set and const buffer
+	nvrhi::BufferDesc ConstBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FConstantBuffer), "Instance Culling Buffer", 1);
+	ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(ConstBufferDesc);
 }
 
-void ragdoll::FGPUScene::ResetBuffers(nvrhi::CommandListHandle CommandList, nvrhi::BufferHandle ConstantBufferHandle)
+void ragdoll::FGPUScene::ResetBuffers(nvrhi::CommandListHandle CommandList, nvrhi::BufferHandle ConstantBufferHandle, nvrhi::BindingSetHandle BindingSetHandle)
 {
-	//binding layout and sets
-	nvrhi::BindingSetDesc ResetSetDesc;
-	ResetSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-		nvrhi::BindingSetItem::StructuredBuffer_UAV(INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT, IndirectDrawArgsBuffer)
-	};
-	nvrhi::BindingLayoutHandle ResetLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(ResetSetDesc);
-	nvrhi::BindingSetHandle ResetBindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(ResetSetDesc, ResetLayoutHandle);
-
+	RD_SCOPE(Culling, Reset);
 	//pipeline descs
 	nvrhi::ComputePipelineDesc ResetPipelineDesc;
-	ResetPipelineDesc.bindingLayouts = { ResetLayoutHandle };
+	ResetPipelineDesc.bindingLayouts = { BindingSetHandle->getLayout() };
 	nvrhi::ShaderHandle ResetShader = AssetManager::GetInstance()->GetShader("ResetIndirect.cs.cso");
 	ResetPipelineDesc.CS = ResetShader;
 
 	CommandList->beginMarker("Reset Indirect Draw Args");
 	nvrhi::ComputeState state;
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(ResetPipelineDesc);
-	state.bindings = { ResetBindingSetHandle };
+	state.bindings = { BindingSetHandle };
 	CommandList->setComputeState(state);
 	CommandList->dispatch(AssetManager::GetInstance()->VertexBufferInfos.size() / 64 + 1, 1, 1);
 	CommandList->endMarker();

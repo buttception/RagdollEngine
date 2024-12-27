@@ -244,7 +244,6 @@ namespace ragdoll {
 		std::shared_ptr<FGPUScene> GPUScene;
 		SceneConfig Config;
 		DebugInfo DebugInfo;
-		Octree StaticOctree;
 
 		std::vector<double> JitterOffsetsX;
 		std::vector<double> JitterOffsetsY;
@@ -271,25 +270,11 @@ namespace ragdoll {
 		SceneInformation SceneInfo;
 		std::vector<Proxy> StaticProxies;
 
-		std::vector<InstanceData> StaticInstanceDatas;	//all the instances to draw that was culled
-		std::vector<InstanceGroupInfo> StaticInstanceGroupInfos;	//info on how to draw the instances
-
-		std::vector<InstanceData> StaticCascadeInstanceDatas[4];	//all instances to draw for shadow map
-		std::vector<InstanceGroupInfo> StaticCascadeInstanceInfos[4];	//info on how to draw the instances
-
 		std::vector<InstanceData> StaticDebugInstanceDatas;	//all the debug cubes
-
-		nvrhi::BufferHandle StaticInstanceBufferHandle;
-		nvrhi::BufferHandle StaticCascadeInstanceBufferHandles[4];	//all the cascade instance handles
 		nvrhi::BufferHandle StaticInstanceDebugBufferHandle;	//contains all the aabb boxes to draw
 
-		void PopulateStaticProxies();	//add all proxies into the octree
-		void BuildStaticInstances(const Matrix& cameraProjection, const Matrix& cameraView, std::vector<InstanceData>& instances, std::vector<InstanceGroupInfo>& instancesGrpInfo);
-		void BuildStaticCascadeMapInstances();
+		void PopulateStaticProxies();
 		void BuildDebugInstances(std::vector<InstanceData>& instances);
-
-		void CullOctant(Octant& octant, const DirectX::BoundingFrustum& frustum, std::vector<uint32_t>& result);
-		void CullOctantForCascade(const Octant& octant, const DirectX::BoundingOrientedBox& oob, std::vector<uint32_t>& result, const Vector3& center, const Vector3& normal, float& back, float& front);
 
 		void UpdateShadowCascadesExtents();
 		void UpdateShadowLightMatrices();

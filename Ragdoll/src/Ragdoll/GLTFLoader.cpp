@@ -638,6 +638,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	}
 	
 	{
+		//TODO: remove min max calculation, not deprecated since there is no more octree
 		RD_SCOPE(Load, Creating Hierarchy);
 		Vector3 min{ FLT_MAX, FLT_MAX, FLT_MAX }, max{ -FLT_MAX, -FLT_MAX, -FLT_MAX };
 		//create all the entities and their components
@@ -645,9 +646,6 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			TraverseNode(rootIndex, 0, meshIndicesOffset, model, EntityManagerRef, SceneRef, min, max);
 		}
 		float offset = 1.01f;
-		Octree::Max = max * offset;
-		Octree::Min = min * offset;
-		SceneRef->StaticOctree.Clear();
 #if 0
 		TransformLayer->DebugPrintHierarchy();
 #endif
