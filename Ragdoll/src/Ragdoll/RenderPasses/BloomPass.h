@@ -31,6 +31,8 @@ class BloomPass {
 	nvrhi::BindingSetHandle DownSampleSetHandles[5];
 	nvrhi::BindingSetHandle UpSampleSetHandles[5];
 
+	void CreateBindingSet(ragdoll::SceneRenderTargets* targets);
+
 public:
 	void Init(nvrhi::CommandListHandle cmdList, ragdoll::SceneRenderTargets* targets);
 

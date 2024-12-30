@@ -8,12 +8,8 @@
 #include "Ragdoll/Scene.h"
 #include "Ragdoll/DirectXDevice.h"
 
-void BloomPass::Init(nvrhi::CommandListHandle cmdList, ragdoll::SceneRenderTargets* targets)
+void BloomPass::CreateBindingSet(ragdoll::SceneRenderTargets* targets)
 {
-	CommandListRef = cmdList;
-
-	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FConstantBuffer), "Bloom CBuffer", 1);
-	ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 	for (int i = 0; i < 5; ++i)
 	{
 		nvrhi::BindingSetDesc BindingSetDesc;
@@ -33,10 +29,25 @@ void BloomPass::Init(nvrhi::CommandListHandle cmdList, ragdoll::SceneRenderTarge
 	}
 }
 
+void BloomPass::Init(nvrhi::CommandListHandle cmdList, ragdoll::SceneRenderTargets* targets)
+{
+	CommandListRef = cmdList;
+
+	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FConstantBuffer), "Bloom CBuffer", 1);
+	ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
+	CreateBindingSet(targets);
+}
+
 void BloomPass::Bloom(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets)
 {
 	RD_SCOPE(Render, Bloom);
 	RD_GPU_SCOPE("Bloom", CommandListRef);
+	if (sceneInfo.BloomIntensity == 0.f)
+		return;
+	if (sceneInfo.FilterRadius == 0.f)
+		return;
+	if (sceneInfo.bIsResolutionDirty)
+		CreateBindingSet(targets);
 	DownSample(targets);
 	UpSample(sceneInfo.FilterRadius, sceneInfo.BloomIntensity, targets);
 }

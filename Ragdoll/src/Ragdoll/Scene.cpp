@@ -136,13 +136,13 @@ void ragdoll::Scene::Update(float _dt)
 		if(Config.bInitDLSS)
 			NVSDK::Init(DirectXDevice::GetInstance()->m_Device12, Vector2(SceneInfo.RenderWidth, SceneInfo.RenderHeight), Vector2(SceneInfo.TargetWidth, SceneInfo.TargetHeight));
 		CreateRenderTargets();
-		SceneInfo.bIsResolutionDirty = false;
 	}
 
 	DeferredRenderer->Render(this, GPUScene.get(), _dt, ImguiInterface);
 
 	DirectXDevice::GetInstance()->Present();
 
+	SceneInfo.bIsResolutionDirty = false;
 	SceneInfo.bIsCameraDirty = false;
 }
 
