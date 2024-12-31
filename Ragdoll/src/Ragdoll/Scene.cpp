@@ -124,9 +124,7 @@ void ragdoll::Scene::Update(float _dt)
 	{
 		DebugInfo.CulledOctantsCount = 0;
 		UpdateShadowCascadesExtents();
-		//BuildStaticCascadeMapInstances();
 		UpdateShadowLightMatrices();
-		//BuildStaticInstances(ImguiInterface->CameraProjection, ImguiInterface->CameraView, StaticInstanceDatas, StaticInstanceGroupInfos);
 		BuildDebugInstances(StaticDebugInstanceDatas);
 	}
 

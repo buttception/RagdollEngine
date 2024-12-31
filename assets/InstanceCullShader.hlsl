@@ -124,5 +124,5 @@ void PackInstanceIdCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupInde
         InstanceCount++;
     }
     DrawIndexedIndirectArgsOutput[DTid.x].instanceCount = InstanceCount;
-
+    DrawIndexedIndirectArgsOutput[DTid.x].startInstanceLocation = DrawIndexedIndirectArgsOutput[DTid.x].startIndexLocation == 0 ? 0 : StartIndex;
 }

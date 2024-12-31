@@ -23,6 +23,7 @@ void GBufferPass::DrawAllInstances(
 {
 	RD_SCOPE(Render, GBufferPass);
 	RD_GPU_SCOPE("GBufferPass", CommandListRef);
+	CommandListRef->beginMarker("Instance Draws");
 	//new gpu scene stuff
 	if(debugInfo.bFreezeFrustumCulling)
 		GPUScene->InstanceCull(CommandListRef, debugInfo.FrozenProjection, debugInfo.FrozenView, ProxyCount, true);
@@ -80,13 +81,13 @@ void GBufferPass::DrawAllInstances(
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 	state.indexBuffer = { AssetManager::GetInstance()->IBO, nvrhi::Format::R32_UINT, 0 };
 	state.vertexBuffers = {
-		{ AssetManager::GetInstance()->VBO }
+		{ AssetManager::GetInstance()->VBO, 0 },
+		{ GPUScene->InstanceIdBuffer, 1 }
 	};
 	state.indirectParams = GPUScene->IndirectDrawArgsBuffer;
 	state.addBindingSet(BindingSetHandle);
 	state.addBindingSet(AssetManager::GetInstance()->DescriptorTable);
 
-	CommandListRef->beginMarker("Instance Draws");
 	CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
 	CBuffer.ViewProjWithAA = sceneInfo.MainCameraViewProjWithAA;
 	CBuffer.PrevViewProj = sceneInfo.PrevMainCameraViewProj;
@@ -95,14 +96,6 @@ void GBufferPass::DrawAllInstances(
 
 	CommandListRef->setGraphicsState(state);
 
-	for (int MeshIndex = 0; MeshIndex < AssetManager::GetInstance()->VertexBufferInfos.size(); ++MeshIndex)
-	{
-		MICROPROFILE_SCOPEI("Render", "Each instance", MP_CADETBLUE);
-		CBuffer.MeshIndex = MeshIndex;
-		CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
-		CommandListRef->drawIndexedIndirect(MeshIndex * sizeof(nvrhi::DrawIndexedIndirectArguments));
-	}
-	CBuffer.MeshIndex = 0;
-
+	CommandListRef->drawIndexedIndirect(0, AssetManager::GetInstance()->VertexBufferInfos.size());
 	CommandListRef->endMarker();
 }

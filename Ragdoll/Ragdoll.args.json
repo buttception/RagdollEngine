@@ -50,7 +50,19 @@
         },
         {
           "Id": "395cbeaa-ee05-47d8-8240-23067e17d7e7",
-          "Command": "--scene \"other_gltf/Bistro/Bistro.gltf\""
+          "Command": "--scene \"other_gltf/Bistro/bistro.gltf\""
+        },
+        {
+          "Id": "efe8be07-0ecf-4550-99c9-8d2954b547cf",
+          "Command": "--scene \"other_gltf\\FlyingWorld\\FlyingWorld-BattleOfTheTrashGod.gltf\""
+        },
+        {
+          "Id": "0c8dea10-8fbc-49af-8798-6752f86035c4",
+          "Command": "--scene \"other_gltf\\FlyingWorld\\FlyingWorld-BattleOfTheTrashGod_Optimized.gltf\""
+        },
+        {
+          "Id": "04de94b4-d96a-4eaa-91b5-722dccd7ad96",
+          "Command": "--scene \"other_gltf\\Sponza\\Sponza_Optimized.bin\""
         }
       ]
     }

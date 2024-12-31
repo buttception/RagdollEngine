@@ -32,11 +32,11 @@ void directional_vs(
 	in float3 inNormal : NORMAL,
 	in float3 inTangent : TANGENT,
 	in float2 inTexcoord : TEXCOORD,
-	in uint inInstanceId : SV_INSTANCEID,
+	in int inInstanceId : INSTANCEID,
 	out float4 outPos : SV_Position
 )
 {
-    InstanceData data = InstanceDatas[InstanceIdBufferInput[inInstanceId + InstanceOffsetBufferInput[MeshIndex]]];
+    InstanceData data = InstanceDatas[InstanceIdBufferInput[inInstanceId]];
 	float4 worldPos = mul(float4(inPos, 1), data.worldMatrix);
 	outPos = mul(worldPos, LightViewProj);
 }

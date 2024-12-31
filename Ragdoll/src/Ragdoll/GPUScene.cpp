@@ -210,6 +210,9 @@ void ragdoll::FGPUScene::InstanceCull(nvrhi::CommandListHandle CommandList, cons
 	ResetBuffers(CommandList, ConstantBufferHandle, BindingSetHandle);
 	//frustum cull the scene
 	FrustumCullScene(CommandList, ConstantBufferHandle, BindingSetHandle, ProxyCount);
+	//manually set the uav barrier due to consecutive dispatches with same binding set
+	nvrhi::utils::BufferUavBarrier(CommandList, IndirectDrawArgsBuffer);
+	nvrhi::utils::BufferUavBarrier(CommandList, InstanceIdBuffer);
 	//pack the instance ids
 	PackInstanceIds(CommandList, ConstantBufferHandle, BindingSetHandle);
 	CommandList->endMarker();
@@ -264,6 +267,7 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	InstanceIdBufferDesc.canHaveUAVs = true;
 	InstanceIdBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	InstanceIdBufferDesc.keepInitialState = true;
+	InstanceIdBufferDesc.isVertexBuffer = true;
 	InstanceIdBuffer = DirectXDevice::GetNativeDevice()->createBuffer(InstanceIdBufferDesc);	  //worst case size
 	//bounding box buffer
 	nvrhi::BufferDesc InstanceBoundingBoxBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(FBoundingBox) * Proxies.size(), "InstanceBoundingBoxBuffer");

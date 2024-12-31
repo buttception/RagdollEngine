@@ -37,7 +37,7 @@ void gbuffer_vs(
 	in float3 inNormal : NORMAL,
 	in float3 inTangent : TANGENT,
 	in float2 inTexcoord : TEXCOORD,
-	in uint inInstanceId : SV_INSTANCEID,
+	in int inInstanceId : INSTANCEID,
 	out float4 outPos : SV_Position,
 	out float4 outPrevFragPos : TEXCOORD1,
 	out float4 outFragPos : TEXCOORD2,
@@ -48,7 +48,7 @@ void gbuffer_vs(
 	out nointerpolation uint outInstanceId : TEXCOORD7
 )
 {
-    InstanceData data = InstanceDatas[InstanceIdBufferInput[inInstanceId + InstanceOffsetBufferInput[MeshIndex]]];
+    InstanceData data = InstanceDatas[InstanceIdBufferInput[inInstanceId]];
 	outFragPos = mul(float4(inPos, 1), data.worldMatrix); 
 	outPrevFragPos = mul(float4(inPos, 1), data.prevWorldMatrix);
 	outPos = mul(outFragPos, viewProjMatrixWithAA);
@@ -81,7 +81,7 @@ void gbuffer_ps(
 	out float2 outVelocity: SV_Target3
 )
 {
-    InstanceData data = InstanceDatas[InstanceIdBufferInput[inInstanceId + InstanceOffsetBufferInput[MeshIndex]]];
+    InstanceData data = InstanceDatas[InstanceIdBufferInput[inInstanceId]];
 	// Sample textures
 	float4 albedo = data.albedoFactor;
 	if(data.albedoIndex != -1){

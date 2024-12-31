@@ -163,11 +163,19 @@ void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
 	vTexcoordAttrib.offset = offsetof(Vertex, texcoord);
 	vTexcoordAttrib.elementStride = sizeof(Vertex);
 	vTexcoordAttrib.format = nvrhi::Format::RG32_FLOAT;
+	nvrhi::VertexAttributeDesc InstanceIdAttrib;
+	InstanceIdAttrib.bufferIndex = 1;
+	InstanceIdAttrib.name = "INSTANCEID";
+	InstanceIdAttrib.offset = 0;
+	InstanceIdAttrib.elementStride = sizeof(int32_t);
+	InstanceIdAttrib.format = nvrhi::Format::R32_SINT;
+	InstanceIdAttrib.isInstanced = true;
 	InstancedVertexAttributes = {
 		vPositionAttrib,
 		vNormalAttrib,
 		vTangentAttrib,
 		vTexcoordAttrib,
+		InstanceIdAttrib,
 	};
 	InstancedInputLayoutHandle = Device->createInputLayout(InstancedVertexAttributes.data(), static_cast<uint32_t>(InstancedVertexAttributes.size()), nullptr);
 

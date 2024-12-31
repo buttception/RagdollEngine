@@ -27,6 +27,7 @@ void ShadowPass::DrawAllInstances(
 {
 	RD_SCOPE(Render, ShadowPass);
 	RD_GPU_SCOPE("ShadowPass", CommandListRef[CascadeIndex]);
+	CommandListRef[CascadeIndex]->beginMarker(("Directional Light Shadow Pass" + std::to_string(CascadeIndex)).c_str());
 	ragdoll::CascadeInfo CascadeInfo = sceneInfo.CascadeInfos[CascadeIndex];
 	GPUScene->InstanceCull(CommandListRef[CascadeIndex], CascadeInfo.proj, CascadeInfo.view, ProxyCount, false);
 
@@ -66,26 +67,19 @@ void ShadowPass::DrawAllInstances(
 	state.viewport.addViewportAndScissorRect({ 2000.f, 2000.f });
 	state.indexBuffer = { AssetManager::GetInstance()->IBO, nvrhi::Format::R32_UINT, 0 };
 	state.vertexBuffers = {
-		{ AssetManager::GetInstance()->VBO }
+		{ AssetManager::GetInstance()->VBO, 0 },
+		{ GPUScene->InstanceIdBuffer, 1 }
 	};
 	state.indirectParams = GPUScene->IndirectDrawArgsBuffer;
 	state.addBindingSet(BindingSetHandle);
 
-	CommandListRef[CascadeIndex]->beginMarker(("Directional Light Shadow Pass" + std::to_string(CascadeIndex)).c_str());
-	CommandListRef[CascadeIndex]->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
-	CommandListRef[CascadeIndex]->setGraphicsState(state);
-
 	CBuffer[CascadeIndex].CascadeIndex = CascadeIndex;
 	CBuffer[CascadeIndex].LightViewProj = sceneInfo.CascadeInfos[CascadeIndex].viewProj;
 	CBuffer[CascadeIndex].MeshIndex = 0;
+	CommandListRef[CascadeIndex]->writeBuffer(ConstantBufferHandle, &CBuffer[CascadeIndex], sizeof(ConstantBuffer));
 
-	for (int MeshIndex = 0; MeshIndex < AssetManager::GetInstance()->VertexBufferInfos.size(); ++MeshIndex)
-	{
-		MICROPROFILE_SCOPEI("Render", "Each instance", MP_CADETBLUE);
-		CBuffer[CascadeIndex].MeshIndex = MeshIndex;
-		CommandListRef[CascadeIndex]->writeBuffer(ConstantBufferHandle, &CBuffer[CascadeIndex], sizeof(ConstantBuffer));
-		CommandListRef[CascadeIndex]->drawIndexedIndirect(MeshIndex * sizeof(nvrhi::DrawIndexedIndirectArguments));
-	}
-	CBuffer[CascadeIndex].MeshIndex = 0;
+	CommandListRef[CascadeIndex]->setGraphicsState(state);
+
+	CommandListRef[CascadeIndex]->drawIndexedIndirect(0, AssetManager::GetInstance()->VertexBufferInfos.size());
 	CommandListRef[CascadeIndex]->endMarker();
 }
