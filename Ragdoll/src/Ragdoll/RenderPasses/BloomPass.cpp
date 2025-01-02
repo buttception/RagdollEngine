@@ -32,10 +32,6 @@ void BloomPass::CreateBindingSet(ragdoll::SceneRenderTargets* targets)
 void BloomPass::Init(nvrhi::CommandListHandle cmdList, ragdoll::SceneRenderTargets* targets)
 {
 	CommandListRef = cmdList;
-
-	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FConstantBuffer), "Bloom CBuffer", 1);
-	ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
-	CreateBindingSet(targets);
 }
 
 void BloomPass::Bloom(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets)
@@ -46,8 +42,10 @@ void BloomPass::Bloom(const ragdoll::SceneInformation& sceneInfo, ragdoll::Scene
 		return;
 	if (sceneInfo.FilterRadius == 0.f)
 		return;
-	if (sceneInfo.bIsResolutionDirty)
-		CreateBindingSet(targets);
+	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FConstantBuffer), "Bloom CBuffer", 1);
+	ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
+	CreateBindingSet(targets);
+
 	DownSample(targets);
 	UpSample(sceneInfo.FilterRadius, sceneInfo.BloomIntensity, targets);
 }

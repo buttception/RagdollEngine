@@ -5,8 +5,6 @@
 namespace ragdoll
 {
 	class FGPUScene {
-		nvrhi::BindingSetHandle BindingSetHandle;
-		nvrhi::BufferHandle ConstantBufferHandle;
 	public:
 		//TODO: upload mesh data as well, so can derive boudning box with the instance buffer
 		//InstanceBuffer (only transforms)

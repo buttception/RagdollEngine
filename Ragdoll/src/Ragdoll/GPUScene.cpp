@@ -117,23 +117,9 @@ void ragdoll::FGPUScene::UpdateInstanceBuffer(std::vector<Proxy>& Proxies)
 	CommandList->beginTrackingBufferState(InstanceBoundingBoxBuffer, nvrhi::ResourceStates::CopyDest);
 	CommandList->writeBuffer(InstanceBoundingBoxBuffer, BoundingBoxes.data(), sizeof(FBoundingBox) * BoundingBoxes.size());
 	CommandList->setPermanentBufferState(InstanceBoundingBoxBuffer, nvrhi::ResourceStates::ShaderResource);
-	CommandList->writeBuffer(ConstantBufferHandle, &ConstantBuffer, sizeof(FConstantBuffer));
 	CommandList->endMarker();
 	CommandList->close();
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
-
-	//create the binding set
-	nvrhi::BindingSetDesc BindingSetDesc;
-	BindingSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_DATA_BUFFER_SRV_SLOT, InstanceBuffer),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_BOUNDING_BOX_BUFFER_SRV_SLOT, InstanceBoundingBoxBuffer),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_OFFSET_BUFFER_SRV_SLOT, InstanceOffsetBuffer),
-		nvrhi::BindingSetItem::StructuredBuffer_UAV(INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT, IndirectDrawArgsBuffer),
-		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_ID_BUFFER_UAV_SLOT, InstanceIdBuffer),
-	};
-	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
-	BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);
 }
 
 void ExtractFrustumPlanes(Vector4 OutPlanes[6], const Matrix& Projection, const Matrix& View)
@@ -205,7 +191,22 @@ void ragdoll::FGPUScene::InstanceCull(nvrhi::CommandListHandle CommandList, cons
 	ConstantBuffer.ProxyCount = ProxyCount;
 	ConstantBuffer.InfiniteZEnabled = InfiniteZEnabled;
 	ConstantBuffer.MeshCount = AssetManager::GetInstance()->VertexBufferInfos.size();
+	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FConstantBuffer), "InstanceCull ConstantBuffer", 1));
 	CommandList->writeBuffer(ConstantBufferHandle, &ConstantBuffer, sizeof(FConstantBuffer));
+
+	//create the binding set
+	nvrhi::BindingSetDesc BindingSetDesc;
+	BindingSetDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_DATA_BUFFER_SRV_SLOT, InstanceBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_BOUNDING_BOX_BUFFER_SRV_SLOT, InstanceBoundingBoxBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_OFFSET_BUFFER_SRV_SLOT, InstanceOffsetBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT, IndirectDrawArgsBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_ID_BUFFER_UAV_SLOT, InstanceIdBuffer),
+	};
+	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
+	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);
+
 	//reset the indirect draw args first
 	ResetBuffers(CommandList, ConstantBufferHandle, BindingSetHandle);
 	//frustum cull the scene
@@ -287,10 +288,6 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	nvrhi::BufferDesc InstanceOffsetBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(uint32_t) * AssetManager::GetInstance()->VertexBufferInfos.size(), "InstanceOffsetBuffer");
 	InstanceOffsetBufferDesc.structStride = sizeof(uint32_t);
 	InstanceOffsetBuffer = DirectXDevice::GetNativeDevice()->createBuffer(InstanceOffsetBufferDesc);
-
-	//create the binding set and const buffer
-	nvrhi::BufferDesc ConstBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FConstantBuffer), "Instance Culling Buffer", 1);
-	ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(ConstBufferDesc);
 }
 
 void ragdoll::FGPUScene::ResetBuffers(nvrhi::CommandListHandle CommandList, nvrhi::BufferHandle ConstantBufferHandle, nvrhi::BindingSetHandle BindingSetHandle)
