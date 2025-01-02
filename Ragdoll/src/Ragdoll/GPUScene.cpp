@@ -97,8 +97,6 @@ void ragdoll::FGPUScene::UpdateInstanceBuffer(std::vector<Proxy>& Proxies)
 		BoundingBoxes[i].Extents = Proxies[i].BoundingBox.Extents;
 	}
 
-	FConstantBuffer ConstantBuffer;
-
 	//get command list from render in the future for multi threading
 	nvrhi::CommandListHandle CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
 	CommandList->open();
@@ -122,7 +120,7 @@ void ragdoll::FGPUScene::UpdateInstanceBuffer(std::vector<Proxy>& Proxies)
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 }
 
-void ExtractFrustumPlanes(Vector4 OutPlanes[6], const Matrix& Projection, const Matrix& View)
+void ragdoll::FGPUScene::ExtractFrustumPlanes(Vector4 OutPlanes[6], const Matrix& Projection, const Matrix& View)
 {
 	Matrix ViewProjection = View * Projection;
 	// Left plane
@@ -185,7 +183,7 @@ void ragdoll::FGPUScene::InstanceCull(nvrhi::CommandListHandle CommandList, cons
 {
 	RD_SCOPE(Culling, Instance Culling);
 	CommandList->beginMarker("Instance Culling");
-	 FConstantBuffer ConstantBuffer;
+	FConstantBuffer ConstantBuffer;
 	ExtractFrustumPlanes(ConstantBuffer.FrustumPlanes, Projection, View);
 	ConstantBuffer.ViewMatrix = View;//create a constant buffer here
 	ConstantBuffer.ProxyCount = ProxyCount;

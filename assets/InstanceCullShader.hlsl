@@ -86,20 +86,23 @@ void FrustumCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, 
         BBox.Center + float3(BBox.Extent.x, BBox.Extent.y, -BBox.Extent.z),
         BBox.Center + float3(BBox.Extent.x, BBox.Extent.y, BBox.Extent.z)
     };
-    uint VisibilityMask = 0;
+    
     uint PlaneCount = InfiniteZEnabled == 1 ? 5 : 6;
-    //only check the first 5 planes as the 6th plane is at infinity
+    bool CompletelyOutside = true; // Assume completely outside initially
     [unroll]
     for (int i = 0; i < PlaneCount; ++i)
     {
+        int VisibleCorners = 0;
         [unroll]
         for (int j = 0; j < 8; ++j)
         {
-            //as long as one corner is visible, the proxy is visible
-            VisibilityMask |= (dot(FrustumPlanes[i].xyz, Corners[j]) + FrustumPlanes[i].w) >= 0.f ? 1 : 0;
+            float Distance = dot(Corners[j], FrustumPlanes[i].xyz) + FrustumPlanes[i].w;
+            VisibleCorners |= (Distance >= 0.0f) ? 1 : 0; // Mark as visible if any corner is inside
         }
+        CompletelyOutside &= (VisibleCorners == 0);
     }
-    InstanceIdBufferOutput[DTid.x] = VisibilityMask != 0 ? DTid.x : -1;
+    InstanceIdBufferOutput[DTid.x] = CompletelyOutside ? -1 : DTid.x;
+
 }
 
 StructuredBuffer<uint> InstanceOffsetBufferInput : register(INSTANCE_OFFSET_BUFFER_SRV_SLOT);

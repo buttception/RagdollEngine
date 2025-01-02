@@ -57,6 +57,8 @@ ragdoll::Scene::Scene(Application* app)
 
 void ragdoll::Scene::Update(float _dt)
 {
+	//no need to update transforms as the scene is static for now
+	//UpdateTransforms();
 	{
 		RD_SCOPE(Render, ImGuiBuildData);
 		ImguiInterface->BeginFrame();
@@ -545,7 +547,9 @@ void ragdoll::Scene::CreateRenderTargets()
 
 void ragdoll::Scene::UpdateTransforms()
 {
+	RD_SCOPE(Scene, UpdateTransforms);
 	TraverseTreeAndUpdateTransforms();
+	ResetTransformDirtyFlags();
 }
 
 void ragdoll::Scene::ResetTransformDirtyFlags()
@@ -614,13 +618,52 @@ void ragdoll::Scene::PopulateStaticProxies()
 			Proxy.Roughness = mat.Roughness;
 			Proxy.bIsLit = mat.bIsLit;
 			Proxy.ModelToWorld = tComp->m_ModelToWorld;
-			Proxy.InvModelToWorld = tComp->m_ModelToWorld.Invert();
 			Proxy.PrevWorldMatrix = tComp->m_PrevModelToWorld;
 			Proxy.BufferIndex = (int32_t)submesh.VertexBufferIndex;
 			Proxy.MaterialIndex = (int32_t)submesh.MaterialIndex;
 			AssetManager::GetInstance()->VertexBufferInfos[Proxy.BufferIndex].BestFitBox.Transform(Proxy.BoundingBox, tComp->m_ModelToWorld);
 		}
 	}
+}
+
+Matrix ComputePlaneTransform(const Vector4& plane, float width, float height)
+{
+	// Normalize the plane normal
+	Vector3 normal = Vector3(plane.x, plane.y, plane.z);
+
+	// Compute plane distance from origin
+	float distance = plane.w;
+
+	// Compute center of the plane
+	Vector3 center = -distance * normal;
+
+	// Generate orthonormal basis
+	Vector3 up = Vector3(0, 1, 0);
+	if (fabsf(up.Dot(normal)) > 0.99f)
+	{
+		up = Vector3(1, 0, 0); // Choose a different up vector if too parallel
+	}
+	Vector3 xAxis = up.Cross(normal);
+	Vector3 yAxis = normal.Cross(xAxis);
+	xAxis.Normalize();
+	yAxis.Normalize();
+
+	// Construct the rotation matrix
+	Matrix rotation = DirectX::XMMATRIX(
+		xAxis,         // Right vector (x-axis)
+		yAxis,            // Up vector (y-axis)
+		normal,       // Forward vector (z-axis)
+		DirectX::XMVectorSet(0.f, 0.f, 0.f, 1.f)
+	);
+
+	// Construct the scaling matrix
+	Matrix scale = Matrix::CreateScale(width, height, 0.01f); // Flattened along Z
+
+	// Combine to create the final transform
+	Matrix transform = scale * rotation;
+	transform *= Matrix::CreateTranslation(center);
+
+	return transform;
 }
 
 void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
@@ -670,6 +713,29 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 		debugData.bIsLit = false;
 		debugData.Color = colors[SceneInfo.EnableCascadeDebug - 1];
 		instances.emplace_back(debugData);
+	}
+	
+	if (DebugInfo.bShowFrustum)
+	{
+		//add the 5 planes for the camera
+		Vector4 Planes[6];
+		if(DebugInfo.bFreezeFrustumCulling)
+			GPUScene->ExtractFrustumPlanes(Planes, DebugInfo.FrozenProjection, DebugInfo.FrozenView);
+		else
+			GPUScene->ExtractFrustumPlanes(Planes, SceneInfo.InfiniteReverseZProj, SceneInfo.MainCameraView);
+		for (int i = 0; i < 5; ++i)
+		{
+			InstanceData debugData;;
+			debugData.ModelToWorld = ComputePlaneTransform(Planes[i], 10.f, 10.f);
+			debugData.bIsLit = false;
+			if(i < 2)
+				debugData.Color = { 0.f, 0.f, 1.f, 1.f };
+			else if(i < 4)
+				debugData.Color = { 1.f, 1.f, 0.f, 1.f };
+			else
+				debugData.Color = { 0.f, 1.f, 0.f, 1.f };
+			instances.emplace_back(debugData);
+		}
 	}
 
 	if (!instances.empty())

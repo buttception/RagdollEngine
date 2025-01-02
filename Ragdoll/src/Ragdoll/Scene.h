@@ -17,7 +17,6 @@ namespace ragdoll {
 
 	struct Proxy {
 		Matrix ModelToWorld;
-		Matrix InvModelToWorld;
 		Matrix PrevWorldMatrix;
 		DirectX::BoundingBox BoundingBox;
 
@@ -38,7 +37,6 @@ namespace ragdoll {
 
 	struct InstanceData {
 		Matrix ModelToWorld;
-		Matrix InvModelToWorld;
 		Matrix PrevWorldMatrix;
 
 		Vector4 Color = Vector4::One;
@@ -55,7 +53,6 @@ namespace ragdoll {
 
 		InstanceData& operator=(const Proxy& proxy) {
 			ModelToWorld = proxy.ModelToWorld;
-			InvModelToWorld = proxy.InvModelToWorld;
 			PrevWorldMatrix = proxy.PrevWorldMatrix;
 
 			Color = proxy.Color;
@@ -88,6 +85,7 @@ namespace ragdoll {
 		Matrix FrozenProjection;
 		Matrix FrozenView;
 		Vector3 FrozenCameraPosition;
+		bool bShowFrustum{ false };
 	};
 
 	struct SceneConfig {

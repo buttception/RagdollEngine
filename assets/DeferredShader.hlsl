@@ -11,7 +11,6 @@ cbuffer g_Const : register(b0) {
 
 struct InstanceData{
 	float4x4 worldMatrix;
-	float4x4 invWorldMatrix;
 	float4x4 prevWorldMatrix;
 
 	float4 albedoFactor;

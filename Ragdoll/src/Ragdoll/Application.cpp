@@ -147,7 +147,6 @@ namespace ragdoll
 		}
 
 		//scenes are always static now so update the gpu scene instance buffer once
-		m_Scene->UpdateTransforms();
 		m_Scene->PopulateStaticProxies();
 		m_Scene->GPUScene->UpdateInstanceBuffer(m_Scene->StaticProxies);
 		m_Scene->ResetTransformDirtyFlags();

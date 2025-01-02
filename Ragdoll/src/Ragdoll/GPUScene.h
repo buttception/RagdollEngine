@@ -23,6 +23,9 @@ namespace ragdoll
 		void UpdateInstanceBuffer(std::vector<Proxy>& Proxies);
 		void InstanceCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled);
 
+		//helper
+		void ExtractFrustumPlanes(Vector4 OutPlanes[6], const Matrix& Projection, const Matrix& View);
+
 	private:
 		void CreateBuffers(const std::vector<Proxy>& Proxies);
 		void ResetBuffers(nvrhi::CommandListHandle CommandList, nvrhi::BufferHandle ConstantBufferHandle, nvrhi::BindingSetHandle BindingSetHandle);

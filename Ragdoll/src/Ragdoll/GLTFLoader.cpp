@@ -55,6 +55,8 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndice
 	}
 
 	TransformComp* transComp = em->AddComponent<TransformComp>(ent);
+	//no need to update transform again as it is already done here
+	transComp->m_Dirty = false;
 	transComp->glTFId = currIndex;
 	//root level entities
 	if (level == 0)
@@ -84,7 +86,7 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndice
 	//since i need the modelstack already i no need transform system to update
 	//transComp->m_Dirty = true;
 	if (!modelStack.empty())
-		transComp->m_PrevModelToWorld = transComp->m_ModelToWorld = modelStack.top() * mat;
+		transComp->m_PrevModelToWorld = transComp->m_ModelToWorld = mat * modelStack.top();
 	else
 		transComp->m_PrevModelToWorld = transComp->m_ModelToWorld = mat;
 	modelStack.push(mat);

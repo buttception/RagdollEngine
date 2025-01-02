@@ -299,6 +299,8 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 			}
 			SceneInfo.bIsCameraDirty = true;
 		}
+		if(ImGui::Checkbox("Show Frustum", &DebugInfo.bShowFrustum));
+			SceneInfo.bIsCameraDirty = true;
 		if (ImGui::Checkbox("Show Octree", &Config.bDrawOctree))
 			SceneInfo.bIsCameraDirty = true;
 		if (Config.bDrawOctree) {
