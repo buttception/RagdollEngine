@@ -42,7 +42,7 @@ void AddToFurthestSibling(ragdoll::Guid child, ragdoll::Guid newChild, std::shar
 		trans->m_Sibling = newChild;
 }
 
-ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndicesOffset, const tinygltf::Model& model, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> scene, Vector3& min, Vector3& max)
+ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndicesOffset, const tinygltf::Model& model, std::shared_ptr<ragdoll::EntityManager> em, std::shared_ptr<ragdoll::Scene> scene)
 {
 	static std::stack<Matrix> modelStack;
 	const tinygltf::Node& curr = model.nodes[currIndex];
@@ -55,19 +55,17 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndice
 	}
 
 	TransformComp* transComp = em->AddComponent<TransformComp>(ent);
-	//no need to update transform again as it is already done here
-	transComp->m_Dirty = false;
 	transComp->glTFId = currIndex;
+	transComp->m_Dirty = true;
 	//root level entities
 	if (level == 0)
 	{
 		scene->AddEntityAtRootLevel(currId);
 	}
 
-	Matrix mat;
 	if (curr.matrix.size() > 0) {
 		const std::vector<double>& gltfMat = curr.matrix;
-		mat = {
+		Matrix mat = {
 			(float)gltfMat[0], (float)gltfMat[1], (float)gltfMat[2], (float)gltfMat[3], 
 			(float)gltfMat[4], (float)gltfMat[5], (float)gltfMat[6], (float)gltfMat[7], 
 			(float)gltfMat[8], (float)gltfMat[9], (float)gltfMat[10], (float)gltfMat[11],
@@ -81,39 +79,11 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndice
 			transComp->m_LocalRotation = { (float)curr.rotation[0], (float)curr.rotation[1], (float)curr.rotation[2], (float)curr.rotation[3] };
 		if (curr.scale.size() > 0)
 			transComp->m_LocalScale = { (float)curr.scale[0], (float)curr.scale[1], (float)curr.scale[2] };
-		mat = Matrix::CreateScale(transComp->m_LocalScale) * Matrix::CreateFromQuaternion(transComp->m_LocalRotation) * Matrix::CreateTranslation(transComp->m_LocalPosition);
-	}
-	//since i need the modelstack already i no need transform system to update
-	//transComp->m_Dirty = true;
-	if (!modelStack.empty())
-		transComp->m_PrevModelToWorld = transComp->m_ModelToWorld = mat * modelStack.top();
-	else
-		transComp->m_PrevModelToWorld = transComp->m_ModelToWorld = mat;
-	modelStack.push(mat);
-
-	//get max extents in world space
-	if (curr.mesh >= 0)
-	{
-		for (const Submesh& submesh : AssetManager::GetInstance()->Meshes[curr.mesh + meshIndicesOffset].Submeshes)
-		{
-			DirectX::BoundingBox box = AssetManager::GetInstance()->VertexBufferInfos[submesh.VertexBufferIndex].BestFitBox;
-			box.Transform(box, transComp->m_ModelToWorld);
-			Vector3 corners[8];
-			box.GetCorners(corners);
-			for (int i = 0; i < 8; ++i) {
-				min.x = std::min({ corners[i].x, min.x });
-				min.y = std::min({ corners[i].y, min.y });
-				min.z = std::min({ corners[i].z, min.z });
-				max.x = std::max({ corners[i].x, max.x });
-				max.y = std::max({ corners[i].y, max.y });
-				max.z = std::max({ corners[i].z, max.z });
-			}
-		}
 	}
 
 	const tinygltf::Node& parent = model.nodes[currIndex];
 	for (const int& childIndex : parent.children) {
-		ragdoll::Guid childId = TraverseNode(childIndex, level + 1, meshIndicesOffset, model, em, scene, min, max);
+		ragdoll::Guid childId = TraverseNode(childIndex, level + 1, meshIndicesOffset, model, em, scene);
 		if (transComp->m_Child.m_RawId == 0) {
 			transComp->m_Child = childId;
 		}
@@ -121,8 +91,6 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndice
 			AddToFurthestSibling(transComp->m_Child, childId, em);
 		}
 	}
-
-	modelStack.pop();
 
 	return currId;
 }
@@ -640,14 +608,18 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	}
 	
 	{
-		//TODO: remove min max calculation, not deprecated since there is no more octree
 		RD_SCOPE(Load, Creating Hierarchy);
-		Vector3 min{ FLT_MAX, FLT_MAX, FLT_MAX }, max{ -FLT_MAX, -FLT_MAX, -FLT_MAX };
 		//create all the entities and their components
 		for (const int& rootIndex : model.scenes[0].nodes) {	//iterating through the root nodes
-			TraverseNode(rootIndex, 0, meshIndicesOffset, model, EntityManagerRef, SceneRef, min, max);
+			TraverseNode(rootIndex, 0, meshIndicesOffset, model, EntityManagerRef, SceneRef);
 		}
-		float offset = 1.01f;
+		SceneRef->UpdateTransforms();
+		//iterate through comps and set prev matrix as curr matrix
+		auto EcsView = EntityManagerRef->GetRegistry().view<TransformComp>();
+		for (const entt::entity& ent : EcsView) {
+			TransformComp* comp = EntityManagerRef->GetComponent<TransformComp>(ent);
+			comp->m_PrevModelToWorld = comp->m_ModelToWorld;
+		}
 #if 0
 		TransformLayer->DebugPrintHierarchy();
 #endif
