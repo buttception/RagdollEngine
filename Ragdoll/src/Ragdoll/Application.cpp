@@ -45,6 +45,7 @@ ________________________________________________________________________________
 #include "Input/InputHandler.h"
 #include "File/FileManager.h"
 #include "Scene.h"
+#include "GPUScene.h"
 
 #include "DirectXDevice.h"
 #include "GLTFLoader.h"
@@ -145,8 +146,9 @@ namespace ragdoll
 			}
 		}
 
-		m_Scene->UpdateTransforms();
+		//scenes are always static now so update the gpu scene instance buffer once
 		m_Scene->PopulateStaticProxies();
+		m_Scene->GPUScene->UpdateInstanceBuffer(m_Scene->StaticProxies);
 		m_Scene->ResetTransformDirtyFlags();
 	}
 

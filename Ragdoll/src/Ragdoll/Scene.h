@@ -13,10 +13,10 @@ namespace ragdoll {
 	class TransformSystem;
 	class Application;
 	class Window;
+	class FGPUScene;
 
 	struct Proxy {
 		Matrix ModelToWorld;
-		Matrix InvModelToWorld;
 		Matrix PrevWorldMatrix;
 		DirectX::BoundingBox BoundingBox;
 
@@ -37,7 +37,6 @@ namespace ragdoll {
 
 	struct InstanceData {
 		Matrix ModelToWorld;
-		Matrix InvModelToWorld;
 		Matrix PrevWorldMatrix;
 
 		Vector4 Color = Vector4::One;
@@ -54,7 +53,6 @@ namespace ragdoll {
 
 		InstanceData& operator=(const Proxy& proxy) {
 			ModelToWorld = proxy.ModelToWorld;
-			InvModelToWorld = proxy.InvModelToWorld;
 			PrevWorldMatrix = proxy.PrevWorldMatrix;
 
 			Color = proxy.Color;
@@ -83,6 +81,11 @@ namespace ragdoll {
 		uint32_t CompCount;
 		Vector4 Add;
 		Vector4 Mul;
+		bool bFreezeFrustumCulling{ false };
+		Matrix FrozenProjection;
+		Matrix FrozenView;
+		Vector3 FrozenCameraPosition;
+		bool bShowFrustum{ false };
 	};
 
 	struct SceneConfig {
@@ -106,7 +109,7 @@ namespace ragdoll {
 		Matrix PrevMainCameraViewProj;
 		Matrix InfiniteReverseZProj;
 		Matrix MainCameraView;
-		CascadeInfo CascadeInfo[4];
+		CascadeInfo CascadeInfos[4];
 		Vector3 MainCameraPosition;
 		Vector4 LightDiffuseColor = { 1.f, 1.f, 1.f, 1.f };
 		Vector4 SceneAmbientColor = { 0.2f, 0.2f, 0.2f, 1.f };
@@ -127,7 +130,6 @@ namespace ragdoll {
 		bool UseCACAO = false;
 		bool UseXeGTAO = true;
 		bool bIsCameraDirty{ true };
-		bool bFreezeFrustumCulling{ false };
 		bool bEnableDLSS{ true };
 		bool bEnableIntelTAA{ false };
 		bool bEnableFSR{ false };
@@ -237,9 +239,9 @@ namespace ragdoll {
 
 	public:
 		std::shared_ptr<Renderer> DeferredRenderer;
+		std::shared_ptr<FGPUScene> GPUScene;
 		SceneConfig Config;
 		DebugInfo DebugInfo;
-		Octree StaticOctree;
 
 		std::vector<double> JitterOffsetsX;
 		std::vector<double> JitterOffsetsY;
@@ -266,25 +268,11 @@ namespace ragdoll {
 		SceneInformation SceneInfo;
 		std::vector<Proxy> StaticProxies;
 
-		std::vector<InstanceData> StaticInstanceDatas;	//all the instances to draw that was culled
-		std::vector<InstanceGroupInfo> StaticInstanceGroupInfos;	//info on how to draw the instances
-
-		std::vector<InstanceData> StaticCascadeInstanceDatas[4];	//all instances to draw for shadow map
-		std::vector<InstanceGroupInfo> StaticCascadeInstanceInfos[4];	//info on how to draw the instances
-
 		std::vector<InstanceData> StaticDebugInstanceDatas;	//all the debug cubes
-
-		nvrhi::BufferHandle StaticInstanceBufferHandle;
-		nvrhi::BufferHandle StaticCascadeInstanceBufferHandles[4];	//all the cascade instance handles
 		nvrhi::BufferHandle StaticInstanceDebugBufferHandle;	//contains all the aabb boxes to draw
 
-		void PopulateStaticProxies();	//add all proxies into the octree
-		void BuildStaticInstances(const Matrix& cameraProjection, const Matrix& cameraView, std::vector<InstanceData>& instances, std::vector<InstanceGroupInfo>& instancesGrpInfo);
-		void BuildStaticCascadeMapInstances();
+		void PopulateStaticProxies();
 		void BuildDebugInstances(std::vector<InstanceData>& instances);
-
-		void CullOctant(Octant& octant, const DirectX::BoundingFrustum& frustum, std::vector<uint32_t>& result);
-		void CullOctantForCascade(const Octant& octant, const DirectX::BoundingOrientedBox& oob, std::vector<uint32_t>& result, const Vector3& center, const Vector3& normal, float& back, float& front);
 
 		void UpdateShadowCascadesExtents();
 		void UpdateShadowLightMatrices();

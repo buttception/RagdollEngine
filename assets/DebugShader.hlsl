@@ -24,7 +24,6 @@ static const int2 lineIndices[12] = {
 
 struct InstanceData{
 	float4x4 worldMatrix;
-	float4x4 invWorldMatrix;
 	float4x4 prevWorldMatrix;
 
 	float4 albedoFactor;

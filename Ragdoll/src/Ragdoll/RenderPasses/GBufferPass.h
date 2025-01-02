@@ -4,7 +4,9 @@
 namespace ragdoll {
 	struct InstanceGroupInfo;
 	struct SceneInformation;
+	struct DebugInfo;
 	struct SceneRenderTargets;
+	class FGPUScene;
 }
 class GBufferPass {
 	struct ConstantBuffer {
@@ -13,7 +15,7 @@ class GBufferPass {
 		Matrix ViewProjWithAA;
 		Matrix PrevViewProj;
 		Vector2 RenderResolution;
-		int InstanceOffset{ 0 };
+		uint32_t MeshIndex{ 0 };
 	}CBuffer;
 
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
@@ -21,5 +23,10 @@ class GBufferPass {
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
 
-	void DrawAllInstances(nvrhi::BufferHandle instanceBuffer, const std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets);
+	void DrawAllInstances(
+		ragdoll::FGPUScene* GPUScene,
+		uint32_t ProxyCount,
+		const ragdoll::SceneInformation& sceneInfo,
+		const ragdoll::DebugInfo& debugInfo,
+		ragdoll::SceneRenderTargets* targets);
 };

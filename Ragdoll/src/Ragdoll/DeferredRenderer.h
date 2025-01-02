@@ -23,6 +23,7 @@ namespace ragdoll {
 	class FileManager;
 	class EntityManager;
 	class Scene;
+	class FGPUScene;
 	struct SceneRenderTargets;
 	struct InstanceGroupInfo;
 }
@@ -83,7 +84,7 @@ public:
 	void Shutdown();
 
 	void BeginFrame();
-	void Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRenderer> imgui);
+	void Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float _dt, std::shared_ptr<ImguiRenderer> imgui);
 private:
 	std::shared_ptr<ragdoll::Window> PrimaryWindowRef;
 	//handled at renderer

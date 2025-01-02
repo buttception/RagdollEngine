@@ -6,6 +6,7 @@
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
+#include "Ragdoll/GPUScene.h"
 #include "Ragdoll/DirectXDevice.h"
 
 void ShadowPass::Init(nvrhi::CommandListHandle cmdList0, nvrhi::CommandListHandle cmdList1, nvrhi::CommandListHandle cmdList2, nvrhi::CommandListHandle cmdList3)
@@ -16,15 +17,22 @@ void ShadowPass::Init(nvrhi::CommandListHandle cmdList0, nvrhi::CommandListHandl
 	CommandListRef[3] = cmdList3;
 }
 
-void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, std::vector<ragdoll::InstanceGroupInfo>& infos, const ragdoll::SceneInformation& sceneInfo, uint32_t cascadeIndex, ragdoll::SceneRenderTargets* targets)
+void ShadowPass::DrawAllInstances(
+	uint32_t CascadeIndex,
+	ragdoll::FGPUScene* GPUScene,
+	uint32_t ProxyCount,
+	const ragdoll::SceneInformation& sceneInfo,
+	ragdoll::SceneRenderTargets* targets
+)
 {
 	RD_SCOPE(Render, ShadowPass);
-	RD_GPU_SCOPE("ShadowPass", CommandListRef[cascadeIndex]);
-	if (infos.empty())
-		return;
+	RD_GPU_SCOPE("ShadowPass", CommandListRef[CascadeIndex]);
+	CommandListRef[CascadeIndex]->beginMarker(("Directional Light Shadow Pass" + std::to_string(CascadeIndex)).c_str());
+	ragdoll::CascadeInfo CascadeInfo = sceneInfo.CascadeInfos[CascadeIndex];
+	GPUScene->InstanceCull(CommandListRef[CascadeIndex], CascadeInfo.proj, CascadeInfo.view, ProxyCount, false);
 
 	nvrhi::FramebufferDesc desc = nvrhi::FramebufferDesc()
-		.setDepthAttachment(targets->ShadowMap[cascadeIndex]);
+		.setDepthAttachment(targets->ShadowMap[CascadeIndex]);
 	nvrhi::FramebufferHandle pipelineFb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
 
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ShadowPass CBuffer", 1);
@@ -33,7 +41,9 @@ void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, std::vecto
 	nvrhi::BindingSetDesc BindingSetDesc;
 	BindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, instanceBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, GPUScene->InstanceBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(1, GPUScene->InstanceOffsetBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(2, GPUScene->InstanceIdBuffer),
 	};
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
 	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);
@@ -57,31 +67,19 @@ void ShadowPass::DrawAllInstances(nvrhi::BufferHandle instanceBuffer, std::vecto
 	state.viewport.addViewportAndScissorRect({ 2000.f, 2000.f });
 	state.indexBuffer = { AssetManager::GetInstance()->IBO, nvrhi::Format::R32_UINT, 0 };
 	state.vertexBuffers = {
-		{ AssetManager::GetInstance()->VBO }
+		{ AssetManager::GetInstance()->VBO, 0 },
+		{ GPUScene->InstanceIdBuffer, 1 }
 	};
+	state.indirectParams = GPUScene->IndirectDrawArgsBuffer;
 	state.addBindingSet(BindingSetHandle);
 
-	CommandListRef[cascadeIndex]->beginMarker(("Directional Light Shadow Pass" + std::to_string(cascadeIndex)).c_str());
-	CommandListRef[cascadeIndex]->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
-	CommandListRef[cascadeIndex]->setGraphicsState(state);
+	CBuffer[CascadeIndex].CascadeIndex = CascadeIndex;
+	CBuffer[CascadeIndex].LightViewProj = sceneInfo.CascadeInfos[CascadeIndex].viewProj;
+	CBuffer[CascadeIndex].MeshIndex = 0;
+	CommandListRef[CascadeIndex]->writeBuffer(ConstantBufferHandle, &CBuffer[CascadeIndex], sizeof(ConstantBuffer));
 
-	CBuffer[cascadeIndex].CascadeIndex = cascadeIndex;
-	CBuffer[cascadeIndex].LightViewProj = sceneInfo.CascadeInfo[cascadeIndex].viewProj;
+	CommandListRef[CascadeIndex]->setGraphicsState(state);
 
-	uint32_t instanceCount = 0;
-	for (const ragdoll::InstanceGroupInfo& info : infos)
-	{
-		MICROPROFILE_SCOPEI("Render", "Each instance", MP_CADETBLUE);
-		const VertexBufferInfo& buffer = AssetManager::GetInstance()->VertexBufferInfos[info.VertexBufferIndex];
-		nvrhi::DrawArguments args;
-		args.vertexCount = buffer.IndicesCount;
-		args.startVertexLocation = buffer.VBOffset;
-		args.startIndexLocation = buffer.IBOffset;
-		args.instanceCount = info.InstanceCount;
-		CommandListRef[cascadeIndex]->writeBuffer(ConstantBufferHandle, &CBuffer[cascadeIndex], sizeof(ConstantBuffer));
-		CommandListRef[cascadeIndex]->drawIndexed(args);
-		CBuffer[cascadeIndex].InstanceOffset += info.InstanceCount;
-	}
-	CBuffer[cascadeIndex].InstanceOffset = 0;
-	CommandListRef[cascadeIndex]->endMarker();
+	CommandListRef[CascadeIndex]->drawIndexedIndirect(0, AssetManager::GetInstance()->VertexBufferInfos.size());
+	CommandListRef[CascadeIndex]->endMarker();
 }

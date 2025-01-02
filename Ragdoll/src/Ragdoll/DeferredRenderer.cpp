@@ -10,6 +10,7 @@
 #include "Ragdoll/Components/TransformComp.h"
 #include "Ragdoll/Components/RenderableComp.h"
 #include "Scene.h"
+#include "GPUScene.h"
 #include "GeometryBuilder.h"
 #include "ImGuiRenderer.h"
 #include "NVSDK.h"
@@ -58,7 +59,7 @@ void Renderer::BeginFrame()
 	CommandList->endMarker();
 }
 
-void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRenderer> imgui)
+void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float _dt, std::shared_ptr<ImguiRenderer> imgui)
 {
 	//swaps the depth buffer being drawn to
 	bIsOddFrame = !bIsOddFrame;
@@ -122,8 +123,14 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::SKY_GENERATE]);
 
-	Taskflow.emplace([this, &scene]() {
-		GBufferPass->DrawAllInstances(scene->StaticInstanceBufferHandle, scene->StaticInstanceGroupInfos, scene->SceneInfo, RenderTargets);
+	uint32_t ProxyCount = scene->StaticProxies.size();
+	Taskflow.emplace([this, &scene, GPUScene, ProxyCount]() {
+		GBufferPass->DrawAllInstances(
+			GPUScene,
+			ProxyCount,
+			scene->SceneInfo,
+			scene->DebugInfo,
+			RenderTargets);
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::GBUFFER]);
 
@@ -142,21 +149,21 @@ void Renderer::Render(ragdoll::Scene* scene, float _dt, std::shared_ptr<ImguiRen
 		activeList.emplace_back(CommandLists[(int)Pass::AO]);
 	}
 
-	Taskflow.emplace([this, &scene]() {
-		ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles[0], scene->StaticCascadeInstanceInfos[0], scene->SceneInfo, 0, RenderTargets);
+	Taskflow.emplace([this, &scene, GPUScene]() {
+		ShadowPass->DrawAllInstances(0, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
 	});
+	Taskflow.emplace([this, &scene, GPUScene]() {
+		ShadowPass->DrawAllInstances(1, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
+		});
+	Taskflow.emplace([this, &scene, GPUScene]() {
+		ShadowPass->DrawAllInstances(2, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
+		});
+	Taskflow.emplace([this, &scene, GPUScene]() {
+		ShadowPass->DrawAllInstances(3, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
+		});
 	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH0]);
-	Taskflow.emplace([this, &scene]() {
-		ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles[1], scene->StaticCascadeInstanceInfos[1], scene->SceneInfo, 1, RenderTargets);
-		});
 	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH1]);
-	Taskflow.emplace([this, &scene]() {
-		ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles[2], scene->StaticCascadeInstanceInfos[2], scene->SceneInfo, 2, RenderTargets);
-		});
 	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH2]);
-	Taskflow.emplace([this, &scene]() {
-		ShadowPass->DrawAllInstances(scene->StaticCascadeInstanceBufferHandles[3], scene->StaticCascadeInstanceInfos[3], scene->SceneInfo, 3, RenderTargets);
-		});
 	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH3]);
 
 	Taskflow.emplace([this, &scene]() {
@@ -301,7 +308,7 @@ void Renderer::CreateResource()
 	SkyPass->Init(CommandLists[(int)Pass::SKY]);
 	
 	BloomPass = std::make_shared<class BloomPass>();
-	BloomPass->Init(CommandLists[(int)Pass::BLOOM]);
+	BloomPass->Init(CommandLists[(int)Pass::BLOOM], RenderTargets);
 
 	AutomaticExposurePass = std::make_shared<class AutomaticExposurePass>();
 	AutomaticExposurePass->Init(CommandLists[(int)Pass::EXPOSURE]);

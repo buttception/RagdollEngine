@@ -27,7 +27,7 @@ void ShadowMaskPass::DrawShadowMask(const ragdoll::SceneInformation& sceneInfo, 
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ShadowMask CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 	for (int i = 0; i < 4; ++i) {
-		CBuffer.LightViewProj[i] = sceneInfo.CascadeInfo[i].viewProj;
+		CBuffer.LightViewProj[i] = sceneInfo.CascadeInfos[i].viewProj;
 	}
 	CBuffer.InvViewProj = sceneInfo.MainCameraViewProj.Invert();
 	CBuffer.View = sceneInfo.MainCameraView;

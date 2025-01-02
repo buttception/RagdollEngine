@@ -6,12 +6,11 @@ cbuffer g_Const : register(b0) {
 	float4x4 viewProjMatrixWithAA;
 	float4x4 prevViewProjMatrix;
 	float2 RenderResolution;
-	int instanceOffset;
+	int MeshIndex;
 };
 
 struct InstanceData{
 	float4x4 worldMatrix;
-	float4x4 invWorldMatrix;
 	float4x4 prevWorldMatrix;
 
 	float4 albedoFactor;
@@ -28,6 +27,8 @@ struct InstanceData{
 };
 
 StructuredBuffer<InstanceData> InstanceDatas : register(t0);
+StructuredBuffer<uint> InstanceOffsetBufferInput : register(t1);
+StructuredBuffer<int> InstanceIdBufferInput : register(t2);
 Texture2D Textures[] : register(t0, space1);
 
 void gbuffer_vs(
@@ -35,7 +36,7 @@ void gbuffer_vs(
 	in float3 inNormal : NORMAL,
 	in float3 inTangent : TANGENT,
 	in float2 inTexcoord : TEXCOORD,
-	in uint inInstanceId : SV_INSTANCEID,
+	in int inInstanceId : INSTANCEID,
 	out float4 outPos : SV_Position,
 	out float4 outPrevFragPos : TEXCOORD1,
 	out float4 outFragPos : TEXCOORD2,
@@ -46,7 +47,7 @@ void gbuffer_vs(
 	out nointerpolation uint outInstanceId : TEXCOORD7
 )
 {
-	InstanceData data = InstanceDatas[inInstanceId + instanceOffset];
+    InstanceData data = InstanceDatas[InstanceIdBufferInput[inInstanceId]];
 	outFragPos = mul(float4(inPos, 1), data.worldMatrix); 
 	outPrevFragPos = mul(float4(inPos, 1), data.prevWorldMatrix);
 	outPos = mul(outFragPos, viewProjMatrixWithAA);
@@ -79,7 +80,7 @@ void gbuffer_ps(
 	out float2 outVelocity: SV_Target3
 )
 {
-	InstanceData data = InstanceDatas[inInstanceId + instanceOffset];
+    InstanceData data = InstanceDatas[InstanceIdBufferInput[inInstanceId]];
 	// Sample textures
 	float4 albedo = data.albedoFactor;
 	if(data.albedoIndex != -1){

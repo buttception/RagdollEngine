@@ -133,9 +133,9 @@ int32_t ImguiRenderer::DrawFBViewer()
 void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneInformation& SceneInfo, ragdoll::SceneConfig& Config, float _dt)
 {
 	static struct Data {
-		Vector3 cameraPos = { 0.f, 1.f, 5.f };
+		Vector3 cameraPos = { 0.f, 1.f, 0.f };
 		Vector3 cameraDir = { 0.f, 0.f, 1.f };
-		float cameraYaw = DirectX::XM_PI;
+		float cameraYaw = 0.f;
 		float cameraPitch = 0.f;
 		float cameraFov = 90.f;
 		float cameraNear = 0.01f;
@@ -283,14 +283,23 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		ImGui::SliderFloat("Camera Rotation Speed (Degrees)", &data.cameraRotationSpeed, 5.f, 100.f);
 
 		data.cameraDir = Vector3::Transform(Vector3(0.f, 0.f, 1.f), Quaternion::CreateFromYawPitchRoll(data.cameraYaw, data.cameraPitch, 0.f));
-		SceneInfo.MainCameraPosition = data.cameraPos;
 
 		ImGui::TreePop();
 	}
 
 	if (ImGui::TreeNode("Debug"))
 	{
-		if (ImGui::Checkbox("Freeze Culling Matrix", &SceneInfo.bFreezeFrustumCulling))
+		if (ImGui::Checkbox("Freeze Culling Matrix", &DebugInfo.bFreezeFrustumCulling))
+		{
+			if (DebugInfo.bFreezeFrustumCulling)
+			{
+				DebugInfo.FrozenProjection = SceneInfo.InfiniteReverseZProj;
+				DebugInfo.FrozenCameraPosition = SceneInfo.MainCameraPosition;
+				DebugInfo.FrozenView = SceneInfo.MainCameraView;
+			}
+			SceneInfo.bIsCameraDirty = true;
+		}
+		if(ImGui::Checkbox("Show Frustum", &DebugInfo.bShowFrustum));
 			SceneInfo.bIsCameraDirty = true;
 		if (ImGui::Checkbox("Show Octree", &Config.bDrawOctree))
 			SceneInfo.bIsCameraDirty = true;
@@ -308,9 +317,9 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 				for (int i = 0; i < 4; ++i) {
 					if (ImGui::TreeNode(("Cascade" + std::to_string(i)).c_str(), "Casecade %d", i))
 					{
-						ImGui::Text("Position: %1.f, %1.f, %1.f", SceneInfo.CascadeInfo[i].center.x, SceneInfo.CascadeInfo[i].center.y, SceneInfo.CascadeInfo[i].center.z);
-						ImGui::Text("Dimension: %.2f, %.2f", SceneInfo.CascadeInfo[i].width, SceneInfo.CascadeInfo[i].height);
-						ImGui::Text("NearFar: %.2f, %.2f", SceneInfo.CascadeInfo[i].nearZ, SceneInfo.CascadeInfo[i].farZ);
+						ImGui::Text("Position: %1.f, %1.f, %1.f", SceneInfo.CascadeInfos[i].center.x, SceneInfo.CascadeInfos[i].center.y, SceneInfo.CascadeInfos[i].center.z);
+						ImGui::Text("Dimension: %.2f, %.2f", SceneInfo.CascadeInfos[i].width, SceneInfo.CascadeInfos[i].height);
+						ImGui::Text("NearFar: %.2f, %.2f", SceneInfo.CascadeInfos[i].nearZ, SceneInfo.CascadeInfos[i].farZ);
 						ImGui::TreePop();
 					}
 				}
@@ -399,15 +408,13 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		SceneInfo.InfiniteReverseZProj._43 = data.cameraNear;
 		SceneInfo.InfiniteReverseZProj._34 = 1.f;
 
-		if (!SceneInfo.bFreezeFrustumCulling)
-			CameraProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraWidth / data.cameraHeight, data.cameraNear, data.cameraFar);
+		CameraProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraWidth / data.cameraHeight, data.cameraNear, data.cameraFar);
 
 		SceneInfo.MainCameraView = DirectX::XMMatrixLookAtLH(data.cameraPos, data.cameraPos + data.cameraDir, Vector3(0.f, 1.f, 0.f));
-		if (!SceneInfo.bFreezeFrustumCulling)
-			CameraView = SceneInfo.MainCameraView;
+		CameraView = SceneInfo.MainCameraView;
 		SceneInfo.MainCameraViewProj = SceneInfo.MainCameraView * SceneInfo.InfiniteReverseZProj;
-		if (!SceneInfo.bFreezeFrustumCulling)
-			CameraViewProjection = SceneInfo.MainCameraViewProj;
+		CameraViewProjection = SceneInfo.MainCameraViewProj;
+		SceneInfo.MainCameraPosition = data.cameraPos;
 	}
 }
 
