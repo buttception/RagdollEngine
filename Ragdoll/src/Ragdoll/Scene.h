@@ -111,6 +111,7 @@ namespace ragdoll {
 		Matrix MainCameraView;
 		CascadeInfo CascadeInfos[4];
 		Vector3 MainCameraPosition;
+		DirectX::BoundingBox SceneBounds;
 		Vector4 LightDiffuseColor = { 1.f, 1.f, 1.f, 1.f };
 		Vector4 SceneAmbientColor = { 0.2f, 0.2f, 0.2f, 1.f };
 		Vector3 LightDirection = { 1.f, -1.f, 1.f };
@@ -249,7 +250,7 @@ namespace ragdoll {
 
 		SceneRenderTargets RenderTargets;
 		//distance where the subfrusta are seperated
-		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
+		const float SubfrustaFarPlanes[5] = { 0.001f, 10.f, 25.f, 50.f, 100.f };
 
 		Scene(Application*);
 

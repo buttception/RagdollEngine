@@ -614,11 +614,34 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			TraverseNode(rootIndex, 0, meshIndicesOffset, model, EntityManagerRef, SceneRef);
 		}
 		SceneRef->UpdateTransforms();
-		//iterate through comps and set prev matrix as curr matrix
-		auto EcsView = EntityManagerRef->GetRegistry().view<TransformComp>();
-		for (const entt::entity& ent : EcsView) {
-			TransformComp* comp = EntityManagerRef->GetComponent<TransformComp>(ent);
-			comp->m_PrevModelToWorld = comp->m_ModelToWorld;
+		{
+			//iterate through comps and set prev matrix as curr matrix
+			auto EcsView = EntityManagerRef->GetRegistry().view<TransformComp>();
+			for (const entt::entity& ent : EcsView) {
+				TransformComp* comp = EntityManagerRef->GetComponent<TransformComp>(ent);
+				comp->m_PrevModelToWorld = comp->m_ModelToWorld;
+			}
+		}
+		{
+			Vector3 Min{ FLT_MAX, FLT_MAX, FLT_MAX };
+			Vector3 Max{ -FLT_MAX, -FLT_MAX, -FLT_MAX };
+			//get the min and max extends
+			auto EcsView = EntityManagerRef->GetRegistry().view<TransformComp, RenderableComp>();
+			for (const entt::entity& ent : EcsView)
+			{
+				const RenderableComp* rComp = EntityManagerRef->GetComponent<RenderableComp>(ent);
+				const Mesh& mesh = AssetManager::GetInstance()->Meshes[rComp->meshIndex];
+				const TransformComp* tComp = EntityManagerRef->GetComponent<TransformComp>(ent);
+				for (const Submesh& submesh : mesh.Submeshes)
+				{
+					const VertexBufferInfo& Info = AssetManager::GetInstance()->VertexBufferInfos[submesh.VertexBufferIndex];
+					DirectX::BoundingBox Box = Info.BestFitBox;
+					Box.Transform(Box, tComp->m_ModelToWorld);
+					Min = DirectX::XMVectorMin(Min, Box.Center - Box.Extents);
+					Max = DirectX::XMVectorMax(Max, Box.Center + Box.Extents);
+				}
+			}
+			SceneRef->SceneInfo.SceneBounds = DirectX::BoundingBox(Min, Max);
 		}
 #if 0
 		TransformLayer->DebugPrintHierarchy();

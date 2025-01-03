@@ -18,16 +18,17 @@ void main_ps(
     out float4 outColor : SV_Target0
 )
 {
+    const float SubfrustaFarPlanes[5] = { 0.001f, 10.f, 25.f, 50.f, 100.f };
     //get the frag pos
 	float3 fragPos = DepthToWorld(DepthBuffer.Sample(Sampler, inTexcoord).r, inTexcoord, InvViewProjMatrix);
-    
-    float distanceFromCam = mul(float4(fragPos, 1.f), View).z;
+    float distanceFromCam = length(fragPos.xz - float2(View[3].xz));
+    //float distanceFromCam = mul(float4(fragPos, 1.f), View).z;
     //decide which matrix and texture to use
     Texture2D shadowMap;
     float4x4 lightMatrix;
     float4 color = float4(1.f, 1.f, 1.f, 1.f);
     float bias;
-    if(distanceFromCam < 5.f)
+    if (distanceFromCam < SubfrustaFarPlanes[1])
     {
         if(EnableCascadeDebug)
             color = float4(1.f, 0.5f, 0.5f, 1.f);
@@ -35,7 +36,7 @@ void main_ps(
         lightMatrix = LightViewProj[0];
         bias = 0.002f;
     }
-    else if(distanceFromCam < 10.f)
+    else if (distanceFromCam < SubfrustaFarPlanes[2])
     {
         if(EnableCascadeDebug)
             color = float4(1.f, 1.f, 0.5f, 1.f);
@@ -43,7 +44,7 @@ void main_ps(
         lightMatrix = LightViewProj[1];
         bias = 0.003f;
     }
-    else if(distanceFromCam < 15.f)
+    else if (distanceFromCam < SubfrustaFarPlanes[3])
     {
         if(EnableCascadeDebug)
             color = float4(0.5f, 1.f, 0.5f, 1.f);
