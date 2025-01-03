@@ -637,11 +637,16 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 					const VertexBufferInfo& Info = AssetManager::GetInstance()->VertexBufferInfos[submesh.VertexBufferIndex];
 					DirectX::BoundingBox Box = Info.BestFitBox;
 					Box.Transform(Box, tComp->m_ModelToWorld);
-					Min = DirectX::XMVectorMin(Min, Box.Center - Box.Extents);
-					Max = DirectX::XMVectorMax(Max, Box.Center + Box.Extents);
+					Vector3 Corners[8];
+					Box.GetCorners(Corners);
+					for (const Vector3& corner : Corners)
+					{
+						Min = DirectX::XMVectorMin(Min, corner);
+						Max = DirectX::XMVectorMax(Max, corner);
+					}
 				}
 			}
-			SceneRef->SceneInfo.SceneBounds = DirectX::BoundingBox(Min, Max);
+			DirectX::BoundingBox::CreateFromPoints(SceneRef->SceneInfo.SceneBounds, Min, Max);
 		}
 #if 0
 		TransformLayer->DebugPrintHierarchy();
