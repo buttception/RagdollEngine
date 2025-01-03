@@ -2549,6 +2549,8 @@ namespace nvrhi
         virtual void drawIndexed(const DrawArguments& args) = 0;
         virtual void drawIndirect(uint32_t offsetBytes, uint32_t drawCount = 1) = 0;
         virtual void drawIndexedIndirect(uint32_t offsetBytes, uint32_t drawCount = 1) = 0;
+        //devin
+		virtual void drawIndexedIndirect(uint32_t offsetBytes, IBuffer* b, uint32_t drawCount = 1) = 0;
         
         virtual void setComputeState(const ComputeState& state) = 0;
         virtual void dispatch(uint32_t groupsX, uint32_t groupsY = 1, uint32_t groupsZ = 1) = 0;

@@ -748,6 +748,35 @@ namespace nvrhi::validation
         m_CommandList->drawIndexedIndirect(offsetBytes, drawCount);
     }
 
+    //devin
+    void CommandListWrapper::drawIndexedIndirect(uint32_t offsetBytes, IBuffer* countBuffer, uint32_t drawCount)
+    {
+		if (!requireOpenState())
+			return;
+		if (!requireType(CommandQueue::Graphics, "drawIndexedIndirect"))
+			return;
+		if (!m_GraphicsStateSet)
+		{
+			error("Graphics state is not set before a drawIndexedIndirect call.\n"
+				"Note that setting compute state invalidates the graphics state.");
+			return;
+		}
+		if (!m_CurrentGraphicsState.indirectParams)
+		{
+			error("Indirect params buffer is not set before a drawIndexedIndirect call.");
+			return;
+		}
+		if (!countBuffer)
+		{
+			error("countBuffer is NULL");
+			return;
+		}
+		if (!validatePushConstants("graphics", "setGraphicsState"))
+			return;
+		m_CommandList->drawIndexedIndirect(offsetBytes, countBuffer, drawCount);
+    }
+    //end of devin
+
     void CommandListWrapper::setComputeState(const ComputeState& state)
     {
         if (!requireOpenState())

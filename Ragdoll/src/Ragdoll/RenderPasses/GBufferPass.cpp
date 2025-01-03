@@ -95,7 +95,6 @@ void GBufferPass::DrawAllInstances(
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
 
 	CommandListRef->setGraphicsState(state);
-
 	CommandListRef->drawIndexedIndirect(0, AssetManager::GetInstance()->VertexBufferInfos.size());
 	CommandListRef->endMarker();
 }

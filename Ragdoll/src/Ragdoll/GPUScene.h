@@ -17,6 +17,7 @@ namespace ragdoll
 		nvrhi::BufferHandle InstanceOffsetBuffer{};
 		//buffer of all the instances bounding boxes in world
 		nvrhi::BufferHandle InstanceBoundingBoxBuffer{};	//in world space, TODO: remove wen i derive the boxes in gpu scene instead
+		nvrhi::BufferHandle CountBuffer{};
 
 		void Update(Scene* Scene);
 		//will sort the proxies before making a instance buffer copy and uploading to gpu

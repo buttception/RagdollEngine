@@ -286,6 +286,13 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	nvrhi::BufferDesc InstanceOffsetBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(uint32_t) * AssetManager::GetInstance()->VertexBufferInfos.size(), "InstanceOffsetBuffer");
 	InstanceOffsetBufferDesc.structStride = sizeof(uint32_t);
 	InstanceOffsetBuffer = DirectXDevice::GetNativeDevice()->createBuffer(InstanceOffsetBufferDesc);
+
+	nvrhi::BufferDesc CountBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(uint32_t), "CountBuffer");
+	CountBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	CountBufferDesc.keepInitialState = true;
+	CountBufferDesc.canHaveUAVs = true;
+	CountBufferDesc.isDrawIndirectArgs = true;
+	CountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
 }
 
 void ragdoll::FGPUScene::ResetBuffers(nvrhi::CommandListHandle CommandList, nvrhi::BufferHandle ConstantBufferHandle, nvrhi::BindingSetHandle BindingSetHandle)

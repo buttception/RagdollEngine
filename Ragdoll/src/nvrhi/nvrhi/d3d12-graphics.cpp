@@ -573,6 +573,24 @@ namespace nvrhi::d3d12
         m_ActiveCommandList->commandList->ExecuteIndirect(m_Context.drawIndexedIndirectSignature, drawCount, indirectParams->resource, offsetBytes, nullptr, 0);
     }
     
+    //devin
+    void CommandList::drawIndexedIndirect(uint32_t offsetBytes, IBuffer* countBuffer, uint32_t drawCount)
+    {
+		Buffer* indirectParams = checked_cast<Buffer*>(m_CurrentGraphicsState.indirectParams);
+        Buffer* buffer = checked_cast<Buffer*>(countBuffer);
+		assert(indirectParams);
+		assert(buffer);
+		updateGraphicsVolatileBuffers();
+
+        if (m_EnableAutomaticBarriers)
+        {
+            requireBufferState(buffer, ResourceStates::IndirectArgument);
+        }
+        commitBarriers();
+		m_ActiveCommandList->commandList->ExecuteIndirect(m_Context.drawIndexedIndirectSignature, drawCount, indirectParams->resource, offsetBytes, buffer->resource, 0);
+    }
+    //end of devin
+    
     DX12_ViewportState convertViewportState(const RasterState& rasterState, const FramebufferInfoEx& framebufferInfo, const ViewportState& vpState)
     {
         DX12_ViewportState ret;
