@@ -1,10 +1,10 @@
-struct InstanceData
+struct FInstanceData
 {
     float4x4 worldMatrix;
-    float4x4 invWorldMatrix;
     float4x4 prevWorldMatrix;
 
     float4 albedoFactor;
+    uint meshIndex;
     float roughness;
     float metallic;
 
@@ -34,36 +34,37 @@ struct BoundingBox
     float pad1;
 };
 
+struct MeshData
+{
+    uint IndexCount;
+    uint VertexCount;
+    uint IndexOffset;
+    uint VertexOffset;
+};
+
 #define INSTANCE_DATA_BUFFER_SRV_SLOT t0
 #define INSTANCE_BOUNDING_BOX_BUFFER_SRV_SLOT t1
-#define INSTANCE_OFFSET_BUFFER_SRV_SLOT t2
+#define MESH_BUFFER_SRV_SLOT t2
 
 #define INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT u0
 #define INSTANCE_ID_BUFFER_UAV_SLOT u1
+#define INSTANCE_VISIBLE_COUNT_UAV_SLOT u2
 
 cbuffer g_Const : register(b0)
 {
     float4x4 ViewMatrix;
     float4 FrustumPlanes[6];
     uint ProxyCount;
-    uint MeshCount;
     uint InfiniteZEnabled;
 }
 
-RWStructuredBuffer<DrawIndexedIndirectArguments> DrawIndexedIndirectArgsOutput : register(INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT);
-
-[numthreads(64, 1, 1)]
-void ResetIndirectCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, uint3 GTid : SV_GroupThreadID)
-{
-    if (DTid.x < MeshCount)
-    {
-        DrawIndexedIndirectArgsOutput[DTid.x].instanceCount = 0;
-    }
-}
-
-StructuredBuffer<InstanceData> InstanceDatas : register(INSTANCE_DATA_BUFFER_SRV_SLOT);
+StructuredBuffer<FInstanceData> InstanceDataInput : register(INSTANCE_DATA_BUFFER_SRV_SLOT);
 StructuredBuffer<BoundingBox> BoundingBoxInput : register(INSTANCE_BOUNDING_BOX_BUFFER_SRV_SLOT);
+StructuredBuffer<MeshData> MeshDataInput : register(MESH_BUFFER_SRV_SLOT);
+
+RWStructuredBuffer<DrawIndexedIndirectArguments> DrawIndexedIndirectArgsOutput : register(INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT);
 RWStructuredBuffer<uint> InstanceIdBufferOutput : register(INSTANCE_ID_BUFFER_UAV_SLOT);
+RWStructuredBuffer<uint> InstanceVisibleCountOutput : register(INSTANCE_VISIBLE_COUNT_UAV_SLOT);
 
 [numthreads(64, 1, 1)]
 void FrustumCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, uint3 GTid : SV_GroupThreadID)
@@ -72,6 +73,7 @@ void FrustumCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, 
     {
         return;
     }
+    FInstanceData InstanceData = InstanceDataInput[DTid.x];
     //each thread will cull 1 proxy
     BoundingBox BBox = BoundingBoxInput[DTid.x];
     //view planes are already in world space
@@ -88,7 +90,7 @@ void FrustumCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, 
     };
     uint PlaneCount = InfiniteZEnabled == 1 ? 5 : 6;
     //only check the first 5 planes as the 6th plane is at infinity
-    bool CompletelyOutside = false;
+    //looking for a plane that the proxy is completely outside of, if found, exit early
     [unroll]
     for (int i = 0; i < PlaneCount; ++i)
     {
@@ -105,34 +107,17 @@ void FrustumCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, 
         }
         if (!Visible)
         {
-            CompletelyOutside = true;
-            break;
+            return;
         }
     }
-    InstanceIdBufferOutput[DTid.x] = !CompletelyOutside ? DTid.x : -1;
-}
-
-StructuredBuffer<uint> InstanceOffsetBufferInput : register(INSTANCE_OFFSET_BUFFER_SRV_SLOT);
-
-[numthreads(64, 1, 1)]
-void PackInstanceIdCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, uint3 GTid : SV_GroupThreadID)
-{
-    if(DTid.x >= MeshCount)
-        return;
-    //1 thread 1 mesh, iterate through the id buffer and pack all the indices
-    uint StartIndex = InstanceOffsetBufferInput[DTid.x];
-    uint EndIndex = DTid.x == MeshCount - 1 ? ProxyCount : InstanceOffsetBufferInput[DTid.x + 1];
-    uint InstanceCount = 0;
-    for (int i = StartIndex; i < EndIndex; ++i)
-    {
-        int InstanceId = InstanceIdBufferOutput[i];
-        if (InstanceId == -1)
-        {
-            continue;
-        }
-        InstanceIdBufferOutput[StartIndex + InstanceCount] = InstanceId;
-        InstanceCount++;
-    }
-    DrawIndexedIndirectArgsOutput[DTid.x].instanceCount = InstanceCount;
-    DrawIndexedIndirectArgsOutput[DTid.x].startInstanceLocation = DrawIndexedIndirectArgsOutput[DTid.x].startIndexLocation == 0 ? 0 : StartIndex;
+    uint Index;
+    InterlockedAdd(InstanceVisibleCountOutput[0], 1, Index);
+    InstanceIdBufferOutput[Index] = DTid.x;
+    
+    //immediately populate the indirect args buffer
+    DrawIndexedIndirectArgsOutput[Index].indexCount = MeshDataInput[InstanceData.meshIndex].IndexCount;
+    DrawIndexedIndirectArgsOutput[Index].startIndexLocation = MeshDataInput[InstanceData.meshIndex].IndexOffset;
+    DrawIndexedIndirectArgsOutput[Index].baseVertexLocation = MeshDataInput[InstanceData.meshIndex].VertexOffset;
+    DrawIndexedIndirectArgsOutput[Index].instanceCount = 1;
+    DrawIndexedIndirectArgsOutput[Index].startInstanceLocation = Index;
 }

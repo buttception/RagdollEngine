@@ -25,10 +25,11 @@ void GBufferPass::DrawAllInstances(
 	RD_GPU_SCOPE("GBufferPass", CommandListRef);
 	CommandListRef->beginMarker("Instance Draws");
 	//new gpu scene stuff
+	nvrhi::BufferHandle CountBuffer;
 	if(debugInfo.bFreezeFrustumCulling)
-		GPUScene->InstanceCull(CommandListRef, debugInfo.FrozenProjection, debugInfo.FrozenView, ProxyCount, true);
+		CountBuffer = GPUScene->InstanceCull(CommandListRef, debugInfo.FrozenProjection, debugInfo.FrozenView, ProxyCount, true);
 	else
-		GPUScene->InstanceCull(CommandListRef, sceneInfo.InfiniteReverseZProj, sceneInfo.MainCameraView, ProxyCount, true);
+		CountBuffer = GPUScene->InstanceCull(CommandListRef, sceneInfo.InfiniteReverseZProj, sceneInfo.MainCameraView, ProxyCount, true);
 	MICROPROFILE_SCOPEI("Render", "Draw All Instances", MP_BLUEVIOLET);
 	//create a constant buffer here
 	nvrhi::BufferDesc ConstantBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "GBufferPass CBuffer", 1);
@@ -39,8 +40,6 @@ void GBufferPass::DrawAllInstances(
 	BindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, GPUScene->InstanceBuffer),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(1, GPUScene->InstanceOffsetBuffer),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(2, GPUScene->InstanceIdBuffer),
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
 	{
@@ -95,6 +94,6 @@ void GBufferPass::DrawAllInstances(
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
 
 	CommandListRef->setGraphicsState(state);
-	CommandListRef->drawIndexedIndirect(0, AssetManager::GetInstance()->VertexBufferInfos.size());
+	CommandListRef->drawIndexedIndirect(0, CountBuffer, AssetManager::GetInstance()->VertexBufferInfos.size());
 	CommandListRef->endMarker();
 }

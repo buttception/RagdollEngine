@@ -27,6 +27,7 @@ struct InstanceData{
 	float4x4 prevWorldMatrix;
 
 	float4 albedoFactor;
+    uint meshIndex;
 	float roughness;
 	float metallic;
 

@@ -6,14 +6,14 @@ cbuffer g_Const : register(b0) {
 	float4x4 viewProjMatrixWithAA;
 	float4x4 prevViewProjMatrix;
 	float2 RenderResolution;
-	int MeshIndex;
 };
 
 struct InstanceData{
 	float4x4 worldMatrix;
 	float4x4 prevWorldMatrix;
 
-	float4 albedoFactor;
+    float4 albedoFactor;
+    uint meshIndex;
 	float roughness;
 	float metallic;
 
@@ -27,8 +27,6 @@ struct InstanceData{
 };
 
 StructuredBuffer<InstanceData> InstanceDatas : register(t0);
-StructuredBuffer<uint> InstanceOffsetBufferInput : register(t1);
-StructuredBuffer<int> InstanceIdBufferInput : register(t2);
 Texture2D Textures[] : register(t0, space1);
 
 void gbuffer_vs(
@@ -47,7 +45,7 @@ void gbuffer_vs(
 	out nointerpolation uint outInstanceId : TEXCOORD7
 )
 {
-    InstanceData data = InstanceDatas[InstanceIdBufferInput[inInstanceId]];
+    InstanceData data = InstanceDatas[inInstanceId];
 	outFragPos = mul(float4(inPos, 1), data.worldMatrix); 
 	outPrevFragPos = mul(float4(inPos, 1), data.prevWorldMatrix);
 	outPos = mul(outFragPos, viewProjMatrixWithAA);
@@ -60,7 +58,7 @@ void gbuffer_vs(
 	//still need so we can sample the normal properly
 	outBinormal = normalize(cross(outTangent, outNormal)) * binormalSign;
 	outTexcoord = inTexcoord;
-	outInstanceId = inInstanceId;
+    outInstanceId = inInstanceId;
 }
 
 sampler Samplers[9] : register(s0);
@@ -80,7 +78,7 @@ void gbuffer_ps(
 	out float2 outVelocity: SV_Target3
 )
 {
-    InstanceData data = InstanceDatas[InstanceIdBufferInput[inInstanceId]];
+    InstanceData data = InstanceDatas[inInstanceId];
 	// Sample textures
 	float4 albedo = data.albedoFactor;
 	if(data.albedoIndex != -1){

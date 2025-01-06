@@ -40,6 +40,7 @@ namespace ragdoll {
 		Matrix PrevWorldMatrix;
 
 		Vector4 Color = Vector4::One;
+		uint32_t MeshIndex;
 		float Roughness = 0.f;
 		float Metallic = 0.f;
 
