@@ -21,7 +21,7 @@ void main_ps(
     const float SubfrustaFarPlanes[5] = { 0.001f, 10.f, 25.f, 50.f, 100.f };
     //get the frag pos
 	float3 fragPos = DepthToWorld(DepthBuffer.Sample(Sampler, inTexcoord).r, inTexcoord, InvViewProjMatrix);
-    float distanceFromCam = length(fragPos.xz - float2(View[3].xz));
+    float distanceFromCam = length(fragPos - View[3].xyz);
     //float distanceFromCam = mul(float4(fragPos, 1.f), View).z;
     //decide which matrix and texture to use
     Texture2D shadowMap;
