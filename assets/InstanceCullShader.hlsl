@@ -1,46 +1,4 @@
-struct FInstanceData
-{
-    float4x4 worldMatrix;
-    float4x4 prevWorldMatrix;
-
-    float4 albedoFactor;
-    uint meshIndex;
-    float roughness;
-    float metallic;
-
-    int albedoIndex;
-    int albedoSamplerIndex;
-    int normalIndex;
-    int normalSamplerIndex;
-    int roughnessMetallicIndex;
-    int roughnessMetallicSamplerIndex;
-    int isLit;
-};
-
-struct DrawIndexedIndirectArguments
-{
-    uint indexCount;
-    uint instanceCount;
-    uint startIndexLocation;
-    int baseVertexLocation;
-    uint startInstanceLocation;
-};
-
-struct BoundingBox
-{
-    float3 Center;
-    float pad0;
-    float3 Extent;
-    float pad1;
-};
-
-struct MeshData
-{
-    uint IndexCount;
-    uint VertexCount;
-    uint IndexOffset;
-    uint VertexOffset;
-};
+#include "BasePassCommons.hlsli"
 
 #define INSTANCE_DATA_BUFFER_SRV_SLOT t0
 #define INSTANCE_BOUNDING_BOX_BUFFER_SRV_SLOT t1
@@ -59,10 +17,10 @@ cbuffer g_Const : register(b0)
 }
 
 StructuredBuffer<FInstanceData> InstanceDataInput : register(INSTANCE_DATA_BUFFER_SRV_SLOT);
-StructuredBuffer<BoundingBox> BoundingBoxInput : register(INSTANCE_BOUNDING_BOX_BUFFER_SRV_SLOT);
-StructuredBuffer<MeshData> MeshDataInput : register(MESH_BUFFER_SRV_SLOT);
+StructuredBuffer<FBoundingBox> BoundingBoxInput : register(INSTANCE_BOUNDING_BOX_BUFFER_SRV_SLOT);
+StructuredBuffer<FMeshData> MeshDataInput : register(MESH_BUFFER_SRV_SLOT);
 
-RWStructuredBuffer<DrawIndexedIndirectArguments> DrawIndexedIndirectArgsOutput : register(INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT);
+RWStructuredBuffer<FDrawIndexedIndirectArguments> DrawIndexedIndirectArgsOutput : register(INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT);
 RWStructuredBuffer<uint> InstanceIdBufferOutput : register(INSTANCE_ID_BUFFER_UAV_SLOT);
 RWStructuredBuffer<uint> InstanceVisibleCountOutput : register(INSTANCE_VISIBLE_COUNT_UAV_SLOT);
 
@@ -75,18 +33,18 @@ void FrustumCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, 
     }
     FInstanceData InstanceData = InstanceDataInput[DTid.x];
     //each thread will cull 1 proxy
-    BoundingBox BBox = BoundingBoxInput[DTid.x];
+    FBoundingBox BBox = BoundingBoxInput[DTid.x];
     //view planes are already in world space
     float3 Corners[8] =
     {
-        BBox.Center + float3(-BBox.Extent.x, -BBox.Extent.y, -BBox.Extent.z),
-        BBox.Center + float3(-BBox.Extent.x, -BBox.Extent.y, BBox.Extent.z),
-        BBox.Center + float3(-BBox.Extent.x, BBox.Extent.y, -BBox.Extent.z),
-        BBox.Center + float3(-BBox.Extent.x, BBox.Extent.y, BBox.Extent.z),
-        BBox.Center + float3(BBox.Extent.x, -BBox.Extent.y, -BBox.Extent.z),
-        BBox.Center + float3(BBox.Extent.x, -BBox.Extent.y, BBox.Extent.z),
-        BBox.Center + float3(BBox.Extent.x, BBox.Extent.y, -BBox.Extent.z),
-        BBox.Center + float3(BBox.Extent.x, BBox.Extent.y, BBox.Extent.z)
+        BBox.Center + float3(-BBox.Extents.x, -BBox.Extents.y, -BBox.Extents.z),
+        BBox.Center + float3(-BBox.Extents.x, -BBox.Extents.y, BBox.Extents.z),
+        BBox.Center + float3(-BBox.Extents.x, BBox.Extents.y, -BBox.Extents.z),
+        BBox.Center + float3(-BBox.Extents.x, BBox.Extents.y, BBox.Extents.z),
+        BBox.Center + float3(BBox.Extents.x, -BBox.Extents.y, -BBox.Extents.z),
+        BBox.Center + float3(BBox.Extents.x, -BBox.Extents.y, BBox.Extents.z),
+        BBox.Center + float3(BBox.Extents.x, BBox.Extents.y, -BBox.Extents.z),
+        BBox.Center + float3(BBox.Extents.x, BBox.Extents.y, BBox.Extents.z)
     };
     uint PlaneCount = InfiniteZEnabled == 1 ? 5 : 6;
     //only check the first 5 planes as the 6th plane is at infinity
@@ -115,9 +73,10 @@ void FrustumCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, 
     InstanceIdBufferOutput[Index] = DTid.x;
     
     //immediately populate the indirect args buffer
-    DrawIndexedIndirectArgsOutput[Index].indexCount = MeshDataInput[InstanceData.meshIndex].IndexCount;
-    DrawIndexedIndirectArgsOutput[Index].startIndexLocation = MeshDataInput[InstanceData.meshIndex].IndexOffset;
-    DrawIndexedIndirectArgsOutput[Index].baseVertexLocation = MeshDataInput[InstanceData.meshIndex].VertexOffset;
+    FMeshData MeshData = MeshDataInput[InstanceData.MeshIndex];
+    DrawIndexedIndirectArgsOutput[Index].indexCount = MeshData.IndexCount;
+    DrawIndexedIndirectArgsOutput[Index].startIndexLocation = MeshData.IndexOffset;
+    DrawIndexedIndirectArgsOutput[Index].baseVertexLocation = MeshData.VertexOffset;
     DrawIndexedIndirectArgsOutput[Index].instanceCount = 1;
     DrawIndexedIndirectArgsOutput[Index].startInstanceLocation = Index;
 }

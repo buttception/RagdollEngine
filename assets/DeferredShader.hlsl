@@ -1,3 +1,4 @@
+#include "BasePassCommons.hlsli"
 #include "ShadingModel.hlsli"
 #include "Utils.hlsli"
 
@@ -8,25 +9,7 @@ cbuffer g_Const : register(b0) {
 	float2 RenderResolution;
 };
 
-struct InstanceData{
-	float4x4 worldMatrix;
-	float4x4 prevWorldMatrix;
-
-    float4 albedoFactor;
-    uint meshIndex;
-	float roughness;
-	float metallic;
-
-	int albedoIndex;
-	int albedoSamplerIndex;
-	int normalIndex;
-	int normalSamplerIndex;
-	int roughnessMetallicIndex;
-	int roughnessMetallicSamplerIndex;
-	int isLit;
-};
-
-StructuredBuffer<InstanceData> InstanceDatas : register(t0);
+StructuredBuffer<FInstanceData> InstanceDatas : register(t0);
 Texture2D Textures[] : register(t0, space1);
 
 void gbuffer_vs(
@@ -45,22 +28,21 @@ void gbuffer_vs(
 	out nointerpolation uint outInstanceId : TEXCOORD7
 )
 {
-    InstanceData data = InstanceDatas[inInstanceId];
-	outFragPos = mul(float4(inPos, 1), data.worldMatrix); 
-	outPrevFragPos = mul(float4(inPos, 1), data.prevWorldMatrix);
+    FInstanceData data = InstanceDatas[inInstanceId];
+	outFragPos = mul(float4(inPos, 1), data.ModelToWorld); 
+	outPrevFragPos = mul(float4(inPos, 1), data.PrevModelToWorld);
 	outPos = mul(outFragPos, viewProjMatrixWithAA);
 
 	float binormalSign = inNormal.x > 0.0f ? -1.0f : 1.0f;
-	//outNormal = normalize(mul(inNormal, transpose((float3x3)data.invWorldMatrix)));
-    outNormal = normalize(mul(inNormal, Adjugate(data.worldMatrix)));
-	//outTangent = normalize(mul(inTangent, transpose((float3x3)data.invWorldMatrix)));
-    outTangent = normalize(mul(inTangent, Adjugate(data.worldMatrix)));
-	//still need so we can sample the normal properly
+    float3x3 AdjugateMatrix = Adjugate(data.ModelToWorld);
+    outNormal = normalize(mul(inNormal, AdjugateMatrix));
+    outTangent = normalize(mul(inTangent, AdjugateMatrix));
 	outBinormal = normalize(cross(outTangent, outNormal)) * binormalSign;
 	outTexcoord = inTexcoord;
     outInstanceId = inInstanceId;
 }
 
+StructuredBuffer<FMaterialData> MaterialDatas : register(t1);
 sampler Samplers[9] : register(s0);
 
 void gbuffer_ps(
@@ -78,25 +60,26 @@ void gbuffer_ps(
 	out float2 outVelocity: SV_Target3
 )
 {
-    InstanceData data = InstanceDatas[inInstanceId];
+    FInstanceData data = InstanceDatas[inInstanceId];
+    FMaterialData materialData = MaterialDatas[data.MaterialIndex];
 	// Sample textures
-	float4 albedo = data.albedoFactor;
-	if(data.albedoIndex != -1){
-		albedo *= Textures[data.albedoIndex].Sample(Samplers[data.albedoSamplerIndex], inTexcoord);
+    float4 albedo = materialData.AlbedoFactor;
+    if (materialData.AlbedoIndex != -1){
+		albedo *= Textures[materialData.AlbedoIndex].Sample(Samplers[materialData.AlbedoSamplerIndex], inTexcoord);
 	}
 	clip(albedo.a - 0.01f);
-	float4 RM = float4(0.f, data.roughness, data.metallic, 0);
-	if(data.roughnessMetallicIndex != -1){
-		RM = Textures[data.roughnessMetallicIndex].Sample(Samplers[data.roughnessMetallicSamplerIndex], inTexcoord);
-	}
+	float4 RM = float4(0.f, materialData.RoughnessFactor, materialData.MetallicFactor, 0);
+	if(materialData.ORMIndex != -1){
+        RM = Textures[materialData.ORMIndex].Sample(Samplers[materialData.ORMSamplerIndex], inTexcoord);
+    }
 	float ao = 1.f;
 	float roughness = RM.g;
 	float metallic = RM.b;
 
 	// Sample normal map and leave it in model space, the deferred lighting will calculate this instead
 	float3 N = inNormal;
-	if(data.normalIndex != -1){
-		float3 normalMapValue = normalize(Textures[data.normalIndex].Sample(Samplers[data.normalSamplerIndex], inTexcoord).xyz * 2.0f - 1.0f);
+	if(materialData.NormalIndex != -1){
+        float3 normalMapValue = normalize(Textures[materialData.NormalIndex].Sample(Samplers[materialData.NormalSamplerIndex], inTexcoord).xyz * 2.0f - 1.0f);
 		float3x3 TBN = float3x3(inTangent, inBinormal, inNormal);
 		N = normalize(mul(normalMapValue, TBN));
 	}

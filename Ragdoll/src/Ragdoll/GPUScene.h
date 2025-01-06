@@ -8,11 +8,12 @@ namespace ragdoll
 	public:
 		//TODO: upload mesh data as well, so can derive bounding box with the instance buffer
 		//InstanceBuffer (only transforms)
+		nvrhi::BufferHandle InstanceBuffer{};
 		//MaterialBuffer (only material data)
+		nvrhi::BufferHandle MaterialBuffer{};
 		//MeshBuffer (only mesh data)
 		nvrhi::BufferHandle MeshBuffer{};
 		nvrhi::BufferHandle IndirectDrawArgsBuffer{};
-		nvrhi::BufferHandle InstanceBuffer{}; //all the material data can be separated and duplicates can be removed, so it can contain only transformation data
 		nvrhi::BufferHandle InstanceIdBuffer{};
 		//buffer of all the instances bounding boxes in world
 		nvrhi::BufferHandle InstanceBoundingBoxBuffer{};	//in world space, TODO: remove wen i derive the boxes in gpu scene instead

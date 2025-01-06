@@ -29,7 +29,7 @@ void ShadowPass::DrawAllInstances(
 	RD_GPU_SCOPE("ShadowPass", CommandListRef[CascadeIndex]);
 	CommandListRef[CascadeIndex]->beginMarker(("Directional Light Shadow Pass" + std::to_string(CascadeIndex)).c_str());
 	ragdoll::CascadeInfo CascadeInfo = sceneInfo.CascadeInfos[CascadeIndex];
-	GPUScene->InstanceCull(CommandListRef[CascadeIndex], CascadeInfo.proj, CascadeInfo.view, ProxyCount, false);
+	nvrhi::BufferHandle CountBuffer = GPUScene->InstanceCull(CommandListRef[CascadeIndex], CascadeInfo.proj, CascadeInfo.view, ProxyCount, false);
 
 	nvrhi::FramebufferDesc desc = nvrhi::FramebufferDesc()
 		.setDepthAttachment(targets->ShadowMap[CascadeIndex]);
@@ -78,6 +78,6 @@ void ShadowPass::DrawAllInstances(
 
 	CommandListRef[CascadeIndex]->setGraphicsState(state);
 
-	CommandListRef[CascadeIndex]->drawIndexedIndirect(0, AssetManager::GetInstance()->VertexBufferInfos.size());
+	CommandListRef[CascadeIndex]->drawIndexedIndirect(0, CountBuffer, AssetManager::GetInstance()->VertexBufferInfos.size());
 	CommandListRef[CascadeIndex]->endMarker();
 }

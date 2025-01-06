@@ -54,8 +54,8 @@ struct Image
 
 struct Texture
 {
-	int32_t ImageIndex;
-	int32_t SamplerIndex;
+	int32_t ImageIndex{ -1 };
+	int32_t SamplerIndex{ -1 };
 };
 
 enum class SamplerTypes

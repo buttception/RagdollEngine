@@ -1,3 +1,5 @@
+#include "BasePassCommons.hlsli"
+
 cbuffer g_Const : register(b0) {
     float4x4 LightViewProj;
 	uint InstanceOffset;
@@ -5,25 +7,7 @@ cbuffer g_Const : register(b0) {
     uint MeshIndex;
 };
 
-struct InstanceData{
-	float4x4 worldMatrix;
-	float4x4 prevWorldMatrix;
-
-    float4 albedoFactor;
-    uint meshIndex;
-	float roughness;
-	float metallic;
-
-	int albedoIndex;
-	int albedoSamplerIndex;
-	int normalIndex;
-	int normalSamplerIndex;
-	int roughnessMetallicIndex;
-	int roughnessMetallicSamplerIndex;
-	int isLit;
-};
-
-StructuredBuffer<InstanceData> InstanceDatas : register(t0);
+StructuredBuffer<FInstanceData> InstanceDatas : register(t0);
 void directional_vs(
 	in float3 inPos : POSITION,
 	in float3 inNormal : NORMAL,
@@ -33,8 +17,8 @@ void directional_vs(
 	out float4 outPos : SV_Position
 )
 {
-    InstanceData data = InstanceDatas[inInstanceId];
-	float4 worldPos = mul(float4(inPos, 1), data.worldMatrix);
+    FInstanceData data = InstanceDatas[inInstanceId];
+	float4 worldPos = mul(float4(inPos, 1), data.ModelToWorld);
 	outPos = mul(worldPos, LightViewProj);
 }
 

@@ -26,19 +26,40 @@ struct FConstantBuffer
 struct FBoundingBox
 {
 	Vector3 Center;
-	float pad0;
 	Vector3 Extents;
-	float pad1;
 };
 
 //used in compute shader to populate indirect calls
-struct MeshData
+struct FMeshData
 {
 	uint32_t IndexCount;
 	uint32_t VertexCount;
 	uint32_t IndexOffset;
 	uint32_t VertexOffset;
 	//TODO: bounding box if needed in the future
+};
+
+struct FInstanceData
+{
+	Matrix ModelToWorld;
+	Matrix PrevModelToWorld;
+	uint32_t MeshIndex;
+	uint32_t MaterialIndex;
+};
+
+struct FMaterialData
+{
+	Vector4 AlbedoFactor = Vector4::One;
+	float RoughnessFactor = 0.f;
+	float MetallicFactor = 0.f;
+
+	int AlbedoIndex = -1;
+	int AlbedoSamplerIndex = 0;
+	int NormalIndex = -1;
+	int NormalSamplerIndex = 0;
+	int ORMIndex = -1;
+	int ORMSamplerIndex = 0;
+	int bIsLit = 1;
 };
 
 void ragdoll::FGPUScene::Update(Scene* Scene)
@@ -64,41 +85,56 @@ void ragdoll::FGPUScene::UpdateInstanceBuffer(std::vector<Proxy>& Proxies)
 	}
 	//update all the buffers
 	//get all the relevant mesh details
-	std::vector<MeshData> MeshDatas;
+	std::vector<FMeshData> MeshDatas;
 	MeshDatas.resize(AssetManager::GetInstance()->VertexBufferInfos.size());
 	for (int i = 0; i < AssetManager::GetInstance()->VertexBufferInfos.size(); ++i)
 	{
 		const VertexBufferInfo& info = AssetManager::GetInstance()->VertexBufferInfos[i];
-		MeshData data;
+		FMeshData data;
 		data.IndexCount = info.IndicesCount;
 		data.VertexCount = info.VerticesCount;
 		data.IndexOffset = info.IBOffset;
 		data.VertexOffset = info.VBOffset;
 		MeshDatas[i] = data;
 	}
-	//get a instance data buffer copy
-	std::sort(Proxies.begin(), Proxies.end(), [](const Proxy& a, const Proxy& b) { return a.BufferIndex < b.BufferIndex; });
-	//get a copy of all proxies as instances then sort them
-	std::vector<InstanceData> Instances;
+	std::vector<FMaterialData> MaterialDatas;
+	MaterialDatas.resize(AssetManager::GetInstance()->Materials.size());
+	for (int i = 0; i < AssetManager::GetInstance()->Materials.size(); ++i)
+	{
+		const Material& Material = AssetManager::GetInstance()->Materials[i];
+		FMaterialData& data = MaterialDatas[i];
+		data.AlbedoFactor = Material.Color;
+		data.RoughnessFactor = Material.Roughness;
+		data.MetallicFactor = Material.Metallic;
+		if (Material.AlbedoTextureIndex != -1)
+		{
+			const Texture& AlbedoTexture = AssetManager::GetInstance()->Textures[Material.AlbedoTextureIndex];
+			data.AlbedoIndex = AlbedoTexture.ImageIndex;
+			data.AlbedoSamplerIndex = AlbedoTexture.SamplerIndex;
+		}
+		if (Material.NormalTextureIndex != -1)
+		{
+			const Texture& NormalTexture = AssetManager::GetInstance()->Textures[Material.NormalTextureIndex];
+			data.NormalIndex = NormalTexture.ImageIndex;
+			data.NormalSamplerIndex = NormalTexture.SamplerIndex;
+		}
+		if (Material.RoughnessMetallicTextureIndex != -1)
+		{
+			const Texture& ORMTexture = AssetManager::GetInstance()->Textures[Material.RoughnessMetallicTextureIndex];
+			data.ORMIndex = ORMTexture.ImageIndex;
+			data.ORMSamplerIndex = ORMTexture.SamplerIndex;
+		}
+		data.bIsLit = Material.bIsLit;
+	}
+	//do not need to sort instances now as it contains mesh indices instead now
+	std::vector<FInstanceData> Instances;
 	Instances.resize(Proxies.size());
 	for (int i = 0; i < Proxies.size(); ++i)
 	{
-		Instances[i] = Proxies[i];
+		Instances[i].ModelToWorld = Proxies[i].ModelToWorld;
+		Instances[i].PrevModelToWorld = Proxies[i].PrevWorldMatrix;
+		Instances[i].MaterialIndex = Proxies[i].MaterialIndex;
 		Instances[i].MeshIndex = Proxies[i].BufferIndex;
-	}
-	//get all the mesh index offsets for the proxies
-	std::vector<uint32_t> Offsets;
-	Offsets.resize(AssetManager::GetInstance()->VertexBufferInfos.size());
-	uint32_t Offset = 0;
-	uint32_t MeshIndex = Proxies[0].BufferIndex;
-	for (int i = 0; i < Proxies.size(); ++i)
-	{
-		if (Proxies[i].BufferIndex != MeshIndex)
-		{
-			Offsets[Proxies[i].BufferIndex] = Offset;
-			MeshIndex = Proxies[i].BufferIndex;
-		}
-		Offset++;
 	}
 	//indirect draw args do not need any values
 	//get all the bounding boxes and upload onto gpu
@@ -116,13 +152,19 @@ void ragdoll::FGPUScene::UpdateInstanceBuffer(std::vector<Proxy>& Proxies)
 
 	CommandList->beginMarker("Writing Mesh buffer");
 	CommandList->beginTrackingBufferState(MeshBuffer, nvrhi::ResourceStates::CopyDest);
-	CommandList->writeBuffer(MeshBuffer, MeshDatas.data(), sizeof(MeshData) * MeshDatas.size());
+	CommandList->writeBuffer(MeshBuffer, MeshDatas.data(), sizeof(FMeshData) * MeshDatas.size());
 	CommandList->setPermanentBufferState(MeshBuffer, nvrhi::ResourceStates::ShaderResource);
+	CommandList->endMarker();
+
+	CommandList->beginMarker("Writing Material buffer");
+	CommandList->beginTrackingBufferState(MaterialBuffer, nvrhi::ResourceStates::CopyDest);
+	CommandList->writeBuffer(MaterialBuffer, MaterialDatas.data(), sizeof(FMaterialData) * MaterialDatas.size());
+	CommandList->setPermanentBufferState(MaterialBuffer, nvrhi::ResourceStates::ShaderResource);
 	CommandList->endMarker();
 
 	CommandList->beginMarker("Writing Instance Data");
 	CommandList->beginTrackingBufferState(InstanceBuffer, nvrhi::ResourceStates::CopyDest);
-	CommandList->writeBuffer(InstanceBuffer, Instances.data(), sizeof(InstanceData) * Instances.size());
+	CommandList->writeBuffer(InstanceBuffer, Instances.data(), sizeof(FInstanceData) * Instances.size());
 	CommandList->setPermanentBufferState(InstanceBuffer, nvrhi::ResourceStates::ShaderResource);
 	CommandList->endMarker();
 
@@ -259,14 +301,17 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 {
 	//create the buffers
 	//mesh buffer
-	nvrhi::BufferDesc MeshBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(MeshData) * AssetManager::GetInstance()->VertexBufferInfos.size(), "MeshBuffer");
-	MeshBufferDesc.structStride = sizeof(MeshData);
-	MeshBuffer = DirectXDevice::GetNativeDevice()->createBuffer(MeshBufferDesc);	  //worst case size
-
+	nvrhi::BufferDesc MeshBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(FMeshData) * AssetManager::GetInstance()->VertexBufferInfos.size(), "MeshBuffer");
+	MeshBufferDesc.structStride = sizeof(FMeshData);
+	MeshBuffer = DirectXDevice::GetNativeDevice()->createBuffer(MeshBufferDesc);
+	//material buffer
+	nvrhi::BufferDesc MaterialBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(FMaterialData) * AssetManager::GetInstance()->Materials.size(), "MaterialBuffer");
+	MaterialBufferDesc.structStride = sizeof(FMaterialData);
+	MaterialBuffer = DirectXDevice::GetNativeDevice()->createBuffer(MaterialBufferDesc);
 	//instance buffer
-	nvrhi::BufferDesc InstanceBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(InstanceData) * Proxies.size(), "InstanceBuffer");
-	InstanceBufferDesc.structStride = sizeof(InstanceData);
-	InstanceBuffer = DirectXDevice::GetNativeDevice()->createBuffer(InstanceBufferDesc);	   //worst case size
+	nvrhi::BufferDesc InstanceBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(FInstanceData) * Proxies.size(), "InstanceBuffer");
+	InstanceBufferDesc.structStride = sizeof(FInstanceData);
+	InstanceBuffer = DirectXDevice::GetNativeDevice()->createBuffer(InstanceBufferDesc);
 	//instance id buffer
 	nvrhi::BufferDesc InstanceIdBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(int32_t) * Proxies.size(), "InstanceIdsBuffer");
 	InstanceIdBufferDesc.structStride = sizeof(int32_t);

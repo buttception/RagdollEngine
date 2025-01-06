@@ -40,6 +40,7 @@ void GBufferPass::DrawAllInstances(
 	BindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, GPUScene->InstanceBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(1, GPUScene->MaterialBuffer),
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
 	{
