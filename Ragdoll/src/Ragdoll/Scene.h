@@ -158,6 +158,7 @@ namespace ragdoll {
 		nvrhi::TextureHandle GBufferNormal;
 		nvrhi::TextureHandle GBufferRM;
 		nvrhi::TextureHandle VelocityBuffer;
+		nvrhi::TextureHandle HZBMips;
 		//TAA / fsr
 		nvrhi::TextureHandle TemporalColor0;	//temporal buffer
 		nvrhi::TextureHandle TemporalColor1;	//temporal buffer

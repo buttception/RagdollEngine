@@ -15,21 +15,20 @@ namespace ragdoll
 		nvrhi::BufferHandle MeshBuffer{};
 		nvrhi::BufferHandle IndirectDrawArgsBuffer{};
 		nvrhi::BufferHandle InstanceIdBuffer{};
-		//buffer of all the instances bounding boxes in world
-		nvrhi::BufferHandle InstanceBoundingBoxBuffer{};	//in world space, TODO: remove wen i derive the boxes in gpu scene instead
 
 		void Update(Scene* Scene);
 		//will sort the proxies before making a instance buffer copy and uploading to gpu
 		void UpdateInstanceBuffer(std::vector<Proxy>& Proxies);
 		//returns the count buffer for the draw indirect function
-		nvrhi::BufferHandle InstanceCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled);
+		nvrhi::BufferHandle FrustumCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled);
+		//returns the count buffer for the draw indirect function, culls the instances in the instance id buffer
+		nvrhi::BufferHandle OcclusionCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, bool PreviousFrame);
+		void BuildHZB(nvrhi::CommandListHandle CommandList, SceneRenderTargets* Targets);
 
 		//helper
 		void ExtractFrustumPlanes(Vector4 OutPlanes[6], const Matrix& Projection, const Matrix& View);
 
 	private:
 		void CreateBuffers(const std::vector<Proxy>& Proxies);
-		//cull the scene then update the instance id buffer and indirect draw args buffer
-		void FrustumCullScene(nvrhi::CommandListHandle Commandlist, nvrhi::BufferHandle ConstantBufferHandle, nvrhi::BindingSetHandle BindingSetHandle, uint32_t ProxyCount);
 	};
 }

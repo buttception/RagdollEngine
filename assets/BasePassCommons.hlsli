@@ -11,7 +11,8 @@ struct FMeshData
     uint VertexCount;
     uint IndexOffset;
     uint VertexOffset;
-	//TODO: bounding box if needed in the future
+    float3 Center;
+    float3 Extents;
 };
 
 struct FInstanceData

@@ -27,9 +27,19 @@ void GBufferPass::DrawAllInstances(
 	//new gpu scene stuff
 	nvrhi::BufferHandle CountBuffer;
 	if(debugInfo.bFreezeFrustumCulling)
-		CountBuffer = GPUScene->InstanceCull(CommandListRef, debugInfo.FrozenProjection, debugInfo.FrozenView, ProxyCount, true);
+		CountBuffer = GPUScene->FrustumCull(CommandListRef, debugInfo.FrozenProjection, debugInfo.FrozenView, ProxyCount, true);
 	else
-		CountBuffer = GPUScene->InstanceCull(CommandListRef, sceneInfo.InfiniteReverseZProj, sceneInfo.MainCameraView, ProxyCount, true);
+		CountBuffer = GPUScene->FrustumCull(CommandListRef, sceneInfo.InfiniteReverseZProj, sceneInfo.MainCameraView, ProxyCount, true);
+	//occlusion cull phase 1
+
+	//draw phase 1 onto gbuffer
+	
+	//build hzb
+	GPUScene->BuildHZB(CommandListRef, targets);
+	//occlusion cull phase 2
+	
+	//draw phase 2 onto gbuffer
+	
 	MICROPROFILE_SCOPEI("Render", "Draw All Instances", MP_BLUEVIOLET);
 	//create a constant buffer here
 	nvrhi::BufferDesc ConstantBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "GBufferPass CBuffer", 1);
@@ -96,5 +106,9 @@ void GBufferPass::DrawAllInstances(
 
 	CommandListRef->setGraphicsState(state);
 	CommandListRef->drawIndexedIndirect(0, CountBuffer, AssetManager::GetInstance()->VertexBufferInfos.size());
+
+	//build hzb for next frame
+	GPUScene->BuildHZB(CommandListRef, targets);
+
 	CommandListRef->endMarker();
 }

@@ -280,6 +280,26 @@ void ragdoll::Scene::CreateRenderTargets()
 		RenderTargets.ShadowMap[i] = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
 	}
 
+	depthBufferDesc = nvrhi::TextureDesc();
+	depthBufferDesc.width = depthBufferDesc.height = 1;
+	int MaxIterations = 32, Iterations = 1;
+	while (depthBufferDesc.width < SceneInfo.RenderWidth && Iterations++ < MaxIterations)
+		depthBufferDesc.width <<= 1;
+	Iterations = 0;
+	while (depthBufferDesc.height < SceneInfo.RenderHeight && Iterations++ < MaxIterations)
+		depthBufferDesc.height <<= 1;
+	depthBufferDesc.width >>= 1;
+	depthBufferDesc.height >>= 1;
+	depthBufferDesc.format = nvrhi::Format::D32;
+	depthBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	depthBufferDesc.isUAV = true;
+	depthBufferDesc.keepInitialState = true;
+	depthBufferDesc.debugName = "HZB";
+	depthBufferDesc.dimension = nvrhi::TextureDimension::Texture2DArray;
+	depthBufferDesc.arraySize = 1;
+	depthBufferDesc.mipLevels = log2(std::max(depthBufferDesc.width, depthBufferDesc.height));
+	RenderTargets.HZBMips = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
+
 	nvrhi::TextureDesc texDesc;
 	texDesc.width = SceneInfo.RenderWidth;
 	texDesc.height = SceneInfo.RenderHeight;

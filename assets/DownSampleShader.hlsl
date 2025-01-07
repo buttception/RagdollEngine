@@ -3,14 +3,12 @@ cbuffer g_Const : register(b0)
 {
     uint Width;
     uint Height;
-    float FilterRadius;
-    float BloomIntensity;
 };
 
 Texture2D Source : register(t0);
 sampler Sampler : register(s0);
 
-void main_ps(
+void downsample_ps(
 	in float4 inPos : SV_Position,
 	in float2 inTexcoord : TEXCOORD0,
 	out float3 outColor : SV_Target0
@@ -61,4 +59,18 @@ void main_ps(
     outColor += (a+c+g+i)*0.03125;
     outColor += (b+d+f+h)*0.0625;
     outColor += (j+k+l+m)*0.125;
+}
+
+RWTexture2D<float> Output : register(u0);
+
+[numthreads(8, 8, 1)]
+void DownSamplePoTCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, uint3 GTid : SV_GroupThreadID)
+{
+    if (all(DTid.xy < float2(Width, Height)))
+    {
+        float4 depths = Source.Gather(Sampler, (DTid.xy + 0.5) / float2(Width, Height));
+ 
+        //find and return max depth
+        Output[DTid.xy] = max(max(depths.x, depths.y), max(depths.z, depths.w));
+    }
 }
