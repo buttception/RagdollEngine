@@ -70,7 +70,7 @@ void DownSamplePoTCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex
     {
         float4 depths = Source.Gather(Sampler, (DTid.xy + 0.5) / float2(Width, Height));
  
-        //find and return max depth
-        Output[DTid.xy] = max(max(depths.x, depths.y), max(depths.z, depths.w));
+        //find and return min depth, smaller is further
+        Output[DTid.xy] = min(min(depths.x, depths.y), min(depths.z, depths.w));
     }
 }

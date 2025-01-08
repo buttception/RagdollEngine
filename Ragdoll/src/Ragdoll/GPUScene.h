@@ -5,6 +5,7 @@
 namespace ragdoll
 {
 	class FGPUScene {
+		nvrhi::BufferHandle DebugBuffer{};
 	public:
 		//TODO: upload mesh data as well, so can derive bounding box with the instance buffer
 		//InstanceBuffer (only transforms)
@@ -15,6 +16,7 @@ namespace ragdoll
 		nvrhi::BufferHandle MeshBuffer{};
 		nvrhi::BufferHandle IndirectDrawArgsBuffer{};
 		nvrhi::BufferHandle InstanceIdBuffer{};
+		nvrhi::BufferHandle OccludedInstanceIdBuffer{};
 
 		void Update(Scene* Scene);
 		//will sort the proxies before making a instance buffer copy and uploading to gpu
@@ -22,7 +24,22 @@ namespace ragdoll
 		//returns the count buffer for the draw indirect function
 		nvrhi::BufferHandle FrustumCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled);
 		//returns the count buffer for the draw indirect function, culls the instances in the instance id buffer
-		nvrhi::BufferHandle OcclusionCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, bool PreviousFrame);
+		void OcclusionCullPhase1(
+			nvrhi::CommandListHandle CommandList,
+			const SceneInformation& SceneInfo,
+			SceneRenderTargets* Targets,
+			nvrhi::BufferHandle FrustumVisibleCountBuffer,
+			nvrhi::BufferHandle& PassedOcclusionCountOutput,
+			nvrhi::BufferHandle& FailedOcclusionCountOutput,
+			uint32_t ProxyCount
+		);
+		nvrhi::BufferHandle OcclusionCullPhase2(
+			nvrhi::CommandListHandle CommandList,
+			const SceneInformation& SceneInfo,
+			SceneRenderTargets* Targets,
+			nvrhi::BufferHandle FrustumVisibleCountBuffer,
+			uint32_t ProxyCount
+		);
 		void BuildHZB(nvrhi::CommandListHandle CommandList, SceneRenderTargets* Targets);
 
 		//helper

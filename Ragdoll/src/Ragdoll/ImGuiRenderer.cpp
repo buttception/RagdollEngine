@@ -326,8 +326,9 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 				ImGui::TreePop();
 			}
 		}
-		ImGui::Text("%d octants culled", DebugInfo.CulledOctantsCount);
-		ImGui::Text("%d proxies in octree", Octree::TotalProxies);
+		ImGui::Text("%d total proxies", DebugInfo.TotalProxyCount);
+		ImGui::Text("%d passed frustum test", DebugInfo.PassedFrustumCullCount);
+		ImGui::Text("%d passed occlusion test", DebugInfo.PassedOcclusionCullCount);
 		ImGui::TreePop();
 	}
 	ImGui::End();

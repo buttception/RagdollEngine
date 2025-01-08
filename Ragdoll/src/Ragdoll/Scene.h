@@ -87,6 +87,9 @@ namespace ragdoll {
 		Matrix FrozenView;
 		Vector3 FrozenCameraPosition;
 		bool bShowFrustum{ false };
+		uint32_t TotalProxyCount;
+		uint32_t PassedFrustumCullCount{};
+		uint32_t PassedOcclusionCullCount{};
 	};
 
 	struct SceneConfig {

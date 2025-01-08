@@ -7,12 +7,32 @@
 #include "AssetManager.h"
 #include "Profiler.h"
 
-#define INSTANCE_DATA_BUFFER_SRV_SLOT 0
-#define MESH_BUFFER_SRV_SLOT 1
+#define INSTANCE_DATA_BUFFER_SRV_SLOT 1
+#define MESH_BUFFER_SRV_SLOT 2
 
 #define INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT 0
 #define INSTANCE_ID_BUFFER_UAV_SLOT 1
 #define INSTANCE_VISIBLE_COUNT_UAV_SLOT 2
+#define INSTANCE_NOT_OCCLUDED_COUNT_UAV_SLOT 3
+#define INSTANCE_OCCLUDED_ID_BUFFER_UAV_SLOT 4
+#define INSTANCE_OCCLUDED_COUNT_UAV_SLOT 5
+
+#define DEBUG_BUFFER_UAV_SLOT 9
+
+#define INFINITE_Z_ENABLED 1
+#define PREVIOUS_FRAME_ENABLED 1 << 1
+#define IS_PHASE_1 1 << 2
+
+struct FConstantBuffer
+{
+	Matrix ViewProjectionMatrix{};
+	Vector4 FrustumPlanes[6]{};
+	uint32_t MipBaseWidth;
+	uint32_t MipBaseHeight;
+	uint32_t MipLevels;
+	uint32_t ProxyCount{};
+	uint32_t Flags{};
+};
 
 struct FBoundingBox
 {
@@ -228,20 +248,12 @@ nvrhi::BufferHandle ragdoll::FGPUScene::FrustumCull(nvrhi::CommandListHandle Com
 {
 	RD_SCOPE(Culling, Instance Culling);
 	CommandList->beginMarker("Frustum Cull Scene");
-	struct FConstantBuffer
-	{
-		Matrix ViewMatrix{};
-		Vector4 FrustumPlanes[6]{};
-		uint32_t ProxyCount{};
-		uint32_t InfiniteZEnabled{};
-	} ConstantBuffer;
+	FConstantBuffer ConstantBuffer;
 	ExtractFrustumPlanes(ConstantBuffer.FrustumPlanes, Projection, View);
-	ConstantBuffer.ViewMatrix = View;//create a constant buffer here
 	ConstantBuffer.ProxyCount = ProxyCount;
-	ConstantBuffer.InfiniteZEnabled = InfiniteZEnabled;
+	ConstantBuffer.Flags |= InfiniteZEnabled ? INFINITE_Z_ENABLED : 0;
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FConstantBuffer), "InstanceCull ConstantBuffer", 1));
 	CommandList->writeBuffer(ConstantBufferHandle, &ConstantBuffer, sizeof(FConstantBuffer));
-	uint32_t VisibleCount{};
 
 	nvrhi::BufferDesc CountBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(uint32_t), "CountBuffer");
 	CountBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
@@ -250,6 +262,7 @@ nvrhi::BufferHandle ragdoll::FGPUScene::FrustumCull(nvrhi::CommandListHandle Com
 	CountBufferDesc.isDrawIndirectArgs = true;
 	CountBufferDesc.structStride = sizeof(uint32_t);
 	nvrhi::BufferHandle CountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+	uint32_t VisibleCount{};
 	CommandList->writeBuffer(CountBuffer, &VisibleCount, sizeof(uint32_t));
 
 	//create the binding set
@@ -268,7 +281,7 @@ nvrhi::BufferHandle ragdoll::FGPUScene::FrustumCull(nvrhi::CommandListHandle Com
 	//pipeline descs
 	nvrhi::ComputePipelineDesc CullingPipelineDesc;
 	CullingPipelineDesc.bindingLayouts = { BindingSetHandle->getLayout() };
-	nvrhi::ShaderHandle CullingShader = AssetManager::GetInstance()->GetShader("InstanceCull.cs.cso");
+	nvrhi::ShaderHandle CullingShader = AssetManager::GetInstance()->GetShader("FrustumCull.cs.cso");
 	CullingPipelineDesc.CS = CullingShader;
 
 	nvrhi::ComputeState state;
@@ -277,6 +290,156 @@ nvrhi::BufferHandle ragdoll::FGPUScene::FrustumCull(nvrhi::CommandListHandle Com
 	CommandList->setComputeState(state);
 	CommandList->dispatch(ProxyCount / 64 + 1, 1, 1);
 	CommandList->endMarker();
+	return CountBuffer;
+}
+
+void ragdoll::FGPUScene::OcclusionCullPhase1(
+	nvrhi::CommandListHandle CommandList,
+	const SceneInformation& SceneInfo,
+	SceneRenderTargets* Targets,
+	nvrhi::BufferHandle FrustumVisibleCountBuffer,
+	nvrhi::BufferHandle& PassedOcclusionCountOutput,
+	nvrhi::BufferHandle& FailedOcclusionCountOutput,
+	uint32_t ProxyCount
+)
+{
+	RD_SCOPE(Culling, Occlusion Culling);
+	CommandList->beginMarker("Occlusion Cull Phase 1");
+	FConstantBuffer ConstantBuffer;
+	ConstantBuffer.ViewProjectionMatrix = SceneInfo.PrevMainCameraViewProj;
+	ConstantBuffer.Flags |= PREVIOUS_FRAME_ENABLED | IS_PHASE_1;
+	ConstantBuffer.MipBaseWidth = Targets->HZBMips->getDesc().width;
+	ConstantBuffer.MipBaseHeight = Targets->HZBMips->getDesc().height;
+	ConstantBuffer.MipLevels = Targets->HZBMips->getDesc().mipLevels;
+
+	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FConstantBuffer), "InstanceCull ConstantBuffer", 1));
+	CommandList->writeBuffer(ConstantBufferHandle, &ConstantBuffer, sizeof(FConstantBuffer));
+
+	//buffer containing non occluded count to draw after phase 1
+	nvrhi::BufferDesc CountBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(uint32_t), "CountBuffer");
+	CountBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	CountBufferDesc.keepInitialState = true;
+	CountBufferDesc.canHaveUAVs = true;
+	CountBufferDesc.isDrawIndirectArgs = true;
+	CountBufferDesc.structStride = sizeof(uint32_t);
+	nvrhi::BufferHandle CountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+	uint32_t VisibleCount{};
+	CommandList->writeBuffer(CountBuffer, &VisibleCount, sizeof(uint32_t));
+	PassedOcclusionCountOutput = CountBuffer;
+
+	//buffer containing the count of items that failed the culling test to be tested again in phase 2
+	nvrhi::BufferDesc OccludedCountBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(uint32_t), "OccludedCountBuffer");
+	OccludedCountBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	OccludedCountBufferDesc.keepInitialState = true;
+	OccludedCountBufferDesc.canHaveUAVs = true;
+	OccludedCountBufferDesc.isDrawIndirectArgs = true;
+	OccludedCountBufferDesc.structStride = sizeof(uint32_t);
+	nvrhi::BufferHandle OccludedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(OccludedCountBufferDesc);
+	uint32_t Occluded{};
+	CommandList->writeBuffer(OccludedCountBuffer, &Occluded, sizeof(uint32_t));
+	FailedOcclusionCountOutput = OccludedCountBuffer;
+
+	//create the binding set
+	nvrhi::BindingSetDesc BindingSetDesc;
+	BindingSetDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
+		nvrhi::BindingSetItem::Texture_SRV(0, Targets->HZBMips, nvrhi::Format::D32, nvrhi::AllSubresources),
+		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp]),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_DATA_BUFFER_SRV_SLOT, InstanceBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(MESH_BUFFER_SRV_SLOT, MeshBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT, IndirectDrawArgsBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_ID_BUFFER_UAV_SLOT, InstanceIdBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_VISIBLE_COUNT_UAV_SLOT, FrustumVisibleCountBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_NOT_OCCLUDED_COUNT_UAV_SLOT, CountBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_OCCLUDED_ID_BUFFER_UAV_SLOT, OccludedInstanceIdBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_OCCLUDED_COUNT_UAV_SLOT, OccludedCountBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(DEBUG_BUFFER_UAV_SLOT, DebugBuffer),
+	};
+	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
+	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);
+
+	//pipeline descs
+	nvrhi::ComputePipelineDesc CullingPipelineDesc;
+	CullingPipelineDesc.bindingLayouts = { BindingSetHandle->getLayout() };
+	nvrhi::ShaderHandle CullingShader = AssetManager::GetInstance()->GetShader("OcclusionCull.cs.cso");
+	CullingPipelineDesc.CS = CullingShader;
+
+	nvrhi::ComputeState state;
+	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(CullingPipelineDesc);
+	state.bindings = { BindingSetHandle };
+	CommandList->setComputeState(state);
+	CommandList->dispatch(ProxyCount / 64 + 1, 1, 1);
+	CommandList->endMarker();
+}
+
+nvrhi::BufferHandle ragdoll::FGPUScene::OcclusionCullPhase2(nvrhi::CommandListHandle CommandList, const SceneInformation& SceneInfo, SceneRenderTargets* Targets, nvrhi::BufferHandle FrustumVisibleCountBuffer, uint32_t ProxyCount)
+{
+	RD_SCOPE(Culling, Instance Culling);
+	CommandList->beginMarker("Occlusion Cull Phase 2");
+	FConstantBuffer ConstantBuffer;
+	ConstantBuffer.ViewProjectionMatrix = SceneInfo.MainCameraViewProj;
+	ConstantBuffer.Flags = 0;
+	ConstantBuffer.MipBaseWidth = Targets->HZBMips->getDesc().width;
+	ConstantBuffer.MipBaseHeight = Targets->HZBMips->getDesc().height;
+	ConstantBuffer.MipLevels = Targets->HZBMips->getDesc().mipLevels;
+
+	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FConstantBuffer), "InstanceCull ConstantBuffer", 1));
+	CommandList->writeBuffer(ConstantBufferHandle, &ConstantBuffer, sizeof(FConstantBuffer));
+
+	//buffer containing non occluded count to draw after phase 1
+	nvrhi::BufferDesc CountBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(uint32_t), "CountBuffer");
+	CountBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	CountBufferDesc.keepInitialState = true;
+	CountBufferDesc.canHaveUAVs = true;
+	CountBufferDesc.isDrawIndirectArgs = true;
+	CountBufferDesc.structStride = sizeof(uint32_t);
+	nvrhi::BufferHandle CountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+	uint32_t VisibleCount{};
+	CommandList->writeBuffer(CountBuffer, &VisibleCount, sizeof(uint32_t));
+
+	//buffer containing the count of items that failed the culling test to be tested again in phase 2
+	nvrhi::BufferDesc OccludedCountBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(uint32_t), "OccludedCountBuffer");
+	OccludedCountBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	OccludedCountBufferDesc.keepInitialState = true;
+	OccludedCountBufferDesc.canHaveUAVs = true;
+	OccludedCountBufferDesc.isDrawIndirectArgs = true;
+	OccludedCountBufferDesc.structStride = sizeof(uint32_t);
+	nvrhi::BufferHandle OccludedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(OccludedCountBufferDesc);
+	uint32_t Occluded{};
+	CommandList->writeBuffer(OccludedCountBuffer, &Occluded, sizeof(uint32_t));
+
+	//create the binding set
+	nvrhi::BindingSetDesc BindingSetDesc;
+	BindingSetDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
+		nvrhi::BindingSetItem::Texture_SRV(0, Targets->HZBMips, nvrhi::Format::D32, nvrhi::AllSubresources),
+		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp]),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_DATA_BUFFER_SRV_SLOT, InstanceBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(MESH_BUFFER_SRV_SLOT, MeshBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT, IndirectDrawArgsBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_ID_BUFFER_UAV_SLOT, InstanceIdBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_VISIBLE_COUNT_UAV_SLOT, FrustumVisibleCountBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_NOT_OCCLUDED_COUNT_UAV_SLOT, CountBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_OCCLUDED_ID_BUFFER_UAV_SLOT, OccludedInstanceIdBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_OCCLUDED_COUNT_UAV_SLOT, OccludedCountBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(DEBUG_BUFFER_UAV_SLOT, DebugBuffer),
+	};
+	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
+	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);
+
+	//pipeline descs
+	nvrhi::ComputePipelineDesc CullingPipelineDesc;
+	CullingPipelineDesc.bindingLayouts = { BindingSetHandle->getLayout() };
+	nvrhi::ShaderHandle CullingShader = AssetManager::GetInstance()->GetShader("OcclusionCull.cs.cso");
+	CullingPipelineDesc.CS = CullingShader;
+
+	nvrhi::ComputeState state;
+	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(CullingPipelineDesc);
+	state.bindings = { BindingSetHandle };
+	CommandList->setComputeState(state);
+	CommandList->dispatch(ProxyCount / 64 + 1, 1, 1);
+	CommandList->endMarker();
+
 	return CountBuffer;
 }
 
@@ -347,6 +510,9 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	InstanceIdBufferDesc.keepInitialState = true;
 	InstanceIdBufferDesc.isVertexBuffer = true;
 	InstanceIdBuffer = DirectXDevice::GetNativeDevice()->createBuffer(InstanceIdBufferDesc);	  //worst case size
+	//instance id buffer
+	InstanceIdBufferDesc.debugName = "OccludedInstanceIdsBuffer";
+	OccludedInstanceIdBuffer = DirectXDevice::GetNativeDevice()->createBuffer(InstanceIdBufferDesc);	  //worst case size
 	
 	//create the indirect draw args buffer
 	nvrhi::BufferDesc IndirectDrawArgsBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(nvrhi::DrawIndexedIndirectArguments) * AssetManager::GetInstance()->VertexBufferInfos.size(), "IndirectDrawArgsBuffer");
@@ -356,4 +522,11 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	IndirectDrawArgsBufferDesc.keepInitialState = true;
 	IndirectDrawArgsBufferDesc.isDrawIndirectArgs = true;
 	IndirectDrawArgsBuffer = DirectXDevice::GetNativeDevice()->createBuffer(IndirectDrawArgsBufferDesc);
+
+	nvrhi::BufferDesc DebugBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(float) * Proxies.size(), "DebugBuffer");
+	DebugBufferDesc.structStride = sizeof(float);
+	DebugBufferDesc.canHaveUAVs = true;
+	DebugBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	DebugBufferDesc.keepInitialState = true;
+	DebugBuffer = DirectXDevice::GetNativeDevice()->createBuffer(DebugBufferDesc);
 }

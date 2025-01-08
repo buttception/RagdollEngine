@@ -144,6 +144,7 @@ void ragdoll::Scene::Update(float _dt)
 
 	SceneInfo.bIsResolutionDirty = false;
 	SceneInfo.bIsCameraDirty = false;
+	DebugInfo.TotalProxyCount = StaticProxies.size();
 }
 
 void ragdoll::Scene::Shutdown()

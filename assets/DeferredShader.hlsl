@@ -38,7 +38,7 @@ void gbuffer_vs(
     outNormal = normalize(mul(inNormal, AdjugateMatrix));
     outTangent = normalize(mul(inTangent, AdjugateMatrix));
 	outBinormal = normalize(cross(outTangent, outNormal)) * binormalSign;
-	outTexcoord = inTexcoord;
+    outTexcoord = float2(inTexcoord.x, inTexcoord.y);
     outInstanceId = inInstanceId;
 }
 

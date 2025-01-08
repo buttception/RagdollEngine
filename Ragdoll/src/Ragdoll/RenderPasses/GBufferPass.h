@@ -22,9 +22,23 @@ class GBufferPass {
 
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
+	//determines whether to cull objects
+	void Draw(ragdoll::FGPUScene* GPUScene,
+		uint32_t ProxyCount,
+		const ragdoll::SceneInformation& sceneInfo,
+		const ragdoll::DebugInfo& debugInfo,
+		ragdoll::SceneRenderTargets* targets,
+		bool isOcclusionCullingEnabled);
 
+	nvrhi::BufferHandle PassedFrustumTestCountBuffer;
+	nvrhi::BufferHandle Phase1NonOccludedCountBuffer;
+	nvrhi::BufferHandle Phase2NonOccludedCountBuffer;
+
+private:
+	//only draw instances
 	void DrawAllInstances(
 		ragdoll::FGPUScene* GPUScene,
+		nvrhi::BufferHandle CountBuffer,
 		uint32_t ProxyCount,
 		const ragdoll::SceneInformation& sceneInfo,
 		const ragdoll::DebugInfo& debugInfo,

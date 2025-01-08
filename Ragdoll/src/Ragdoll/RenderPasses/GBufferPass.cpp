@@ -1,4 +1,4 @@
-#include "ragdollpch.h"
+ #include "ragdollpch.h"
 #include "GbufferPass.h"
 
 #include <nvrhi/utils.h>
@@ -12,35 +12,63 @@
 void GBufferPass::Init(nvrhi::CommandListHandle cmdList)
 {
 	CommandListRef = cmdList;
+
+	nvrhi::BufferDesc CountBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(uint32_t), "CountBuffer");
+	CountBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
+	CountBufferDesc.keepInitialState = true;
+	CountBufferDesc.cpuAccess = nvrhi::CpuAccessMode::Read;
+	PassedFrustumTestCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+	CountBufferDesc.debugName = "Phase1NonOccludedCountBuffer";
+	Phase1NonOccludedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+	CountBufferDesc.debugName = "Phase2NonOccludedCountBuffer";
+	Phase2NonOccludedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+}
+
+void GBufferPass::Draw(ragdoll::FGPUScene* GPUScene, uint32_t ProxyCount, const ragdoll::SceneInformation& sceneInfo, const ragdoll::DebugInfo& debugInfo, ragdoll::SceneRenderTargets* targets, bool isOcclusionCullingEnabled)
+{
+	RD_SCOPE(Render, GBufferPass);
+	RD_GPU_SCOPE("GBufferPass", CommandListRef);
+	CommandListRef->beginMarker("GBufferPass");
+
+	nvrhi::BufferHandle CountBuffer;
+	nvrhi::BufferHandle NotOccludedCountBuffer;
+	nvrhi::BufferHandle OccludedCountBuffer;
+	if (debugInfo.bFreezeFrustumCulling)
+	{
+		CountBuffer = GPUScene->FrustumCull(CommandListRef, debugInfo.FrozenProjection, debugInfo.FrozenView, ProxyCount, true);
+	}
+	else
+	{
+		CountBuffer = GPUScene->FrustumCull(CommandListRef, sceneInfo.InfiniteReverseZProj, sceneInfo.MainCameraView, ProxyCount, true);
+	}
+	CommandListRef->copyBuffer(PassedFrustumTestCountBuffer, 0, CountBuffer, 0, sizeof(uint32_t));
+	if (isOcclusionCullingEnabled)
+	{
+		//occlusion cull phase 1
+		GPUScene->OcclusionCullPhase1(CommandListRef, sceneInfo, targets, CountBuffer, NotOccludedCountBuffer, OccludedCountBuffer, ProxyCount);
+		CommandListRef->copyBuffer(Phase1NonOccludedCountBuffer, 0, NotOccludedCountBuffer, 0, sizeof(uint32_t));
+		//draw phase 1 onto gbuffer that was not occluded
+		DrawAllInstances(GPUScene, NotOccludedCountBuffer, ProxyCount, sceneInfo, debugInfo, targets);
+		//build hzb
+		GPUScene->BuildHZB(CommandListRef, targets);
+		//occlusion cull phase 2, cull occluded objexcts
+		CountBuffer = GPUScene->OcclusionCullPhase2(CommandListRef, sceneInfo, targets, OccludedCountBuffer, ProxyCount);
+		CommandListRef->copyBuffer(Phase2NonOccludedCountBuffer, 0, CountBuffer, 0, sizeof(uint32_t));
+		//draw phase 2 onto gbuffer
+		DrawAllInstances(GPUScene, CountBuffer, ProxyCount, sceneInfo, debugInfo, targets);
+	}
+	CommandListRef->endMarker();
 }
 
 void GBufferPass::DrawAllInstances(
 	ragdoll::FGPUScene* GPUScene,
+	nvrhi::BufferHandle CountBuffer,
 	uint32_t ProxyCount,
 	const ragdoll::SceneInformation& sceneInfo,
 	const ragdoll::DebugInfo& debugInfo,
 	ragdoll::SceneRenderTargets* targets)
 {
-	RD_SCOPE(Render, GBufferPass);
-	RD_GPU_SCOPE("GBufferPass", CommandListRef);
 	CommandListRef->beginMarker("Instance Draws");
-	//new gpu scene stuff
-	nvrhi::BufferHandle CountBuffer;
-	if(debugInfo.bFreezeFrustumCulling)
-		CountBuffer = GPUScene->FrustumCull(CommandListRef, debugInfo.FrozenProjection, debugInfo.FrozenView, ProxyCount, true);
-	else
-		CountBuffer = GPUScene->FrustumCull(CommandListRef, sceneInfo.InfiniteReverseZProj, sceneInfo.MainCameraView, ProxyCount, true);
-	//occlusion cull phase 1
-
-	//draw phase 1 onto gbuffer
-	
-	//build hzb
-	GPUScene->BuildHZB(CommandListRef, targets);
-	//occlusion cull phase 2
-	
-	//draw phase 2 onto gbuffer
-	
-	MICROPROFILE_SCOPEI("Render", "Draw All Instances", MP_BLUEVIOLET);
 	//create a constant buffer here
 	nvrhi::BufferDesc ConstantBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "GBufferPass CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(ConstantBufferDesc);
@@ -106,9 +134,6 @@ void GBufferPass::DrawAllInstances(
 
 	CommandListRef->setGraphicsState(state);
 	CommandListRef->drawIndexedIndirect(0, CountBuffer, AssetManager::GetInstance()->VertexBufferInfos.size());
-
-	//build hzb for next frame
-	GPUScene->BuildHZB(CommandListRef, targets);
 
 	CommandListRef->endMarker();
 }

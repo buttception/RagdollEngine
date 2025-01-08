@@ -94,16 +94,40 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 		RD_SCOPE(Render, Readback);
 		//readback all the debug infos needed
 		float* valPtr;
+		int* intPtr;
 		{
 			RD_SCOPE(Render, Map);
 			if (valPtr = (float*)DirectXDevice::GetNativeDevice()->mapBuffer(AutomaticExposurePass->ReadbackBuffer, nvrhi::CpuAccessMode::Read))
 			{
 				AdaptedLuminance = *valPtr;
 			}
+			DirectXDevice::GetNativeDevice()->unmapBuffer(AutomaticExposurePass->ReadbackBuffer);
+
+			scene->DebugInfo.PassedFrustumCullCount = 0;
+			if (GBufferPass->PassedFrustumTestCountBuffer)
+			{
+				if (intPtr = (int*)DirectXDevice::GetNativeDevice()->mapBuffer(GBufferPass->PassedFrustumTestCountBuffer, nvrhi::CpuAccessMode::Read))
+				{
+					scene->DebugInfo.PassedFrustumCullCount = *intPtr;
+				}
+				DirectXDevice::GetNativeDevice()->unmapBuffer(GBufferPass->PassedFrustumTestCountBuffer);
+			}
+			if (GBufferPass->Phase1NonOccludedCountBuffer && GBufferPass->Phase2NonOccludedCountBuffer)
+			{
+				scene->DebugInfo.PassedOcclusionCullCount = 0;
+				if (intPtr = (int*)DirectXDevice::GetNativeDevice()->mapBuffer(GBufferPass->Phase1NonOccludedCountBuffer, nvrhi::CpuAccessMode::Read))
+				{
+					scene->DebugInfo.PassedOcclusionCullCount += *intPtr;
+				}
+				if (intPtr = (int*)DirectXDevice::GetNativeDevice()->mapBuffer(GBufferPass->Phase2NonOccludedCountBuffer, nvrhi::CpuAccessMode::Read))
+				{
+					scene->DebugInfo.PassedOcclusionCullCount += *intPtr;
+				}
+				DirectXDevice::GetNativeDevice()->unmapBuffer(GBufferPass->Phase1NonOccludedCountBuffer);
+				DirectXDevice::GetNativeDevice()->unmapBuffer(GBufferPass->Phase2NonOccludedCountBuffer);
+			}
 		}
 		{
-			RD_SCOPE(Render, Unmap);
-			DirectXDevice::GetNativeDevice()->unmapBuffer(AutomaticExposurePass->ReadbackBuffer);
 		}
 	}
 
@@ -125,12 +149,13 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 
 	uint32_t ProxyCount = scene->StaticProxies.size();
 	Taskflow.emplace([this, &scene, GPUScene, ProxyCount]() {
-		GBufferPass->DrawAllInstances(
+		GBufferPass->Draw(
 			GPUScene,
 			ProxyCount,
 			scene->SceneInfo,
 			scene->DebugInfo,
-			RenderTargets);
+			RenderTargets,
+			true);
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::GBUFFER]);
 
