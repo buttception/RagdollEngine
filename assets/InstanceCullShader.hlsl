@@ -151,7 +151,9 @@ void OcclusionCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex
             Corners[i] = mul(float4(Corners[i], 1.f), InstanceData.ModelToWorld).xyz;
         float4 ClipPosition = mul(float4(Corners[i], 1.f), ViewProjectionMatrix);
         Corners[i] = ClipPosition.xyz / ClipPosition.w;
+        Corners[i].xy = clamp(Corners[i].xy, float2(-1.f, -1.f), float2(1.f, 1.f));
         Corners[i].xy = ScreenPosToViewportUV(Corners[i].xy);
+        
     }
     float2 maxXY = float2(0.f, 0.f);
     float2 minXY = float2(1.f, 1.f);
@@ -168,20 +170,20 @@ void OcclusionCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex
     float4 boxUVs = float4(minXY, maxXY);
     //calculate hi-Z buffer mip
     int2 size = (maxXY - minXY) * float2(MipBaseWidth, MipBaseHeight);
-    float mip = ceil(log2(max(size.x, size.y)));
+    float mip = floor(log2(max(size.x, size.y)));
  
-    mip = clamp(mip, 0, MipLevels);
+    //mip = clamp(mip, 0, MipLevels);
  
-    // Texel footprint for the lower (finer-grained) level
-    float level_lower = max(mip - 1, 0);
-    float2 scale = exp2(-level_lower);
-    float2 a = floor(boxUVs.xy * scale);
-    float2 b = ceil(boxUVs.zw * scale);
-    float2 dims = b - a;
+    //// Texel footprint for the lower (finer-grained) level
+    //float level_lower = max(mip - 1, 0);
+    //float2 scale = exp2(-level_lower);
+    //float2 a = floor(boxUVs.xy * scale);
+    //float2 b = ceil(boxUVs.zw * scale);
+    //float2 dims = b - a;
  
-    // Use the lower level if we only touch <= 2 texels in both dimensions
-    if (dims.x <= 2 && dims.y <= 2)
-        mip = level_lower;
+    //// Use the lower level if we only touch <= 2 texels in both dimensions
+    //if (dims.x <= 2 && dims.y <= 2)
+    //    mip = level_lower;
  
     //load depths from high z buffer
     float4 depth =
@@ -203,7 +205,7 @@ void OcclusionCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex
         InterlockedAdd(OccludedCountBufferOutput[0], 1, Index);
         //TODO: potential racing issue where threads have not read the id yet
         OccludedInstanceIdBufferOutput[Index] = InstanceId;
-        DebugBuffer[Index] = maxZ;
+        DebugBuffer[Index] = mip + maxZ;
     }
     else
     {

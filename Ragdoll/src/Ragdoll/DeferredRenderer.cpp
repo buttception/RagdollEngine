@@ -114,14 +114,14 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 			}
 			if (GBufferPass->Phase1NonOccludedCountBuffer && GBufferPass->Phase2NonOccludedCountBuffer)
 			{
-				scene->DebugInfo.PassedOcclusionCullCount = 0;
+				scene->DebugInfo.PassedOcclusion1CullCount = scene->DebugInfo.PassedOcclusion2CullCount = 0;
 				if (intPtr = (int*)DirectXDevice::GetNativeDevice()->mapBuffer(GBufferPass->Phase1NonOccludedCountBuffer, nvrhi::CpuAccessMode::Read))
 				{
-					scene->DebugInfo.PassedOcclusionCullCount += *intPtr;
+					scene->DebugInfo.PassedOcclusion1CullCount = *intPtr;
 				}
 				if (intPtr = (int*)DirectXDevice::GetNativeDevice()->mapBuffer(GBufferPass->Phase2NonOccludedCountBuffer, nvrhi::CpuAccessMode::Read))
 				{
-					scene->DebugInfo.PassedOcclusionCullCount += *intPtr;
+					scene->DebugInfo.PassedOcclusion2CullCount = *intPtr;
 				}
 				DirectXDevice::GetNativeDevice()->unmapBuffer(GBufferPass->Phase1NonOccludedCountBuffer);
 				DirectXDevice::GetNativeDevice()->unmapBuffer(GBufferPass->Phase2NonOccludedCountBuffer);

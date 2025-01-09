@@ -298,7 +298,7 @@ void ragdoll::Scene::CreateRenderTargets()
 	depthBufferDesc.debugName = "HZB";
 	depthBufferDesc.dimension = nvrhi::TextureDimension::Texture2DArray;
 	depthBufferDesc.arraySize = 1;
-	depthBufferDesc.mipLevels = log2(std::max(depthBufferDesc.width, depthBufferDesc.height));
+	depthBufferDesc.mipLevels = log2(std::max(depthBufferDesc.width, depthBufferDesc.height)) + 1;
 	RenderTargets.HZBMips = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
 
 	nvrhi::TextureDesc texDesc;

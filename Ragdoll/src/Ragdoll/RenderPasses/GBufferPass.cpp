@@ -56,6 +56,8 @@ void GBufferPass::Draw(ragdoll::FGPUScene* GPUScene, uint32_t ProxyCount, const 
 		CommandListRef->copyBuffer(Phase2NonOccludedCountBuffer, 0, CountBuffer, 0, sizeof(uint32_t));
 		//draw phase 2 onto gbuffer
 		DrawAllInstances(GPUScene, CountBuffer, ProxyCount, sceneInfo, debugInfo, targets);
+		//build hzb for next frame
+		GPUScene->BuildHZB(CommandListRef, targets);
 	}
 	CommandListRef->endMarker();
 }

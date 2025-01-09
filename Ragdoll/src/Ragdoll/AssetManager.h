@@ -70,6 +70,7 @@ enum class SamplerTypes
 	Trilinear_Clamp,
 	Trilinear_Wrap,
 	Trilinear_Repeat,
+	Point_Clamp_Reduction,
 	COUNT
 };
 

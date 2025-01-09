@@ -6,6 +6,12 @@ namespace ragdoll
 {
 	class FGPUScene {
 		nvrhi::BufferHandle DebugBuffer{};
+		//count buffers, static buffers need to be precreated because it takes a long time for it to be volatile
+		nvrhi::BufferHandle PassedFrustumTestCountBuffer{};
+		nvrhi::BufferHandle Phase1NonOccludedCountBuffer{};
+		nvrhi::BufferHandle Phase1OccludedCountBuffer{};
+		nvrhi::BufferHandle Phase2NonOccludedCountBuffer{};
+		nvrhi::BufferHandle Phase2OccludedCountBuffer{};
 	public:
 		//TODO: upload mesh data as well, so can derive bounding box with the instance buffer
 		//InstanceBuffer (only transforms)

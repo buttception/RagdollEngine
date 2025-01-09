@@ -89,7 +89,8 @@ namespace ragdoll {
 		bool bShowFrustum{ false };
 		uint32_t TotalProxyCount;
 		uint32_t PassedFrustumCullCount{};
-		uint32_t PassedOcclusionCullCount{};
+		uint32_t PassedOcclusion1CullCount{};
+		uint32_t PassedOcclusion2CullCount{};
 	};
 
 	struct SceneConfig {

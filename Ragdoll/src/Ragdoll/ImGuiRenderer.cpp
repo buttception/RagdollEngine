@@ -328,7 +328,8 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		}
 		ImGui::Text("%d total proxies", DebugInfo.TotalProxyCount);
 		ImGui::Text("%d passed frustum test", DebugInfo.PassedFrustumCullCount);
-		ImGui::Text("%d passed occlusion test", DebugInfo.PassedOcclusionCullCount);
+		ImGui::Text("%d passed occlusion1 test", DebugInfo.PassedOcclusion1CullCount);
+		ImGui::Text("%d passed occlusion2 test", DebugInfo.PassedOcclusion2CullCount);
 		ImGui::TreePop();
 	}
 	ImGui::End();
