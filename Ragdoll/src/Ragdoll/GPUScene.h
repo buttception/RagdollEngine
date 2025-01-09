@@ -32,8 +32,9 @@ namespace ragdoll
 		//returns the count buffer for the draw indirect function, culls the instances in the instance id buffer
 		void OcclusionCullPhase1(
 			nvrhi::CommandListHandle CommandList,
-			const SceneInformation& SceneInfo,
 			SceneRenderTargets* Targets,
+			Matrix ViewMatrix,
+			Matrix ProjectionMatrix,
 			nvrhi::BufferHandle FrustumVisibleCountBuffer,
 			nvrhi::BufferHandle& PassedOcclusionCountOutput,
 			nvrhi::BufferHandle& FailedOcclusionCountOutput,
@@ -41,8 +42,9 @@ namespace ragdoll
 		);
 		nvrhi::BufferHandle OcclusionCullPhase2(
 			nvrhi::CommandListHandle CommandList,
-			const SceneInformation& SceneInfo,
 			SceneRenderTargets* Targets,
+			Matrix ViewMatrix,
+			Matrix ProjectionMatrix,
 			nvrhi::BufferHandle FrustumVisibleCountBuffer,
 			uint32_t ProxyCount
 		);

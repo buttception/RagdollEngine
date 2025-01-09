@@ -33,31 +33,45 @@ void GBufferPass::Draw(ragdoll::FGPUScene* GPUScene, uint32_t ProxyCount, const 
 	nvrhi::BufferHandle CountBuffer;
 	nvrhi::BufferHandle NotOccludedCountBuffer;
 	nvrhi::BufferHandle OccludedCountBuffer;
+	Matrix ViewMatrix;
+	Matrix ProjectionMatrix;
+	Matrix ViewProjectionMatrix;
+	Matrix PrevViewMatrix;
+	Matrix PrevProjectionMatrix;
 	if (debugInfo.bFreezeFrustumCulling)
 	{
-		CountBuffer = GPUScene->FrustumCull(CommandListRef, debugInfo.FrozenProjection, debugInfo.FrozenView, ProxyCount, true);
+		PrevViewMatrix = ViewMatrix = debugInfo.FrozenView;
+		PrevProjectionMatrix = ProjectionMatrix = debugInfo.FrozenProjection;
+		ViewProjectionMatrix = ViewMatrix * ProjectionMatrix;
 	}
 	else
 	{
-		CountBuffer = GPUScene->FrustumCull(CommandListRef, sceneInfo.InfiniteReverseZProj, sceneInfo.MainCameraView, ProxyCount, true);
+		ViewMatrix = sceneInfo.MainCameraView;
+		ProjectionMatrix = sceneInfo.MainCameraProj;
+		ViewProjectionMatrix = sceneInfo.MainCameraViewProj;
+		PrevViewMatrix = sceneInfo.PrevMainCameraView;
+		PrevProjectionMatrix = sceneInfo.PrevMainCameraProj;
 	}
+	CountBuffer = GPUScene->FrustumCull(CommandListRef, ProjectionMatrix, ViewMatrix, ProxyCount, true);
 	CommandListRef->copyBuffer(PassedFrustumTestCountBuffer, 0, CountBuffer, 0, sizeof(uint32_t));
 	if (isOcclusionCullingEnabled)
 	{
 		//occlusion cull phase 1
-		GPUScene->OcclusionCullPhase1(CommandListRef, sceneInfo, targets, CountBuffer, NotOccludedCountBuffer, OccludedCountBuffer, ProxyCount);
+		GPUScene->OcclusionCullPhase1(CommandListRef, targets, PrevViewMatrix, PrevProjectionMatrix, CountBuffer, NotOccludedCountBuffer, OccludedCountBuffer, ProxyCount);
 		CommandListRef->copyBuffer(Phase1NonOccludedCountBuffer, 0, NotOccludedCountBuffer, 0, sizeof(uint32_t));
 		//draw phase 1 onto gbuffer that was not occluded
 		DrawAllInstances(GPUScene, NotOccludedCountBuffer, ProxyCount, sceneInfo, debugInfo, targets);
-		//build hzb
-		GPUScene->BuildHZB(CommandListRef, targets);
+		//build hzb if not frozen
+		if(!debugInfo.bFreezeFrustumCulling)
+			GPUScene->BuildHZB(CommandListRef, targets);
 		//occlusion cull phase 2, cull occluded objexcts
-		CountBuffer = GPUScene->OcclusionCullPhase2(CommandListRef, sceneInfo, targets, OccludedCountBuffer, ProxyCount);
+		CountBuffer = GPUScene->OcclusionCullPhase2(CommandListRef, targets, ViewMatrix, ProjectionMatrix, OccludedCountBuffer, ProxyCount);
 		CommandListRef->copyBuffer(Phase2NonOccludedCountBuffer, 0, CountBuffer, 0, sizeof(uint32_t));
 		//draw phase 2 onto gbuffer
 		DrawAllInstances(GPUScene, CountBuffer, ProxyCount, sceneInfo, debugInfo, targets);
 		//build hzb for next frame
-		GPUScene->BuildHZB(CommandListRef, targets);
+		if (!debugInfo.bFreezeFrustumCulling)
+			GPUScene->BuildHZB(CommandListRef, targets);
 	}
 	CommandListRef->endMarker();
 }

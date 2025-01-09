@@ -32,7 +32,7 @@ void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo, ragdoll:
 	RD_GPU_SCOPE("XeGTAO", CommandListRef);
 
 	CommandListRef->beginMarker("XeGTAO");
-	UpdateConstants(targets->CurrDepthBuffer->getDesc().width, targets->CurrDepthBuffer->getDesc().height, sceneInfo.InfiniteReverseZProj, sceneInfo);
+	UpdateConstants(targets->CurrDepthBuffer->getDesc().width, targets->CurrDepthBuffer->getDesc().height, sceneInfo.MainCameraProj, sceneInfo);
 	//cbuffer shared amongst all
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(XeGTAO::GTAOConstants), "XeGTAO CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);

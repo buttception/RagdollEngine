@@ -19,7 +19,8 @@
 
 cbuffer g_Const : register(b0)
 {
-    float4x4 ViewProjectionMatrix;
+    float4x4 ViewMatrix;
+    float4x4 ProjectionMatrix;
     float4 FrustumPlanes[6];
     uint MipBaseWidth;
     uint MipBaseHeight;
@@ -105,107 +106,107 @@ void FrustumCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, 
     DrawIndexedIndirectArgsOutput[Index].startInstanceLocation = Index;
 }
 
+// 2D Polyhedral Bounds of a Clipped, Perspective-Projected 3D Sphere. Michael Mara, Morgan McGuire. 2013
+bool projectSphereView(float3 c, float r, float znear, float P00, float P11, out float4 aabb)
+{
+    if (c.z < r + znear)
+        return false;
+
+    float3 cr = c * r;
+    float czr2 = c.z * c.z - r * r;
+
+    float vx = sqrt(c.x * c.x + czr2);
+    float minx = (vx * c.x - cr.z) / (vx * c.z + cr.x);
+    float maxx = (vx * c.x + cr.z) / (vx * c.z - cr.x);
+
+    float vy = sqrt(c.y * c.y + czr2);
+    float miny = (vy * c.y - cr.z) / (vy * c.z + cr.y);
+    float maxy = (vy * c.y + cr.z) / (vy * c.z - cr.y);
+
+    aabb = float4(minx * P00, miny * P11, maxx * P00, maxy * P11);
+    // clip space -> uv space
+    aabb = aabb.xyzw * float4(0.5f, -0.5f, 0.5f, -0.5f) + float4(0.5f, 0.5f, 0.5f, 0.5f);
+
+    return true;
+}
+
 [numthreads(64, 1, 1)]
 void OcclusionCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, uint3 GTid : SV_GroupThreadID)
 {
+    if (DTid.x >= InstanceVisibleCountOutput[0])
+    {
+        return;
+    }
     //go through all the instances in the instance id buffer and test occlusion
     uint InstanceId;
+    float4x4 Transform;
     if (Flags & IS_PHASE_1)
     {
-        if (DTid.x >= InstanceVisibleCountOutput[0])
-        {
-            return;
-        }
         InstanceId = InstanceIdBufferOutput[DTid.x];
+        Transform = InstanceDataInput[InstanceId].PrevModelToWorld;
     }
     else
     {
-        if (DTid.x >= OccludedCountBufferOutput[0])
-        {
-            return;
-        }
         InstanceId = OccludedInstanceIdBufferOutput[DTid.x];
+        Transform = InstanceDataInput[InstanceId].ModelToWorld;
     }
     FInstanceData InstanceData = InstanceDataInput[InstanceId];
     //each thread will cull 1 proxy
     float3 Center = MeshDataInput[InstanceData.MeshIndex].Center;
     float3 Extents = MeshDataInput[InstanceData.MeshIndex].Extents;
-    float3 Corners[8] =
+    //get transformed r
+    float3 ScaleX = Transform[0].xyz;
+    float3 ScaleY = Transform[1].xyz;
+    float3 ScaleZ = Transform[2].xyz;
+    float Scale = max(max(length(ScaleX), length(ScaleY)), length(ScaleZ));
+    float Radius = length(Extents) * Scale;
+    //calculate the closest possible position of the sphere in viewspace
+    float3 PositionInWorld = mul(float4(Center, 1.f), Transform).xyz;
+    float3 ViewSpacePosition = mul(float4(PositionInWorld, 1.f), ViewMatrix).xyz;
+    float3 ClosestViewSpacePoint = ViewSpacePosition - float3(0.f, 0.f, Radius);
+    
+    bool Occluded = true;
+    //determine mip map level by getting projected bounds first
+    float4 aabb = float4(0.f, 0.f, 0.f, 0.f);
+    bool Valid = projectSphereView(ViewSpacePosition, Radius, ProjectionMatrix[3].z, ProjectionMatrix[0].x, ProjectionMatrix[1].y, aabb);
+    float mip = -1.f;
+    if (!Valid)
     {
-        Center + float3(-Extents.x, -Extents.y, -Extents.z),
-        Center + float3(-Extents.x, -Extents.y, Extents.z),
-        Center + float3(-Extents.x, Extents.y, -Extents.z),
-        Center + float3(-Extents.x, Extents.y, Extents.z),
-        Center + float3(Extents.x, -Extents.y, -Extents.z),
-        Center + float3(Extents.x, -Extents.y, Extents.z),
-        Center + float3(Extents.x, Extents.y, -Extents.z),
-        Center + float3(Extents.x, Extents.y, Extents.z)
-    };
-    //transform the corners into clipspace and to viewport space [0,1]
-    [unroll]
-    for (int i = 0; i < 8; ++i)
-    {
-        if (Flags & PREVIOUS_FRAME_ENABLED)
-            Corners[i] = mul(float4(Corners[i], 1.f), InstanceData.PrevModelToWorld).xyz;
-        else
-            Corners[i] = mul(float4(Corners[i], 1.f), InstanceData.ModelToWorld).xyz;
-        float4 ClipPosition = mul(float4(Corners[i], 1.f), ViewProjectionMatrix);
-        Corners[i] = ClipPosition.xyz / ClipPosition.w;
-        Corners[i].xy = clamp(Corners[i].xy, float2(-1.f, -1.f), float2(1.f, 1.f));
-        Corners[i].xy = ScreenPosToViewportUV(Corners[i].xy);
-        
+        //if invalid, point is behind the near plane, just accpet as not occluded
+        Occluded = false;
     }
-    float2 maxXY = float2(0.f, 0.f);
-    float2 minXY = float2(1.f, 1.f);
-    //get max z in reverse z as larger z value is closer to camera
-    float maxZ = 0.f;
-    //get the min max of the aabb box
-    [unroll]
-    for (int i = 0; i < 8; ++i)
+    else
     {
-        minXY = min(minXY, Corners[i].xy);
-        maxXY = max(maxXY, Corners[i].xy);
-        maxZ = saturate(max(maxZ, Corners[i].z));
+        //get the position in clip space
+        float4 ClipPosition = mul(float4(ClosestViewSpacePoint, 1.f), ProjectionMatrix);
+        ClipPosition.xyz /= ClipPosition.w;
+        //clamp texcoord
+        aabb = clamp(aabb, float4(0.f, 0.f, 0.f, 0.f), float4(1.f, 1.f, 1.f, 1.f));
+        //calculate hi-Z buffer mip
+        int2 size = (aabb.xy - aabb.zw) * float2(MipBaseWidth, MipBaseHeight);
+        mip = ceil(log2(max(size.x, size.y)));
+ 
+        //load depths from high z buffer
+        float4 depth =
+        {
+            HZBMips.SampleLevel(SamplerPoint, aabb.xy, mip),
+            HZBMips.SampleLevel(SamplerPoint, aabb.zy, mip),
+            HZBMips.SampleLevel(SamplerPoint, aabb.xw, mip),
+            HZBMips.SampleLevel(SamplerPoint, aabb.zw, mip)
+        };
+        //find the min depth, smaller means further away
+        float minDepth = min(min(min(depth.x, depth.y), depth.z), depth.w);
+        //reverse z, smaller means closer to far plane, meaning likely behind
+        Occluded = ClipPosition.z < minDepth;
+        DebugBuffer[DTid.x] = mip + ClipPosition.z;
     }
-    float4 boxUVs = float4(minXY, maxXY);
-    //calculate hi-Z buffer mip
-    int2 size = (maxXY - minXY) * float2(MipBaseWidth, MipBaseHeight);
-    float mip = floor(log2(max(size.x, size.y)));
- 
-    //mip = clamp(mip, 0, MipLevels);
- 
-    //// Texel footprint for the lower (finer-grained) level
-    //float level_lower = max(mip - 1, 0);
-    //float2 scale = exp2(-level_lower);
-    //float2 a = floor(boxUVs.xy * scale);
-    //float2 b = ceil(boxUVs.zw * scale);
-    //float2 dims = b - a;
- 
-    //// Use the lower level if we only touch <= 2 texels in both dimensions
-    //if (dims.x <= 2 && dims.y <= 2)
-    //    mip = level_lower;
- 
-    //load depths from high z buffer
-    float4 depth =
-    {
-        HZBMips.SampleLevel(SamplerPoint, boxUVs.xy, mip),
-        HZBMips.SampleLevel(SamplerPoint, boxUVs.zy, mip),
-        HZBMips.SampleLevel(SamplerPoint, boxUVs.xw, mip),
-        HZBMips.SampleLevel(SamplerPoint, boxUVs.zw, mip)
-    };
-    //find the min depth, smaller means further away
-    float minDepth = min(min(min(depth.x, depth.y), depth.z), depth.w);
-    //reverse z, smaller means closer to far plane, meaning likely behind
-    bool Occluded = maxZ < minDepth;
  
     if (Occluded)
     {
         //if fail, place into failed buffer
         uint Index;
         InterlockedAdd(OccludedCountBufferOutput[0], 1, Index);
-        //TODO: potential racing issue where threads have not read the id yet
         OccludedInstanceIdBufferOutput[Index] = InstanceId;
-        DebugBuffer[Index] = mip + maxZ;
     }
     else
     {
@@ -223,5 +224,4 @@ void OcclusionCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex
         DrawIndexedIndirectArgsOutput[Index].instanceCount = 1;
         DrawIndexedIndirectArgsOutput[Index].startInstanceLocation = Index;
     }
-    
 }

@@ -112,8 +112,10 @@ namespace ragdoll {
 		Matrix MainCameraViewProj;
 		Matrix MainCameraViewProjWithAA;
 		Matrix PrevMainCameraViewProj;
-		Matrix InfiniteReverseZProj;
+		Matrix MainCameraProj;
 		Matrix MainCameraView;
+		Matrix PrevMainCameraProj;
+		Matrix PrevMainCameraView;
 		CascadeInfo CascadeInfos[4];
 		Vector3 MainCameraPosition;
 		DirectX::BoundingBox SceneBounds;

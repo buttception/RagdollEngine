@@ -27,7 +27,8 @@
 
 struct FConstantBuffer
 {
-	Matrix ViewProjectionMatrix{};
+	Matrix ViewMatrix{};
+	Matrix ProjectionMatrix{};
 	Vector4 FrustumPlanes[6]{};
 	uint32_t MipBaseWidth;
 	uint32_t MipBaseHeight;
@@ -290,8 +291,9 @@ nvrhi::BufferHandle ragdoll::FGPUScene::FrustumCull(nvrhi::CommandListHandle Com
 
 void ragdoll::FGPUScene::OcclusionCullPhase1(
 	nvrhi::CommandListHandle CommandList,
-	const SceneInformation& SceneInfo,
 	SceneRenderTargets* Targets,
+	Matrix ViewMatrix,
+	Matrix ProjectionMatrix,
 	nvrhi::BufferHandle FrustumVisibleCountBuffer,
 	nvrhi::BufferHandle& PassedOcclusionCountOutput,
 	nvrhi::BufferHandle& FailedOcclusionCountOutput,
@@ -301,7 +303,8 @@ void ragdoll::FGPUScene::OcclusionCullPhase1(
 	RD_SCOPE(Culling, Occlusion Culling);
 	CommandList->beginMarker("Occlusion Cull Phase 1");
 	FConstantBuffer ConstantBuffer;
-	ConstantBuffer.ViewProjectionMatrix = SceneInfo.PrevMainCameraViewProj;
+	ConstantBuffer.ViewMatrix = ViewMatrix;
+	ConstantBuffer.ProjectionMatrix = ProjectionMatrix;
 	ConstantBuffer.Flags |= PREVIOUS_FRAME_ENABLED | IS_PHASE_1;
 	ConstantBuffer.MipBaseWidth = Targets->HZBMips->getDesc().width;
 	ConstantBuffer.MipBaseHeight = Targets->HZBMips->getDesc().height;
@@ -353,12 +356,19 @@ void ragdoll::FGPUScene::OcclusionCullPhase1(
 	CommandList->endMarker();
 }
 
-nvrhi::BufferHandle ragdoll::FGPUScene::OcclusionCullPhase2(nvrhi::CommandListHandle CommandList, const SceneInformation& SceneInfo, SceneRenderTargets* Targets, nvrhi::BufferHandle Phase1OccludedCountBuffer, uint32_t ProxyCount)
+nvrhi::BufferHandle ragdoll::FGPUScene::OcclusionCullPhase2(
+	nvrhi::CommandListHandle CommandList,
+	SceneRenderTargets* Targets,
+	Matrix ViewMatrix,
+	Matrix ProjectionMatrix,
+	nvrhi::BufferHandle Phase1OccludedCountBuffer,
+	uint32_t ProxyCount)
 {
 	RD_SCOPE(Culling, Instance Culling);
 	CommandList->beginMarker("Occlusion Cull Phase 2");
 	FConstantBuffer ConstantBuffer;
-	ConstantBuffer.ViewProjectionMatrix = SceneInfo.MainCameraViewProj;
+	ConstantBuffer.ViewMatrix = ViewMatrix;
+	ConstantBuffer.ProjectionMatrix = ProjectionMatrix;
 	ConstantBuffer.Flags = 0;
 	ConstantBuffer.MipBaseWidth = Targets->HZBMips->getDesc().width;
 	ConstantBuffer.MipBaseHeight = Targets->HZBMips->getDesc().height;

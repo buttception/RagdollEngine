@@ -106,7 +106,7 @@ void ragdoll::Scene::Update(float _dt)
 
 		PhaseIndex = ++PhaseIndex == TotalPhaseCount ? 0 : PhaseIndex;
 		//jitter the projection
-		Matrix Proj = SceneInfo.InfiniteReverseZProj;
+		Matrix Proj = SceneInfo.MainCameraProj;
 		if (SceneInfo.bEnableJitter)
 		{
 			Proj.m[2][0] += JitterOffsetsX[PhaseIndex] / (double)SceneInfo.RenderWidth;
@@ -743,7 +743,7 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 		if(DebugInfo.bFreezeFrustumCulling)
 			GPUScene->ExtractFrustumPlanes(Planes, DebugInfo.FrozenProjection, DebugInfo.FrozenView);
 		else
-			GPUScene->ExtractFrustumPlanes(Planes, SceneInfo.InfiniteReverseZProj, SceneInfo.MainCameraView);
+			GPUScene->ExtractFrustumPlanes(Planes, SceneInfo.MainCameraProj, SceneInfo.MainCameraView);
 		for (int i = 0; i < 5; ++i)
 		{
 			InstanceData debugData;;
