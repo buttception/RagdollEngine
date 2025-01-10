@@ -3,14 +3,12 @@ cbuffer g_Const : register(b0)
 {
     uint Width;
     uint Height;
-    float FilterRadius;
-    float BloomIntensity;
 };
 
 Texture2D Source : register(t0);
 sampler Sampler : register(s0);
 
-void main_ps(
+void downsample_ps(
 	in float4 inPos : SV_Position,
 	in float2 inTexcoord : TEXCOORD0,
 	out float3 outColor : SV_Target0
@@ -61,4 +59,38 @@ void main_ps(
     outColor += (a+c+g+i)*0.03125;
     outColor += (b+d+f+h)*0.0625;
     outColor += (j+k+l+m)*0.125;
+}
+
+
+cbuffer g_Const : register(b0)
+{
+    uint OutputWidth;
+    uint OutputHeight;
+    uint MipLevel;
+};
+
+#define MAX_HZB_MIP_COUNT 16
+RWTexture2D<float> Mips[MAX_HZB_MIP_COUNT] : register(u0);
+
+[numthreads(8, 8, 1)]
+void DownSamplePoTCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, uint3 GTid : SV_GroupThreadID)
+{
+    if (all(DTid.xy < float2(OutputWidth, OutputHeight)))
+    {
+        float4 depths;
+        if (MipLevel == 0)
+        {
+            depths = Source.Gather(Sampler, (DTid.xy + 0.5) / float2(OutputWidth, OutputHeight));
+        }
+        else
+        {
+            depths.x = Mips[MipLevel - 1].Load(int3(DTid.xy * 2 + int2(0, 0), 0));
+            depths.y = Mips[MipLevel - 1].Load(int3(DTid.xy * 2 + int2(1, 0), 0));
+            depths.z = Mips[MipLevel - 1].Load(int3(DTid.xy * 2 + int2(0, 1), 0));
+            depths.w = Mips[MipLevel - 1].Load(int3(DTid.xy * 2 + int2(1, 1), 0));
+        }
+ 
+        //find and return min depth, smaller is further
+        Mips[MipLevel][DTid.xy] = min(min(depths.x, depths.y), min(depths.z, depths.w));
+    }
 }

@@ -106,7 +106,7 @@ void ragdoll::Scene::Update(float _dt)
 
 		PhaseIndex = ++PhaseIndex == TotalPhaseCount ? 0 : PhaseIndex;
 		//jitter the projection
-		Matrix Proj = SceneInfo.InfiniteReverseZProj;
+		Matrix Proj = SceneInfo.MainCameraProj;
 		if (SceneInfo.bEnableJitter)
 		{
 			Proj.m[2][0] += JitterOffsetsX[PhaseIndex] / (double)SceneInfo.RenderWidth;
@@ -144,6 +144,7 @@ void ragdoll::Scene::Update(float _dt)
 
 	SceneInfo.bIsResolutionDirty = false;
 	SceneInfo.bIsCameraDirty = false;
+	DebugInfo.TotalProxyCount = StaticProxies.size();
 }
 
 void ragdoll::Scene::Shutdown()
@@ -279,6 +280,26 @@ void ragdoll::Scene::CreateRenderTargets()
 		depthBufferDesc.debugName = "ShadowMap" + std::to_string(i);
 		RenderTargets.ShadowMap[i] = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
 	}
+
+	depthBufferDesc = nvrhi::TextureDesc();
+	depthBufferDesc.width = depthBufferDesc.height = 1;
+	int MaxIterations = 32, Iterations = 1;
+	while (depthBufferDesc.width < SceneInfo.RenderWidth && Iterations++ < MaxIterations)
+		depthBufferDesc.width <<= 1;
+	Iterations = 0;
+	while (depthBufferDesc.height < SceneInfo.RenderHeight && Iterations++ < MaxIterations)
+		depthBufferDesc.height <<= 1;
+	depthBufferDesc.width >>= 1;
+	depthBufferDesc.height >>= 1;
+	depthBufferDesc.format = nvrhi::Format::D32;
+	depthBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	depthBufferDesc.isUAV = true;
+	depthBufferDesc.keepInitialState = true;
+	depthBufferDesc.debugName = "HZB";
+	depthBufferDesc.dimension = nvrhi::TextureDimension::Texture2DArray;
+	depthBufferDesc.arraySize = 1;
+	depthBufferDesc.mipLevels = log2(std::max(depthBufferDesc.width, depthBufferDesc.height)) + 1;
+	RenderTargets.HZBMips = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
 
 	nvrhi::TextureDesc texDesc;
 	texDesc.width = SceneInfo.RenderWidth;
@@ -722,7 +743,7 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 		if(DebugInfo.bFreezeFrustumCulling)
 			GPUScene->ExtractFrustumPlanes(Planes, DebugInfo.FrozenProjection, DebugInfo.FrozenView);
 		else
-			GPUScene->ExtractFrustumPlanes(Planes, SceneInfo.InfiniteReverseZProj, SceneInfo.MainCameraView);
+			GPUScene->ExtractFrustumPlanes(Planes, SceneInfo.MainCameraProj, SceneInfo.MainCameraView);
 		for (int i = 0; i < 5; ++i)
 		{
 			InstanceData debugData;;
@@ -775,10 +796,9 @@ void ragdoll::Scene::UpdateShadowCascadesExtents()
 	//for each subfrusta
 	for (int i = 1; i < 5; ++i)
 	{
-		//create the subfrusta
+		//create the subfrusta in view space
 		DirectX::BoundingFrustum frustum;
-		//no need to be reverse z
-		Matrix proj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(SceneInfo.CameraFov), SceneInfo.CameraAspect, SubfrustaFarPlanes[i-1], SubfrustaFarPlanes[i]);
+		Matrix proj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(SceneInfo.CameraFov / 2.f), SceneInfo.CameraAspect, SubfrustaFarPlanes[i-1], SubfrustaFarPlanes[i]);
 		DirectX::BoundingFrustum::CreateFromMatrix(frustum, proj);
 		//move the frustum to world space
 		frustum.Transform(frustum, SceneInfo.MainCameraView.Invert());
@@ -806,12 +826,12 @@ void ragdoll::Scene::UpdateShadowCascadesExtents()
 		//get the furthest extents of the corners for the left right top and bottom values
 		Vector3 min = { FLT_MAX, FLT_MAX, FLT_MAX };
 		Vector3 max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+		//bring the frustum back from world to light space
+		frustum.Transform(frustum, lightViewProj);
+		frustum.GetCorners(corners);
 		for (int j = 0; j < 8; ++j) {
-			//bring into lightspace
-			corners[j] = Vector3::Transform(corners[j], lightViewProj);
-			min.x = std::min(min.x, corners[j].x); max.x = std::max(max.x, corners[j].x);
-			min.y = std::min(min.y, corners[j].y); max.y = std::max(max.y, corners[j].y);
-			min.z = std::min(min.z, corners[j].z); max.z = std::max(max.z, corners[j].z);
+			max = DirectX::XMVectorMax(max, corners[j]);
+			min = DirectX::XMVectorMin(min, corners[j]);
 		}
 		//get largest width or height to make ortho a square
 		float x = max.x - min.x;
@@ -819,6 +839,21 @@ void ragdoll::Scene::UpdateShadowCascadesExtents()
 		float length = x < y ? y : x;
 		SceneInfo.CascadeInfos[i - 1].center = center;
 		SceneInfo.CascadeInfos[i - 1].width = SceneInfo.CascadeInfos[i - 1].height = length;
+
+		//transform the scene bound into the light view space, to get the near and far planes
+		DirectX::BoundingBox sceneBound = SceneInfo.SceneBounds;
+		sceneBound.Transform(sceneBound, SceneInfo.CascadeInfos[i - 1].view);
+		Vector3 sceneCorners[8];
+		sceneBound.GetCorners(sceneCorners);
+		min = { FLT_MAX, FLT_MAX, FLT_MAX };
+		max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+		for (int j = 0; j < 8; ++j)
+		{
+			max = DirectX::XMVectorMax(max, sceneCorners[j]);
+			min = DirectX::XMVectorMin(min, sceneCorners[j]);
+		}
+		SceneInfo.CascadeInfos[i - 1].farZ = max.z;
+		SceneInfo.CascadeInfos[i - 1].nearZ = min.z;
 	}
 }
 
@@ -933,6 +968,7 @@ void ragdoll::Scene::UpdateTransform(TransformComp& comp, const Guid& guid)
 	}
 	else
 		m_ModelStack.push(comp.m_ModelToWorld);	//if not dirty, just push the current model matrix
+
 	//traverse children
 	if (comp.m_Child)
 		TraverseNode(comp.m_Child);

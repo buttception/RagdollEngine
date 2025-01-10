@@ -58,7 +58,7 @@
         },
         {
           "Id": "0c8dea10-8fbc-49af-8798-6752f86035c4",
-          "Command": "--scene \"other_gltf\\FlyingWorld\\FlyingWorld-BattleOfTheTrashGod_Optimized.gltf\""
+          "Command": "--scene \"other_gltf\\dust2\\scene.gltf\""
         },
         {
           "Id": "04de94b4-d96a-4eaa-91b5-722dccd7ad96",

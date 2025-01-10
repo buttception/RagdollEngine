@@ -29,7 +29,7 @@ void ShadowPass::DrawAllInstances(
 	RD_GPU_SCOPE("ShadowPass", CommandListRef[CascadeIndex]);
 	CommandListRef[CascadeIndex]->beginMarker(("Directional Light Shadow Pass" + std::to_string(CascadeIndex)).c_str());
 	ragdoll::CascadeInfo CascadeInfo = sceneInfo.CascadeInfos[CascadeIndex];
-	GPUScene->InstanceCull(CommandListRef[CascadeIndex], CascadeInfo.proj, CascadeInfo.view, ProxyCount, false);
+	nvrhi::BufferHandle CountBuffer = GPUScene->FrustumCull(CommandListRef[CascadeIndex], CascadeInfo.proj, CascadeInfo.view, ProxyCount, false);
 
 	nvrhi::FramebufferDesc desc = nvrhi::FramebufferDesc()
 		.setDepthAttachment(targets->ShadowMap[CascadeIndex]);
@@ -42,8 +42,6 @@ void ShadowPass::DrawAllInstances(
 	BindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, GPUScene->InstanceBuffer),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(1, GPUScene->InstanceOffsetBuffer),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(2, GPUScene->InstanceIdBuffer),
 	};
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
 	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);
@@ -80,6 +78,6 @@ void ShadowPass::DrawAllInstances(
 
 	CommandListRef[CascadeIndex]->setGraphicsState(state);
 
-	CommandListRef[CascadeIndex]->drawIndexedIndirect(0, AssetManager::GetInstance()->VertexBufferInfos.size());
+	CommandListRef[CascadeIndex]->drawIndexedIndirect(0, CountBuffer, AssetManager::GetInstance()->VertexBufferInfos.size());
 	CommandListRef[CascadeIndex]->endMarker();
 }

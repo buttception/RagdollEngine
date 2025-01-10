@@ -288,6 +288,14 @@ void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
 	Samplers[(int)SamplerTypes::Trilinear_Repeat] = Device->createSampler(samplerDesc);
+	samplerDesc.minFilter = 0;
+	samplerDesc.magFilter = 0;
+	samplerDesc.mipFilter = 0;
+	samplerDesc.addressU = nvrhi::SamplerAddressMode::Clamp;
+	samplerDesc.addressV = nvrhi::SamplerAddressMode::Clamp;
+	samplerDesc.addressW = nvrhi::SamplerAddressMode::Clamp;
+	samplerDesc.reductionType = nvrhi::SamplerReductionType::Minimum;
+	Samplers[(int)SamplerTypes::Point_Clamp_Reduction] = Device->createSampler(samplerDesc);
 
 	samplerDesc.minFilter = 1;
 	samplerDesc.magFilter = 1;

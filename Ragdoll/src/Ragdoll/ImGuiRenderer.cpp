@@ -144,8 +144,19 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		float cameraHeight = 9.f;
 		float cameraSpeed = 5.f;
 		float cameraRotationSpeed = 15.f;
+		//this is for lights
 		Vector2 azimuthAndElevation = { 0.f, 90.f };
 	} data;
+	if (SceneInfo.ActiveCameraIndex == -1)
+	{
+		if (SceneInfo.Cameras.size() > 0)
+		{
+			SceneInfo.ActiveCameraIndex = 0;
+			data.cameraPos = SceneInfo.Cameras[0].Position;
+			data.cameraYaw = SceneInfo.Cameras[0].Rotation.y;
+			data.cameraPitch = SceneInfo.Cameras[0].Rotation.x;
+		}
+	}
 
 	ImGui::Begin("Debug");
 	if (ImGui::Button("Reload Shaders")) {
@@ -159,7 +170,7 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		{"1600x900"},
 		{"1920x1080"}
 	};
-	static int32_t selectedItem{};
+	static int32_t selectedItem{2};
 	if(ImGui::Combo("Resolution", &selectedItem, resolutions, 4))
 	{
 		switch (selectedItem)
@@ -274,6 +285,23 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 
 	if (ImGui::TreeNode("Camera"))
 	{
+		if (SceneInfo.Cameras.size() > 0)
+		{
+			ImGui::Text("Active Camera: %s", SceneInfo.Cameras[SceneInfo.ActiveCameraIndex].Name);
+			if (ImGui::SliderInt("Camera Index", &SceneInfo.ActiveCameraIndex, 0, SceneInfo.Cameras.size() - 1))
+			{
+				if (SceneInfo.Cameras.size() > 0)
+				{
+					data.cameraYaw = SceneInfo.Cameras[SceneInfo.ActiveCameraIndex].Rotation.y;
+					data.cameraPitch = SceneInfo.Cameras[SceneInfo.ActiveCameraIndex].Rotation.x;
+					data.cameraPos = SceneInfo.Cameras[SceneInfo.ActiveCameraIndex].Position;
+					SceneInfo.bIsCameraDirty = true;
+				}
+			}
+		}
+		else
+			ImGui::Text("No Cameras in scene");
+		
 		SceneInfo.bIsCameraDirty = !SceneInfo.bIsCameraDirty ? ImGui::SliderFloat("Camera FOV (Degrees)", &data.cameraFov, 60.f, 120.f) : true;
 		SceneInfo.bIsCameraDirty = !SceneInfo.bIsCameraDirty ? ImGui::SliderFloat("Camera Near", &data.cameraNear, 0.01f, 1.f) : true;
 		SceneInfo.bIsCameraDirty = !SceneInfo.bIsCameraDirty ? ImGui::SliderFloat("Camera Far", &data.cameraFar, 10.f, 10000.f) : true;
@@ -293,7 +321,7 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		{
 			if (DebugInfo.bFreezeFrustumCulling)
 			{
-				DebugInfo.FrozenProjection = SceneInfo.InfiniteReverseZProj;
+				DebugInfo.FrozenProjection = SceneInfo.MainCameraProj;
 				DebugInfo.FrozenCameraPosition = SceneInfo.MainCameraPosition;
 				DebugInfo.FrozenView = SceneInfo.MainCameraView;
 			}
@@ -326,8 +354,10 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 				ImGui::TreePop();
 			}
 		}
-		ImGui::Text("%d octants culled", DebugInfo.CulledOctantsCount);
-		ImGui::Text("%d proxies in octree", Octree::TotalProxies);
+		ImGui::Text("%d total proxies", DebugInfo.TotalProxyCount);
+		ImGui::Text("%d passed frustum test", DebugInfo.PassedFrustumCullCount);
+		ImGui::Text("%d passed occlusion1 test", DebugInfo.PassedOcclusion1CullCount);
+		ImGui::Text("%d passed occlusion2 test", DebugInfo.PassedOcclusion2CullCount);
 		ImGui::TreePop();
 	}
 	ImGui::End();
@@ -392,6 +422,8 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 	SceneInfo.LightDirection.Normalize();
 
 	SceneInfo.PrevMainCameraViewProj = SceneInfo.MainCameraViewProj;
+	SceneInfo.PrevMainCameraView = SceneInfo.MainCameraView;
+	SceneInfo.PrevMainCameraProj = SceneInfo.MainCameraProj;
 	if (SceneInfo.bIsCameraDirty)
 	{
 		SceneInfo.CameraFov = data.cameraFov;
@@ -401,18 +433,18 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 
 		//make a infinite z inverse projection matrix
 		float e = 1 / tanf(DirectX::XMConvertToRadians(data.cameraFov) / 2.f);
-		SceneInfo.InfiniteReverseZProj._11 = e;
-		SceneInfo.InfiniteReverseZProj._22 = e * (data.cameraWidth / data.cameraHeight);
-		SceneInfo.InfiniteReverseZProj._33 = 0.f;
-		SceneInfo.InfiniteReverseZProj._44 = 0.f;
-		SceneInfo.InfiniteReverseZProj._43 = data.cameraNear;
-		SceneInfo.InfiniteReverseZProj._34 = 1.f;
+		SceneInfo.MainCameraProj._11 = e;
+		SceneInfo.MainCameraProj._22 = e * (data.cameraWidth / data.cameraHeight);
+		SceneInfo.MainCameraProj._33 = 0.f;
+		SceneInfo.MainCameraProj._44 = 0.f;
+		SceneInfo.MainCameraProj._43 = data.cameraNear;
+		SceneInfo.MainCameraProj._34 = 1.f;
 
 		CameraProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraWidth / data.cameraHeight, data.cameraNear, data.cameraFar);
 
 		SceneInfo.MainCameraView = DirectX::XMMatrixLookAtLH(data.cameraPos, data.cameraPos + data.cameraDir, Vector3(0.f, 1.f, 0.f));
 		CameraView = SceneInfo.MainCameraView;
-		SceneInfo.MainCameraViewProj = SceneInfo.MainCameraView * SceneInfo.InfiniteReverseZProj;
+		SceneInfo.MainCameraViewProj = SceneInfo.MainCameraView * SceneInfo.MainCameraProj;
 		CameraViewProjection = SceneInfo.MainCameraViewProj;
 		SceneInfo.MainCameraPosition = data.cameraPos;
 	}

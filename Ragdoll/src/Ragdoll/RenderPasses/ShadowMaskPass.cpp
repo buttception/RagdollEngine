@@ -11,8 +11,6 @@
 void ShadowMaskPass::Init(nvrhi::CommandListHandle cmdList)
 {
 	CommandListRef = cmdList;
-
-
 }
 
 void ShadowMaskPass::DrawShadowMask(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets)
@@ -30,7 +28,7 @@ void ShadowMaskPass::DrawShadowMask(const ragdoll::SceneInformation& sceneInfo, 
 		CBuffer.LightViewProj[i] = sceneInfo.CascadeInfos[i].viewProj;
 	}
 	CBuffer.InvViewProj = sceneInfo.MainCameraViewProj.Invert();
-	CBuffer.View = sceneInfo.MainCameraView;
+	CBuffer.View = sceneInfo.MainCameraView.Invert();
 	CBuffer.EnableCascadeDebug = sceneInfo.EnableCascadeDebug;
 
 	nvrhi::BindingSetDesc bindingSetDesc;

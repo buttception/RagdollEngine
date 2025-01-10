@@ -37,6 +37,7 @@ float2 ViewportUVToScreenPos(float2 ViewportUV)
 	return float2(2 * ViewportUV.x - 1, 1 - 2 * ViewportUV.y);
 }
 
+//screenpos but should be ndc, lifted from unreal
 float2 ScreenPosToViewportUV(float2 ScreenPos)
 {
 	return float2(0.5 + 0.5 * ScreenPos.x, 0.5 - 0.5 * ScreenPos.y);

@@ -40,6 +40,7 @@ namespace ragdoll {
 		Matrix PrevWorldMatrix;
 
 		Vector4 Color = Vector4::One;
+		uint32_t MeshIndex;
 		float Roughness = 0.f;
 		float Metallic = 0.f;
 
@@ -86,6 +87,10 @@ namespace ragdoll {
 		Matrix FrozenView;
 		Vector3 FrozenCameraPosition;
 		bool bShowFrustum{ false };
+		uint32_t TotalProxyCount;
+		uint32_t PassedFrustumCullCount{};
+		uint32_t PassedOcclusion1CullCount{};
+		uint32_t PassedOcclusion2CullCount{};
 	};
 
 	struct SceneConfig {
@@ -103,14 +108,26 @@ namespace ragdoll {
 		float width, height, nearZ{ -10.f }, farZ{ 10.f };
 	};
 
+	struct SceneCamera
+	{
+		std::string Name;
+		Vector3 Position;
+		Vector3 Rotation;
+	};
+
 	struct SceneInformation {
+		std::vector<SceneCamera> Cameras;
+		int32_t ActiveCameraIndex{ -1 };
 		Matrix MainCameraViewProj;
 		Matrix MainCameraViewProjWithAA;
 		Matrix PrevMainCameraViewProj;
-		Matrix InfiniteReverseZProj;
+		Matrix MainCameraProj;
 		Matrix MainCameraView;
+		Matrix PrevMainCameraProj;
+		Matrix PrevMainCameraView;
 		CascadeInfo CascadeInfos[4];
 		Vector3 MainCameraPosition;
+		DirectX::BoundingBox SceneBounds;
 		Vector4 LightDiffuseColor = { 1.f, 1.f, 1.f, 1.f };
 		Vector4 SceneAmbientColor = { 0.2f, 0.2f, 0.2f, 1.f };
 		Vector3 LightDirection = { 1.f, -1.f, 1.f };
@@ -136,8 +153,8 @@ namespace ragdoll {
 		bool bResetAccumulation{ true };
 		bool bEnableJitter{ true };
 		bool bEnableXeGTAONoise{ true };
-		uint32_t RenderWidth = 960;
-		uint32_t RenderHeight = 540;
+		uint32_t RenderWidth = 1600;
+		uint32_t RenderHeight = 900;
 		uint32_t TargetWidth;
 		uint32_t TargetHeight;
 		float JitterX;
@@ -156,6 +173,7 @@ namespace ragdoll {
 		nvrhi::TextureHandle GBufferNormal;
 		nvrhi::TextureHandle GBufferRM;
 		nvrhi::TextureHandle VelocityBuffer;
+		nvrhi::TextureHandle HZBMips;
 		//TAA / fsr
 		nvrhi::TextureHandle TemporalColor0;	//temporal buffer
 		nvrhi::TextureHandle TemporalColor1;	//temporal buffer
@@ -249,7 +267,7 @@ namespace ragdoll {
 
 		SceneRenderTargets RenderTargets;
 		//distance where the subfrusta are seperated
-		const float SubfrustaFarPlanes[5] = { 0.001f, 5.f, 10.f, 15.f, 30.f };
+		const float SubfrustaFarPlanes[5] = { 0.001f, 10.f, 25.f, 50.f, 100.f };
 
 		Scene(Application*);
 
