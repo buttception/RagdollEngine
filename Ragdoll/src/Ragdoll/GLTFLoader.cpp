@@ -49,10 +49,6 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndice
 	//create the entity
 	entt::entity ent = em->CreateEntity();
 	ragdoll::Guid currId = em->GetGuid(ent);
-	if (curr.mesh >= 0) {
-		RenderableComp* renderableComp = em->AddComponent<RenderableComp>(ent);
-		renderableComp->meshIndex = curr.mesh + meshIndicesOffset;
-	}
 
 	TransformComp* transComp = em->AddComponent<TransformComp>(ent);
 	transComp->glTFId = currIndex;
@@ -79,6 +75,26 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndice
 			transComp->m_LocalRotation = { (float)curr.rotation[0], (float)curr.rotation[1], (float)curr.rotation[2], (float)curr.rotation[3] };
 		if (curr.scale.size() > 0)
 			transComp->m_LocalScale = { (float)curr.scale[0], (float)curr.scale[1], (float)curr.scale[2] };
+	}
+
+	if (curr.mesh >= 0) {
+		RenderableComp* renderableComp = em->AddComponent<RenderableComp>(ent);
+		renderableComp->meshIndex = curr.mesh + meshIndicesOffset;
+	}
+	else
+	{
+		//if there is no mesh, there is a chance it is camera
+		for (ragdoll::SceneCamera& SceneCamera : scene->SceneInfo.Cameras)
+		{
+			if (SceneCamera.Name == curr.name)
+			{
+				SceneCamera.Position = transComp->m_LocalPosition;
+				SceneCamera.Rotation = transComp->m_LocalRotation.ToEuler();
+				SceneCamera.Rotation.y += DirectX::XM_PI;
+				SceneCamera.Rotation.x = -SceneCamera.Rotation.x;
+				break;
+			}
+		}
 	}
 
 	const tinygltf::Node& parent = model.nodes[currIndex];
@@ -120,6 +136,16 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 		RD_SCOPE(Load, Load GLTF File);
 		bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, path.string());
 		RD_ASSERT(ret == false, "Issue loading {}", path.string());
+	}
+
+	{
+		//need to add cameras first with name, so when i load the node it can be assigned
+		RD_SCOPE(Load, Load Cameras);
+		SceneRef->SceneInfo.Cameras.clear();
+		for (const tinygltf::Camera& itCam : model.cameras)
+		{
+			SceneRef->SceneInfo.Cameras.push_back({ itCam.name });
+		}
 	}
 
 	uint32_t meshIndicesOffset = static_cast<uint32_t>(AssetManager::GetInstance()->Meshes.size());
@@ -610,7 +636,7 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 	{
 		RD_SCOPE(Load, Creating Hierarchy);
 		//create all the entities and their components
-		for (const int& rootIndex : model.scenes[0].nodes) {	//iterating through the root nodes
+		for (const int& rootIndex : model.scenes[0].nodes) {	//iterating through the all nodes
 			TraverseNode(rootIndex, 0, meshIndicesOffset, model, EntityManagerRef, SceneRef);
 		}
 		SceneRef->UpdateTransforms();

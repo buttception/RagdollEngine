@@ -84,6 +84,7 @@ void GBufferPass::DrawAllInstances(
 	const ragdoll::DebugInfo& debugInfo,
 	ragdoll::SceneRenderTargets* targets)
 {
+	RD_SCOPE(Render, Draw All Instances)
 	CommandListRef->beginMarker("Instance Draws");
 	//create a constant buffer here
 	nvrhi::BufferDesc ConstantBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "GBufferPass CBuffer", 1);

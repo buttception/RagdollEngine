@@ -300,7 +300,7 @@ void ragdoll::FGPUScene::OcclusionCullPhase1(
 	uint32_t ProxyCount
 )
 {
-	RD_SCOPE(Culling, Occlusion Culling);
+	RD_SCOPE(Culling, Occlusion Cull Phase 1);
 	CommandList->beginMarker("Occlusion Cull Phase 1");
 	FConstantBuffer ConstantBuffer;
 	ConstantBuffer.ViewMatrix = ViewMatrix;
@@ -364,7 +364,7 @@ nvrhi::BufferHandle ragdoll::FGPUScene::OcclusionCullPhase2(
 	nvrhi::BufferHandle Phase1OccludedCountBuffer,
 	uint32_t ProxyCount)
 {
-	RD_SCOPE(Culling, Instance Culling);
+	RD_SCOPE(Culling, Occlusion Cull Phase 2);
 	CommandList->beginMarker("Occlusion Cull Phase 2");
 	FConstantBuffer ConstantBuffer;
 	ConstantBuffer.ViewMatrix = ViewMatrix;

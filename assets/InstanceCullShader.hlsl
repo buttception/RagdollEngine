@@ -158,6 +158,9 @@ void OcclusionCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex
     float3 ScaleX = Transform[0].xyz;
     float3 ScaleY = Transform[1].xyz;
     float3 ScaleZ = Transform[2].xyz;
+    //float3 ScaleX = float3(Transform[0].x, Transform[1].x, Transform[2].x);
+    //float3 ScaleY = float3(Transform[0].y, Transform[1].y, Transform[2].y);
+    //float3 ScaleZ = float3(Transform[0].z, Transform[1].z, Transform[2].z);
     float Scale = max(max(length(ScaleX), length(ScaleY)), length(ScaleZ));
     float Radius = length(Extents) * Scale;
     //calculate the closest possible position of the sphere in viewspace

@@ -108,7 +108,16 @@ namespace ragdoll {
 		float width, height, nearZ{ -10.f }, farZ{ 10.f };
 	};
 
+	struct SceneCamera
+	{
+		std::string Name;
+		Vector3 Position;
+		Vector3 Rotation;
+	};
+
 	struct SceneInformation {
+		std::vector<SceneCamera> Cameras;
+		int32_t ActiveCameraIndex{ -1 };
 		Matrix MainCameraViewProj;
 		Matrix MainCameraViewProjWithAA;
 		Matrix PrevMainCameraViewProj;
@@ -144,8 +153,8 @@ namespace ragdoll {
 		bool bResetAccumulation{ true };
 		bool bEnableJitter{ true };
 		bool bEnableXeGTAONoise{ true };
-		uint32_t RenderWidth = 960;
-		uint32_t RenderHeight = 540;
+		uint32_t RenderWidth = 1600;
+		uint32_t RenderHeight = 900;
 		uint32_t TargetWidth;
 		uint32_t TargetHeight;
 		float JitterX;

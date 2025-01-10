@@ -968,6 +968,7 @@ void ragdoll::Scene::UpdateTransform(TransformComp& comp, const Guid& guid)
 	}
 	else
 		m_ModelStack.push(comp.m_ModelToWorld);	//if not dirty, just push the current model matrix
+
 	//traverse children
 	if (comp.m_Child)
 		TraverseNode(comp.m_Child);

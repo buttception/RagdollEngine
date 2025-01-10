@@ -144,8 +144,19 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		float cameraHeight = 9.f;
 		float cameraSpeed = 5.f;
 		float cameraRotationSpeed = 15.f;
+		//this is for lights
 		Vector2 azimuthAndElevation = { 0.f, 90.f };
 	} data;
+	if (SceneInfo.ActiveCameraIndex == -1)
+	{
+		if (SceneInfo.Cameras.size() > 0)
+		{
+			SceneInfo.ActiveCameraIndex = 0;
+			data.cameraPos = SceneInfo.Cameras[0].Position;
+			data.cameraYaw = SceneInfo.Cameras[0].Rotation.y;
+			data.cameraPitch = SceneInfo.Cameras[0].Rotation.x;
+		}
+	}
 
 	ImGui::Begin("Debug");
 	if (ImGui::Button("Reload Shaders")) {
@@ -159,7 +170,7 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		{"1600x900"},
 		{"1920x1080"}
 	};
-	static int32_t selectedItem{};
+	static int32_t selectedItem{2};
 	if(ImGui::Combo("Resolution", &selectedItem, resolutions, 4))
 	{
 		switch (selectedItem)
@@ -274,6 +285,23 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 
 	if (ImGui::TreeNode("Camera"))
 	{
+		if (SceneInfo.Cameras.size() > 0)
+		{
+			ImGui::Text("Active Camera: %s", SceneInfo.Cameras[SceneInfo.ActiveCameraIndex].Name);
+			if (ImGui::SliderInt("Camera Index", &SceneInfo.ActiveCameraIndex, 0, SceneInfo.Cameras.size() - 1))
+			{
+				if (SceneInfo.Cameras.size() > 0)
+				{
+					data.cameraYaw = SceneInfo.Cameras[SceneInfo.ActiveCameraIndex].Rotation.y;
+					data.cameraPitch = SceneInfo.Cameras[SceneInfo.ActiveCameraIndex].Rotation.x;
+					data.cameraPos = SceneInfo.Cameras[SceneInfo.ActiveCameraIndex].Position;
+					SceneInfo.bIsCameraDirty = true;
+				}
+			}
+		}
+		else
+			ImGui::Text("No Cameras in scene");
+		
 		SceneInfo.bIsCameraDirty = !SceneInfo.bIsCameraDirty ? ImGui::SliderFloat("Camera FOV (Degrees)", &data.cameraFov, 60.f, 120.f) : true;
 		SceneInfo.bIsCameraDirty = !SceneInfo.bIsCameraDirty ? ImGui::SliderFloat("Camera Near", &data.cameraNear, 0.01f, 1.f) : true;
 		SceneInfo.bIsCameraDirty = !SceneInfo.bIsCameraDirty ? ImGui::SliderFloat("Camera Far", &data.cameraFar, 10.f, 10000.f) : true;
