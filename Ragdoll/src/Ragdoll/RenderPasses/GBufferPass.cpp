@@ -47,10 +47,10 @@ void GBufferPass::Draw(ragdoll::FGPUScene* GPUScene, uint32_t ProxyCount, const 
 	else
 	{
 		ViewMatrix = sceneInfo.MainCameraView;
-		ProjectionMatrix = sceneInfo.MainCameraProj;
-		ViewProjectionMatrix = sceneInfo.MainCameraViewProj;
+		ProjectionMatrix = sceneInfo.MainCameraProjWithJitter;
+		ViewProjectionMatrix = sceneInfo.MainCameraViewProjWithJitter;
 		PrevViewMatrix = sceneInfo.PrevMainCameraView;
-		PrevProjectionMatrix = sceneInfo.PrevMainCameraProj;
+		PrevProjectionMatrix = sceneInfo.PrevMainCameraProjWithJitter;
 	}
 	CountBuffer = GPUScene->FrustumCull(CommandListRef, ProjectionMatrix, ViewMatrix, ProxyCount, true);
 	CommandListRef->copyBuffer(PassedFrustumTestCountBuffer, 0, CountBuffer, 0, sizeof(uint32_t));
@@ -72,6 +72,11 @@ void GBufferPass::Draw(ragdoll::FGPUScene* GPUScene, uint32_t ProxyCount, const 
 		//build hzb for next frame
 		if (!debugInfo.bFreezeFrustumCulling)
 			GPUScene->BuildHZB(CommandListRef, targets);
+	}
+	else
+	{
+		//draw all instances
+		DrawAllInstances(GPUScene, CountBuffer, ProxyCount, sceneInfo, debugInfo, targets);
 	}
 	CommandListRef->endMarker();
 }
@@ -144,7 +149,7 @@ void GBufferPass::DrawAllInstances(
 	state.addBindingSet(AssetManager::GetInstance()->DescriptorTable);
 
 	CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
-	CBuffer.ViewProjWithAA = sceneInfo.MainCameraViewProjWithAA;
+	CBuffer.ViewProjWithAA = sceneInfo.MainCameraViewProjWithJitter;
 	CBuffer.PrevViewProj = sceneInfo.PrevMainCameraViewProj;
 	CBuffer.RenderResolution = Vector2((float)sceneInfo.RenderWidth, (float)sceneInfo.RenderHeight);
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));

@@ -42,6 +42,10 @@
         },
         {
           "Id": "cf475ba1-1513-4a2d-bdd1-450d2047223f",
+          "Command": "--sample \"LightsPunctualLamp\""
+        },
+        {
+          "Id": "125a2791-f8c0-4f37-ac56-fb69a5a1388d",
           "Command": "--sample \"Sponza\""
         },
         {

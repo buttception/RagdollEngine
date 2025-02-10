@@ -23,10 +23,13 @@ namespace ragdoll
 		nvrhi::BufferHandle IndirectDrawArgsBuffer{};
 		nvrhi::BufferHandle InstanceIdBuffer{};
 		nvrhi::BufferHandle OccludedInstanceIdBuffer{};
+		//Light buffers
+		nvrhi::BufferHandle PointLightBufferHandle;
+		uint32_t PointLightCount{ 0 };
 
 		void Update(Scene* Scene);
 		//will sort the proxies before making a instance buffer copy and uploading to gpu
-		void UpdateInstanceBuffer(std::vector<Proxy>& Proxies);
+		void UpdateBuffers(Scene* Scene);
 		//returns the count buffer for the draw indirect function
 		nvrhi::BufferHandle FrustumCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled);
 		//returns the count buffer for the draw indirect function, culls the instances in the instance id buffer

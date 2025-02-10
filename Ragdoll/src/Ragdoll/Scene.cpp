@@ -119,7 +119,10 @@ void ragdoll::Scene::Update(float _dt)
 			SceneInfo.JitterX = 0.f;
 			SceneInfo.JitterY = 0.f;
 		}
-		SceneInfo.MainCameraViewProjWithAA = SceneInfo.MainCameraView * Proj;
+		SceneInfo.PrevMainCameraProjWithJitter = SceneInfo.MainCameraProjWithJitter;
+		SceneInfo.MainCameraProjWithJitter = Proj;
+		SceneInfo.PrevMainCameraViewProjWithJitter = SceneInfo.MainCameraViewProjWithJitter;
+		SceneInfo.MainCameraViewProjWithJitter = SceneInfo.MainCameraView * Proj;
 	}
 
 	if (SceneInfo.bIsCameraDirty)
@@ -298,7 +301,7 @@ void ragdoll::Scene::CreateRenderTargets()
 	depthBufferDesc.debugName = "HZB";
 	depthBufferDesc.dimension = nvrhi::TextureDimension::Texture2DArray;
 	depthBufferDesc.arraySize = 1;
-	depthBufferDesc.mipLevels = log2(std::max(depthBufferDesc.width, depthBufferDesc.height)) + 1;
+	depthBufferDesc.mipLevels = log2(std::max(depthBufferDesc.width, depthBufferDesc.height)) - 1;
 	RenderTargets.HZBMips = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
 
 	nvrhi::TextureDesc texDesc;
@@ -644,6 +647,26 @@ void ragdoll::Scene::PopulateStaticProxies()
 			Proxy.MaterialIndex = (int32_t)submesh.MaterialIndex;
 			AssetManager::GetInstance()->VertexBufferInfos[Proxy.BufferIndex].BestFitBox.Transform(Proxy.BoundingBox, tComp->m_ModelToWorld);
 		}
+	}
+}
+
+void ragdoll::Scene::PopulateLightProxies()
+{
+	PointLightProxies.clear();
+	auto EcsView = EntityManagerRef->GetRegistry().view<PointLightComp, TransformComp>();
+	for (const entt::entity& ent : EcsView) {
+		TransformComp* tComp = EntityManagerRef->GetComponent<TransformComp>(ent);
+		PointLightComp* lComp = EntityManagerRef->GetComponent<PointLightComp>(ent);
+		PointLightProxies.emplace_back();
+		PointLightProxy& Proxy = PointLightProxies.back();
+		Proxy.Color.x = lComp->Color.x;
+		Proxy.Color.y = lComp->Color.y;
+		Proxy.Color.z = lComp->Color.z;
+		Proxy.Color.w = lComp->Range;
+		Proxy.Position.x = tComp->m_LocalPosition.x;
+		Proxy.Position.y = tComp->m_LocalPosition.y;
+		Proxy.Position.z = tComp->m_LocalPosition.z;
+		Proxy.Position.w = lComp->Intensity;
 	}
 }
 

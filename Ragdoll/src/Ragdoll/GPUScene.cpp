@@ -83,20 +83,20 @@ void ragdoll::FGPUScene::Update(Scene* Scene)
 		CreateBuffers(Scene->StaticProxies);
 }
 
-void ragdoll::FGPUScene::UpdateInstanceBuffer(std::vector<Proxy>& Proxies)
+void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 {
 	//check if instance buffer is large enough to hold the instances
 	if (InstanceBuffer)
 	{
-		if (InstanceBuffer->getDesc().byteSize < sizeof(InstanceData) * Proxies.size())
+		if (InstanceBuffer->getDesc().byteSize < sizeof(InstanceData) * Scene->StaticProxies.size())
 		{
 			//recreate the buffer
-			CreateBuffers(Proxies);
+			CreateBuffers(Scene->StaticProxies);
 		}
 	}
 	else
 	{
-		CreateBuffers(Proxies);
+		CreateBuffers(Scene->StaticProxies);
 	}
 	//update all the buffers
 	//get all the relevant mesh details
@@ -144,22 +144,22 @@ void ragdoll::FGPUScene::UpdateInstanceBuffer(std::vector<Proxy>& Proxies)
 	}
 	//do not need to sort instances now as it contains mesh indices instead now
 	std::vector<FInstanceData> Instances;
-	Instances.resize(Proxies.size());
-	for (int i = 0; i < Proxies.size(); ++i)
+	Instances.resize(Scene->StaticProxies.size());
+	for (int i = 0; i < Scene->StaticProxies.size(); ++i)
 	{
-		Instances[i].ModelToWorld = Proxies[i].ModelToWorld;
-		Instances[i].PrevModelToWorld = Proxies[i].PrevWorldMatrix;
-		Instances[i].MaterialIndex = Proxies[i].MaterialIndex;
-		Instances[i].MeshIndex = Proxies[i].BufferIndex;
+		Instances[i].ModelToWorld = Scene->StaticProxies[i].ModelToWorld;
+		Instances[i].PrevModelToWorld = Scene->StaticProxies[i].PrevWorldMatrix;
+		Instances[i].MaterialIndex = Scene->StaticProxies[i].MaterialIndex;
+		Instances[i].MeshIndex = Scene->StaticProxies[i].BufferIndex;
 	}
 	//indirect draw args do not need any values
 	//get all the bounding boxes and upload onto gpu
 	std::vector<FBoundingBox> BoundingBoxes;
-	BoundingBoxes.resize(Proxies.size());
-	for (int i = 0; i < Proxies.size(); ++i)
+	BoundingBoxes.resize(Scene->StaticProxies.size());
+	for (int i = 0; i < Scene->StaticProxies.size(); ++i)
 	{
-		BoundingBoxes[i].Center = Proxies[i].BoundingBox.Center;
-		BoundingBoxes[i].Extents = Proxies[i].BoundingBox.Extents;
+		BoundingBoxes[i].Center = Scene->StaticProxies[i].BoundingBox.Center;
+		BoundingBoxes[i].Extents = Scene->StaticProxies[i].BoundingBox.Extents;
 	}
 
 	//get command list from render in the future for multi threading
@@ -183,6 +183,14 @@ void ragdoll::FGPUScene::UpdateInstanceBuffer(std::vector<Proxy>& Proxies)
 	CommandList->writeBuffer(InstanceBuffer, Instances.data(), sizeof(FInstanceData) * Instances.size());
 	CommandList->setPermanentBufferState(InstanceBuffer, nvrhi::ResourceStates::ShaderResource);
 	CommandList->endMarker();
+
+	RD_ASSERT(Scene->PointLightProxies.size() > 256, "Exceeded maximum number of point lights");
+	CommandList->beginMarker("Writing Point Lights Data");
+	CommandList->beginTrackingBufferState(PointLightBufferHandle, nvrhi::ResourceStates::CopyDest);
+	CommandList->writeBuffer(PointLightBufferHandle, Scene->PointLightProxies.data(), sizeof(PointLightProxy) * Scene->PointLightProxies.size());
+	CommandList->setPermanentBufferState(PointLightBufferHandle, nvrhi::ResourceStates::ShaderResource);
+	CommandList->endMarker();
+	PointLightCount = Scene->PointLightProxies.size();
 
 	CommandList->close();
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
@@ -541,4 +549,8 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	Phase2NonOccludedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
 	CountBufferDesc.debugName = "Phase2OccludedCountBuffer";
 	Phase2OccludedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+
+	nvrhi::BufferDesc PointLightBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(PointLightProxy) * 256, "PointLightBuffer");
+	PointLightBufferDesc.structStride = sizeof(PointLightProxy);
+	PointLightBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(PointLightBufferDesc);
 }

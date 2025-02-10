@@ -247,6 +247,7 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 
 	if (ImGui::TreeNode("Bloom"))
 	{
+		ImGui::Checkbox("Bloom", &SceneInfo.bEnableBloom);
 		ImGui::SliderFloat("Filter Radius", &SceneInfo.FilterRadius, 0.001f, 1.f);
 		ImGui::SliderFloat("Bloom Intensity", &SceneInfo.BloomIntensity, 0.f, 1.f);
 
@@ -327,6 +328,8 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 			}
 			SceneInfo.bIsCameraDirty = true;
 		}
+		if (ImGui::Checkbox("Enable Occlusion Culling", &SceneInfo.bEnableOcclusionCull))
+			SceneInfo.bIsCameraDirty = true;
 		if(ImGui::Checkbox("Show Frustum", &DebugInfo.bShowFrustum));
 			SceneInfo.bIsCameraDirty = true;
 		if (ImGui::Checkbox("Show Octree", &Config.bDrawOctree))

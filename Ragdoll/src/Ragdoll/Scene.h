@@ -2,6 +2,7 @@
 
 #include "Components/TransformComp.h"
 #include "Components/RenderableComp.h"
+#include "Components/PointLightComp.h"
 #include "RenderPasses/BloomPass.h"
 #include "Entity/EntityManager.h"
 #include "Octree.h"
@@ -14,6 +15,16 @@ namespace ragdoll {
 	class Application;
 	class Window;
 	class FGPUScene;
+
+	struct PointLightProxy
+	{
+		//xyz is position, w is intensity
+		Vector4 Position;
+		//float Intensity;
+		//rgb is color, w is maximum range
+		Vector4 Color;
+		//float Range;
+	};
 
 	struct Proxy {
 		Matrix ModelToWorld;
@@ -119,11 +130,14 @@ namespace ragdoll {
 		std::vector<SceneCamera> Cameras;
 		int32_t ActiveCameraIndex{ -1 };
 		Matrix MainCameraViewProj;
-		Matrix MainCameraViewProjWithAA;
+		Matrix MainCameraViewProjWithJitter;
 		Matrix PrevMainCameraViewProj;
+		Matrix PrevMainCameraViewProjWithJitter;
 		Matrix MainCameraProj;
+		Matrix MainCameraProjWithJitter;
 		Matrix MainCameraView;
 		Matrix PrevMainCameraProj;
+		Matrix PrevMainCameraProjWithJitter;
 		Matrix PrevMainCameraView;
 		CascadeInfo CascadeInfos[4];
 		Vector3 MainCameraPosition;
@@ -153,6 +167,8 @@ namespace ragdoll {
 		bool bResetAccumulation{ true };
 		bool bEnableJitter{ true };
 		bool bEnableXeGTAONoise{ true };
+		bool bEnableBloom{ true };
+		bool bEnableOcclusionCull{ true };
 		uint32_t RenderWidth = 1600;
 		uint32_t RenderHeight = 900;
 		uint32_t TargetWidth;
@@ -285,11 +301,13 @@ namespace ragdoll {
 		//Renderable
 		SceneInformation SceneInfo;
 		std::vector<Proxy> StaticProxies;
+		std::vector<PointLightProxy> PointLightProxies;
 
 		std::vector<InstanceData> StaticDebugInstanceDatas;	//all the debug cubes
 		nvrhi::BufferHandle StaticInstanceDebugBufferHandle;	//contains all the aabb boxes to draw
 
 		void PopulateStaticProxies();
+		void PopulateLightProxies();
 		void BuildDebugInstances(std::vector<InstanceData>& instances);
 
 		void UpdateShadowCascadesExtents();

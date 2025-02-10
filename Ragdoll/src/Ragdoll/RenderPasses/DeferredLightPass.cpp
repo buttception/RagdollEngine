@@ -6,6 +6,7 @@
 
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
+#include "Ragdoll/GPUScene.h"
 #include "Ragdoll/DirectXDevice.h"
 
 void DeferredLightPass::Init(nvrhi::CommandListHandle cmdList)
@@ -13,7 +14,7 @@ void DeferredLightPass::Init(nvrhi::CommandListHandle cmdList)
 	CommandListRef = cmdList;
 }
 
-void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets)
+void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets, ragdoll::FGPUScene* GPUScene)
 {
 	RD_SCOPE(Render, LightPass);
 	RD_GPU_SCOPE("LightPass", CommandListRef);
@@ -30,6 +31,7 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo, ra
 	CBuffer.LightDirection = sceneInfo.LightDirection;
 	CBuffer.CameraPosition = sceneInfo.MainCameraPosition;
 	CBuffer.LightIntensity = sceneInfo.LightIntensity;
+	CBuffer.PointLightCount = GPUScene->PointLightCount;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
@@ -39,7 +41,8 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo, ra
 		nvrhi::BindingSetItem::Texture_SRV(2, targets->GBufferRM),
 		nvrhi::BindingSetItem::Texture_SRV(3, targets->AONormalized),
 		nvrhi::BindingSetItem::Texture_SRV(4, targets->CurrDepthBuffer),
-		nvrhi::BindingSetItem::Texture_SRV(5, targets->ShadowMask)
+		nvrhi::BindingSetItem::Texture_SRV(5, targets->ShadowMask),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(6, GPUScene->PointLightBufferHandle)
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
 	{

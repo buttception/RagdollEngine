@@ -101,8 +101,11 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity, ragdoll::Scen
 	RD_SCOPE(Render, UpSample);
 	CommandListRef->beginMarker("Up Sample Pass");
 
+	//the final result is the mix pass, where the 1 mip down will be mixed with the native resolution result
+	//4 -> 3 -> 2 -> 1 -> 0
 	for (size_t i = targets->DownsampledImages.size() - 1; i > 0; --i) {
 		RD_SCOPE(Render, UpSampleMip);
+		//3 -> 2 -> 1 -> 0
 		nvrhi::TextureHandle Target = targets->DownsampledImages[i - 1].Image;
 		//create the target
 		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
@@ -127,11 +130,12 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity, ragdoll::Scen
 		state.pipeline = AssetManager::GetInstance()->GetGraphicsPipeline(PipelineDesc, TargetFB);
 		state.framebuffer = TargetFB;
 		state.viewport.addViewportAndScissorRect(TargetFB->getFramebufferInfo().getViewport());
+		//images used is 4 -> 3 -> 2 -> 1
 		state.addBindingSet(UpSampleSetHandles[4 - i]);
 
 		ConstantBuffer.FilterRadius = filterRadius;
-		ConstantBuffer.BloomIntensity = i - 1 == 0 ? bloomIntensity : 0.f;
-		//ConstantBuffer.BloomIntensity = bloomIntensity;
+		ConstantBuffer.BloomIntensity = (i - 1 == 0) ? bloomIntensity : 0.f;
+		//if bloom intensity is 0, the shader will pressume is last pass and will bloom instead of upsample
 		CommandListRef->writeBuffer(ConstantBufferHandle, &ConstantBuffer, sizeof(FConstantBuffer));
 		CommandListRef->setGraphicsState(state);
 
@@ -141,7 +145,7 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity, ragdoll::Scen
 	}
 	CommandListRef->endMarker();
 	{
-		//copy the first mip into scene color
+		//copy the result into scene color
 		//create the target
 		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
 			.addColorAttachment(targets->SceneColor);
@@ -174,7 +178,7 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity, ragdoll::Scen
 		state.viewport.addViewportAndScissorRect(TargetFB->getFramebufferInfo().getViewport());
 		state.addBindingSet(BindingSetHandle);
 
-		CommandListRef->beginMarker("Bloom Pass");
+		CommandListRef->beginMarker("Copy Result");
 		CommandListRef->setGraphicsState(state);
 
 		nvrhi::DrawArguments args;

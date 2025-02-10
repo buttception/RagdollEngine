@@ -105,6 +105,17 @@ cbuffer g_LightConst : register(b1) {
 	float3 LightDirection;
 	float LightIntensity;
 	float3 CameraPosition;
+    uint PointLightCount;
+};
+
+struct PointLightProxy
+{
+	//xyz is position, w is intensity
+    float4 Position;
+	//float Intensity;
+	//rgb is color, w is maximum range
+    float4 Color;
+	//float Range;
 };
 
 Texture2D albedoTexture : register(t0);
@@ -113,6 +124,7 @@ Texture2D RMTexture : register(t2);
 Texture2D AOTexture : register(t3);
 Texture2D DepthBuffer : register(t4);
 Texture2D ShadowMask : register(t5);
+StructuredBuffer<PointLightProxy> PointLights : register(t6);
 
 void deferred_light_ps(
 	in float4 inPos : SV_Position,
@@ -133,8 +145,21 @@ void deferred_light_ps(
 	//apply pbr lighting, AO is 1.f for now so it does nth
 	//float3 diffuse = max(dot(N, LightDirection), 0) * albedo.rgb;
 	float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.y, RM.x, AO);
-
-	float3 ambient = SceneAmbientColor.rgb * albedo.rgb * AO;
-	float3 lighting = ambient + diffuse * (1.f - shadowFactor.a);
+	
+    float3 ambient = SceneAmbientColor.rgb * albedo.rgb * AO;
+    float3 lighting = ambient + diffuse * (1.f - shadowFactor.a);
+	
+    for (int i = 0; i < PointLightCount; i++)
+    {
+        float3 LightDir = fragPos - PointLights[i].Position.xyz;
+        float Dist = length(LightDir);
+        if (PointLights[i].Color.w != 0.f && Dist > PointLights[i].Color.w)
+            continue;
+        LightDir /= Dist;
+        float k1 = 0.7; // Linear term
+        float k2 = 1.8; // Quadratic term
+        float Attenuation = 1.0 / (1.0 + k1 * Dist + k2 * (Dist * Dist));
+        lighting += PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDir, PointLights[i].Color.rgb * PointLights[i].Position.w, RM.y, RM.x, AO) * Attenuation;
+    }
 	outColor = lighting * shadowFactor.rgb;
 }
