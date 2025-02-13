@@ -196,9 +196,18 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_MASK]);
 
-	Taskflow.emplace([this, &scene, GPUScene]() {
-		DeferredLightPass->LightPass(scene->SceneInfo, RenderTargets, GPUScene);
-	});
+	if (scene->DebugInfo.bEnableLightGrid)
+	{
+		Taskflow.emplace([this, &scene, GPUScene]() {
+			DeferredLightPass->LightGridPass(scene->SceneInfo, RenderTargets, GPUScene);
+		});
+	}
+	else 
+	{
+		Taskflow.emplace([this, &scene, GPUScene]() {
+			DeferredLightPass->LightPass(scene->SceneInfo, RenderTargets, GPUScene);
+		});
+	}
 	activeList.emplace_back(CommandLists[(int)Pass::LIGHT]);
 
 	Taskflow.emplace([this, &scene]() {

@@ -26,10 +26,20 @@ namespace ragdoll
 		//Light buffers
 		nvrhi::BufferHandle PointLightBufferHandle;
 		uint32_t PointLightCount{ 0 };
+		nvrhi::BufferHandle DepthSliceBoundsClipspaceBufferHandle;
+		nvrhi::BufferHandle DepthSliceBoundsViewspaceBufferHandle;;
+		nvrhi::TextureHandle LightGridTextureHandle{};
+		uint32_t LightGridCount{ 0 };
+		nvrhi::BufferHandle LightGridBoundingBoxBufferHandle{};
+		nvrhi::BufferHandle LightListBufferHandle{};
 
 		void Update(Scene* Scene);
 		//will sort the proxies before making a instance buffer copy and uploading to gpu
 		void UpdateBuffers(Scene* Scene);
+		//updates the bounding box buffer, will not open or close the command list
+		void UpdateLightGrid(Scene* Scene, nvrhi::CommandListHandle CommandList);
+		//culls the light grid, will not open or close the command list
+		void CullLightGrid(const SceneInformation& SceneInfo, nvrhi::CommandListHandle CommandList);
 		//returns the count buffer for the draw indirect function
 		nvrhi::BufferHandle FrustumCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled);
 		//returns the count buffer for the draw indirect function, culls the instances in the instance id buffer
@@ -56,6 +66,8 @@ namespace ragdoll
 		//helper
 		void ExtractFrustumPlanes(Vector4 OutPlanes[6], const Matrix& Projection, const Matrix& View);
 
+		//gpu lights
+		void CreateLightGrid(Scene* Scene);
 	private:
 		void CreateBuffers(const std::vector<Proxy>& Proxies);
 	};

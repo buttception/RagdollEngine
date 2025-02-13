@@ -150,6 +150,7 @@ namespace ragdoll
 		m_Scene->PopulateStaticProxies();
 		m_Scene->PopulateLightProxies();
 		m_Scene->GPUScene->UpdateBuffers(m_Scene.get());
+		m_Scene->GPUScene->CreateLightGrid(m_Scene.get());
 		m_Scene->ResetTransformDirtyFlags();
 	}
 

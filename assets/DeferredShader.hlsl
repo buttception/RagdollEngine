@@ -2,6 +2,9 @@
 #include "ShadingModel.hlsli"
 #include "Utils.hlsli"
 
+#define TILE_SIZE 64
+#define DEPTH_SLICE_COUNT 17
+
 cbuffer g_Const : register(b0) {
 	float4x4 viewProjMatrix;
 	float4x4 viewProjMatrixWithAA;
@@ -100,12 +103,14 @@ void gbuffer_ps(
 
 cbuffer g_LightConst : register(b1) {
 	float4x4 InvViewProjMatrix;
+    float4x4 InvProjMatrixWithJitter;
 	float4 LightDiffuseColor;
 	float4 SceneAmbientColor;
 	float3 LightDirection;
 	float LightIntensity;
 	float3 CameraPosition;
     uint PointLightCount;
+    float2 ScreenSize;
 };
 
 struct PointLightProxy
@@ -151,15 +156,77 @@ void deferred_light_ps(
 	
     for (int i = 0; i < PointLightCount; i++)
     {
-        float3 LightDir = fragPos - PointLights[i].Position.xyz;
+        float3 LightDir = PointLights[i].Position.xyz - fragPos;
         float Dist = length(LightDir);
         if (PointLights[i].Color.w != 0.f && Dist > PointLights[i].Color.w)
             continue;
         LightDir /= Dist;
         float k1 = 0.7; // Linear term
         float k2 = 1.8; // Quadratic term
-        float Attenuation = 1.0 / (1.0 + k1 * Dist + k2 * (Dist * Dist));
+        float Attenuation = saturate(1.0 / (1.0 + k1 * Dist + k2 * (Dist * Dist)));
         lighting += PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDir, PointLights[i].Color.rgb * PointLights[i].Position.w, RM.y, RM.x, AO) * Attenuation;
     }
 	outColor = lighting * shadowFactor.rgb;
+}
+
+StructuredBuffer<uint> LightListInput : register(t7);
+Texture3D<uint2> LightGridTextureInput : register(t8);
+StructuredBuffer<float> DepthSliceBoundsViewspaceInput : register(t9);
+
+void deferred_light_grid_ps(
+	in float4 inPos : SV_Position,
+	in float2 inTexcoord : TEXCOORD0,
+	out float3 outColor : SV_Target0
+)
+{
+	//getting texture values
+    float4 albedo = albedoTexture.Sample(Samplers[6], inTexcoord);
+    float3 N = Decode(normalTexture.Sample(Samplers[6], inTexcoord).xy);
+    float2 RM = RMTexture.Sample(Samplers[6], inTexcoord).xy;
+    float AO = AOTexture.Sample(Samplers[6], inTexcoord).x;
+    float4 shadowFactor = ShadowMask.Sample(Samplers[6], inTexcoord);
+
+	//getting the positions
+    float depth = DepthBuffer.Sample(Samplers[6], inTexcoord).r;
+    float3 fragPos = DepthToWorld(depth, inTexcoord, InvViewProjMatrix);
+    float3 viewPos = DepthToView(depth, inTexcoord, InvProjMatrixWithJitter);
+
+	//apply pbr lighting, AO is 1.f for now so it does nth
+	//float3 diffuse = max(dot(N, LightDirection), 0) * albedo.rgb;
+    float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.y, RM.x, AO);
+	
+    float3 ambient = SceneAmbientColor.rgb * albedo.rgb * AO;
+    float3 lighting = ambient + diffuse * (1.f - shadowFactor.a);
+	
+	//get which slice this pixel is in
+    uint Z = 0;
+    for (int i = 1; i < DEPTH_SLICE_COUNT; ++i)
+    {
+        if (viewPos.z < DepthSliceBoundsViewspaceInput[i])
+        {
+            Z = i - 1;
+            break;
+        }
+    }
+	//get the index to the light list and count
+    uint X = uint(inTexcoord.x * ScreenSize.x / TILE_SIZE);
+    uint Y = uint(inTexcoord.y * ScreenSize.y / TILE_SIZE);
+    uint2 LightListData = LightGridTextureInput.Load(int4(X, Y, Z, 0));
+	//do light calculations with the indices in the list
+    for (int j = 0; j < LightListData.y; ++j)
+    {
+        PointLightProxy Light = PointLights[LightListInput[LightListData.x + j]];
+        float3 LightDir = Light.Position.xyz - fragPos;
+        float Dist = length(LightDir);
+        if (Light.Color.w != 0.f && Dist > Light.Color.w)
+            continue;
+        LightDir /= Dist;
+        float k1 = 0.7; // Linear term
+        float k2 = 1.8; // Quadratic term
+        float Attenuation = 1.0 / (1.0 + k1 * Dist + k2 * (Dist * Dist));
+        lighting += PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDir, Light.Color.rgb * Light.Position.w, RM.y, RM.x, AO) * Attenuation;
+    }
+    outColor = lighting * shadowFactor.rgb;
+    //outColor = float3(X / 25.f, Y / 15.f, Z / 16.f);
+    //outColor = lighting * LightListData.y / PointLightCount;
 }

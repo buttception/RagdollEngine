@@ -57,6 +57,10 @@
           "Command": "--scene \"other_gltf/Bistro/bistro.gltf\""
         },
         {
+          "Id": "6931d7b9-9ea1-4de0-b321-90c46acd4bf1",
+          "Command": "--scene \"other_gltf/SponzaSingleLight/SponzaSingleLight.gltf\""
+        },
+        {
           "Id": "efe8be07-0ecf-4550-99c9-8d2954b547cf",
           "Command": "--scene \"other_gltf\\FlyingWorld\\FlyingWorld-BattleOfTheTrashGod.gltf\""
         },

@@ -98,6 +98,8 @@ namespace ragdoll {
 		Matrix FrozenView;
 		Vector3 FrozenCameraPosition;
 		bool bShowFrustum{ false };
+		bool bEnableLightGrid{ true };
+		bool bShowLightGrid{ false };
 		uint32_t TotalProxyCount;
 		uint32_t PassedFrustumCullCount{};
 		uint32_t PassedOcclusion1CullCount{};
@@ -106,11 +108,8 @@ namespace ragdoll {
 
 	struct SceneConfig {
 		bool bIsThereCustomMeshes{ false };
-		bool bDrawOctree{ false };
 		bool bDrawBoxes{ false };
 		bool bInitDLSS{ false };
-		int32_t DrawOctreeLevelMin{ 0 };
-		int32_t DrawOctreeLevelMax{ 0 };
 	};
 
 	struct CascadeInfo {
@@ -324,8 +323,5 @@ namespace ragdoll {
 
 		// Halton Sequence
 		void HaltonSequence(Vector2 RenderRes, Vector2 TargetRes);	//assuming aspect ratio is same
-
-		//Debug
-		void AddOctantDebug(const Octant& octant, int32_t level);
 	};
 }

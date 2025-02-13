@@ -59,7 +59,6 @@ namespace ragdoll
 			std::string glTfSampleSceneToLoad;
 			std::string glTfSceneToLoad;
 			bool bCreateCustomMeshes{ false };
-			bool bDrawDebugOctree{ false };
 			bool bDrawDebugBoundingBoxes{ false };
 			bool bInitDLSS{ false };
 		};

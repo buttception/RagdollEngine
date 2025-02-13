@@ -59,6 +59,7 @@ void downsample_ps(
     outColor += (a+c+g+i)*0.03125;
     outColor += (b+d+f+h)*0.0625;
     outColor += (j+k+l+m)*0.125;
+    outColor = max(outColor, 0.0001f);
 }
 
 
