@@ -111,6 +111,8 @@ cbuffer g_LightConst : register(b1) {
 	float3 CameraPosition;
     uint PointLightCount;
     float2 ScreenSize;
+    float2 GridSize;
+    uint FieldsNeeded;
 };
 
 struct PointLightProxy
@@ -169,7 +171,7 @@ void deferred_light_ps(
 	outColor = lighting * shadowFactor.rgb;
 }
 
-StructuredBuffer<uint> LightListInput : register(t7);
+StructuredBuffer<uint> LightBitFieldsInput : register(t7);
 Texture3D<uint2> LightGridTextureInput : register(t8);
 StructuredBuffer<float> DepthSliceBoundsViewspaceInput : register(t9);
 
@@ -210,23 +212,28 @@ void deferred_light_grid_ps(
     }
 	//get the index to the light list and count
     uint X = uint(inTexcoord.x * ScreenSize.x / TILE_SIZE);
-    uint Y = uint(inTexcoord.y * ScreenSize.y / TILE_SIZE);
-    uint2 LightListData = LightGridTextureInput.Load(int4(X, Y, Z, 0));
-	//do light calculations with the indices in the list
-    for (int j = 0; j < LightListData.y; ++j)
+    uint Y = uint((1.f - inTexcoord.y) * ScreenSize.y / TILE_SIZE);
+    uint TileIndex = X + Y * GridSize.x + Z * GridSize.x * GridSize.y;
+    uint BitFieldIndex = TileIndex * FieldsNeeded;
+    for (uint Bucket = 0; Bucket < FieldsNeeded; ++Bucket)
     {
-        PointLightProxy Light = PointLights[LightListInput[LightListData.x + j]];
-        float3 LightDir = Light.Position.xyz - fragPos;
-        float Dist = length(LightDir);
-        if (Light.Color.w != 0.f && Dist > Light.Color.w)
-            continue;
-        LightDir /= Dist;
-        float k1 = 0.7; // Linear term
-        float k2 = 1.8; // Quadratic term
-        float Attenuation = 1.0 / (1.0 + k1 * Dist + k2 * (Dist * Dist));
-        lighting += PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDir, Light.Color.rgb * Light.Position.w, RM.y, RM.x, AO) * Attenuation;
+        uint BucketBits = LightBitFieldsInput[BitFieldIndex + Bucket];
+        while (BucketBits != 0)
+        {
+            const uint BucketBitIndex = firstbitlow(BucketBits);
+            const uint LightIndex = Bucket * 32 + BucketBitIndex;
+            BucketBits ^= 1 << BucketBitIndex;
+			
+            float3 LightDir = PointLights[LightIndex].Position.xyz - fragPos;
+            float Dist = length(LightDir);
+            if (PointLights[LightIndex].Color.w != 0.f && Dist > PointLights[LightIndex].Color.w)
+                continue;
+            LightDir /= Dist;
+            float k1 = 0.7; // Linear term
+            float k2 = 1.8; // Quadratic term
+            float Attenuation = saturate(1.0 / (1.0 + k1 * Dist + k2 * (Dist * Dist)));
+            lighting += PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDir, PointLights[LightIndex].Color.rgb * PointLights[LightIndex].Position.w, RM.y, RM.x, AO) * Attenuation;
+        }
     }
     outColor = lighting * shadowFactor.rgb;
-    //outColor = float3(X / 25.f, Y / 15.f, Z / 16.f);
-    //outColor = lighting * LightListData.y / PointLightCount;
 }

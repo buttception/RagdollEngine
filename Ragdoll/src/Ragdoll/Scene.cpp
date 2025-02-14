@@ -683,7 +683,7 @@ void ragdoll::Scene::PopulateLightProxies()
 		{
 			constexpr float k1 = 0.7f;
 			constexpr float k2 = 1.8f;
-			constexpr float minIntensity = 0.1f;
+			constexpr float minIntensity = 0.01f;
 			Proxy.Color.w = ComputeLightRange(lComp->Intensity, k1, k2, minIntensity);
 		}
 		else
@@ -762,7 +762,7 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 		matrix *= Matrix::CreateTranslation(translate);
 		debugData.ModelToWorld = matrix;
 		debugData.bIsLit = false;
-		debugData.Color = { 1.f, 1.f, 1.f, 1.f };
+		debugData.Color = { PointLightProxies[i].Color.x, PointLightProxies[i].Color.y, PointLightProxies[i].Color.z, 1.f};
 		instances.emplace_back(debugData);
 	}
 

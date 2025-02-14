@@ -31,7 +31,8 @@ namespace ragdoll
 		nvrhi::TextureHandle LightGridTextureHandle{};
 		uint32_t LightGridCount{ 0 };
 		nvrhi::BufferHandle LightGridBoundingBoxBufferHandle{};
-		nvrhi::BufferHandle LightListBufferHandle{};
+		uint32_t FieldsNeeded;
+		nvrhi::BufferHandle LightBitFieldsBufferHandle{};
 
 		void Update(Scene* Scene);
 		//will sort the proxies before making a instance buffer copy and uploading to gpu
@@ -39,7 +40,7 @@ namespace ragdoll
 		//updates the bounding box buffer, will not open or close the command list
 		void UpdateLightGrid(Scene* Scene, nvrhi::CommandListHandle CommandList);
 		//culls the light grid, will not open or close the command list
-		void CullLightGrid(const SceneInformation& SceneInfo, nvrhi::CommandListHandle CommandList);
+		void CullLightGrid(const SceneInformation& SceneInfo, nvrhi::CommandListHandle CommandList, ragdoll::SceneRenderTargets* RenderTargets);
 		//returns the count buffer for the draw indirect function
 		nvrhi::BufferHandle FrustumCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled);
 		//returns the count buffer for the draw indirect function, culls the instances in the instance id buffer

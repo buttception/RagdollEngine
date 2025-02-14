@@ -88,7 +88,7 @@ void DeferredLightPass::LightGridPass(const ragdoll::SceneInformation& sceneInfo
 	RD_SCOPE(Render, LightPass);
 	RD_GPU_SCOPE("LightPass", CommandListRef);
 
-	GPUScene->CullLightGrid(sceneInfo, CommandListRef);
+	GPUScene->CullLightGrid(sceneInfo, CommandListRef, targets);
 
 	//create a constant buffer here
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "DeferredLight CBuffer", 1);
@@ -106,6 +106,8 @@ void DeferredLightPass::LightGridPass(const ragdoll::SceneInformation& sceneInfo
 	CBuffer.PointLightCount = GPUScene->PointLightCount;
 	CBuffer.InvProjWithJitter = sceneInfo.MainCameraProjWithJitter.Invert();
 	CBuffer.ScreenSize = { (float)sceneInfo.RenderWidth, (float)sceneInfo.RenderHeight };
+	CBuffer.GridSize = { (float)GPUScene->LightGridTextureHandle->getDesc().width, (float)GPUScene->LightGridTextureHandle->getDesc().height };
+	CBuffer.FieldsNeeded = GPUScene->FieldsNeeded;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
@@ -117,7 +119,7 @@ void DeferredLightPass::LightGridPass(const ragdoll::SceneInformation& sceneInfo
 		nvrhi::BindingSetItem::Texture_SRV(4, targets->CurrDepthBuffer),
 		nvrhi::BindingSetItem::Texture_SRV(5, targets->ShadowMask),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(6, GPUScene->PointLightBufferHandle),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(7, GPUScene->LightListBufferHandle),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(7, GPUScene->LightBitFieldsBufferHandle),
 		nvrhi::BindingSetItem::Texture_SRV(8, GPUScene->LightGridTextureHandle),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(9, GPUScene->DepthSliceBoundsViewspaceBufferHandle),
 	};

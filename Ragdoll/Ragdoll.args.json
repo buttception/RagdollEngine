@@ -61,6 +61,10 @@
           "Command": "--scene \"other_gltf/SponzaSingleLight/SponzaSingleLight.gltf\""
         },
         {
+          "Id": "3c5485aa-f98f-4568-ad6d-00ffd1e48294",
+          "Command": "--scene \"other_gltf/SponzaMultiLights/SponzaMultiLights.gltf\""
+        },
+        {
           "Id": "efe8be07-0ecf-4550-99c9-8d2954b547cf",
           "Command": "--scene \"other_gltf\\FlyingWorld\\FlyingWorld-BattleOfTheTrashGod.gltf\""
         },

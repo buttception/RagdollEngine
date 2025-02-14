@@ -84,15 +84,16 @@ cbuffer g_Const : register(b0)
     uint LightCount;
     uint TextureWidth;
     uint TextureHeight;
+    uint FieldsNeeded;
+    uint DepthWidth;
+    uint DepthHeight;
 };
 
 StructuredBuffer<FBoundingBox> BoundingBoxBufferInput : register(t0);
 StructuredBuffer<PointLightProxy> PointLightBufferInput : register(t1);
-RWStructuredBuffer<uint> LightListBufferOutput : register(u0);
-RWTexture3D<uint2> LightGrid : register(u1);
-
-groupshared uint LightListCount = 0;
-groupshared uint LightListOffset = 0;
+Texture2D<float> DepthBuffer : register(t2);
+RWStructuredBuffer<uint> LightBitFieldsBufferOutput : register(u0);
+RWTexture3D<uint2> LightGridOutput : register(u1);
 
 bool IsLightInsideTile(FBoundingBox Tile, float3 Position, float Range)
 {
@@ -105,45 +106,29 @@ bool IsLightInsideTile(FBoundingBox Tile, float3 Position, float Range)
 [numthreads(64, 1, 1)]
 void CullLightsCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, uint3 GTid : SV_GroupThreadID)
 {
-    if(DTid.x == 0)
-        LightListCount = LightListOffset = 0;
-    if(DTid.x >= LightCount)
+    //1 thread 1 tile
+    if (DTid.x >= TextureWidth * TextureHeight * (DEPTH_SLICE_COUNT - 1))
         return;
-    GroupMemoryBarrierWithGroupSync();
-    //for each light grid cuboid
-    int PassCount = LightCount / 64 + (LightCount % 64 > 0 ? 1 : 0);
-    for (int i = 0; i < LightGridCount; ++i)
+    const uint X = DTid.x % TextureWidth;
+    const uint Y = TextureHeight - (DTid.x / TextureWidth) % TextureHeight - 1;
+    const uint Z = DTid.x / (TextureWidth * TextureHeight);
+    //reset the field
+    for (int i = 0; i < FieldsNeeded; ++i)
     {
-        //for each set of 64 lights;
-        for (int j = 0; j < PassCount; ++j)
-        {
-            uint LightIndex = DTid.x + j * 64;
-            if (LightIndex >= LightCount)
-                continue;
-            //TODO: move this into a outer loop so transform only has to be done once per pass
-            float3 LightViewSpacePosition = mul(float4(PointLightBufferInput[LightIndex].Position.xyz, 1.0), View).xyz;
-            //test if the light intersects with a frustum tile
-            if (IsLightInsideTile(BoundingBoxBufferInput[i], LightViewSpacePosition, PointLightBufferInput[LightIndex].Color.w))
-            {
-                uint LightListIndex;
-                InterlockedAdd(LightListCount, 1, LightListIndex);
-                LightListBufferOutput[LightListOffset + LightListIndex] = LightIndex;
-            }
-        }
-        GroupMemoryBarrierWithGroupSync();
-        //update the light grid
-        if (DTid.x == 0)
-        {
-            //update the light grid texture
-            uint X = i % TextureWidth;
-            uint Y = (i / TextureWidth) % TextureHeight;
-            uint Z = i / (TextureWidth * TextureHeight);
-
-            LightGrid[uint3(X, Y, Z)].x = LightListOffset;
-            LightGrid[uint3(X, Y, Z)].y = LightListCount;
-            LightListOffset += LightListCount;
-            LightListCount = 0;
-        }
-        GroupMemoryBarrierWithGroupSync();
+        LightBitFieldsBufferOutput[DTid.x * FieldsNeeded + i] = 0;
     }
+    uint IntersectingLightCount = 0;
+    //TODO: 2.5d culling, skip if depth range is not in the tile
+    for (int j = 0; j < LightCount; ++j)
+    {
+        float3 LightViewSpacePosition = mul(float4(PointLightBufferInput[j].Position.xyz, 1.f), View).xyz;
+        if (IsLightInsideTile(BoundingBoxBufferInput[DTid.x], LightViewSpacePosition, PointLightBufferInput[j].Color.w))
+        {
+            const uint BucketIndex = j / 32;
+            const uint BucketPlace = j % 32;
+            LightBitFieldsBufferOutput[DTid.x * FieldsNeeded + BucketIndex] |= 1 << BucketPlace;
+            IntersectingLightCount++;
+        }
+    }
+    LightGridOutput[int3(X, Y, Z)].x = IntersectingLightCount;
 }

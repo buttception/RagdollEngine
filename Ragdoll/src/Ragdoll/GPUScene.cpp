@@ -28,7 +28,7 @@
 #define MAX_LIGHT_COUNT 128
 #define TILE_SIZE 64
 #define DEPTH_SLICE_COUNT 17
-#define LIGHT_LIST_MAX_SIZE 65535
+#define LIGHT_LIST_MAX_SIZE 262143
 
 struct FConstantBuffer
 {
@@ -96,14 +96,6 @@ void ragdoll::FGPUScene::Update(Scene* Scene)
 		CommandList->close();
 		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 	}
-	//Cull Lights Temp, move to own pass
-	/*{
-		nvrhi::CommandListHandle CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
-		CommandList->open();
-		CullLightGrid(Scene->SceneInfo, CommandList);
-		CommandList->close();
-		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
-	}*/
 }
 
 void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
@@ -288,7 +280,7 @@ void ragdoll::FGPUScene::UpdateLightGrid(Scene* Scene, nvrhi::CommandListHandle 
 	CommandList->endMarker();
 }
 
-void ragdoll::FGPUScene::CullLightGrid(const SceneInformation& SceneInfo, nvrhi::CommandListHandle CommandList)
+void ragdoll::FGPUScene::CullLightGrid(const SceneInformation& SceneInfo, nvrhi::CommandListHandle CommandList, ragdoll::SceneRenderTargets* RenderTargets)
 {
 	CommandList->beginMarker("Cull Light Grid");
 	CommandList->clearTextureUInt(LightGridTextureHandle, nvrhi::AllSubresources, 0);
@@ -298,12 +290,19 @@ void ragdoll::FGPUScene::CullLightGrid(const SceneInformation& SceneInfo, nvrhi:
 		uint32_t LightCount;
 		uint32_t TextureWidth;
 		uint32_t TextureHeight;
+		uint32_t FieldsNeeded;
+		uint32_t DepthWidth;
+		uint32_t DepthHeight;
 	} CBuffer;
 	CBuffer.View = SceneInfo.MainCameraView;
 	CBuffer.LightGridCount = LightGridCount;
 	CBuffer.LightCount = PointLightCount;
 	CBuffer.TextureWidth = LightGridTextureHandle->getDesc().width;
 	CBuffer.TextureHeight = LightGridTextureHandle->getDesc().height;
+	CBuffer.FieldsNeeded = FieldsNeeded;
+	CBuffer.DepthWidth = RenderTargets->CurrDepthBuffer->getDesc().width;
+	CBuffer.DepthHeight = RenderTargets->CurrDepthBuffer->getDesc().height;
+
 	//create the constant buffer
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FLightGridCullConstantBuffer), "LightGridCull ConstantBuffer", 1));
 	CommandList->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(FLightGridCullConstantBuffer));
@@ -313,7 +312,8 @@ void ragdoll::FGPUScene::CullLightGrid(const SceneInformation& SceneInfo, nvrhi:
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, LightGridBoundingBoxBufferHandle),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(1, PointLightBufferHandle),
-		nvrhi::BindingSetItem::StructuredBuffer_UAV(0, LightListBufferHandle),
+		nvrhi::BindingSetItem::Texture_SRV(2, RenderTargets->CurrDepthBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(0, LightBitFieldsBufferHandle),
 		nvrhi::BindingSetItem::Texture_UAV(1, LightGridTextureHandle),
 	};
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
@@ -328,7 +328,7 @@ void ragdoll::FGPUScene::CullLightGrid(const SceneInformation& SceneInfo, nvrhi:
 	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(CullingPipelineDesc);
 	state.bindings = { BindingSetHandle };
 	CommandList->setComputeState(state);
-	CommandList->dispatch(1, 1, 1);
+	CommandList->dispatch(LightGridCount / 64 + (LightGridCount % 64 ? 1 : 0), 1, 1);
 	CommandList->endMarker();
 }
 
@@ -714,12 +714,13 @@ void ragdoll::FGPUScene::CreateLightGrid(Scene* Scene)
 	LightGridBufferDesc.keepInitialState = true;
 	LightGridBoundingBoxBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(LightGridBufferDesc);
 
-	nvrhi::BufferDesc LightListBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(uint32_t) * LIGHT_LIST_MAX_SIZE, "LightListBuffer");
-	LightListBufferDesc.structStride = sizeof(uint32_t);
-	LightListBufferDesc.canHaveUAVs = true;
-	LightListBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
-	LightListBufferDesc.keepInitialState = true;
-	LightListBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(LightListBufferDesc);
+	FieldsNeeded = Scene->PointLightProxies.size() / 32 + (Scene->PointLightProxies.size() % 32 ? 1 : 0);
+	nvrhi::BufferDesc LightBitFieldsBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(uint32_t) * FieldsNeeded * LightGridCount, "LightBitFieldsBuffer");
+	LightBitFieldsBufferDesc.structStride = sizeof(uint32_t);
+	LightBitFieldsBufferDesc.canHaveUAVs = true;
+	LightBitFieldsBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	LightBitFieldsBufferDesc.keepInitialState = true;
+	LightBitFieldsBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(LightBitFieldsBufferDesc);
 
 	DepthSliceBoundsClipspaceBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateStaticConstantBufferDesc(DEPTH_SLICE_COUNT * sizeof(float), "LightGridDepthBoundsClipspaceBuffer").setStructStride(sizeof(float)));
 	DepthSliceBoundsViewspaceBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateStaticConstantBufferDesc(DEPTH_SLICE_COUNT * sizeof(float), "LightGridDepthBoundsViewspaceBuffer").setStructStride(sizeof(float)));

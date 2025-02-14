@@ -19,6 +19,8 @@ class DeferredLightPass {
 		Vector3 CameraPosition;
 		uint32_t PointLightCount;
 		Vector2 ScreenSize;
+		Vector2 GridSize;
+		uint32_t FieldsNeeded;
 	}CBuffer;
 
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
