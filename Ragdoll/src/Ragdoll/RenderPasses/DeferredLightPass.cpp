@@ -87,6 +87,7 @@ void DeferredLightPass::LightGridPass(const ragdoll::SceneInformation& sceneInfo
 {
 	RD_SCOPE(Render, LightPass);
 	RD_GPU_SCOPE("LightPass", CommandListRef);
+	CommandListRef->beginMarker("Light Pass");
 
 	GPUScene->CullLightGrid(sceneInfo, CommandListRef, targets);
 
@@ -151,7 +152,6 @@ void DeferredLightPass::LightGridPass(const ragdoll::SceneInformation& sceneInfo
 	state.addBindingSet(BindingSetHandle);
 	state.addBindingSet(AssetManager::GetInstance()->DescriptorTable);
 
-	CommandListRef->beginMarker("Light Pass");
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
 	CommandListRef->setGraphicsState(state);
 

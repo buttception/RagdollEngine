@@ -280,10 +280,35 @@ void ragdoll::FGPUScene::UpdateLightGrid(Scene* Scene, nvrhi::CommandListHandle 
 	CommandList->endMarker();
 }
 
+void ragdoll::FGPUScene::GetLightGridMinMax(nvrhi::CommandListHandle CommandList, ragdoll::SceneRenderTargets* RenderTargets)
+{
+	CommandList->beginMarker("Get Light Grid Min Max");
+	//create the binding set
+	nvrhi::BindingSetDesc BindingSetDesc;
+	BindingSetDesc.bindings = {
+		nvrhi::BindingSetItem::Texture_SRV(0, RenderTargets->CurrDepthBuffer),
+		nvrhi::BindingSetItem::Texture_UAV(0, LightGridTextureHandle),
+	};
+	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
+	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);
+	nvrhi::ComputePipelineDesc CullingPipelineDesc;
+	CullingPipelineDesc.bindingLayouts = { BindingSetHandle->getLayout() };
+	nvrhi::ShaderHandle CullingShader = AssetManager::GetInstance()->GetShader("GetTileMinMaxDepth.cs.cso");
+	CullingPipelineDesc.CS = CullingShader;
+	nvrhi::ComputeState state;
+	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(CullingPipelineDesc);
+	state.bindings = { BindingSetHandle };
+	CommandList->setComputeState(state);
+	uint32_t Width = LightGridTextureHandle->getDesc().width;
+	uint32_t Height = LightGridTextureHandle->getDesc().height;
+	CommandList->dispatch(Width, Height, 1);
+	CommandList->endMarker();
+}
+
 void ragdoll::FGPUScene::CullLightGrid(const SceneInformation& SceneInfo, nvrhi::CommandListHandle CommandList, ragdoll::SceneRenderTargets* RenderTargets)
 {
+	GetLightGridMinMax(CommandList, RenderTargets);
 	CommandList->beginMarker("Cull Light Grid");
-	CommandList->clearTextureUInt(LightGridTextureHandle, nvrhi::AllSubresources, 0);
 	struct FLightGridCullConstantBuffer {
 		Matrix View;
 		uint32_t LightGridCount;
@@ -310,11 +335,11 @@ void ragdoll::FGPUScene::CullLightGrid(const SceneInformation& SceneInfo, nvrhi:
 	nvrhi::BindingSetDesc BindingSetDesc;
 	BindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, LightGridBoundingBoxBufferHandle),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(1, PointLightBufferHandle),
-		nvrhi::BindingSetItem::Texture_SRV(2, RenderTargets->CurrDepthBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(0, RenderTargets->CurrDepthBuffer),
+		nvrhi::BindingSetItem::Texture_SRV(1, LightGridTextureHandle),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(2, LightGridBoundingBoxBufferHandle),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(3, PointLightBufferHandle),
 		nvrhi::BindingSetItem::StructuredBuffer_UAV(0, LightBitFieldsBufferHandle),
-		nvrhi::BindingSetItem::Texture_UAV(1, LightGridTextureHandle),
 	};
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
 	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);
@@ -694,19 +719,20 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 void ragdoll::FGPUScene::CreateLightGrid(Scene* Scene)
 {
 	nvrhi::TextureDesc LightGridTextureDesc;
+	uint32_t TileCountX = Scene->SceneInfo.RenderWidth / TILE_SIZE + (Scene->SceneInfo.RenderWidth % TILE_SIZE ? 1 : 0);
+	uint32_t TileCountY = Scene->SceneInfo.RenderHeight / TILE_SIZE + (Scene->SceneInfo.RenderHeight % TILE_SIZE ? 1 : 0);
+	uint32_t TileCountZ = DEPTH_SLICE_COUNT - 1;
 	LightGridTextureDesc.dimension = nvrhi::TextureDimension::Texture3D;
-	LightGridTextureDesc.width = Scene->SceneInfo.RenderWidth / TILE_SIZE + (Scene->SceneInfo.RenderWidth % TILE_SIZE ? 1 : 0);
-	LightGridTextureDesc.height = Scene->SceneInfo.RenderHeight / TILE_SIZE + (Scene->SceneInfo.RenderHeight % TILE_SIZE ? 1 : 0);
-	//need to minus 1 as x slices have x - 1 segments
-	LightGridTextureDesc.depth = DEPTH_SLICE_COUNT - 1;
-	LightGridTextureDesc.format = nvrhi::Format::RG32_UINT;
+	LightGridTextureDesc.width = TileCountX;
+	LightGridTextureDesc.height = TileCountY;
+	LightGridTextureDesc.format = nvrhi::Format::RG16_UNORM;
 	LightGridTextureDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	LightGridTextureDesc.keepInitialState = true;
 	LightGridTextureDesc.isUAV = true;
 	LightGridTextureDesc.debugName = "LightGridTexture";
 	LightGridTextureHandle = DirectXDevice::GetNativeDevice()->createTexture(LightGridTextureDesc);
 
-	LightGridCount = LightGridTextureDesc.width * LightGridTextureDesc.height * LightGridTextureDesc.depth;
+	LightGridCount = TileCountX * TileCountY * TileCountZ;
 	nvrhi::BufferDesc LightGridBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(FBoundingBox) * LightGridCount, "LightGridBoundingBoxBuffer");
 	LightGridBufferDesc.structStride = sizeof(FBoundingBox);
 	LightGridBufferDesc.canHaveUAVs = true;

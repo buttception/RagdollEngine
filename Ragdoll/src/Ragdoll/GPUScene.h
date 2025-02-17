@@ -39,6 +39,8 @@ namespace ragdoll
 		void UpdateBuffers(Scene* Scene);
 		//updates the bounding box buffer, will not open or close the command list
 		void UpdateLightGrid(Scene* Scene, nvrhi::CommandListHandle CommandList);
+		//Gets the min max depth value for each tile
+		void GetLightGridMinMax(nvrhi::CommandListHandle CommandList, ragdoll::SceneRenderTargets* RenderTargets);
 		//culls the light grid, will not open or close the command list
 		void CullLightGrid(const SceneInformation& SceneInfo, nvrhi::CommandListHandle CommandList, ragdoll::SceneRenderTargets* RenderTargets);
 		//returns the count buffer for the draw indirect function

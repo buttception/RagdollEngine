@@ -172,7 +172,6 @@ void deferred_light_ps(
 }
 
 StructuredBuffer<uint> LightBitFieldsInput : register(t7);
-Texture3D<uint2> LightGridTextureInput : register(t8);
 StructuredBuffer<float> DepthSliceBoundsViewspaceInput : register(t9);
 
 void deferred_light_grid_ps(
