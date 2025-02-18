@@ -71,7 +71,7 @@ cbuffer g_Const : register(b0)
 };
 
 #define MAX_HZB_MIP_COUNT 16
-RWTexture2D<float> Mips[MAX_HZB_MIP_COUNT] : register(u0);
+RWTexture2D<float2> Mips[MAX_HZB_MIP_COUNT] : register(u0);
 
 [numthreads(8, 8, 1)]
 void DownSamplePoTCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, uint3 GTid : SV_GroupThreadID)
@@ -92,6 +92,7 @@ void DownSamplePoTCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex
         }
  
         //find and return min depth, smaller is further
-        Mips[MipLevel][DTid.xy] = min(min(depths.x, depths.y), min(depths.z, depths.w));
+        Mips[MipLevel][DTid.xy].x = min(min(depths.x, depths.y), min(depths.z, depths.w));
+        Mips[MipLevel][DTid.xy].y = max(max(depths.x, depths.y), max(depths.z, depths.w));
     }
 }

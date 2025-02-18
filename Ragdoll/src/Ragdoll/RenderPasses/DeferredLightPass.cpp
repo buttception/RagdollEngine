@@ -107,7 +107,7 @@ void DeferredLightPass::LightGridPass(const ragdoll::SceneInformation& sceneInfo
 	CBuffer.PointLightCount = GPUScene->PointLightCount;
 	CBuffer.InvProjWithJitter = sceneInfo.MainCameraProjWithJitter.Invert();
 	CBuffer.ScreenSize = { (float)sceneInfo.RenderWidth, (float)sceneInfo.RenderHeight };
-	CBuffer.GridSize = { (float)GPUScene->LightGridTextureHandle->getDesc().width, (float)GPUScene->LightGridTextureHandle->getDesc().height };
+	CBuffer.GridSize = { (float)GPUScene->TileCountX, (float)GPUScene->TileCountY };
 	CBuffer.FieldsNeeded = GPUScene->FieldsNeeded;
 
 	nvrhi::BindingSetDesc bindingSetDesc;
@@ -121,8 +121,7 @@ void DeferredLightPass::LightGridPass(const ragdoll::SceneInformation& sceneInfo
 		nvrhi::BindingSetItem::Texture_SRV(5, targets->ShadowMask),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(6, GPUScene->PointLightBufferHandle),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(7, GPUScene->LightBitFieldsBufferHandle),
-		nvrhi::BindingSetItem::Texture_SRV(8, GPUScene->LightGridTextureHandle),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(9, GPUScene->DepthSliceBoundsViewspaceBufferHandle),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(8, GPUScene->DepthSliceBoundsViewspaceBufferHandle),
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
 	{

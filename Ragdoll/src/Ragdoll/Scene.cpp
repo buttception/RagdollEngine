@@ -294,7 +294,7 @@ void ragdoll::Scene::CreateRenderTargets()
 		depthBufferDesc.height <<= 1;
 	depthBufferDesc.width >>= 1;
 	depthBufferDesc.height >>= 1;
-	depthBufferDesc.format = nvrhi::Format::D32;
+	depthBufferDesc.format = nvrhi::Format::RG32_FLOAT;
 	depthBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	depthBufferDesc.isUAV = true;
 	depthBufferDesc.keepInitialState = true;

@@ -172,7 +172,7 @@ void deferred_light_ps(
 }
 
 StructuredBuffer<uint> LightBitFieldsInput : register(t7);
-StructuredBuffer<float> DepthSliceBoundsViewspaceInput : register(t9);
+StructuredBuffer<float> DepthSliceBoundsViewspaceInput : register(t8);
 
 void deferred_light_grid_ps(
 	in float4 inPos : SV_Position,

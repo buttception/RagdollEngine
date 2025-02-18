@@ -67,52 +67,6 @@ void UpdateBoundingBoxCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupI
     }
 }
 
-Texture2D<float> DepthBuffer : register(t0);
-RWTexture2D<float2> LightGridOutput : register(u0);
-
-groupshared float GroupMinDepth[64]; // One per thread
-groupshared float GroupMaxDepth[64];
-
-[numthreads(8, 8, 1)]
-void GetTileMinMaxDepth(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, uint3 GTid : SV_GroupThreadID, uint3 Gid : SV_GroupID)
-{
-    float MinDepth = 1.0f; // Max possible depth
-    float MaxDepth = 0.0f; // Min possible depth
-
-    // Each thread processes 64 pixels in the 64x64 tile
-    for (uint i = 0; i < 64; i++)
-    {
-        uint2 PixelCoord = Gid.xy * 64 + GTid.xy * 8 + uint2(i % 8, i / 8);
-        float Depth = DepthBuffer.Load(int3(PixelCoord, 0)).r;
-        if (Depth == 0.f)
-            continue;
-        MinDepth = min(MinDepth, Depth);
-        MaxDepth = max(MaxDepth, Depth);
-    }
-
-    // Store in shared memory
-    GroupMinDepth[GIid] = MinDepth;
-    GroupMaxDepth[GIid] = MaxDepth;
-    GroupMemoryBarrierWithGroupSync();
-
-    // Parallel reduction
-    for (uint stride = 32; stride > 0; stride >>= 1)
-    {
-        if (GIid < stride)
-        {
-            GroupMinDepth[GIid] = min(GroupMinDepth[GIid], GroupMinDepth[GIid + stride]);
-            GroupMaxDepth[GIid] = max(GroupMaxDepth[GIid], GroupMaxDepth[GIid + stride]);
-        }
-        GroupMemoryBarrierWithGroupSync();
-    }
-
-    // Store result
-    if (GIid == 0)
-    {
-        LightGridOutput[Gid.xy] = float2(GroupMinDepth[0], GroupMaxDepth[0]);
-    }
-}
-
 struct PointLightProxy
 {
 	//xyz is position, w is intensity
@@ -126,6 +80,7 @@ struct PointLightProxy
 cbuffer g_Const : register(b0)
 {
     float4x4 View;
+    float4x4 InverseProjectionWithJitter;
     uint LightGridCount;
     uint LightCount;
     uint TextureWidth;
@@ -135,16 +90,17 @@ cbuffer g_Const : register(b0)
     uint DepthHeight;
 };
 
-Texture2D<float2> LightGridInput : register(t1);
+Texture2D<float> DepthBuffer : register(t0);
+Texture2D<float2> HZBMips : register(t1);
 StructuredBuffer<FBoundingBox> BoundingBoxBufferInput : register(t2);
 StructuredBuffer<PointLightProxy> PointLightBufferInput : register(t3);
+StructuredBuffer<float> DepthBoundsViewspace : register(t4);
 RWStructuredBuffer<uint> LightBitFieldsBufferOutput : register(u0);
+
+sampler SamplerPoint : register(s0);
 
 bool IsLightInsideTile(FBoundingBox Tile, float3 Position, float Range)
 {
-    //early exit if light is outside the min max depth of the tile
-    if (Tile.Center.z - Tile.Extents.z > Position.z + Range || Tile.Center.z + Tile.Extents.z < Position.z - Range)
-        return false;
     float3 CenterToLight = Tile.Center - Position;
     float DistanceSq = dot(CenterToLight, CenterToLight);
     float RadiusSq = (length(Tile.Extents) + Range) * (length(Tile.Extents) + Range);
@@ -158,23 +114,35 @@ void CullLightsCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, u
     if (DTid.x >= TextureWidth * TextureHeight * (DEPTH_SLICE_COUNT - 1))
         return;
     const uint X = DTid.x % TextureWidth;
-    const uint Y = TextureHeight - (DTid.x / TextureWidth) % TextureHeight - 1;
+    const uint Y = (DTid.x / TextureWidth) % TextureHeight;
     const uint Z = DTid.x / (TextureWidth * TextureHeight);
     //reset the field
     for (int i = 0; i < FieldsNeeded; ++i)
     {
         LightBitFieldsBufferOutput[DTid.x * FieldsNeeded + i] = 0;
     }
-    float MinDepth = LightGridInput[DTid.xy].x;
-    float MaxDepth = LightGridInput[DTid.xy].y;
+    //get the correct mip to read from the min max hzb, reduce mip by 1 as hzb is half render size
+    float mip = max(0, ceil(log2(max(TILE_SIZE, TILE_SIZE))) - 1);
+    float2 InvRes = float2(1.f / TextureWidth, 1.f / TextureHeight);
+    float2 UV = InvRes * float2(X, Y);
+    UV = float2(UV.x, 1.f - UV.y);
+    float2 DepthRange = HZBMips.SampleLevel(SamplerPoint, UV, mip);
+    //bring uv into ndc space
+    UV = UV * 2.f.xx - 1.f.xx;
+    //get min max of the tile in view space, the smaller value is max due to reverse Z
+    float4 ProjPos = mul(float4(float3(UV, DepthRange.x), 1.0), InverseProjectionWithJitter);
+    float MaxZ = ProjPos.z / ProjPos.w;
+    ProjPos = mul(float4(float3(UV, DepthRange.y), 1.0), InverseProjectionWithJitter);
+    float MinZ = ProjPos.z / ProjPos.w;
+    FBoundingBox Tile = BoundingBoxBufferInput[DTid.x];
+    //test if the tile is inside the depth range
+    if (MaxZ < Tile.Center.z - Tile.Extents.z || MinZ > Tile.Center.z + Tile.Extents.z)
+        return;
     for (int j = 0; j < LightCount; ++j)
     {
         PointLightProxy Light = PointLightBufferInput[j];
-        //cull light out if it is outside the depth bounds
-        if (Light.Position.z + Light.Color.w < MinDepth || Light.Position.z - Light.Color.w > MaxDepth)
-            continue;
         float3 LightViewSpacePosition = mul(float4(Light.Position.xyz, 1.f), View).xyz;
-        if (IsLightInsideTile(BoundingBoxBufferInput[DTid.x], LightViewSpacePosition, PointLightBufferInput[j].Color.w))
+        if (IsLightInsideTile(Tile, LightViewSpacePosition, PointLightBufferInput[j].Color.w))
         {
             const uint BucketIndex = j / 32;
             const uint BucketPlace = j % 32;
