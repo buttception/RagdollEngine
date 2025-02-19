@@ -131,10 +131,10 @@ void CullLightsCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, u
     float Mip = max(0, ceil(log2(Size)));
     float2 Depths[4] =
     {
-        { HZBMips.SampleLevel(SamplerPoint, UV, Mip) },
-        { HZBMips.SampleLevel(SamplerPoint, UV + float2(InvRes.x, 0.f), Mip) },
-        { HZBMips.SampleLevel(SamplerPoint, UV + float2(0.f, InvRes.y), Mip) },
-        { HZBMips.SampleLevel(SamplerPoint, UV + InvRes, Mip) },
+        { HZBMips.SampleLevel(SamplerPoint, UV + float2(-InvRes.x * 0.5f, -InvRes.y * 0.5f), Mip) },
+        { HZBMips.SampleLevel(SamplerPoint, UV + float2(InvRes.x * 0.5f, -InvRes.y), Mip) },
+        { HZBMips.SampleLevel(SamplerPoint, UV + float2(-InvRes.x * 0.5f, InvRes.y * 0.5f), Mip) },
+        { HZBMips.SampleLevel(SamplerPoint, UV + float2(InvRes.x * 0.5f, InvRes.y * 0.5f), Mip) },
     };
     float2 DepthRange = float2(min(min(Depths[0].x, Depths[1].x), min(Depths[2].x, Depths[3].x)), max(max(Depths[0].y, Depths[1].y), max(Depths[2].y, Depths[3].y)));
     //get min max of the tile in view space, the smaller value is max due to reverse Z
@@ -144,12 +144,14 @@ void CullLightsCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, u
     float MinZ = ProjPos.z / ProjPos.w;
     FBoundingBox Tile = BoundingBoxBufferInput[DTid.x];
     //test if the tile is inside the depth range
-    if (MaxZ < Tile.Center.z - Tile.Extents.z || MinZ > Tile.Center.z + Tile.Extents.z)
+    if (MaxZ < Tile.Center.z - Tile.Extents.z - 0.001f || MinZ > Tile.Center.z + Tile.Extents.z + 0.001f)
         return;
     for (int j = 0; j < LightCount; ++j)
     {
         PointLightProxy Light = PointLightBufferInput[j];
         float3 LightViewSpacePosition = mul(float4(Light.Position.xyz, 1.f), View).xyz;
+        if (LightViewSpacePosition.z + PointLightBufferInput[j].Color.w < MinZ || LightViewSpacePosition.z - PointLightBufferInput[j].Color.w > MaxZ)
+            continue;
         if (IsLightInsideTile(Tile, LightViewSpacePosition, PointLightBufferInput[j].Color.w))
         {
             const uint BucketIndex = j / 32;
