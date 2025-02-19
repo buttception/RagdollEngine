@@ -292,6 +292,8 @@ void ragdoll::FGPUScene::CullLightGrid(const SceneInformation& SceneInfo, nvrhi:
 		uint32_t FieldsNeeded;
 		uint32_t DepthWidth;
 		uint32_t DepthHeight;
+		uint32_t MipBaseWidth;
+		uint32_t MipBaseHeight;
 	} CBuffer;
 	CBuffer.View = SceneInfo.MainCameraView;
 	CBuffer.InverseProjectionWithJitter = SceneInfo.MainCameraProjWithJitter.Invert();
@@ -302,6 +304,8 @@ void ragdoll::FGPUScene::CullLightGrid(const SceneInformation& SceneInfo, nvrhi:
 	CBuffer.FieldsNeeded = FieldsNeeded;
 	CBuffer.DepthWidth = RenderTargets->CurrDepthBuffer->getDesc().width;
 	CBuffer.DepthHeight = RenderTargets->CurrDepthBuffer->getDesc().height;
+	CBuffer.MipBaseWidth = RenderTargets->HZBMips->getDesc().width;
+	CBuffer.MipBaseHeight = RenderTargets->HZBMips->getDesc().height;
 
 	//create the constant buffer
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FLightGridCullConstantBuffer), "LightGridCull ConstantBuffer", 1));
@@ -708,6 +712,10 @@ void ragdoll::FGPUScene::CreateLightGrid(Scene* Scene)
 	LightGridBoundingBoxBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(LightGridBufferDesc);
 
 	FieldsNeeded = Scene->PointLightProxies.size() / 32 + (Scene->PointLightProxies.size() % 32 ? 1 : 0);
+	if (FieldsNeeded == 0)
+	{
+		FieldsNeeded = 1;
+	}
 	nvrhi::BufferDesc LightBitFieldsBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(uint32_t) * FieldsNeeded * LightGridCount, "LightBitFieldsBuffer");
 	LightBitFieldsBufferDesc.structStride = sizeof(uint32_t);
 	LightBitFieldsBufferDesc.canHaveUAVs = true;

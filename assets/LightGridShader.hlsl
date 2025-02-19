@@ -88,6 +88,8 @@ cbuffer g_Const : register(b0)
     uint FieldsNeeded;
     uint DepthWidth;
     uint DepthHeight;
+    uint MipBaseWidth;
+    uint MipBaseHeight;
 };
 
 Texture2D<float> DepthBuffer : register(t0);
@@ -121,14 +123,20 @@ void CullLightsCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, u
     {
         LightBitFieldsBufferOutput[DTid.x * FieldsNeeded + i] = 0;
     }
-    //get the correct mip to read from the min max hzb, reduce mip by 1 as hzb is half render size
-    float mip = max(0, ceil(log2(max(TILE_SIZE, TILE_SIZE))) - 1);
     float2 InvRes = float2(1.f / TextureWidth, 1.f / TextureHeight);
-    float2 UV = InvRes * float2(X, Y);
-    UV = float2(UV.x, 1.f - UV.y);
-    float2 DepthRange = HZBMips.SampleLevel(SamplerPoint, UV, mip);
-    //bring uv into ndc space
-    UV = UV * 2.f.xx - 1.f.xx;
+    float2 UV = InvRes * float2(X, Y) + InvRes * 0.5f.xx;
+    UV.y = 1.f - UV.y;
+    //get the correct mip to read from the min max hzb, reduce mip by 1 as hzb is half render size
+    float Size = max(InvRes.x * MipBaseWidth, InvRes.y * MipBaseHeight);
+    float Mip = max(0, ceil(log2(Size)));
+    float2 Depths[4] =
+    {
+        { HZBMips.SampleLevel(SamplerPoint, UV, Mip) },
+        { HZBMips.SampleLevel(SamplerPoint, UV + float2(InvRes.x, 0.f), Mip) },
+        { HZBMips.SampleLevel(SamplerPoint, UV + float2(0.f, InvRes.y), Mip) },
+        { HZBMips.SampleLevel(SamplerPoint, UV + InvRes, Mip) },
+    };
+    float2 DepthRange = float2(min(min(Depths[0].x, Depths[1].x), min(Depths[2].x, Depths[3].x)), max(max(Depths[0].y, Depths[1].y), max(Depths[2].y, Depths[3].y)));
     //get min max of the tile in view space, the smaller value is max due to reverse Z
     float4 ProjPos = mul(float4(float3(UV, DepthRange.x), 1.0), InverseProjectionWithJitter);
     float MaxZ = ProjPos.z / ProjPos.w;

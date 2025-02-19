@@ -103,7 +103,7 @@ void gbuffer_ps(
 
 cbuffer g_LightConst : register(b1) {
 	float4x4 InvViewProjMatrix;
-    float4x4 InvProjMatrixWithJitter;
+    float4x4 View;
 	float4 LightDiffuseColor;
 	float4 SceneAmbientColor;
 	float3 LightDirection;
@@ -171,8 +171,10 @@ void deferred_light_ps(
 	outColor = lighting * shadowFactor.rgb;
 }
 
-StructuredBuffer<uint> LightBitFieldsInput : register(t7);
+//StructuredBuffer<uint> LightBitFieldsInput : register(t7);
 StructuredBuffer<float> DepthSliceBoundsViewspaceInput : register(t8);
+StructuredBuffer<FBoundingBox> BoundingBoxBufferInput : register(t9);
+RWStructuredBuffer<uint> LightBitFieldsInput : register(u0);
 
 void deferred_light_grid_ps(
 	in float4 inPos : SV_Position,
@@ -190,7 +192,7 @@ void deferred_light_grid_ps(
 	//getting the positions
     float depth = DepthBuffer.Sample(Samplers[6], inTexcoord).r;
     float3 fragPos = DepthToWorld(depth, inTexcoord, InvViewProjMatrix);
-    float3 viewPos = DepthToView(depth, inTexcoord, InvProjMatrixWithJitter);
+    float3 viewPos = mul(float4(fragPos, 1), View).xyz;
 
 	//apply pbr lighting, AO is 1.f for now so it does nth
 	//float3 diffuse = max(dot(N, LightDirection), 0) * albedo.rgb;
@@ -200,18 +202,19 @@ void deferred_light_grid_ps(
     float3 lighting = ambient + diffuse * (1.f - shadowFactor.a);
 	
 	//get which slice this pixel is in
+    uint X = floor(inTexcoord.x * GridSize.x);
+    uint Y = floor((1.f - inTexcoord.y) * GridSize.y);
     uint Z = 0;
-    for (int i = 1; i < DEPTH_SLICE_COUNT; ++i)
+    for (int i = 0; i < DEPTH_SLICE_COUNT - 1; ++i)
     {
-        if (viewPos.z < DepthSliceBoundsViewspaceInput[i])
+        FBoundingBox Box = BoundingBoxBufferInput[X + Y * GridSize.x + i * GridSize.x * GridSize.y];
+        if (viewPos.z < (Box.Center.z + Box.Extents.z) && viewPos.z > (Box.Center.z - Box.Extents.z))
         {
-            Z = i - 1;
+            Z = i;
             break;
         }
     }
 	//get the index to the light list and count
-    uint X = uint(inTexcoord.x * ScreenSize.x / TILE_SIZE);
-    uint Y = uint((1.f - inTexcoord.y) * ScreenSize.y / TILE_SIZE);
     uint TileIndex = X + Y * GridSize.x + Z * GridSize.x * GridSize.y;
     uint BitFieldIndex = TileIndex * FieldsNeeded;
     for (uint Bucket = 0; Bucket < FieldsNeeded; ++Bucket)
