@@ -25,6 +25,10 @@
 
 #define MAX_HZB_MIP_COUNT 16
 
+#define MAX_LIGHT_COUNT 1024
+#define TILE_SIZE 64
+#define DEPTH_SLICE_COUNT 17
+
 struct FConstantBuffer
 {
 	Matrix ViewMatrix{};
@@ -40,7 +44,9 @@ struct FConstantBuffer
 struct FBoundingBox
 {
 	Vector3 Center;
+	float pad0;
 	Vector3 Extents;
+	float pad1;
 };
 
 //used in compute shader to populate indirect calls
@@ -79,24 +85,32 @@ struct FMaterialData
 
 void ragdoll::FGPUScene::Update(Scene* Scene)
 {
-	if (InstanceBuffer == nullptr)
-		CreateBuffers(Scene->StaticProxies);
+	//if the projection matrix change, update the frustum aabb
+	if (Scene->SceneInfo.PrevMainCameraProj != Scene->SceneInfo.MainCameraProj)
+	{
+		//prepare the bounding boxes of all the lightgrid
+		nvrhi::CommandListHandle CommandList = DirectXDevice::GetNativeDevice()->createCommandList();
+		CommandList->open();
+		UpdateLightGrid(Scene, CommandList);
+		CommandList->close();
+		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
+	}
 }
 
-void ragdoll::FGPUScene::UpdateInstanceBuffer(std::vector<Proxy>& Proxies)
+void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 {
 	//check if instance buffer is large enough to hold the instances
 	if (InstanceBuffer)
 	{
-		if (InstanceBuffer->getDesc().byteSize < sizeof(InstanceData) * Proxies.size())
+		if (InstanceBuffer->getDesc().byteSize < sizeof(InstanceData) * Scene->StaticProxies.size())
 		{
 			//recreate the buffer
-			CreateBuffers(Proxies);
+			CreateBuffers(Scene->StaticProxies);
 		}
 	}
 	else
 	{
-		CreateBuffers(Proxies);
+		CreateBuffers(Scene->StaticProxies);
 	}
 	//update all the buffers
 	//get all the relevant mesh details
@@ -144,22 +158,22 @@ void ragdoll::FGPUScene::UpdateInstanceBuffer(std::vector<Proxy>& Proxies)
 	}
 	//do not need to sort instances now as it contains mesh indices instead now
 	std::vector<FInstanceData> Instances;
-	Instances.resize(Proxies.size());
-	for (int i = 0; i < Proxies.size(); ++i)
+	Instances.resize(Scene->StaticProxies.size());
+	for (int i = 0; i < Scene->StaticProxies.size(); ++i)
 	{
-		Instances[i].ModelToWorld = Proxies[i].ModelToWorld;
-		Instances[i].PrevModelToWorld = Proxies[i].PrevWorldMatrix;
-		Instances[i].MaterialIndex = Proxies[i].MaterialIndex;
-		Instances[i].MeshIndex = Proxies[i].BufferIndex;
+		Instances[i].ModelToWorld = Scene->StaticProxies[i].ModelToWorld;
+		Instances[i].PrevModelToWorld = Scene->StaticProxies[i].PrevWorldMatrix;
+		Instances[i].MaterialIndex = Scene->StaticProxies[i].MaterialIndex;
+		Instances[i].MeshIndex = Scene->StaticProxies[i].BufferIndex;
 	}
 	//indirect draw args do not need any values
 	//get all the bounding boxes and upload onto gpu
 	std::vector<FBoundingBox> BoundingBoxes;
-	BoundingBoxes.resize(Proxies.size());
-	for (int i = 0; i < Proxies.size(); ++i)
+	BoundingBoxes.resize(Scene->StaticProxies.size());
+	for (int i = 0; i < Scene->StaticProxies.size(); ++i)
 	{
-		BoundingBoxes[i].Center = Proxies[i].BoundingBox.Center;
-		BoundingBoxes[i].Extents = Proxies[i].BoundingBox.Extents;
+		BoundingBoxes[i].Center = Scene->StaticProxies[i].BoundingBox.Center;
+		BoundingBoxes[i].Extents = Scene->StaticProxies[i].BoundingBox.Extents;
 	}
 
 	//get command list from render in the future for multi threading
@@ -184,8 +198,141 @@ void ragdoll::FGPUScene::UpdateInstanceBuffer(std::vector<Proxy>& Proxies)
 	CommandList->setPermanentBufferState(InstanceBuffer, nvrhi::ResourceStates::ShaderResource);
 	CommandList->endMarker();
 
+	RD_ASSERT(Scene->PointLightProxies.size() > MAX_LIGHT_COUNT, "Exceeded maximum number of point lights");
+	CommandList->beginMarker("Writing Point Lights Data");
+	CommandList->beginTrackingBufferState(PointLightBufferHandle, nvrhi::ResourceStates::CopyDest);
+	CommandList->writeBuffer(PointLightBufferHandle, Scene->PointLightProxies.data(), sizeof(PointLightProxy) * Scene->PointLightProxies.size());
+	CommandList->setPermanentBufferState(PointLightBufferHandle, nvrhi::ResourceStates::ShaderResource);
+	CommandList->endMarker();
+	PointLightCount = Scene->PointLightProxies.size();
+
 	CommandList->close();
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
+}
+
+void ragdoll::FGPUScene::UpdateLightGrid(Scene* Scene, nvrhi::CommandListHandle CommandList)
+{
+	//dispatch compute to update the light grid bounding boxes
+	CommandList->beginMarker("Update Light Grid");
+	
+	static bool InitalizedDepthBound = false;
+	if (!InitalizedDepthBound)
+	{
+		const float DepthBoundsView[DEPTH_SLICE_COUNT] =
+		{
+			0.01f, 5.f, 6.8f, 9.2f, 12.6f, 17.1f, 23.2f, 31.5f, 42.8f, 58.2f, 79.1f, 107.6f, 146.4f, 199.1f, 271.1f, 368.7f, 500.f
+		};
+		float DepthBoundsCS[DEPTH_SLICE_COUNT];
+		for (int i = 0; i < DEPTH_SLICE_COUNT; ++i)
+		{
+			Vector4 Point = Vector4(0, 0, DepthBoundsView[i], 1);
+			Vector4 ProjectedPoint = Vector4::Transform(Point, Scene->SceneInfo.MainCameraProj);
+			DepthBoundsCS[i] = ProjectedPoint.z / ProjectedPoint.w;
+		}
+		CommandList->beginTrackingBufferState(DepthSliceBoundsClipspaceBufferHandle, nvrhi::ResourceStates::CopyDest);
+		CommandList->writeBuffer(DepthSliceBoundsClipspaceBufferHandle, DepthBoundsCS, DEPTH_SLICE_COUNT * sizeof(float));
+		CommandList->setPermanentBufferState(DepthSliceBoundsClipspaceBufferHandle, nvrhi::ResourceStates::ShaderResource);
+		CommandList->beginTrackingBufferState(DepthSliceBoundsViewspaceBufferHandle, nvrhi::ResourceStates::CopyDest);
+		CommandList->writeBuffer(DepthSliceBoundsViewspaceBufferHandle, DepthBoundsView, DEPTH_SLICE_COUNT * sizeof(float));
+		CommandList->setPermanentBufferState(DepthSliceBoundsViewspaceBufferHandle, nvrhi::ResourceStates::ShaderResource);
+		InitalizedDepthBound = true;
+	}
+
+	struct FLightGridConstantBuffer
+	{
+		Matrix InvProjection;
+		uint32_t Width;
+		float InvWidth;
+		uint32_t Height;
+		float InvHeight;
+	} CBuffer;
+	CBuffer.InvProjection = Scene->SceneInfo.MainCameraProj.Invert();
+	CBuffer.Width = TileCountX;
+	CBuffer.Height = TileCountY;
+	CBuffer.InvWidth = 1.f / CBuffer.Width;
+	CBuffer.InvHeight = 1.f / CBuffer.Height;
+	
+	//create the constant buffer
+	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FLightGridConstantBuffer), "LightGrid ConstantBuffer", 1));
+	CommandList->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(FLightGridConstantBuffer));
+	//create the binding set
+	nvrhi::BindingSetDesc BindingSetDesc;
+	BindingSetDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, DepthSliceBoundsClipspaceBufferHandle),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(0, LightGridBoundingBoxBufferHandle),
+	};
+	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
+	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);
+
+	//pipeline descs
+	nvrhi::ComputePipelineDesc CullingPipelineDesc;
+	CullingPipelineDesc.bindingLayouts = { BindingSetHandle->getLayout() };
+	nvrhi::ShaderHandle CullingShader = AssetManager::GetInstance()->GetShader("UpdateBoundingBox.cs.cso");
+	CullingPipelineDesc.CS = CullingShader;
+
+	nvrhi::ComputeState state;
+	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(CullingPipelineDesc);
+	state.bindings = { BindingSetHandle };
+	CommandList->setComputeState(state);
+	CommandList->dispatch(CBuffer.Width / 8 + (CBuffer.Width % 8 ? 1 : 0), CBuffer.Height / 8 + (CBuffer.Height % 8 ? 1 : 0), 1);
+	CommandList->endMarker();
+}
+
+void ragdoll::FGPUScene::CullLightGrid(const SceneInformation& SceneInfo, nvrhi::CommandListHandle CommandList, ragdoll::SceneRenderTargets* RenderTargets)
+{
+	CommandList->beginMarker("Cull Light Grid");
+	struct FLightGridCullConstantBuffer {
+		Matrix View;
+		Matrix InverseProjectionWithJitter;
+		uint32_t LightGridCount;
+		uint32_t LightCount;
+		uint32_t TextureWidth;
+		uint32_t TextureHeight;
+		uint32_t FieldsNeeded;
+		uint32_t DepthWidth;
+		uint32_t DepthHeight;
+		uint32_t MipBaseWidth;
+		uint32_t MipBaseHeight;
+	} CBuffer;
+	CBuffer.View = SceneInfo.MainCameraView;
+	CBuffer.InverseProjectionWithJitter = SceneInfo.MainCameraProjWithJitter.Invert();
+	CBuffer.LightGridCount = LightGridCount;
+	CBuffer.LightCount = PointLightCount;
+	CBuffer.TextureWidth = TileCountX;
+	CBuffer.TextureHeight = TileCountY;
+	CBuffer.FieldsNeeded = FieldsNeeded;
+	CBuffer.DepthWidth = RenderTargets->CurrDepthBuffer->getDesc().width;
+	CBuffer.DepthHeight = RenderTargets->CurrDepthBuffer->getDesc().height;
+	CBuffer.MipBaseWidth = RenderTargets->HZBMips->getDesc().width;
+	CBuffer.MipBaseHeight = RenderTargets->HZBMips->getDesc().height;
+
+	//create the constant buffer
+	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FLightGridCullConstantBuffer), "LightGridCull ConstantBuffer", 1));
+	CommandList->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(FLightGridCullConstantBuffer));
+	//create the binding set
+	nvrhi::BindingSetDesc BindingSetDesc;
+	BindingSetDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, LightGridBoundingBoxBufferHandle),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(1, PointLightBufferHandle),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(2, DepthSliceBoundsViewspaceBufferHandle),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(0, LightBitFieldsBufferHandle),
+	};
+	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
+	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);
+
+	nvrhi::ComputePipelineDesc CullingPipelineDesc;
+	CullingPipelineDesc.bindingLayouts = { BindingSetHandle->getLayout() };
+	nvrhi::ShaderHandle CullingShader = AssetManager::GetInstance()->GetShader("CullLights.cs.cso");
+	CullingPipelineDesc.CS = CullingShader;
+
+	nvrhi::ComputeState state;
+	state.pipeline = AssetManager::GetInstance()->GetComputePipeline(CullingPipelineDesc);
+	state.bindings = { BindingSetHandle };
+	CommandList->setComputeState(state);
+	CommandList->dispatch(LightGridCount / 64 + (LightGridCount % 64 ? 1 : 0), 1, 1);
+	CommandList->endMarker();
 }
 
 void ragdoll::FGPUScene::ExtractFrustumPlanes(Vector4 OutPlanes[6], const Matrix& Projection, const Matrix& View)
@@ -327,7 +474,7 @@ void ragdoll::FGPUScene::OcclusionCullPhase1(
 	nvrhi::BindingSetDesc BindingSetDesc;
 	BindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-		nvrhi::BindingSetItem::Texture_SRV(0, Targets->HZBMips, nvrhi::Format::D32, nvrhi::AllSubresources),
+		nvrhi::BindingSetItem::Texture_SRV(0, Targets->HZBMips, nvrhi::Format::RG32_FLOAT, nvrhi::AllSubresources),
 		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp_Reduction]),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_DATA_BUFFER_SRV_SLOT, InstanceBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(MESH_BUFFER_SRV_SLOT, MeshBuffer),
@@ -387,7 +534,7 @@ nvrhi::BufferHandle ragdoll::FGPUScene::OcclusionCullPhase2(
 	nvrhi::BindingSetDesc BindingSetDesc;
 	BindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-		nvrhi::BindingSetItem::Texture_SRV(0, Targets->HZBMips, nvrhi::Format::D32, nvrhi::AllSubresources),
+		nvrhi::BindingSetItem::Texture_SRV(0, Targets->HZBMips, nvrhi::Format::RG32_FLOAT, nvrhi::AllSubresources),
 		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp_Reduction]),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_DATA_BUFFER_SRV_SLOT, InstanceBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(MESH_BUFFER_SRV_SLOT, MeshBuffer),
@@ -447,11 +594,11 @@ void ragdoll::FGPUScene::BuildHZB(nvrhi::CommandListHandle CommandList, SceneRen
 	{
 		if (i < Targets->HZBMips->getDesc().mipLevels)
 		{
-			BindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_UAV(i, Targets->HZBMips, nvrhi::Format::D32, { i, 1, 0, 1 }));
+			BindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_UAV(i, Targets->HZBMips, nvrhi::Format::RG32_FLOAT, { i, 1, 0, 1 }));
 		}
 		else
 		{
-			BindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_UAV(i, Targets->HZBMips, nvrhi::Format::D32, { 0, 1, 0, 1 }));
+			BindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_UAV(i, Targets->HZBMips, nvrhi::Format::RG32_FLOAT, { 0, 1, 0, 1 }));
 		}
 	}
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
@@ -541,4 +688,38 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	Phase2NonOccludedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
 	CountBufferDesc.debugName = "Phase2OccludedCountBuffer";
 	Phase2OccludedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+
+	nvrhi::BufferDesc PointLightBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(PointLightProxy) * MAX_LIGHT_COUNT, "PointLightBuffer");
+	PointLightBufferDesc.structStride = sizeof(PointLightProxy);
+	PointLightBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(PointLightBufferDesc);
+}
+
+void ragdoll::FGPUScene::CreateLightGrid(Scene* Scene)
+{
+	TileCountX = Scene->SceneInfo.RenderWidth / TILE_SIZE + (Scene->SceneInfo.RenderWidth % TILE_SIZE ? 1 : 0);
+	TileCountY = Scene->SceneInfo.RenderHeight / TILE_SIZE + (Scene->SceneInfo.RenderHeight % TILE_SIZE ? 1 : 0);
+	TileCountZ = DEPTH_SLICE_COUNT - 1;
+
+	LightGridCount = TileCountX * TileCountY * TileCountZ;
+	nvrhi::BufferDesc LightGridBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(FBoundingBox) * LightGridCount, "LightGridBoundingBoxBuffer");
+	LightGridBufferDesc.structStride = sizeof(FBoundingBox);
+	LightGridBufferDesc.canHaveUAVs = true;
+	LightGridBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	LightGridBufferDesc.keepInitialState = true;
+	LightGridBoundingBoxBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(LightGridBufferDesc);
+
+	FieldsNeeded = Scene->PointLightProxies.size() / 32 + (Scene->PointLightProxies.size() % 32 ? 1 : 0);
+	if (FieldsNeeded == 0)
+	{
+		FieldsNeeded = 1;
+	}
+	nvrhi::BufferDesc LightBitFieldsBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(uint32_t) * FieldsNeeded * LightGridCount, "LightBitFieldsBuffer");
+	LightBitFieldsBufferDesc.structStride = sizeof(uint32_t);
+	LightBitFieldsBufferDesc.canHaveUAVs = true;
+	LightBitFieldsBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	LightBitFieldsBufferDesc.keepInitialState = true;
+	LightBitFieldsBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(LightBitFieldsBufferDesc);
+
+	DepthSliceBoundsClipspaceBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateStaticConstantBufferDesc(DEPTH_SLICE_COUNT * sizeof(float), "LightGridDepthBoundsClipspaceBuffer").setStructStride(sizeof(float)));
+	DepthSliceBoundsViewspaceBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateStaticConstantBufferDesc(DEPTH_SLICE_COUNT * sizeof(float), "LightGridDepthBoundsViewspaceBuffer").setStructStride(sizeof(float)));
 }

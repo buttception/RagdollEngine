@@ -50,6 +50,13 @@ float3 DepthToWorld(float depth, float2 inTexcoord, float4x4 InvViewProj)
     return homogenousPos.xyz / homogenousPos.w;;
 }
 
+float3 DepthToView(float depth, float2 inTexcoord, float4x4 InvProj)
+{
+    float4 clipspacePos = float4(ViewportUVToScreenPos(inTexcoord), depth, 1.0);
+    float4 homogenousPos = mul(clipspacePos, InvProj);
+    return homogenousPos.xyz / homogenousPos.w;
+}
+
 float3 WorldToLight(float3 fragPos, float4x4 lightMatrix, float bias)
 {
     float4 fragPosLightSpace = mul(float4(fragPos, 1.f), lightMatrix);

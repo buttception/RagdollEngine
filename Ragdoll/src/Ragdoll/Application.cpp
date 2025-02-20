@@ -148,7 +148,9 @@ namespace ragdoll
 
 		//scenes are always static now so update the gpu scene instance buffer once
 		m_Scene->PopulateStaticProxies();
-		m_Scene->GPUScene->UpdateInstanceBuffer(m_Scene->StaticProxies);
+		m_Scene->PopulateLightProxies();
+		m_Scene->GPUScene->UpdateBuffers(m_Scene.get());
+		m_Scene->GPUScene->CreateLightGrid(m_Scene.get());
 		m_Scene->ResetTransformDirtyFlags();
 	}
 

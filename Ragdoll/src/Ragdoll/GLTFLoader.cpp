@@ -10,6 +10,7 @@
 
 #include "Ragdoll/Components/TransformComp.h"
 #include "Ragdoll/Components/RenderableComp.h"
+#include "Ragdoll/Components/PointLightComp.h"
 #include "Scene.h"
 
 // Define these only in *one* .cc file.
@@ -95,6 +96,18 @@ ragdoll::Guid TraverseNode(int32_t currIndex, int32_t level, uint32_t meshIndice
 				break;
 			}
 		}
+	}
+
+	if (curr.light >= 0)
+	{
+		PointLightComp* lightComp = em->AddComponent<PointLightComp>(ent);
+		const tinygltf::Light& light = model.lights[curr.light];
+		if (light.color.size() == 0)
+			lightComp->Color = { 1.f, 1.f, 1.f };
+		else
+			lightComp->Color = { (float)light.color[0], (float)light.color[1], (float)light.color[2] };
+		lightComp->Intensity = (float)light.intensity;
+		lightComp->Range = (float)light.range;
 	}
 
 	const tinygltf::Node& parent = model.nodes[currIndex];

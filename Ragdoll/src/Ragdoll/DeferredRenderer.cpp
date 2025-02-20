@@ -155,7 +155,7 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 			scene->SceneInfo,
 			scene->DebugInfo,
 			RenderTargets,
-			true);
+			scene->SceneInfo.bEnableOcclusionCull);
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::GBUFFER]);
 
@@ -196,9 +196,18 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_MASK]);
 
-	Taskflow.emplace([this, &scene]() {
-		DeferredLightPass->LightPass(scene->SceneInfo, RenderTargets);
-	});
+	if (scene->DebugInfo.bEnableLightGrid)
+	{
+		Taskflow.emplace([this, &scene, GPUScene]() {
+			DeferredLightPass->LightGridPass(scene->SceneInfo, RenderTargets, GPUScene);
+		});
+	}
+	else 
+	{
+		Taskflow.emplace([this, &scene, GPUScene]() {
+			DeferredLightPass->LightPass(scene->SceneInfo, RenderTargets, GPUScene);
+		});
+	}
 	activeList.emplace_back(CommandLists[(int)Pass::LIGHT]);
 
 	Taskflow.emplace([this, &scene]() {
@@ -206,10 +215,13 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::SKY]);
 
-	Taskflow.emplace([this, &scene]() {
-		BloomPass->Bloom(scene->SceneInfo, RenderTargets);
-	});
-	activeList.emplace_back(CommandLists[(int)Pass::BLOOM]);
+	if (scene->SceneInfo.bEnableBloom)
+	{
+		Taskflow.emplace([this, &scene]() {
+			BloomPass->Bloom(scene->SceneInfo, RenderTargets);
+			});
+		activeList.emplace_back(CommandLists[(int)Pass::BLOOM]);
+	}
 
 	Taskflow.emplace([this, _dt]() {
 		AutomaticExposurePass->GetAdaptedLuminance(_dt, RenderTargets);

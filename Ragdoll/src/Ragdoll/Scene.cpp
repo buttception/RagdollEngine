@@ -42,7 +42,6 @@ ragdoll::Scene::Scene(Application* app)
 		CreateCustomMeshes();
 	}
 	Config.bDrawBoxes = app->Config.bDrawDebugBoundingBoxes;
-	Config.bDrawOctree = app->Config.bDrawDebugOctree;
 	ImguiInterface = std::make_shared<ImguiRenderer>();
 	ImguiInterface->Init(DirectXDevice::GetInstance());
 
@@ -119,7 +118,10 @@ void ragdoll::Scene::Update(float _dt)
 			SceneInfo.JitterX = 0.f;
 			SceneInfo.JitterY = 0.f;
 		}
-		SceneInfo.MainCameraViewProjWithAA = SceneInfo.MainCameraView * Proj;
+		SceneInfo.PrevMainCameraProjWithJitter = SceneInfo.MainCameraProjWithJitter;
+		SceneInfo.MainCameraProjWithJitter = Proj;
+		SceneInfo.PrevMainCameraViewProjWithJitter = SceneInfo.MainCameraViewProjWithJitter;
+		SceneInfo.MainCameraViewProjWithJitter = SceneInfo.MainCameraView * Proj;
 	}
 
 	if (SceneInfo.bIsCameraDirty)
@@ -138,6 +140,7 @@ void ragdoll::Scene::Update(float _dt)
 		CreateRenderTargets();
 	}
 
+	GPUScene->Update(this);
 	DeferredRenderer->Render(this, GPUScene.get(), _dt, ImguiInterface);
 
 	DirectXDevice::GetInstance()->Present();
@@ -291,14 +294,14 @@ void ragdoll::Scene::CreateRenderTargets()
 		depthBufferDesc.height <<= 1;
 	depthBufferDesc.width >>= 1;
 	depthBufferDesc.height >>= 1;
-	depthBufferDesc.format = nvrhi::Format::D32;
+	depthBufferDesc.format = nvrhi::Format::RG32_FLOAT;
 	depthBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	depthBufferDesc.isUAV = true;
 	depthBufferDesc.keepInitialState = true;
 	depthBufferDesc.debugName = "HZB";
 	depthBufferDesc.dimension = nvrhi::TextureDimension::Texture2DArray;
 	depthBufferDesc.arraySize = 1;
-	depthBufferDesc.mipLevels = log2(std::max(depthBufferDesc.width, depthBufferDesc.height)) + 1;
+	depthBufferDesc.mipLevels = log2(std::max(depthBufferDesc.width, depthBufferDesc.height)) - 1;
 	RenderTargets.HZBMips = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
 
 	nvrhi::TextureDesc texDesc;
@@ -647,6 +650,51 @@ void ragdoll::Scene::PopulateStaticProxies()
 	}
 }
 
+float ComputeLightRange(float intensity, float k1, float k2, float minIntensity)
+{
+	// Compute the constant C for the quadratic equation
+	float C = 1.0f - (intensity / minIntensity);
+
+	// Compute the discriminant of the quadratic equation
+	float discriminant = k1 * k1 - 4.0f * k2 * C;
+
+	// If the discriminant is negative, return 0 (no valid range)
+	if (discriminant < 0.0f)
+		return 0.0f;
+
+	// Compute the positive root of the quadratic equation
+	float D = (-k1 + std::sqrt(discriminant)) / (2.0f * k2);
+	return (D > 0.0f) ? D : 0.0f; // Ensure range is non-negative
+}
+
+void ragdoll::Scene::PopulateLightProxies()
+{
+	PointLightProxies.clear();
+	auto EcsView = EntityManagerRef->GetRegistry().view<PointLightComp, TransformComp>();
+	for (const entt::entity& ent : EcsView) {
+		TransformComp* tComp = EntityManagerRef->GetComponent<TransformComp>(ent);
+		PointLightComp* lComp = EntityManagerRef->GetComponent<PointLightComp>(ent);
+		PointLightProxies.emplace_back();
+		PointLightProxy& Proxy = PointLightProxies.back();
+		Proxy.Color.x = lComp->Color.x;
+		Proxy.Color.y = lComp->Color.y;
+		Proxy.Color.z = lComp->Color.z;
+		if (lComp->Range == 0.f)//no range, derive range for attenuation
+		{
+			constexpr float k1 = 0.7f;
+			constexpr float k2 = 1.8f;
+			constexpr float minIntensity = 0.01f;
+			Proxy.Color.w = ComputeLightRange(lComp->Intensity, k1, k2, minIntensity);
+		}
+		else
+			Proxy.Color.w = lComp->Range;
+		Proxy.Position.x = tComp->m_LocalPosition.x;
+		Proxy.Position.y = tComp->m_LocalPosition.y;
+		Proxy.Position.z = tComp->m_LocalPosition.z;
+		Proxy.Position.w = lComp->Intensity;
+	}
+}
+
 Matrix ComputePlaneTransform(const Vector4& plane, float width, float height)
 {
 	// Normalize the plane normal
@@ -703,6 +751,19 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 			debugData.Color = { 0.f, 1.f, 0.f, 1.f };
 			instances.emplace_back(debugData);
 		}
+	}
+	//draw the light proxies
+	for (int i = 0; i < PointLightProxies.size(); ++i)
+	{
+		InstanceData debugData;
+		Vector3 translate = Vector3(PointLightProxies[i].Position.x, PointLightProxies[i].Position.y, PointLightProxies[i].Position.z);
+		Vector3 scale = Vector3::One * 0.1f;
+		Matrix matrix = Matrix::CreateScale(scale);
+		matrix *= Matrix::CreateTranslation(translate);
+		debugData.ModelToWorld = matrix;
+		debugData.bIsLit = false;
+		debugData.Color = { PointLightProxies[i].Color.x, PointLightProxies[i].Color.y, PointLightProxies[i].Color.z, 1.f};
+		instances.emplace_back(debugData);
 	}
 
 	if (SceneInfo.EnableCascadeDebug) {
@@ -1008,60 +1069,5 @@ void ragdoll::Scene::HaltonSequence(Vector2 RenderRes, Vector2 TargetRes)
 		}
 		JitterOffsetsX[i - 1] = (ValueX - 0.5); //range [-0.5, 0.5]
 		JitterOffsetsY[i - 1] = (ValueY - 0.5); //range [-0.5, 0.5]
-	}
-}
-
-void ragdoll::Scene::AddOctantDebug(const Octant& octant, int32_t level)
-{
-	if (octant.bIsCulled)
-		return;
-	static constexpr Vector4 colors[] = {
-		 {1.0f, 0.0f, 0.0f, 1.0f},  // Red
-		{0.0f, 0.0f, 1.0f, 1.0f},  // Blue
-		{1.0f, 1.0f, 0.0f, 1.0f},  // Yellow
-		{1.0f, 0.0f, 1.0f, 1.0f},  // Magenta
-		{0.0f, 1.0f, 1.0f, 1.0f},  // Cyan
-		{1.0f, 0.5f, 0.0f, 1.0f},  // Orange
-		{0.5f, 0.0f, 0.5f, 1.0f},  // Purple
-		{0.5f, 1.0f, 0.5f, 1.0f},  // Light Green
-		{0.5f, 0.5f, 1.0f, 1.0f},  // Lavender
-		{0.75f, 0.25f, 0.5f, 1.0f},// Pink
-		{0.25f, 0.5f, 0.75f, 1.0f},// Steel Blue
-		{0.8f, 0.7f, 0.6f, 1.0f},  // Beige
-		{0.6f, 0.4f, 0.2f, 1.0f},  // Brown
-		{0.9f, 0.9f, 0.9f, 1.0f},  // Light Grey
-		{0.4f, 0.4f, 0.4f, 1.0f},  // Dark Grey
-		{0.7f, 0.3f, 0.3f, 1.0f},  // Salmon
-		{0.2f, 0.6f, 0.2f, 1.0f},  // Dark Green
-		{0.3f, 0.7f, 0.8f, 1.0f},  // Sky Blue
-		{0.9f, 0.4f, 0.2f, 1.0f},  // Coral
-		{0.5f, 0.5f, 0.0f, 1.0f},  // Olive
-		{0.6f, 0.2f, 0.8f, 1.0f},  // Violet
-		{0.2f, 0.2f, 0.6f, 1.0f},  // Navy Blue
-		{0.4f, 0.2f, 0.1f, 1.0f},  // Chocolate
-		{0.7f, 0.7f, 0.0f, 1.0f},  // Mustard
-		{0.2f, 0.7f, 0.5f, 1.0f},  // Teal
-		{0.9f, 0.7f, 0.5f, 1.0f},  // Peach
-		{0.7f, 0.4f, 0.4f, 1.0f},  // Light Brown
-		{0.5f, 0.8f, 0.6f, 1.0f},  // Mint
-		{0.6f, 0.6f, 1.0f, 1.0f},  // Light Blue
-		{0.9f, 0.3f, 0.3f, 1.0f},  // Crimson
-		{0.3f, 0.9f, 0.6f, 1.0f}   // Aquamarine
-	};
-	if (level >= Config.DrawOctreeLevelMin && level <= Config.DrawOctreeLevelMax)
-	{
-		InstanceData debugData;
-		Vector3 translate = octant.Box.Center;
-		Vector3 scale = octant.Box.Extents;
-		Matrix matrix = Matrix::CreateScale(scale);
-		matrix *= Matrix::CreateTranslation(translate);
-		debugData.ModelToWorld = matrix;
-		debugData.bIsLit = false;
-		debugData.Color = colors[level];
-		StaticDebugInstanceDatas.emplace_back(debugData);
-	}
-	for (const Octant& itOctant : octant.Octants)
-	{
-		AddOctantDebug(itOctant, level + 1);
 	}
 }

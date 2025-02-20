@@ -1,7 +1,9 @@
 struct FBoundingBox
 {
     float3 Center;
+    float pad0;
     float3 Extents;
+    float pad1;
 };
 
 //used in compute shader to populate indirect calls

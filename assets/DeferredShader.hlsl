@@ -2,6 +2,9 @@
 #include "ShadingModel.hlsli"
 #include "Utils.hlsli"
 
+#define TILE_SIZE 64
+#define DEPTH_SLICE_COUNT 17
+
 cbuffer g_Const : register(b0) {
 	float4x4 viewProjMatrix;
 	float4x4 viewProjMatrixWithAA;
@@ -100,11 +103,26 @@ void gbuffer_ps(
 
 cbuffer g_LightConst : register(b1) {
 	float4x4 InvViewProjMatrix;
+    float4x4 View;
 	float4 LightDiffuseColor;
 	float4 SceneAmbientColor;
 	float3 LightDirection;
 	float LightIntensity;
 	float3 CameraPosition;
+    uint PointLightCount;
+    float2 ScreenSize;
+    float2 GridSize;
+    uint FieldsNeeded;
+};
+
+struct PointLightProxy
+{
+	//xyz is position, w is intensity
+    float4 Position;
+	//float Intensity;
+	//rgb is color, w is maximum range
+    float4 Color;
+	//float Range;
 };
 
 Texture2D albedoTexture : register(t0);
@@ -113,6 +131,7 @@ Texture2D RMTexture : register(t2);
 Texture2D AOTexture : register(t3);
 Texture2D DepthBuffer : register(t4);
 Texture2D ShadowMask : register(t5);
+StructuredBuffer<PointLightProxy> PointLights : register(t6);
 
 void deferred_light_ps(
 	in float4 inPos : SV_Position,
@@ -133,8 +152,90 @@ void deferred_light_ps(
 	//apply pbr lighting, AO is 1.f for now so it does nth
 	//float3 diffuse = max(dot(N, LightDirection), 0) * albedo.rgb;
 	float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.y, RM.x, AO);
-
-	float3 ambient = SceneAmbientColor.rgb * albedo.rgb * AO;
-	float3 lighting = ambient + diffuse * (1.f - shadowFactor.a);
+	
+    float3 ambient = SceneAmbientColor.rgb * albedo.rgb * AO;
+    float3 lighting = ambient + diffuse * (1.f - shadowFactor.a);
+	
+    for (int i = 0; i < PointLightCount; i++)
+    {
+        float3 LightDir = PointLights[i].Position.xyz - fragPos;
+        float Dist = length(LightDir);
+        if (PointLights[i].Color.w != 0.f && Dist > PointLights[i].Color.w)
+            continue;
+        LightDir /= Dist;
+        float k1 = 0.7; // Linear term
+        float k2 = 1.8; // Quadratic term
+        float Attenuation = saturate(1.0 / (1.0 + k1 * Dist + k2 * (Dist * Dist)));
+        lighting += PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDir, PointLights[i].Color.rgb * PointLights[i].Position.w, RM.y, RM.x, AO) * Attenuation;
+    }
 	outColor = lighting * shadowFactor.rgb;
+}
+
+//StructuredBuffer<uint> LightBitFieldsInput : register(t7);
+StructuredBuffer<float> DepthSliceBoundsViewspaceInput : register(t8);
+StructuredBuffer<FBoundingBox> BoundingBoxBufferInput : register(t9);
+RWStructuredBuffer<uint> LightBitFieldsInput : register(u0);
+
+void deferred_light_grid_ps(
+	in float4 inPos : SV_Position,
+	in float2 inTexcoord : TEXCOORD0,
+	out float3 outColor : SV_Target0
+)
+{
+	//getting texture values
+    float4 albedo = albedoTexture.Sample(Samplers[6], inTexcoord);
+    float3 N = Decode(normalTexture.Sample(Samplers[6], inTexcoord).xy);
+    float2 RM = RMTexture.Sample(Samplers[6], inTexcoord).xy;
+    float AO = AOTexture.Sample(Samplers[6], inTexcoord).x;
+    float4 shadowFactor = ShadowMask.Sample(Samplers[6], inTexcoord);
+
+	//getting the positions
+    float depth = DepthBuffer.Sample(Samplers[6], inTexcoord).r;
+    float3 fragPos = DepthToWorld(depth, inTexcoord, InvViewProjMatrix);
+    float3 viewPos = mul(float4(fragPos, 1), View).xyz;
+
+	//apply pbr lighting, AO is 1.f for now so it does nth
+	//float3 diffuse = max(dot(N, LightDirection), 0) * albedo.rgb;
+    float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.y, RM.x, AO);
+	
+    float3 ambient = SceneAmbientColor.rgb * albedo.rgb * AO;
+    float3 lighting = ambient + diffuse * (1.f - shadowFactor.a);
+	
+	//get which slice this pixel is in
+    uint X = floor(inTexcoord.x * GridSize.x);
+    uint Y = floor((1.f - inTexcoord.y) * GridSize.y);
+    uint Z = 0;
+    for (int i = 0; i < DEPTH_SLICE_COUNT - 1; ++i)
+    {
+        FBoundingBox Box = BoundingBoxBufferInput[X + Y * GridSize.x + i * GridSize.x * GridSize.y];
+        if (viewPos.z < (Box.Center.z + Box.Extents.z) && viewPos.z > (Box.Center.z - Box.Extents.z))
+        {
+            Z = i;
+            break;
+        }
+    }
+	//get the index to the light list and count
+    uint TileIndex = X + Y * GridSize.x + Z * GridSize.x * GridSize.y;
+    uint BitFieldIndex = TileIndex * FieldsNeeded;
+    for (uint Bucket = 0; Bucket < FieldsNeeded; ++Bucket)
+    {
+        uint BucketBits = LightBitFieldsInput[BitFieldIndex + Bucket];
+        while (BucketBits != 0)
+        {
+            const uint BucketBitIndex = firstbitlow(BucketBits);
+            const uint LightIndex = Bucket * 32 + BucketBitIndex;
+            BucketBits ^= 1 << BucketBitIndex;
+			
+            float3 LightDir = PointLights[LightIndex].Position.xyz - fragPos;
+            float Dist = length(LightDir);
+            if (PointLights[LightIndex].Color.w != 0.f && Dist > PointLights[LightIndex].Color.w)
+                continue;
+            LightDir /= Dist;
+            float k1 = 0.7; // Linear term
+            float k2 = 1.8; // Quadratic term
+            float Attenuation = saturate(1.0 / (1.0 + k1 * Dist + k2 * (Dist * Dist)));
+            lighting += PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDir, PointLights[LightIndex].Color.rgb * PointLights[LightIndex].Position.w, RM.y, RM.x, AO) * Attenuation;
+        }
+    }
+    outColor = lighting * shadowFactor.rgb;
 }

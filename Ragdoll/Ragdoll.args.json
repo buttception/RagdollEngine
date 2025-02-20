@@ -42,6 +42,10 @@
         },
         {
           "Id": "cf475ba1-1513-4a2d-bdd1-450d2047223f",
+          "Command": "--sample \"LightsPunctualLamp\""
+        },
+        {
+          "Id": "125a2791-f8c0-4f37-ac56-fb69a5a1388d",
           "Command": "--sample \"Sponza\""
         },
         {
@@ -51,6 +55,14 @@
         {
           "Id": "395cbeaa-ee05-47d8-8240-23067e17d7e7",
           "Command": "--scene \"other_gltf/Bistro/bistro.gltf\""
+        },
+        {
+          "Id": "6931d7b9-9ea1-4de0-b321-90c46acd4bf1",
+          "Command": "--scene \"other_gltf/SponzaSingleLight/SponzaSingleLight.gltf\""
+        },
+        {
+          "Id": "3c5485aa-f98f-4568-ad6d-00ffd1e48294",
+          "Command": "--scene \"other_gltf/SponzaMultiLights/SponzaMultiLights.gltf\""
         },
         {
           "Id": "efe8be07-0ecf-4550-99c9-8d2954b547cf",
