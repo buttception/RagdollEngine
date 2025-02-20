@@ -314,13 +314,10 @@ void ragdoll::FGPUScene::CullLightGrid(const SceneInformation& SceneInfo, nvrhi:
 	nvrhi::BindingSetDesc BindingSetDesc;
 	BindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-		nvrhi::BindingSetItem::Texture_SRV(0, RenderTargets->CurrDepthBuffer),
-		nvrhi::BindingSetItem::Texture_SRV(1, RenderTargets->HZBMips),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(2, LightGridBoundingBoxBufferHandle),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(3, PointLightBufferHandle),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(4, DepthSliceBoundsViewspaceBufferHandle),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, LightGridBoundingBoxBufferHandle),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(1, PointLightBufferHandle),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(2, DepthSliceBoundsViewspaceBufferHandle),
 		nvrhi::BindingSetItem::StructuredBuffer_UAV(0, LightBitFieldsBufferHandle),
-		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp]),
 	};
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
 	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);

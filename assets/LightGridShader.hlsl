@@ -92,14 +92,10 @@ cbuffer g_Const : register(b0)
     uint MipBaseHeight;
 };
 
-Texture2D<float> DepthBuffer : register(t0);
-Texture2D<float2> HZBMips : register(t1);
-StructuredBuffer<FBoundingBox> BoundingBoxBufferInput : register(t2);
-StructuredBuffer<PointLightProxy> PointLightBufferInput : register(t3);
-StructuredBuffer<float> DepthBoundsViewspace : register(t4);
+StructuredBuffer<FBoundingBox> BoundingBoxBufferInput : register(t0);
+StructuredBuffer<PointLightProxy> PointLightBufferInput : register(t1);
+StructuredBuffer<float> DepthBoundsViewspace : register(t2);
 RWStructuredBuffer<uint> LightBitFieldsBufferOutput : register(u0);
-
-sampler SamplerPoint : register(s0);
 
 bool IsLightInsideTile(FBoundingBox Tile, float3 Position, float Range)
 {
@@ -126,33 +122,11 @@ void CullLightsCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, u
     float2 InvRes = float2(1.f / TextureWidth, 1.f / TextureHeight);
     float2 UV = InvRes * float2(X, Y) + InvRes * 0.5f.xx;
     UV.y = 1.f - UV.y;
-    //get the correct mip to read from the min max hzb, reduce mip by 1 as hzb is half render size
-    float Size = max(InvRes.x * MipBaseWidth, InvRes.y * MipBaseHeight);
-    float Mip = max(0, ceil(log2(Size)));
-    float2 Depths[4] =
-    {
-        { HZBMips.SampleLevel(SamplerPoint, UV + float2(-InvRes.x * 0.5f, -InvRes.y * 0.5f), Mip) },
-        { HZBMips.SampleLevel(SamplerPoint, UV + float2(InvRes.x * 0.5f, -InvRes.y), Mip) },
-        { HZBMips.SampleLevel(SamplerPoint, UV + float2(-InvRes.x * 0.5f, InvRes.y * 0.5f), Mip) },
-        { HZBMips.SampleLevel(SamplerPoint, UV + float2(InvRes.x * 0.5f, InvRes.y * 0.5f), Mip) },
-    };
-    float2 DepthRange = float2(min(min(Depths[0].x, Depths[1].x), min(Depths[2].x, Depths[3].x)), max(max(Depths[0].y, Depths[1].y), max(Depths[2].y, Depths[3].y)));
-    //get min max of the tile in view space, the smaller value is max due to reverse Z
-    float4 ProjPos = mul(float4(float3(UV, DepthRange.x), 1.0), InverseProjectionWithJitter);
-    float MaxZ = ProjPos.z / ProjPos.w;
-    ProjPos = mul(float4(float3(UV, DepthRange.y), 1.0), InverseProjectionWithJitter);
-    float MinZ = ProjPos.z / ProjPos.w;
-    FBoundingBox Tile = BoundingBoxBufferInput[DTid.x];
-    //test if the tile is inside the depth range
-    if (MaxZ < Tile.Center.z - Tile.Extents.z - 0.001f || MinZ > Tile.Center.z + Tile.Extents.z + 0.001f)
-        return;
     for (int j = 0; j < LightCount; ++j)
     {
         PointLightProxy Light = PointLightBufferInput[j];
         float3 LightViewSpacePosition = mul(float4(Light.Position.xyz, 1.f), View).xyz;
-        if (LightViewSpacePosition.z + PointLightBufferInput[j].Color.w < MinZ || LightViewSpacePosition.z - PointLightBufferInput[j].Color.w > MaxZ)
-            continue;
-        if (IsLightInsideTile(Tile, LightViewSpacePosition, PointLightBufferInput[j].Color.w))
+        if (IsLightInsideTile(BoundingBoxBufferInput[DTid.x], LightViewSpacePosition, PointLightBufferInput[j].Color.w))
         {
             const uint BucketIndex = j / 32;
             const uint BucketPlace = j % 32;
