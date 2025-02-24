@@ -123,7 +123,7 @@ void GBufferPass::DrawAllInstances(
 	PipelineDesc.renderState.depthStencilState.stencilEnable = false;
 	PipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
 	PipelineDesc.renderState.depthStencilState.depthFunc = nvrhi::ComparisonFunc::Greater;
-	PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+	PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::Back;
 	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 	PipelineDesc.inputLayout = AssetManager::GetInstance()->InstancedInputLayoutHandle;
 
@@ -155,7 +155,7 @@ void GBufferPass::DrawAllInstances(
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
 
 	CommandListRef->setGraphicsState(state);
-	CommandListRef->drawIndexedIndirect(0, CountBuffer, AssetManager::GetInstance()->VertexBufferInfos.size());
+	CommandListRef->drawIndexedIndirect(0, CountBuffer, ProxyCount);
 
 	CommandListRef->endMarker();
 }

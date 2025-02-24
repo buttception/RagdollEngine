@@ -294,14 +294,14 @@ void ragdoll::Scene::CreateRenderTargets()
 		depthBufferDesc.height <<= 1;
 	depthBufferDesc.width >>= 1;
 	depthBufferDesc.height >>= 1;
-	depthBufferDesc.format = nvrhi::Format::RG32_FLOAT;
+	depthBufferDesc.format = nvrhi::Format::D32;
 	depthBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	depthBufferDesc.isUAV = true;
 	depthBufferDesc.keepInitialState = true;
 	depthBufferDesc.debugName = "HZB";
 	depthBufferDesc.dimension = nvrhi::TextureDimension::Texture2DArray;
 	depthBufferDesc.arraySize = 1;
-	depthBufferDesc.mipLevels = log2(std::max(depthBufferDesc.width, depthBufferDesc.height)) - 1;
+	depthBufferDesc.mipLevels = log2(std::max(depthBufferDesc.width, depthBufferDesc.height));
 	RenderTargets.HZBMips = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
 
 	nvrhi::TextureDesc texDesc;
@@ -343,7 +343,7 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "TemporalColor1";
 	RenderTargets.TemporalColor1 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
-	texDesc.format = nvrhi::Format::RGBA16_FLOAT;
+	texDesc.format = nvrhi::Format::RG16_FLOAT;
 	texDesc.debugName = "VelocityBuffer";
 	RenderTargets.VelocityBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
@@ -413,7 +413,7 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "SceneColor";
 	RenderTargets.SceneColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
-	texDesc.format = nvrhi::Format::RGBA16_UNORM;
+	texDesc.format = nvrhi::Format::RG16_UNORM;
 	texDesc.debugName = "GBufferNormal";
 	RenderTargets.GBufferNormal = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 

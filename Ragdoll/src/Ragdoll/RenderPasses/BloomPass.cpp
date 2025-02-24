@@ -145,6 +145,13 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity, ragdoll::Scen
 	}
 	CommandListRef->endMarker();
 	{
+		struct CBuffer {
+			Vector2 TexcoordAdd, TexcoordMul;
+		} cbuffer;
+		cbuffer.TexcoordAdd = Vector2(0.f, 0.f);
+		cbuffer.TexcoordMul = Vector2(1.f, 1.f);
+		nvrhi::BufferHandle constbuf = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(CBuffer), "Mix Pass CBuffer", 1));
+		CommandListRef->writeBuffer(constbuf, &cbuffer, sizeof(CBuffer));
 		//copy the result into scene color
 		//create the target
 		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
@@ -153,6 +160,7 @@ void BloomPass::UpSample(float filterRadius, float bloomIntensity, ragdoll::Scen
 		//create the binding set and layout
 		nvrhi::BindingSetDesc bindingSetDesc;
 		bindingSetDesc.bindings = {
+			nvrhi::BindingSetItem::ConstantBuffer(0, constbuf),
 			nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[5]),
 			nvrhi::BindingSetItem::Texture_SRV(0, targets->DownsampledImages[0].Image),
 		};

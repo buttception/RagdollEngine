@@ -18,12 +18,21 @@ void FinalPass::DrawQuad(ragdoll::SceneRenderTargets* targets, bool upscaled)
 	RD_SCOPE(Render, Final);
 	RD_GPU_SCOPE("FinalPass", CommandListRef);
 
+	struct CBuffer {
+		Vector2 TexcoordAdd, TexcoordMul;
+	} cbuffer;
+	cbuffer.TexcoordAdd = Vector2(1.f, 0.f);
+	cbuffer.TexcoordMul = Vector2(-1.f, 1.f);
+	nvrhi::BufferHandle constbuf = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(CBuffer), "Mix Pass CBuffer", 1));
+	CommandListRef->writeBuffer(constbuf, &cbuffer, sizeof(CBuffer));
+
 	nvrhi::FramebufferDesc desc = nvrhi::FramebufferDesc()
 		.addColorAttachment(DirectXDevice::GetInstance()->GetCurrentBackbuffer());
 	nvrhi::FramebufferHandle pipelineFb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
 
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, constbuf),
 		nvrhi::BindingSetItem::Texture_SRV(0, upscaled ? targets->PresentationBuffer : targets->FinalColor),
 		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Linear_Clamp])
 	};

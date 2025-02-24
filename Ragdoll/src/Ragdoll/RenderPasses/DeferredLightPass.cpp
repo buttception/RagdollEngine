@@ -44,10 +44,6 @@ void DeferredLightPass::LightPass(const ragdoll::SceneInformation& sceneInfo, ra
 		nvrhi::BindingSetItem::Texture_SRV(5, targets->ShadowMask),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(6, GPUScene->PointLightBufferHandle)
 	};
-	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
-	{
-		bindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler(i, AssetManager::GetInstance()->Samplers[i]));
-	}
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(bindingSetDesc);
 	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(bindingSetDesc, BindingLayoutHandle);
 

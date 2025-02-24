@@ -12,6 +12,7 @@ call :pull_dependency "imgui" "--branch docking https://github.com/buttception/i
 call :pull_dependency "cxxopts" "https://github.com/jarro2783/cxxopts.git"
 call :pull_dependency "taskflow" "https://github.com/taskflow/taskflow.git"
 call :pull_dependency "dlss" "https://github.com/NVIDIA/DLSS.git"
+call :pull_dependency "directxtex" "https://github.com/microsoft/DirectXTex.git"
 
 call :exit
 pause >nul

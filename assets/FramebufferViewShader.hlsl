@@ -1,7 +1,9 @@
 cbuffer g_Const : register(b0) {
-		float4 CompAdd;
-		float4 CompMul;
-		uint ComponentCount;
+	float4 CompAdd;
+	float4 CompMul;
+    float2 TexcoordAdd;
+    float2 TexcoordMul;
+	uint ComponentCount;
 };
 
 Texture2D Source : register(t0);
@@ -14,19 +16,20 @@ void main_ps(
 )
 {
     float4 finalColor = float4(0.f, 0.f, 0.f, 1.f);
+    float2 finalTexcoord = inTexcoord * TexcoordMul + TexcoordAdd;
     [branch]
     switch(ComponentCount){
         case 1:
-            finalColor.x = float(Source.Sample(Sampler, inTexcoord).x) * CompMul.x + CompAdd.x;
+            finalColor.x = float(Source.Sample(Sampler, finalTexcoord).x) * CompMul.x + CompAdd.x;
             break;
         case 2:
-            finalColor.xy = float2(Source.Sample(Sampler, inTexcoord).xy) * CompMul.xy + CompAdd.xy;
+            finalColor.xy = float2(Source.Sample(Sampler, finalTexcoord).xy) * CompMul.xy + CompAdd.xy;
             break;
         case 3:
-            finalColor.xyz = Source.Sample(Sampler, inTexcoord).xyz * CompMul.xyz + CompAdd.xyz;
+            finalColor.xyz = Source.Sample(Sampler, finalTexcoord).xyz * CompMul.xyz + CompAdd.xyz;
             break;
         case 4:
-            finalColor.xyzw = Source.Sample(Sampler, inTexcoord).xyzw * CompMul.xyzw + CompAdd.xyzw;
+            finalColor.xyzw = Source.Sample(Sampler, finalTexcoord).xyzw * CompMul.xyzw + CompAdd.xyzw;
             break;
         default:
             break;

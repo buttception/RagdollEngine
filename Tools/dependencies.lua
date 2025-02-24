@@ -9,6 +9,7 @@ IncludesDir["imgui"] = "%{wks.location}\\Ragdoll\\dependencies\\imgui"
 IncludesDir["cxxopts"] = "%{wks.location}\\Ragdoll\\dependencies\\cxxopts\\include"
 IncludesDir["taskflow"] = "%{wks.location}\\Ragdoll\\dependencies\\taskflow\\taskflow"
 IncludesDir["dlss"] = "%{wks.location}\\Ragdoll\\dependencies\\dlss\\include"
+IncludesDir["directxtex"] = "%{wks.location}\\Ragdoll\\dependencies\\directxtex\\DirectXTex"
 
 LibDirs = {}
 LibDirs["dlss"] = "%{wks.location}\\Ragdoll\\dependencies\\dlss\\lib\\"

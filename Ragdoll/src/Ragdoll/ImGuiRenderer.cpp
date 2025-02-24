@@ -382,18 +382,18 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_A))
 		{
 			SceneInfo.bIsCameraDirty = true;
-			data.cameraPos += cameraRight * speed * _dt;
+			data.cameraPos -= cameraRight * speed * _dt;
 		}
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_D))
 		{
 			SceneInfo.bIsCameraDirty = true;
-			data.cameraPos -= cameraRight * speed * _dt;
+			data.cameraPos += cameraRight * speed * _dt;
 		}
 		if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
 		{
 			SceneInfo.bIsCameraDirty = true;
 			auto& io = ImGui::GetIO();
-			data.cameraYaw += io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * _dt;
+			data.cameraYaw -= io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * _dt;
 			data.cameraPitch += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * _dt;
 			data.cameraPitch = data.cameraPitch > DirectX::XM_PIDIV2 - 0.1f ? DirectX::XM_PIDIV2 - 0.1f : data.cameraPitch;
 			data.cameraPitch = data.cameraPitch < -DirectX::XM_PIDIV2 + 0.1f ? -DirectX::XM_PIDIV2 + 0.1f : data.cameraPitch;

@@ -49,6 +49,7 @@ struct Image
 {
 	//raw byte data, loaded via stbi
 	uint8_t* RawData{ nullptr };
+	bool bIsDDS{ false };
 	nvrhi::TextureHandle TextureHandle;
 };
 
@@ -61,15 +62,13 @@ struct Texture
 enum class SamplerTypes
 {
 	Point_Clamp,
-	Point_Wrap,
 	Point_Repeat,
 	Point_Mirror,
 	Linear_Clamp,
-	Linear_Wrap,
 	Linear_Repeat,
 	Trilinear_Clamp,
-	Trilinear_Wrap,
 	Trilinear_Repeat,
+	Anisotropic_Repeat,
 	Point_Clamp_Reduction,
 	COUNT
 };

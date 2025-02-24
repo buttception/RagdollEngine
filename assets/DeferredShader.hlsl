@@ -140,14 +140,15 @@ void deferred_light_ps(
 )
 {
 	//getting texture values
-	float4 albedo = albedoTexture.Sample(Samplers[6], inTexcoord);
-	float3 N = Decode(normalTexture.Sample(Samplers[6], inTexcoord).xy);
-	float2 RM = RMTexture.Sample(Samplers[6], inTexcoord).xy;
-	float AO = AOTexture.Sample(Samplers[6], inTexcoord).x;
-	float4 shadowFactor = ShadowMask.Sample(Samplers[6], inTexcoord);
+    int2 PixelLocation = inTexcoord * ScreenSize;
+	float4 albedo = albedoTexture.Load(int3(PixelLocation, 0));
+	float3 N = Decode(normalTexture.Load(int3(PixelLocation, 0)).xy);
+	float2 RM = RMTexture.Load(int3(PixelLocation, 0)).xy;
+	float AO = AOTexture.Load(int3(PixelLocation, 0)).x;
+	float4 shadowFactor = ShadowMask.Load(int3(PixelLocation, 0));
 
 	//getting fragpos
-	float3 fragPos = DepthToWorld(DepthBuffer.Sample(Samplers[6], inTexcoord).r, inTexcoord, InvViewProjMatrix);
+    float3 fragPos = DepthToWorld(DepthBuffer.Load(int3(PixelLocation, 0)).r, inTexcoord, InvViewProjMatrix);
 
 	//apply pbr lighting, AO is 1.f for now so it does nth
 	//float3 diffuse = max(dot(N, LightDirection), 0) * albedo.rgb;
@@ -183,14 +184,15 @@ void deferred_light_grid_ps(
 )
 {
 	//getting texture values
-    float4 albedo = albedoTexture.Sample(Samplers[6], inTexcoord);
-    float3 N = Decode(normalTexture.Sample(Samplers[6], inTexcoord).xy);
-    float2 RM = RMTexture.Sample(Samplers[6], inTexcoord).xy;
-    float AO = AOTexture.Sample(Samplers[6], inTexcoord).x;
-    float4 shadowFactor = ShadowMask.Sample(Samplers[6], inTexcoord);
+    int2 PixelLocation = inTexcoord * ScreenSize;
+	float4 albedo = albedoTexture.Load(int3(PixelLocation, 0));
+	float3 N = Decode(normalTexture.Load(int3(PixelLocation, 0)).xy);
+	float2 RM = RMTexture.Load(int3(PixelLocation, 0)).xy;
+	float AO = AOTexture.Load(int3(PixelLocation, 0)).x;
+	float4 shadowFactor = ShadowMask.Load(int3(PixelLocation, 0));
 
 	//getting the positions
-    float depth = DepthBuffer.Sample(Samplers[6], inTexcoord).r;
+    float depth = DepthBuffer.Load(int3(PixelLocation, 0)).r;
     float3 fragPos = DepthToWorld(depth, inTexcoord, InvViewProjMatrix);
     float3 viewPos = mul(float4(fragPos, 1), View).xyz;
 

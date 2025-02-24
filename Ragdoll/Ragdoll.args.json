@@ -53,6 +53,10 @@
           "Command": "--sample \"BoxTextured\""
         },
         {
+          "Id": "fdcc5be7-81cd-494b-b185-95cc8dbb58a8",
+          "Command": "--sample \"BoomBoxWithAxes\""
+        },
+        {
           "Id": "395cbeaa-ee05-47d8-8240-23067e17d7e7",
           "Command": "--scene \"other_gltf/Bistro/bistro.gltf\""
         },

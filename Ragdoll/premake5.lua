@@ -62,6 +62,7 @@ project "Ragdoll"
 		"%{IncludesDir.cxxopts}",
 		"%{IncludesDir.taskflow}",
 		"%{IncludesDir.dlss}",
+		"%{IncludesDir.directxtex}",
     }
 
 	postbuildcommands
