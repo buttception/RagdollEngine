@@ -9,8 +9,8 @@ class FramebufferViewer {
 	struct ConstantBuffer{
 		Vector4 Add;
 		Vector4 Mul;
-		Vector2 TexcoordAdd = Vector2(1.f, 0.f);
-		Vector2 TexcoordMul = Vector2(-1.f, 1.f);
+		Vector2 TexcoordAdd = Vector2(0.f, 0.f);
+		Vector2 TexcoordMul = Vector2(1.f, 1.f);
 		uint32_t ComponentCount;
 	}CBuffer;
 

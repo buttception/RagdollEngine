@@ -439,11 +439,13 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		SceneInfo.MainCameraProj._33 = 0.f;
 		SceneInfo.MainCameraProj._44 = 0.f;
 		SceneInfo.MainCameraProj._43 = data.cameraNear;
-		SceneInfo.MainCameraProj._34 = 1.f;
+		SceneInfo.MainCameraProj._34 = -1.f;
 
-		CameraProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraWidth / data.cameraHeight, data.cameraNear, data.cameraFar);
+		//SceneInfo.MainCameraProj = DirectX::XMMatrixPerspectiveFovRH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraWidth / data.cameraHeight, data.cameraFar, data.cameraNear);
 
-		SceneInfo.MainCameraView = DirectX::XMMatrixLookAtLH(data.cameraPos, data.cameraPos + data.cameraDir, Vector3(0.f, 1.f, 0.f));
+		CameraProjection = DirectX::XMMatrixPerspectiveFovRH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraWidth / data.cameraHeight, data.cameraNear, data.cameraFar);
+
+		SceneInfo.MainCameraView = DirectX::XMMatrixLookAtRH(data.cameraPos, data.cameraPos + data.cameraDir, Vector3(0.f, 1.f, 0.f));
 		CameraView = SceneInfo.MainCameraView;
 		SceneInfo.MainCameraViewProj = SceneInfo.MainCameraView * SceneInfo.MainCameraProj;
 		CameraViewProjection = SceneInfo.MainCameraViewProj;

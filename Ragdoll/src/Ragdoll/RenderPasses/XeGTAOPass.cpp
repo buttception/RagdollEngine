@@ -32,16 +32,16 @@ void XeGTAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo, ragdoll:
 	RD_GPU_SCOPE("XeGTAO", CommandListRef);
 
 	CommandListRef->beginMarker("XeGTAO");
-	UpdateConstants(targets->CurrDepthBuffer->getDesc().width, targets->CurrDepthBuffer->getDesc().height, sceneInfo.MainCameraProj, sceneInfo);
+	UpdateConstants(targets->CurrDepthBuffer->getDesc().width, targets->CurrDepthBuffer->getDesc().height, sceneInfo.MainCameraProjWithJitter, sceneInfo);
 	//cbuffer shared amongst all
 	nvrhi::BufferDesc CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(XeGTAO::GTAOConstants), "XeGTAO CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(XeGTAO::GTAOConstants));
 
 	CBufDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ViewMatrix CBuffer", 1);
-	OtherBuffer.viewMatrix = sceneInfo.MainCameraView;
-	OtherBuffer.prevViewProjMatrix = sceneInfo.PrevMainCameraViewProj;
-	OtherBuffer.InvViewProjMatrix = sceneInfo.MainCameraViewProj.Invert();
+	OtherBuffer.viewMatrix = sceneInfo.MainCameraView * DirectX::XMMatrixScaling(1.f, 1.f, -1.f);
+	OtherBuffer.prevViewProjMatrix = sceneInfo.PrevMainCameraViewProjWithJitter;
+	OtherBuffer.InvViewProjMatrix = sceneInfo.MainCameraViewProjWithJitter.Invert();
 	nvrhi::BufferHandle MatrixHandle = DirectXDevice::GetNativeDevice()->createBuffer(CBufDesc);
 	CommandListRef->writeBuffer(MatrixHandle, &OtherBuffer, sizeof(ConstantBuffer));
 	{

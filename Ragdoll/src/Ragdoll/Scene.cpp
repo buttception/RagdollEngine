@@ -859,8 +859,8 @@ void ragdoll::Scene::UpdateShadowCascadesExtents()
 	{
 		//create the subfrusta in view space
 		DirectX::BoundingFrustum frustum;
-		Matrix proj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(SceneInfo.CameraFov / 2.f), SceneInfo.CameraAspect, SubfrustaFarPlanes[i-1], SubfrustaFarPlanes[i]);
-		DirectX::BoundingFrustum::CreateFromMatrix(frustum, proj);
+		Matrix proj = DirectX::XMMatrixPerspectiveFovRH(DirectX::XMConvertToRadians(SceneInfo.CameraFov / 2.f), SceneInfo.CameraAspect, SubfrustaFarPlanes[i-1], SubfrustaFarPlanes[i]);
+		DirectX::BoundingFrustum::CreateFromMatrix(frustum, proj, true);
 		//move the frustum to world space
 		frustum.Transform(frustum, SceneInfo.MainCameraView.Invert());
 		//get the corners
@@ -876,13 +876,13 @@ void ragdoll::Scene::UpdateShadowCascadesExtents()
 		center.y = (float)(int32_t)center.y;
 		center.z = (float)(int32_t)center.z;
 		//move all corners into a 1x1x1 cube lightspace with the directional light
-		Matrix lightProj = DirectX::XMMatrixOrthographicLH(1.f, 1.f, -0.5f, 0.5f);	//should be a 1x1x1 cube?
+		Matrix lightProj = DirectX::XMMatrixOrthographicRH(1.f, 1.f, -0.5f, 0.5f);	//should be a 1x1x1 cube?
 		Vector3 lightDir = -SceneInfo.LightDirection;
 		Vector3 up = { 0.f, 1.f, 0.f };
 		if (fabsf(lightDir.Dot(up)) > 0.99f) {
 			up = { 1.f, 0.f, 0.f };
 		}
-		SceneInfo.CascadeInfos[i - 1].view = DirectX::XMMatrixLookAtLH(center, center + lightDir, up);
+		SceneInfo.CascadeInfos[i - 1].view = DirectX::XMMatrixLookAtRH(center, center + lightDir, up);
 		Matrix lightViewProj = SceneInfo.CascadeInfos[i - 1].view * lightProj;
 		//get the furthest extents of the corners for the left right top and bottom values
 		Vector3 min = { FLT_MAX, FLT_MAX, FLT_MAX };
@@ -910,6 +910,7 @@ void ragdoll::Scene::UpdateShadowCascadesExtents()
 		max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
 		for (int j = 0; j < 8; ++j)
 		{
+			sceneCorners[j].z = -sceneCorners[j].z;
 			max = DirectX::XMVectorMax(max, sceneCorners[j]);
 			min = DirectX::XMVectorMin(min, sceneCorners[j]);
 		}
@@ -922,7 +923,7 @@ void ragdoll::Scene::UpdateShadowLightMatrices()
 {
 	for (int i = 0; i < 4; ++i) {
 		//reverse z
-		SceneInfo.CascadeInfos[i].proj = DirectX::XMMatrixOrthographicLH(SceneInfo.CascadeInfos[i].width, SceneInfo.CascadeInfos[i].height, SceneInfo.CascadeInfos[i].farZ, SceneInfo.CascadeInfos[i].nearZ);
+		SceneInfo.CascadeInfos[i].proj = DirectX::XMMatrixOrthographicRH(SceneInfo.CascadeInfos[i].width, SceneInfo.CascadeInfos[i].height, SceneInfo.CascadeInfos[i].farZ, SceneInfo.CascadeInfos[i].nearZ);
 		SceneInfo.CascadeInfos[i].viewProj = SceneInfo.CascadeInfos[i].view * SceneInfo.CascadeInfos[i].proj;
 	}
 }
