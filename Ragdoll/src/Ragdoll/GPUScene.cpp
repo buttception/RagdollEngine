@@ -122,8 +122,8 @@ void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 		FMeshData& data = MeshDatas[i];
 		data.IndexCount = info.IndicesCount;
 		data.VertexCount = info.VerticesCount;
-		data.IndexOffset = info.IBOffset;
-		data.VertexOffset = info.VBOffset;
+		data.IndexOffset = info.IndicesOffset;
+		data.VertexOffset = info.VerticesOffset;
 		data.Center = info.BestFitBox.Center;
 		data.Extents = info.BestFitBox.Extents;
 	}
@@ -206,8 +206,58 @@ void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 	CommandList->endMarker();
 	PointLightCount = Scene->PointLightProxies.size();
 
+	//create the raytracing resources
+	CommandList->beginMarker("Creating BLASs");
+	BottomLevelASs.clear();
+	for (const VertexBufferInfo& BufferInfo : AssetManager::GetInstance()->VertexBufferInfos)
+	{
+		nvrhi::rt::GeometryDesc GeomDesc = nvrhi::rt::GeometryDesc();
+		nvrhi::rt::AccelStructDesc BLASDesc = nvrhi::rt::AccelStructDesc();
+		nvrhi::rt::GeometryTriangles& Triangles = GeomDesc.geometryData.triangles;
+		Triangles.vertexBuffer = AssetManager::GetInstance()->VBO;
+		Triangles.indexBuffer = AssetManager::GetInstance()->IBO;
+		Triangles.indexFormat = nvrhi::Format::R32_UINT;
+		Triangles.vertexFormat = nvrhi::Format::RGB32_FLOAT;
+		Triangles.vertexStride = sizeof(Vertex);
+		Triangles.vertexCount = BufferInfo.VerticesCount;
+		Triangles.indexCount = BufferInfo.IndicesCount;
+		//offsets are in bytes
+		Triangles.vertexOffset = BufferInfo.VerticesOffset * Triangles.vertexStride;
+		Triangles.indexOffset = BufferInfo.IndicesOffset * sizeof(uint32_t);
+		GeomDesc.geometryType = nvrhi::rt::GeometryType::Triangles;
+		//1 blas per mesh
+		BLASDesc.isTopLevel = false;
+		BLASDesc.debugName = "BLAS";
+		BLASDesc.addBottomLevelGeometry(GeomDesc);
+		nvrhi::rt::AccelStructHandle as = DirectXDevice::GetNativeDevice()->createAccelStruct(BLASDesc);
+		nvrhi::utils::BuildBottomLevelAccelStruct(CommandList, as, BLASDesc);
+		BottomLevelASs.push_back(as);
+	}
+	CommandList->endMarker();
+
+	//create the new TLAS with all the new instances
+	CommandList->beginMarker("Create TLAS");
+	std::vector<nvrhi::rt::InstanceDesc> InstanceDescs(Scene->StaticProxies.size());
+	for (uint32_t i = 0; i < Scene->StaticProxies.size(); ++i)
+	{
+		nvrhi::rt::InstanceDesc& InstanceDesc = InstanceDescs[i];
+		InstanceDesc.bottomLevelAS = BottomLevelASs[Scene->StaticProxies[i].BufferIndex];
+		InstanceDesc.instanceID = i;
+		memcpy_s(&InstanceDesc.transform, sizeof(nvrhi::rt::AffineTransform), &Scene->StaticProxies[i].ModelToWorld._11, sizeof(nvrhi::rt::AffineTransform));
+		InstanceDesc.flags = nvrhi::rt::InstanceFlags::TriangleCullDisable;	//may need front is cw
+		InstanceDesc.instanceMask = 1;
+	}
+	nvrhi::rt::AccelStructDesc TLASDesc = nvrhi::rt::AccelStructDesc();
+	TLASDesc.debugName = "TLAS";
+	TLASDesc.isTopLevel = true;
+	TLASDesc.topLevelMaxInstances = Scene->StaticProxies.size();
+	TopLevelAS = DirectXDevice::GetNativeDevice()->createAccelStruct(TLASDesc);
+	CommandList->buildTopLevelAccelStruct(TopLevelAS, InstanceDescs.data(), InstanceDescs.size());
+	CommandList->endMarker();
+
 	CommandList->close();
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
+	DirectXDevice::GetNativeDevice()->waitForIdle();
 }
 
 void ragdoll::FGPUScene::UpdateLightGrid(Scene* Scene, nvrhi::CommandListHandle CommandList)

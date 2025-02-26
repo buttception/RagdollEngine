@@ -75,3 +75,8 @@ void ShadowMaskPass::DrawShadowMask(const ragdoll::SceneInformation& sceneInfo, 
 
 	CommandListRef->endMarker();
 }
+
+void ShadowMaskPass::RaytraceShadowMask(const ragdoll::SceneInformation& sceneInfo, const ragdoll::FGPUScene* GPUScene, ragdoll::SceneRenderTargets* targets)
+{
+	//raytrace pipeline, directly draw onto shadow mask
+}

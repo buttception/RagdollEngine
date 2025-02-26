@@ -163,6 +163,7 @@ void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
 	vTexcoordAttrib.offset = offsetof(Vertex, texcoord);
 	vTexcoordAttrib.elementStride = sizeof(Vertex);
 	vTexcoordAttrib.format = nvrhi::Format::RG32_FLOAT;
+	//second buffer for the vertex shader for instance id
 	nvrhi::VertexAttributeDesc InstanceIdAttrib;
 	InstanceIdAttrib.bufferIndex = 1;
 	InstanceIdAttrib.name = "INSTANCEID";
@@ -304,8 +305,8 @@ size_t AssetManager::AddVertices(const std::vector<Vertex>& newVertices, const s
 	memcpy(Indices.data() + iCurrOffset, newIndices.data(), newIndices.size() * sizeof(uint32_t));
 	//create the vertexbuffer info
 	VertexBufferInfo info;
-	info.VBOffset = vCurrOffset;
-	info.IBOffset = iCurrOffset;
+	info.VerticesOffset = vCurrOffset;
+	info.IndicesOffset = iCurrOffset;
 	info.VerticesCount = (uint32_t)newVertices.size();
 	info.IndicesCount = (uint32_t)newIndices.size();
 	VertexBufferInfos.emplace_back(info);
@@ -326,24 +327,28 @@ void AssetManager::UpdateVBOIBO()
 		vertexBufDesc.isVertexBuffer = true;
 		vertexBufDesc.debugName = "Global vertex buffer";
 		vertexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;	//set as copy dest to copy over data
+		vertexBufDesc.canHaveRawViews = true;
+		vertexBufDesc.isAccelStructBuildInput = true;
 		//smth smth syncrhonization need to be this state to be written
 
 		VBO = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(vertexBufDesc);
 		//copy data over
 		CommandList->beginTrackingBufferState(VBO, nvrhi::ResourceStates::CopyDest);	//i tink this is to update nvrhi resource manager state tracker
 		CommandList->writeBuffer(VBO, Vertices.data(), vertexBufDesc.byteSize);
-		CommandList->setPermanentBufferState(VBO, nvrhi::ResourceStates::VertexBuffer);	//now its a vb
+		CommandList->setPermanentBufferState(VBO, nvrhi::ResourceStates::VertexBuffer | nvrhi::ResourceStates::AccelStructBuildInput);	//now its a vb
 
 		nvrhi::BufferDesc indexBufDesc;
 		indexBufDesc.byteSize = Indices.size() * sizeof(uint32_t);
 		indexBufDesc.isIndexBuffer = true;
 		indexBufDesc.debugName = "Global index buffer";
 		indexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;
+		indexBufDesc.canHaveRawViews = true;
+		indexBufDesc.isAccelStructBuildInput = true;
 
 		IBO = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(indexBufDesc);
 		CommandList->beginTrackingBufferState(IBO, nvrhi::ResourceStates::CopyDest);
 		CommandList->writeBuffer(IBO, Indices.data(), indexBufDesc.byteSize);
-		CommandList->setPermanentBufferState(IBO, nvrhi::ResourceStates::IndexBuffer);
+		CommandList->setPermanentBufferState(IBO, nvrhi::ResourceStates::IndexBuffer | nvrhi::ResourceStates::AccelStructBuildInput);
 
 		CommandList->endMarker();
 	}

@@ -25,8 +25,8 @@ struct Vertex {
 
 struct VertexBufferInfo
 {
-	uint32_t VBOffset;
-	uint32_t IBOffset;
+	uint32_t VerticesOffset;
+	uint32_t IndicesOffset;
 	uint32_t IndicesCount;
 	uint32_t VerticesCount;
 

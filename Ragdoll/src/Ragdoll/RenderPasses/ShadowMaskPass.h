@@ -20,4 +20,5 @@ public:
 	void Init(nvrhi::CommandListHandle cmdList);
 
 	void DrawShadowMask(const ragdoll::SceneInformation& sceneInfo, ragdoll::SceneRenderTargets* targets);
+	void RaytraceShadowMask(const ragdoll::SceneInformation& sceneInfo, const ragdoll::FGPUScene* GPUScene, ragdoll::SceneRenderTargets* targets);
 };

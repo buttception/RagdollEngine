@@ -35,6 +35,9 @@ namespace ragdoll
 		nvrhi::BufferHandle LightGridBoundingBoxBufferHandle{};
 		uint32_t FieldsNeeded;
 		nvrhi::BufferHandle LightBitFieldsBufferHandle{};
+		//raytracing stuff
+		std::vector<nvrhi::rt::AccelStructHandle> BottomLevelASs;
+		nvrhi::rt::AccelStructHandle TopLevelAS;
 
 		void Update(Scene* Scene);
 		//will sort the proxies before making a instance buffer copy and uploading to gpu
