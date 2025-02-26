@@ -101,7 +101,7 @@ void DeferredLightPass::LightGridPass(const ragdoll::SceneInformation& sceneInfo
 	CBuffer.CameraPosition = sceneInfo.MainCameraPosition;
 	CBuffer.LightIntensity = sceneInfo.LightIntensity;
 	CBuffer.PointLightCount = GPUScene->PointLightCount;
-	CBuffer.View = sceneInfo.MainCameraView;
+	CBuffer.View = sceneInfo.MainCameraView * DirectX::XMMatrixScaling(1.f, 1.f, -1.f);
 	CBuffer.ScreenSize = { (float)sceneInfo.RenderWidth, (float)sceneInfo.RenderHeight };
 	CBuffer.GridSize = { (float)GPUScene->TileCountX, (float)GPUScene->TileCountY };
 	CBuffer.FieldsNeeded = GPUScene->FieldsNeeded;

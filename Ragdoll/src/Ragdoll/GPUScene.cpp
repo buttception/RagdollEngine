@@ -351,7 +351,7 @@ void ragdoll::FGPUScene::CullLightGrid(const SceneInformation& SceneInfo, nvrhi:
 		uint32_t MipBaseWidth;
 		uint32_t MipBaseHeight;
 	} CBuffer;
-	CBuffer.View = SceneInfo.MainCameraView;
+	CBuffer.View = SceneInfo.MainCameraView * DirectX::XMMatrixScaling(1.f, 1.f, -1.f);
 	CBuffer.InverseProjectionWithJitter = SceneInfo.MainCameraProjWithJitter.Invert();
 	CBuffer.LightGridCount = LightGridCount;
 	CBuffer.LightCount = PointLightCount;

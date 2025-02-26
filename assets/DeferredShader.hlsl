@@ -240,4 +240,5 @@ void deferred_light_grid_ps(
         }
     }
     outColor = lighting * shadowFactor.rgb;
+    //outColor = lighting * float3(X / GridSize.x, Y / GridSize.y, Z / 16.f);
 }

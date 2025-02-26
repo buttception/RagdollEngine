@@ -120,12 +120,14 @@ void CullLightsCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, u
         LightBitFieldsBufferOutput[DTid.x * FieldsNeeded + i] = 0;
     }
     float2 InvRes = float2(1.f / TextureWidth, 1.f / TextureHeight);
-    float2 UV = InvRes * float2(X, Y) + InvRes * 0.5f.xx;
+    float2 UV = InvRes * float2(X, Y);
     UV.y = 1.f - UV.y;
     for (int j = 0; j < LightCount; ++j)
     {
         PointLightProxy Light = PointLightBufferInput[j];
         float3 LightViewSpacePosition = mul(float4(Light.Position.xyz, 1.f), View).xyz;
+        //why need to negate??
+        LightViewSpacePosition.xy = -LightViewSpacePosition.xy;
         if (IsLightInsideTile(BoundingBoxBufferInput[DTid.x], LightViewSpacePosition, PointLightBufferInput[j].Color.w))
         {
             const uint BucketIndex = j / 32;
