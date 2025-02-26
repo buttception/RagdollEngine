@@ -381,6 +381,10 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "Luminance History1";
 	RenderTargets.LuminanceHistory1 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
+	texDesc.format = nvrhi::Format::RGBA8_UNORM;
+	texDesc.debugName = "ShadowMask";
+	RenderTargets.ShadowMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
 	texDesc.width = SceneInfo.TargetWidth;
 	texDesc.height = SceneInfo.TargetHeight;
 
@@ -416,10 +420,6 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.format = nvrhi::Format::RG16_UNORM;
 	texDesc.debugName = "GBufferNormal";
 	RenderTargets.GBufferNormal = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-
-	texDesc.format = nvrhi::Format::RGBA8_UNORM;
-	texDesc.debugName = "ShadowMask";
-	RenderTargets.ShadowMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.width = 64;
 	texDesc.height = 2;

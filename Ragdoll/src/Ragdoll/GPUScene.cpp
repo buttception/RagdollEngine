@@ -243,7 +243,13 @@ void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 		nvrhi::rt::InstanceDesc& InstanceDesc = InstanceDescs[i];
 		InstanceDesc.bottomLevelAS = BottomLevelASs[Scene->StaticProxies[i].BufferIndex];
 		InstanceDesc.instanceID = i;
-		memcpy_s(&InstanceDesc.transform, sizeof(nvrhi::rt::AffineTransform), &Scene->StaticProxies[i].ModelToWorld._11, sizeof(nvrhi::rt::AffineTransform));
+		for (int j = 0; j < 3; ++j)
+		{
+			for (int k = 0; k < 4; ++k)
+			{
+				InstanceDesc.transform[j * 4 + k] = Scene->StaticProxies[i].ModelToWorld.m[k][j];
+			}
+		}
 		InstanceDesc.flags = nvrhi::rt::InstanceFlags::TriangleCullDisable;	//may need front is cw
 		InstanceDesc.instanceMask = 1;
 	}

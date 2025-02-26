@@ -76,6 +76,30 @@ size_t Hash(const nvrhi::ComputePipelineDesc& desc) {
 	return HashBytes(&obj);
 }
 
+size_t Hash(const nvrhi::rt::PipelineDesc& desc) {
+	struct RaytracePipelineAbstraction {
+		//shader
+		size_t ShaderHashes[16];
+		//binding hash
+		size_t BindingsHash[nvrhi::c_MaxBindingLayouts]{ {}, };
+		//values
+		uint32_t MaxPayloadSize;
+		uint32_t MaxAttributeSize; // typical case: float2 uv;
+		uint32_t MaxRecursionDepth;
+	}obj;
+	RD_ASSERT(desc.shaders.size() > 16, "Exceed max number of shaders in a rt pipeline, consider increase size");
+	for (int i = 0; i < desc.shaders.size(); ++i) {
+		obj.ShaderHashes[i] = HashString(desc.shaders[i].exportName);
+	}
+	for (int i = 0; i < nvrhi::c_MaxBindingLayouts; ++i) {
+		obj.BindingsHash[i] = HashBytes(&desc.globalBindingLayouts);
+	}
+	obj.MaxPayloadSize = HashBytes(&desc.maxPayloadSize);
+	obj.MaxAttributeSize = HashBytes(&desc.maxAttributeSize);
+	obj.MaxRecursionDepth = HashBytes(&desc.maxRecursionDepth);
+	return HashBytes(&obj);
+}
+
 nvrhi::GraphicsPipelineHandle AssetManager::GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb)
 {
 	std::lock_guard<std::mutex> LockGuard(Mutex);
@@ -95,6 +119,18 @@ nvrhi::ComputePipelineHandle AssetManager::GetComputePipeline(const nvrhi::Compu
 		std::lock_guard<std::mutex> LockGuard(Mutex);
 		RD_CORE_INFO("CPSO created");
 		return CPSOs[hash] = DirectXDevice::GetNativeDevice()->createComputePipeline(desc);
+	}
+}
+
+nvrhi::rt::PipelineHandle AssetManager::GetRaytracePipeline(const nvrhi::rt::PipelineDesc& desc)
+{
+	size_t hash = Hash(desc);
+	if (RTSOs.contains(hash))
+		return RTSOs.at(hash);
+	{
+		std::lock_guard<std::mutex> LockGuard(Mutex);
+		RD_CORE_INFO("RTSO created");
+		return RTSOs[hash] = DirectXDevice::GetNativeDevice()->createRayTracingPipeline(desc);
 	}
 }
 
@@ -131,8 +167,10 @@ void AssetManager::RecompileShaders()
 	std::filesystem::path Path = "\"" + (FileManagerRef->GetRoot().parent_path() / "Tools\\compileShader.bat\" < NUL").string();
 	system(("call " + Path.string()).c_str());
 	Shaders.clear();
+	ShaderLibraries.clear();
 	GPSOs.clear();
 	CPSOs.clear();
+	RTSOs.clear();
 }
 
 void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
@@ -226,6 +264,7 @@ void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
 	Samplers[(int)SamplerTypes::Point_Clamp] = Device->createSampler(samplerDesc);
 	samplerDesc.reductionType = nvrhi::SamplerReductionType::Minimum;
 	Samplers[(int)SamplerTypes::Point_Clamp_Reduction] = Device->createSampler(samplerDesc);
+	samplerDesc.reductionType = nvrhi::SamplerReductionType::Standard;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
@@ -382,5 +421,18 @@ nvrhi::ShaderHandle AssetManager::GetShader(const std::string& shaderFilename)
 		desc,
 		data, size);
 	Shaders[shaderFilename] = shader;
-	return Shaders.at(shaderFilename);
+	return shader;
+}
+
+nvrhi::ShaderLibraryHandle AssetManager::GetShaderLibrary(const std::string& shaderFilename)
+{
+	std::lock_guard<std::mutex> LockGuard(Mutex);
+	if (ShaderLibraries.contains(shaderFilename)) {
+		return ShaderLibraries.at(shaderFilename);
+	}
+	uint32_t Size{};
+	const uint8_t* Data = FileManagerRef->ImmediateLoad("cso/" + shaderFilename, Size);
+	nvrhi::ShaderLibraryHandle ShaderLib = DirectXDevice::GetInstance()->m_NvrhiDevice->createShaderLibrary(Data, Size);
+	ShaderLibraries[shaderFilename] = ShaderLib;
+	return ShaderLib;
 }

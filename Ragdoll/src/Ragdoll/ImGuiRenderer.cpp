@@ -268,6 +268,7 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 
 	if (ImGui::TreeNode("Lighting"))
 	{
+		ImGui::Checkbox("Raytrace Directional Light Shadows", &SceneInfo.bRaytraceDirectionalLight);
 		ImGui::SliderFloat("Sky Dimmer e-6", &SceneInfo.SkyDimmer, 0.f, 1.f);
 		ImGui::ColorEdit3("Light Diffuse", &SceneInfo.LightDiffuseColor.x);
 		ImGui::SliderFloat("Light Intensity", &SceneInfo.LightIntensity, 0.1f, 10.f);

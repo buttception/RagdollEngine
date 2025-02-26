@@ -7,6 +7,7 @@
 #include "Ragdoll/AssetManager.h"
 #include "Ragdoll/Scene.h"
 #include "Ragdoll/DirectXDevice.h"
+#include "Ragdoll/GPUScene.h"
 
 void ShadowMaskPass::Init(nvrhi::CommandListHandle cmdList)
 {
@@ -78,5 +79,66 @@ void ShadowMaskPass::DrawShadowMask(const ragdoll::SceneInformation& sceneInfo, 
 
 void ShadowMaskPass::RaytraceShadowMask(const ragdoll::SceneInformation& sceneInfo, const ragdoll::FGPUScene* GPUScene, ragdoll::SceneRenderTargets* targets)
 {
+	RD_SCOPE(Render, ShadowMaskRT);
+	RD_GPU_SCOPE("ShadowMaskRT", CommandListRef);
+	CommandListRef->beginMarker("Raytrace Shadow Mask");
+
+	struct ConstantBuffer {
+		Matrix InvViewProjMatrixWithJitter;
+		Vector3 LightDirection;
+		float RenderWidth;
+		float RenderHeight;
+	}ConstantBuffer;
+	ConstantBuffer.InvViewProjMatrixWithJitter = sceneInfo.MainCameraViewProjWithJitter.Invert();
+	ConstantBuffer.LightDirection = sceneInfo.LightDirection;
+	ConstantBuffer.RenderWidth = sceneInfo.RenderWidth;
+	ConstantBuffer.RenderHeight = sceneInfo.RenderHeight;
+	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "ShadowMaskRT CBuffer", 1));
+	CommandListRef->writeBuffer(ConstantBufferHandle, &ConstantBuffer, sizeof(ConstantBuffer));
+
 	//raytrace pipeline, directly draw onto shadow mask
+	nvrhi::BindingSetDesc BindingSetDesc;
+	BindingSetDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
+		nvrhi::BindingSetItem::RayTracingAccelStruct(0, GPUScene->TopLevelAS),
+		nvrhi::BindingSetItem::Texture_SRV(1, targets->CurrDepthBuffer),
+		nvrhi::BindingSetItem::Texture_UAV(0, targets->ShadowMask),
+	};
+	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
+	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);
+
+	nvrhi::ShaderLibraryHandle ShaderLibrary = AssetManager::GetInstance()->GetShaderLibrary("RaytraceShadow.lib.cso");
+	nvrhi::rt::PipelineDesc PipelineDesc;
+	PipelineDesc.globalBindingLayouts = { BindingLayoutHandle };
+	PipelineDesc.shaders = {
+		{ "", ShaderLibrary->getShader("RayGen", nvrhi::ShaderType::RayGeneration), nullptr },
+		{ "", ShaderLibrary->getShader("Miss", nvrhi::ShaderType::Miss), nullptr }
+	};
+	PipelineDesc.hitGroups = { {
+		"HitGroup",
+		nullptr, // closestHitShader
+		nullptr, // anyHitShader
+		nullptr, // intersectionShader
+		nullptr, // bindingLayout
+		false  // isProceduralPrimitive
+	} };
+	PipelineDesc.maxPayloadSize = sizeof(Vector4);
+	nvrhi::rt::PipelineHandle PipelineHandle = AssetManager::GetInstance()->GetRaytracePipeline(PipelineDesc);
+
+	ShaderTableHandle = PipelineHandle->createShaderTable();
+	ShaderTableHandle->setRayGenerationShader("RayGen");
+	ShaderTableHandle->addHitGroup("HitGroup");
+	ShaderTableHandle->addMissShader("Miss");
+
+	nvrhi::rt::State State;
+	State.shaderTable = ShaderTableHandle;
+	State.bindings = { BindingSetHandle };
+	CommandListRef->setRayTracingState(State);
+
+	nvrhi::rt::DispatchRaysArguments args;
+	args.width = sceneInfo.RenderWidth;
+	args.height = sceneInfo.RenderHeight;
+	CommandListRef->dispatchRays(args);
+
+	CommandListRef->endMarker();
 }

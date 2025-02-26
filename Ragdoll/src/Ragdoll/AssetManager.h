@@ -114,9 +114,11 @@ public:
 
 	std::unordered_map<size_t, nvrhi::GraphicsPipelineHandle> GPSOs;
 	std::unordered_map<size_t, nvrhi::ComputePipelineHandle> CPSOs;
+	std::unordered_map<size_t, nvrhi::rt::PipelineHandle> RTSOs;
 	std::unordered_map<size_t, nvrhi::BindingLayoutHandle> BindingLayouts;
 
 	std::unordered_map<std::string, nvrhi::ShaderHandle> Shaders;
+	std::unordered_map<std::string, nvrhi::ShaderLibraryHandle> ShaderLibraries;
 
 	//no more vbo vectors, but instead is a vector of vb ib offsets
 	//hold onto 1 vbo and ibo here
@@ -135,6 +137,7 @@ public:
 	size_t AddImage(Image img);
 	nvrhi::GraphicsPipelineHandle GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb);
 	nvrhi::ComputePipelineHandle GetComputePipeline(const nvrhi::ComputePipelineDesc& desc);
+	nvrhi::rt::PipelineHandle GetRaytracePipeline(const nvrhi::rt::PipelineDesc& desc);
 	nvrhi::BindingLayoutHandle GetBindingLayout(const nvrhi::BindingSetDesc& desc);
 	void RecompileShaders();
 
@@ -145,6 +148,7 @@ public:
 	void UpdateVBOIBO();
 
 	nvrhi::ShaderHandle GetShader(const std::string& shaderFilename);
+	nvrhi::ShaderLibraryHandle GetShaderLibrary(const std::string& shaderFilename);
 private:
 	nvrhi::CommandListHandle CommandList;	//asset manager commandlist
 	std::shared_ptr<ragdoll::FileManager> FileManagerRef;

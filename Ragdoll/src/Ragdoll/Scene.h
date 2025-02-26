@@ -168,6 +168,7 @@ namespace ragdoll {
 		bool bEnableXeGTAONoise{ true };
 		bool bEnableBloom{ true };
 		bool bEnableOcclusionCull{ true };
+		bool bRaytraceDirectionalLight{ true };
 		uint32_t RenderWidth = 1600;
 		uint32_t RenderHeight = 900;
 		uint32_t TargetWidth;

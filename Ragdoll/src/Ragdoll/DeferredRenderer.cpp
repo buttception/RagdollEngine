@@ -174,25 +174,31 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 		activeList.emplace_back(CommandLists[(int)Pass::AO]);
 	}
 
-	Taskflow.emplace([this, &scene, GPUScene]() {
-		ShadowPass->DrawAllInstances(0, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
-	});
-	Taskflow.emplace([this, &scene, GPUScene]() {
-		ShadowPass->DrawAllInstances(1, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
+	if (!scene->SceneInfo.bRaytraceDirectionalLight)
+	{
+		Taskflow.emplace([this, &scene, GPUScene]() {
+			ShadowPass->DrawAllInstances(0, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
 		});
-	Taskflow.emplace([this, &scene, GPUScene]() {
-		ShadowPass->DrawAllInstances(2, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
-		});
-	Taskflow.emplace([this, &scene, GPUScene]() {
-		ShadowPass->DrawAllInstances(3, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
-		});
-	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH0]);
-	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH1]);
-	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH2]);
-	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH3]);
+		Taskflow.emplace([this, &scene, GPUScene]() {
+			ShadowPass->DrawAllInstances(1, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
+			});
+		Taskflow.emplace([this, &scene, GPUScene]() {
+			ShadowPass->DrawAllInstances(2, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
+			});
+		Taskflow.emplace([this, &scene, GPUScene]() {
+			ShadowPass->DrawAllInstances(3, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
+			});
+		activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH0]);
+		activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH1]);
+		activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH2]);
+		activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH3]);
+	}
 
-	Taskflow.emplace([this, &scene]() {
-		ShadowMaskPass->DrawShadowMask(scene->SceneInfo, RenderTargets);
+	Taskflow.emplace([this, &scene, GPUScene]() {
+		if(!scene->SceneInfo.bRaytraceDirectionalLight)
+			ShadowMaskPass->DrawShadowMask(scene->SceneInfo, RenderTargets);
+		else
+			ShadowMaskPass->RaytraceShadowMask(scene->SceneInfo, GPUScene, RenderTargets);
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_MASK]);
 

@@ -5,6 +5,7 @@ namespace ragdoll {
 	struct InstanceGroupInfo;
 	struct SceneInformation;
 	struct SceneRenderTargets;
+	class FGPUScene;
 }
 class ShadowMaskPass {
 	struct ConstantBuffer {
@@ -15,6 +16,7 @@ class ShadowMaskPass {
 	}CBuffer;
 
 	nvrhi::CommandListHandle CommandListRef{ nullptr };
+	nvrhi::rt::ShaderTableHandle ShaderTableHandle{};
 
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
