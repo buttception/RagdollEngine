@@ -29,21 +29,9 @@ namespace ragdoll {
 	struct Proxy {
 		Matrix ModelToWorld;
 		Matrix PrevWorldMatrix;
+		uint32_t MeshIndex;
+		uint32_t MaterialIndex;
 		DirectX::BoundingBox BoundingBox;
-
-		Vector4 Color = Vector4::One;
-		float Roughness = 0.f;
-		float Metallic = 0.f;
-
-		int32_t BufferIndex;
-		int32_t MaterialIndex;
-		int32_t AlbedoIndex = -1;
-		int32_t AlbedoSamplerIndex = 0;
-		int32_t NormalIndex = -1;
-		int32_t NormalSamplerIndex = 0;
-		int32_t ORMIndex = -1;
-		int32_t ORMSamplerIndex = 0;
-		int32_t bIsLit = 1;
 	};
 
 	struct InstanceData {
@@ -52,32 +40,10 @@ namespace ragdoll {
 
 		Vector4 Color = Vector4::One;
 		uint32_t MeshIndex;
-		float Roughness = 0.f;
-		float Metallic = 0.f;
-
-		int AlbedoIndex = -1;
-		int AlbedoSamplerIndex = 0;
-		int NormalIndex = -1;
-		int NormalSamplerIndex = 0;
-		int ORMIndex = -1;
-		int ORMSamplerIndex = 0;
-		int bIsLit = 1;
 
 		InstanceData& operator=(const Proxy& proxy) {
 			ModelToWorld = proxy.ModelToWorld;
 			PrevWorldMatrix = proxy.PrevWorldMatrix;
-
-			Color = proxy.Color;
-			Roughness = proxy.Roughness;
-			Metallic = proxy.Metallic;
-			
-			AlbedoIndex = proxy.AlbedoIndex;
-			AlbedoSamplerIndex = proxy.AlbedoSamplerIndex;
-			NormalIndex = proxy.NormalIndex;
-			NormalSamplerIndex = proxy.NormalSamplerIndex;
-			ORMIndex = proxy.ORMIndex;
-			ORMSamplerIndex = proxy.ORMSamplerIndex;
-			bIsLit = proxy.bIsLit;
 			return *this;
 		}
 	};

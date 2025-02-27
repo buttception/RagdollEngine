@@ -206,7 +206,6 @@ void ragdoll::Scene::CreateCustomMeshes()
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 
 	Material mat;
-	mat.bIsLit = true;
 	mat.Color = Vector4::One;
 	mat.AlbedoTextureIndex = 0;
 	AssetManager::GetInstance()->Materials.emplace_back(mat);
@@ -618,34 +617,11 @@ void ragdoll::Scene::PopulateStaticProxies()
 		{
 			StaticProxies.emplace_back();
 			Proxy& Proxy = StaticProxies.back();
-			const Material& mat = AssetManager::GetInstance()->Materials[submesh.MaterialIndex];
-			if (mat.AlbedoTextureIndex != -1)
-			{
-				const Texture& tex = AssetManager::GetInstance()->Textures[mat.AlbedoTextureIndex];
-				Proxy.AlbedoIndex = tex.ImageIndex;
-				Proxy.AlbedoSamplerIndex = tex.SamplerIndex;
-			}
-			if (mat.NormalTextureIndex != -1)
-			{
-				const Texture& tex = AssetManager::GetInstance()->Textures[mat.NormalTextureIndex];
-				Proxy.NormalIndex = tex.ImageIndex;
-				Proxy.NormalSamplerIndex = tex.SamplerIndex;
-			}
-			if (mat.RoughnessMetallicTextureIndex != -1)
-			{
-				const Texture& tex = AssetManager::GetInstance()->Textures[mat.RoughnessMetallicTextureIndex];
-				Proxy.ORMIndex = tex.ImageIndex;
-				Proxy.ORMSamplerIndex = tex.SamplerIndex;
-			}
-			Proxy.Color = mat.Color;
-			Proxy.Metallic = mat.Metallic;
-			Proxy.Roughness = mat.Roughness;
-			Proxy.bIsLit = mat.bIsLit;
 			Proxy.ModelToWorld = tComp->m_ModelToWorld;
 			Proxy.PrevWorldMatrix = tComp->m_PrevModelToWorld;
-			Proxy.BufferIndex = (int32_t)submesh.VertexBufferIndex;
-			Proxy.MaterialIndex = (int32_t)submesh.MaterialIndex;
-			AssetManager::GetInstance()->VertexBufferInfos[Proxy.BufferIndex].BestFitBox.Transform(Proxy.BoundingBox, tComp->m_ModelToWorld);
+			Proxy.MaterialIndex = submesh.MaterialIndex;
+			Proxy.MeshIndex = submesh.VertexBufferIndex;
+			AssetManager::GetInstance()->VertexBufferInfos[Proxy.MeshIndex].BestFitBox.Transform(Proxy.BoundingBox, tComp->m_ModelToWorld);
 		}
 	}
 }
@@ -747,7 +723,6 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 			Matrix matrix = Matrix::CreateScale(scale);
 			matrix *= Matrix::CreateTranslation(translate);
 			debugData.ModelToWorld = matrix;
-			debugData.bIsLit = false;
 			debugData.Color = { 0.f, 1.f, 0.f, 1.f };
 			instances.emplace_back(debugData);
 		}
@@ -761,7 +736,6 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 		Matrix matrix = Matrix::CreateScale(scale);
 		matrix *= Matrix::CreateTranslation(translate);
 		debugData.ModelToWorld = matrix;
-		debugData.bIsLit = false;
 		debugData.Color = { PointLightProxies[i].Color.x, PointLightProxies[i].Color.y, PointLightProxies[i].Color.z, 1.f};
 		instances.emplace_back(debugData);
 	}
@@ -792,7 +766,6 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 		matrix *= rotationMatrix;
 		matrix *= Matrix::CreateTranslation(SceneInfo.CascadeInfos[SceneInfo.EnableCascadeDebug - 1].center);
 		debugData.ModelToWorld = matrix;
-		debugData.bIsLit = false;
 		debugData.Color = colors[SceneInfo.EnableCascadeDebug - 1];
 		instances.emplace_back(debugData);
 	}
@@ -809,7 +782,6 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 		{
 			InstanceData debugData;;
 			debugData.ModelToWorld = ComputePlaneTransform(Planes[i], 10.f, 10.f);
-			debugData.bIsLit = false;
 			if(i < 2)
 				debugData.Color = { 0.f, 0.f, 1.f, 1.f };
 			else if(i < 4)
@@ -830,7 +802,6 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 		Matrix matrix = Matrix::CreateScale(scale);
 		matrix *= Matrix::CreateTranslation(translate);
 		debugData.ModelToWorld = matrix;
-		debugData.bIsLit = false;
 		debugData.Color = { 1.f, 1.f, 1.f, 1.f };
 		instances.emplace_back(debugData);
 

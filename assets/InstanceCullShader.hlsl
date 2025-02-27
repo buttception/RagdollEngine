@@ -3,6 +3,7 @@
 
 #define INSTANCE_DATA_BUFFER_SRV_SLOT t1
 #define MESH_BUFFER_SRV_SLOT t2
+#define MATERIAL_BUFFER_SRV_SLOT t3
 
 #define INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT u0
 #define INSTANCE_ID_BUFFER_UAV_SLOT u1
@@ -16,6 +17,8 @@
 #define INFINITE_Z_ENABLED 1
 #define PREVIOUS_FRAME_ENABLED 1 << 1
 #define IS_PHASE_1 1 << 2
+#define ALPHA_TEST_ENABLED 1 << 3
+#define CULL_ALL 1 << 4
 
 cbuffer g_Const : register(b0)
 {
@@ -31,6 +34,7 @@ cbuffer g_Const : register(b0)
 
 StructuredBuffer<FInstanceData> InstanceDataInput : register(INSTANCE_DATA_BUFFER_SRV_SLOT);
 StructuredBuffer<FMeshData> MeshDataInput : register(MESH_BUFFER_SRV_SLOT);
+StructuredBuffer<FMaterialData> MaterialDataInput : register(MATERIAL_BUFFER_SRV_SLOT);
 
 RWStructuredBuffer<FDrawIndexedIndirectArguments> DrawIndexedIndirectArgsOutput : register(INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT);
 RWStructuredBuffer<uint> InstanceIdBufferOutput : register(INSTANCE_ID_BUFFER_UAV_SLOT);
@@ -51,6 +55,18 @@ void FrustumCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, 
         return;
     }
     FInstanceData InstanceData = InstanceDataInput[DTid.x];
+    FMaterialData MaterialData = MaterialDataInput[InstanceData.MaterialIndex];
+    if ((Flags & CULL_ALL) == 0 && Flags & ALPHA_TEST_ENABLED) //cull only mode blend or mask
+    {
+        if (MaterialData.Flags & ALPHA_MODE_OPAQUE)
+            return;
+    }
+    if ((Flags & CULL_ALL) == 0 && (Flags & ALPHA_TEST_ENABLED) == 0) //cull only opaques
+    {
+        if ((MaterialData.Flags & ALPHA_MODE_OPAQUE) == 0)
+            return;
+    }
+        
     //each thread will cull 1 proxy
     float3 Center = MeshDataInput[InstanceData.MeshIndex].Center;
     float3 Extents = MeshDataInput[InstanceData.MeshIndex].Extents;

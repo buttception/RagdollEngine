@@ -70,7 +70,15 @@ void gbuffer_ps(
     if (materialData.AlbedoIndex != -1){
 		albedo *= Textures[materialData.AlbedoIndex].Sample(Samplers[materialData.AlbedoSamplerIndex], inTexcoord);
 	}
-	clip(albedo.a - 0.01f);
+#ifdef NON_OPAQUE
+	if(materialData.Flags & ALPHA_MODE_MASK)
+	{
+		clip(albedo.a - materialData.AlphaCutoff);
+		albedo.a = 1.f;
+	}
+	else
+		clip(albedo.a - 0.01f);	//min clipping
+#endif
 	float4 RM = float4(0.f, materialData.RoughnessFactor, materialData.MetallicFactor, 0);
 	if(materialData.ORMIndex != -1){
         RM = Textures[materialData.ORMIndex].Sample(Samplers[materialData.ORMSamplerIndex], inTexcoord);

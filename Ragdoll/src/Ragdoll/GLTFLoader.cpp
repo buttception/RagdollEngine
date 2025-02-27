@@ -682,6 +682,9 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 					//manually assign to reconcil things like short to uint
 					for (int i = 0; i < accessor.count; ++i) {
 						switch (accessor.componentType) {
+						case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+							IndexStagingBuffer[i] = *reinterpret_cast<uint8_t*>(data + byteOffset + i * tinygltf::GetComponentSizeInBytes(accessor.componentType));
+							break;
 						case TINYGLTF_COMPONENT_TYPE_SHORT:
 							IndexStagingBuffer[i] = *reinterpret_cast<int16_t*>(data + byteOffset + i * tinygltf::GetComponentSizeInBytes(accessor.componentType));
 							break;
@@ -861,6 +864,12 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 				static_cast<float>(gltfMat.pbrMetallicRoughness.baseColorFactor[1]),
 				static_cast<float>(gltfMat.pbrMetallicRoughness.baseColorFactor[2]),
 				static_cast<float>(gltfMat.pbrMetallicRoughness.baseColorFactor[3]));
+			if (gltfMat.alphaMode == "MASK")
+				mat.AlphaMode = Material::AlphaMode::GLTF_MASK;
+			if(gltfMat.alphaMode == "BLEND")
+				mat.AlphaMode = Material::AlphaMode::GLTF_BLEND;
+			mat.AlphaCutoff = (float)gltfMat.alphaCutoff;
+			mat.bIsDoubleSided = gltfMat.doubleSided;
 			//no extension textures
 			if (gltfMat.pbrMetallicRoughness.baseColorTexture.index >= 0)
 				mat.AlbedoTextureIndex = gltfMat.pbrMetallicRoughness.baseColorTexture.index + textureIndicesOffset;
@@ -888,7 +897,6 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 				if (pbrSpecGlossMap.Has("specularGlossinessTexture"))
 					mat.RoughnessMetallicTextureIndex = pbrSpecGlossMap.Get("specularGlossinessTexture").Get("index").GetNumberAsInt() + textureIndicesOffset;
 			}
-			mat.bIsLit = true;
 			AssetManager::GetInstance()->Materials.emplace_back(mat);
 		}
 	}

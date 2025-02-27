@@ -25,6 +25,11 @@ struct FInstanceData
     uint MaterialIndex;
 };
 
+#define ALPHA_MODE_OPAQUE 1
+#define ALPHA_MODE_MASK 1 << 1
+#define ALPHA_MODE_BLEND 1 << 2
+#define DOUBLE_SIDED 1 << 3
+
 struct FMaterialData
 {
     float4 AlbedoFactor;
@@ -37,7 +42,9 @@ struct FMaterialData
     int NormalSamplerIndex;
     int ORMIndex;
     int ORMSamplerIndex;
-    int bIsLit;
+    
+    float AlphaCutoff;
+    uint Flags;
 };
 
 struct FDrawIndexedIndirectArguments

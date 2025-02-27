@@ -12,8 +12,13 @@ struct Material {
 	Vector4 Color;
 	float Roughness = 1.f;
 	float Metallic = 1.f;
-
-	bool bIsLit = false;
+	float AlphaCutoff = 0.5f;
+	enum class AlphaMode {
+		GLTF_OPAQUE,
+		GLTF_MASK,
+		GLTF_BLEND
+	} AlphaMode = AlphaMode::GLTF_OPAQUE;
+	bool bIsDoubleSided = false;
 };
 
 struct Vertex {

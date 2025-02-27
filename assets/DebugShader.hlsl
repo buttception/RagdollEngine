@@ -28,16 +28,6 @@ struct InstanceData{
 
 	float4 albedoFactor;
     uint meshIndex;
-	float roughness;
-	float metallic;
-
-	int albedoIndex;
-	int albedoSamplerIndex;
-	int normalIndex;
-	int normalSamplerIndex;
-	int roughnessMetallicIndex;
-	int roughnessMetallicSamplerIndex;
-	int isLit;
 };
 
 StructuredBuffer<InstanceData> InstanceDatas : register(t0);

@@ -9,6 +9,7 @@
 
 #define INSTANCE_DATA_BUFFER_SRV_SLOT 1
 #define MESH_BUFFER_SRV_SLOT 2
+#define MATERIAL_BUFFER_SRV_SLOT 3
 
 #define INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT 0
 #define INSTANCE_ID_BUFFER_UAV_SLOT 1
@@ -22,6 +23,8 @@
 #define INFINITE_Z_ENABLED 1
 #define PREVIOUS_FRAME_ENABLED 1 << 1
 #define IS_PHASE_1 1 << 2
+#define ALPHA_TEST_ENABLED 1 << 3
+#define CULL_ALL 1 << 4
 
 #define MAX_HZB_MIP_COUNT 16
 
@@ -68,6 +71,11 @@ struct FInstanceData
 	uint32_t MaterialIndex;
 };
 
+#define ALPHA_MODE_OPAQUE 1
+#define ALPHA_MODE_MASK 1 << 1
+#define ALPHA_MODE_BLEND 1 << 2
+#define DOUBLE_SIDED 1 << 3
+
 struct FMaterialData
 {
 	Vector4 AlbedoFactor = Vector4::One;
@@ -80,7 +88,9 @@ struct FMaterialData
 	int NormalSamplerIndex = 0;
 	int ORMIndex = -1;
 	int ORMSamplerIndex = 0;
-	int bIsLit = 1;
+
+	float AlphaCutoff = 0.5f;
+	uint32_t Flags;
 };
 
 void ragdoll::FGPUScene::Update(Scene* Scene)
@@ -127,6 +137,7 @@ void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 		data.Center = info.BestFitBox.Center;
 		data.Extents = info.BestFitBox.Extents;
 	}
+	//upload all the materials
 	std::vector<FMaterialData> MaterialDatas;
 	MaterialDatas.resize(AssetManager::GetInstance()->Materials.size());
 	for (int i = 0; i < AssetManager::GetInstance()->Materials.size(); ++i)
@@ -154,7 +165,24 @@ void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 			data.ORMIndex = ORMTexture.ImageIndex;
 			data.ORMSamplerIndex = ORMTexture.SamplerIndex;
 		}
-		data.bIsLit = Material.bIsLit;
+		data.AlphaCutoff = Material.AlphaCutoff;
+		data.Flags = 0;
+		if (Material.AlphaMode == Material::AlphaMode::GLTF_OPAQUE)
+		{
+			data.Flags |= ALPHA_MODE_OPAQUE;
+		}
+		else if (Material.AlphaMode == Material::AlphaMode::GLTF_MASK)
+		{
+			data.Flags |= ALPHA_MODE_MASK;
+		}
+		else if (Material.AlphaMode == Material::AlphaMode::GLTF_BLEND)
+		{
+			data.Flags |= ALPHA_MODE_BLEND;
+		}
+		if (Material.bIsDoubleSided)
+		{
+			data.Flags |= DOUBLE_SIDED;
+		}
 	}
 	//do not need to sort instances now as it contains mesh indices instead now
 	std::vector<FInstanceData> Instances;
@@ -164,7 +192,7 @@ void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 		Instances[i].ModelToWorld = Scene->StaticProxies[i].ModelToWorld;
 		Instances[i].PrevModelToWorld = Scene->StaticProxies[i].PrevWorldMatrix;
 		Instances[i].MaterialIndex = Scene->StaticProxies[i].MaterialIndex;
-		Instances[i].MeshIndex = Scene->StaticProxies[i].BufferIndex;
+		Instances[i].MeshIndex = Scene->StaticProxies[i].MeshIndex;
 	}
 	//indirect draw args do not need any values
 	//get all the bounding boxes and upload onto gpu
@@ -241,7 +269,7 @@ void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 	for (uint32_t i = 0; i < Scene->StaticProxies.size(); ++i)
 	{
 		nvrhi::rt::InstanceDesc& InstanceDesc = InstanceDescs[i];
-		InstanceDesc.bottomLevelAS = BottomLevelASs[Scene->StaticProxies[i].BufferIndex];
+		InstanceDesc.bottomLevelAS = BottomLevelASs[Scene->StaticProxies[i].MeshIndex];
 		InstanceDesc.instanceID = i;
 		for (int j = 0; j < 3; ++j)
 		{
@@ -450,7 +478,7 @@ void ragdoll::FGPUScene::ExtractFrustumPlanes(Vector4 OutPlanes[6], const Matrix
 	}
 }
 
-nvrhi::BufferHandle ragdoll::FGPUScene::FrustumCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled)
+nvrhi::BufferHandle ragdoll::FGPUScene::FrustumCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled, uint32_t AlphaTest)
 {
 	RD_SCOPE(Culling, Instance Culling);
 	CommandList->beginMarker("Frustum Cull Scene");
@@ -458,6 +486,9 @@ nvrhi::BufferHandle ragdoll::FGPUScene::FrustumCull(nvrhi::CommandListHandle Com
 	ExtractFrustumPlanes(ConstantBuffer.FrustumPlanes, Projection, View);
 	ConstantBuffer.ProxyCount = ProxyCount;
 	ConstantBuffer.Flags |= InfiniteZEnabled ? INFINITE_Z_ENABLED : 0;
+	//decides to include or exclude the alpha test flag
+	ConstantBuffer.Flags |= AlphaTest == 0 ? CULL_ALL : 0;
+	ConstantBuffer.Flags |= AlphaTest == 2 ? ALPHA_TEST_ENABLED : 0;
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FConstantBuffer), "InstanceCull ConstantBuffer", 1));
 	CommandList->writeBuffer(ConstantBufferHandle, &ConstantBuffer, sizeof(FConstantBuffer));
 
@@ -470,6 +501,7 @@ nvrhi::BufferHandle ragdoll::FGPUScene::FrustumCull(nvrhi::CommandListHandle Com
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_DATA_BUFFER_SRV_SLOT, InstanceBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(MESH_BUFFER_SRV_SLOT, MeshBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(MATERIAL_BUFFER_SRV_SLOT, MaterialBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_UAV(INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT, IndirectDrawArgsBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_ID_BUFFER_UAV_SLOT, InstanceIdBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_VISIBLE_COUNT_UAV_SLOT, PassedFrustumTestCountBuffer),

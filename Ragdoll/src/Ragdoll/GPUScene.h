@@ -47,7 +47,7 @@ namespace ragdoll
 		//culls the light grid, will not open or close the command list
 		void CullLightGrid(const SceneInformation& SceneInfo, nvrhi::CommandListHandle CommandList, ragdoll::SceneRenderTargets* RenderTargets);
 		//returns the count buffer for the draw indirect function
-		nvrhi::BufferHandle FrustumCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled);
+		nvrhi::BufferHandle FrustumCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled, uint32_t AlphaTest = 0 /*cull all = 0, opaque = 1, alpha = 2*/);
 		//returns the count buffer for the draw indirect function, culls the instances in the instance id buffer
 		void OcclusionCullPhase1(
 			nvrhi::CommandListHandle CommandList,
