@@ -78,6 +78,40 @@ void main_ps(
     // Divide by number of samples (9)
     shadow /= 9.f;
     //write shadow factor into the shadow mask
-    outColor.a = shadow;
-    outColor.rgb = color.rgb;
+    outColor.r = shadow;
+    outColor.gba = color.rgb;
+}
+
+#define TILE_X 8
+#define TILE_Y 4
+
+cbuffer g_Const : register(b0)
+{
+    float2 ShadowMaskSize;
+}
+
+Texture2D<float4> ShadowMaskInput : register(t0);
+RWTexture2D<uint> ShadowMaskOutput : register(u0);
+
+//only used with the raytracing shadow mask result
+[numthreads(8, 8, 1)]
+void CompressShadowMaskCS(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : SV_DispatchThreadID, uint GI : SV_GroupIndex)
+{
+    ShadowMaskOutput[DTid.xy] = 0;
+    for (int x = 0; x < TILE_X; ++x)
+    {
+        for (int y = 0; y < TILE_Y; ++y)
+        {
+            uint2 coord = uint2(DTid.x * TILE_X + x, DTid.y * TILE_Y + y);
+            if (coord.x < ShadowMaskSize.x && coord.y < ShadowMaskSize.y)
+            {
+                //shadow result is binary, so each bit in the uint32 is 1 or 0
+                if ((1.f - ShadowMaskInput[coord].r) > 0.f)
+                {
+                    ShadowMaskOutput[DTid.xy] |= 1 << (y * TILE_X + x);
+                }
+            }
+        }
+    }
+
 }

@@ -5,6 +5,7 @@
 
 #include "AssetManager.h"
 #include "DirectXDevice.h"
+#include "stb_image.h"
 
 AssetManager* AssetManager::GetInstance()
 {
@@ -250,6 +251,65 @@ void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
 	};
 	CommandList->writeTexture(AssetManager::GetInstance()->ErrorTex, 0, 0, &errorColor, 8);
 
+	std::string NoisePath = "stbn_unitvec2_2Dx1D_128x128x64_";
+	for (int i = 0; i < 64; ++i)
+	{
+		RD_SCOPE(Load, Load File);
+		std::filesystem::path modelPath = FileManagerRef->GetRoot() / "bluenoise" / NoisePath;
+		modelPath += std::to_string(i) + ".png";
+		//load raw bytes, do not use stbi load
+		std::ifstream file(modelPath, std::ios::binary | std::ios::ate);
+		RD_ASSERT(!file, "Unable to open file {}:{}", strerror(errno), modelPath.string());
+		uint32_t size = static_cast<int32_t>(file.tellg());
+		file.seekg(0, std::ios::beg);
+		std::vector<uint8_t> data(size);
+		RD_ASSERT(!file.read((char*)data.data(), size), "Failed to read file {}", modelPath.string());
+		//use stbi_info_from_memory to check header on info for how to load
+		int w = -1, h = -1, comp = -1, req_comp = 0;
+		RD_ASSERT(!stbi_info_from_memory(data.data(), size, &w, &h, &comp), "stb unable to read image {}", modelPath.string());
+		if (comp == 3)
+			req_comp = 4;
+		//dont support hdr images
+		//use stbi_load_from_memory to load the image data, set up all the desc with that info
+		uint8_t* raw = stbi_load_from_memory(data.data(), size, &w, &h, &comp, req_comp);
+		RD_ASSERT(!raw, "Issue loading {}", modelPath.string());
+
+		if (!BlueNoise2D)
+		{
+			nvrhi::TextureDesc texDesc;
+			texDesc.width = w;
+			texDesc.height = h;
+			texDesc.arraySize = 64;
+			texDesc.dimension = nvrhi::TextureDimension::Texture2DArray;
+			switch (comp)
+			{
+			case 1:
+				texDesc.format = nvrhi::Format::R8_UNORM;
+				break;
+			case 2:
+				texDesc.format = nvrhi::Format::RG8_UNORM;
+				break;
+			case 3:
+				texDesc.format = nvrhi::Format::RGBA8_UNORM;
+				break;
+			case 4:
+				texDesc.format = nvrhi::Format::RGBA8_UNORM;
+				break;
+			default:
+				RD_ASSERT(true, "Unsupported texture channel count");
+			}
+			texDesc.debugName = "stbn_unitvec2_2Dx1D_128x128x64";
+			texDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+			texDesc.isRenderTarget = false;
+			texDesc.keepInitialState = true;
+			BlueNoise2D = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+		}
+		//upload the texture data
+		CommandList->writeTexture(BlueNoise2D, i, 0, raw, w * (comp == 3 ? 4 : comp));
+
+		stbi_image_free(raw);
+	}
+
 #pragma region Samplers Creation
 	//create the samplers
 	nvrhi::SamplerDesc samplerDesc;
@@ -318,7 +378,7 @@ void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
 	//create the bindless descriptor table
 	nvrhi::BindlessLayoutDesc bindlessDesc;
 
-	bindlessDesc.visibility = nvrhi::ShaderType::Pixel;
+	bindlessDesc.visibility = nvrhi::ShaderType::All;
 	bindlessDesc.maxCapacity = 1024;
 	bindlessDesc.firstSlot = 0;
 	bindlessDesc.registerSpaces = {
@@ -364,6 +424,7 @@ void AssetManager::UpdateVBOIBO()
 		nvrhi::BufferDesc vertexBufDesc;
 		vertexBufDesc.byteSize = Vertices.size() * sizeof(Vertex);	//the offset is already the size of the vb
 		vertexBufDesc.isVertexBuffer = true;
+		vertexBufDesc.structStride = sizeof(Vertex);
 		vertexBufDesc.debugName = "Global vertex buffer";
 		vertexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;	//set as copy dest to copy over data
 		vertexBufDesc.canHaveRawViews = true;
@@ -374,7 +435,7 @@ void AssetManager::UpdateVBOIBO()
 		//copy data over
 		CommandList->beginTrackingBufferState(VBO, nvrhi::ResourceStates::CopyDest);	//i tink this is to update nvrhi resource manager state tracker
 		CommandList->writeBuffer(VBO, Vertices.data(), vertexBufDesc.byteSize);
-		CommandList->setPermanentBufferState(VBO, nvrhi::ResourceStates::VertexBuffer | nvrhi::ResourceStates::AccelStructBuildInput);	//now its a vb
+		CommandList->setPermanentBufferState(VBO, nvrhi::ResourceStates::VertexBuffer | nvrhi::ResourceStates::AccelStructBuildInput | nvrhi::ResourceStates::ShaderResource);	//now its a vb
 
 		nvrhi::BufferDesc indexBufDesc;
 		indexBufDesc.byteSize = Indices.size() * sizeof(uint32_t);
@@ -387,7 +448,7 @@ void AssetManager::UpdateVBOIBO()
 		IBO = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(indexBufDesc);
 		CommandList->beginTrackingBufferState(IBO, nvrhi::ResourceStates::CopyDest);
 		CommandList->writeBuffer(IBO, Indices.data(), indexBufDesc.byteSize);
-		CommandList->setPermanentBufferState(IBO, nvrhi::ResourceStates::IndexBuffer | nvrhi::ResourceStates::AccelStructBuildInput);
+		CommandList->setPermanentBufferState(IBO, nvrhi::ResourceStates::IndexBuffer | nvrhi::ResourceStates::AccelStructBuildInput | nvrhi::ResourceStates::ShaderResource);
 
 		CommandList->endMarker();
 	}

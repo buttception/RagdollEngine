@@ -123,20 +123,22 @@ namespace ragdoll {
 		float Luminance = 0.f;
 		float FilterRadius = 0.05f;
 		float BloomIntensity = 0.04f;
-		bool UseCACAO = false;
-		bool UseXeGTAO = true;
+		bool UseCACAO = true;
+		bool UseXeGTAO = false;
 		bool bIsCameraDirty{ true };
-		bool bEnableDLSS{ true };
+		bool bEnableDLSS{ false };
 		bool bEnableIntelTAA{ false };
 		bool bEnableFSR{ false };
 		bool bResetAccumulation{ true };
-		bool bEnableJitter{ true };
-		bool bEnableXeGTAONoise{ true };
+		bool bEnableJitter{ false };
+		bool bEnableXeGTAONoise{ false };
 		bool bEnableBloom{ true };
 		bool bEnableOcclusionCull{ true };
 		bool bRaytraceDirectionalLight{ true };
-		uint32_t RenderWidth = 1600;
-		uint32_t RenderHeight = 900;
+		bool bRaytraceShadowDenoiser{ true };
+		float SunSize = 0.1f;
+		uint32_t RenderWidth = 1920;
+		uint32_t RenderHeight = 1080;
 		uint32_t TargetWidth;
 		uint32_t TargetHeight;
 		float JitterX;
@@ -217,6 +219,19 @@ namespace ragdoll {
 		nvrhi::TextureHandle CurrUpscaledBuffer;
 		nvrhi::TextureHandle PrevUpscaledBuffer;
 		nvrhi::TextureHandle PresentationBuffer;
+		//ffx denoiser
+		// Tile size for the shadow denoiser is hardcoded to (8x4)
+		const uint32_t k_tileSizeX = 8;
+		const uint32_t k_tileSizeY = 4;
+		nvrhi::TextureHandle RayTraceResult;	//8x4 tile result
+		nvrhi::TextureHandle Moment0;
+		nvrhi::TextureHandle Moment1;
+		nvrhi::TextureHandle CurrMoment;
+		nvrhi::TextureHandle PrevMoment;
+		nvrhi::TextureHandle Scratch0;
+		nvrhi::TextureHandle Scratch1;
+		nvrhi::TextureHandle CurrScratch;
+		nvrhi::TextureHandle PrevScratch;
 	};
 
 	class Scene {

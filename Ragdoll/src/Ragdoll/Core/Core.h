@@ -83,6 +83,8 @@ ________________________________________________________________________________
 
 #define CONCAT(a, b) a##b
 
+#define DIVIDE_ROUNDING_UP(x, y) ((x + y - 1) / y)
+
 // Function pointer binding with std::functions
 #define RD_BIND_EVENT_FN(fn) std::bind(&fn, this, std::placeholders::_1)
 namespace ragdoll

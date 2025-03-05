@@ -77,7 +77,7 @@ void gbuffer_ps(
 		albedo.a = 1.f;
 	}
 	else
-		clip(albedo.a - 0.01f);	//min clipping
+		clip(albedo.a <= 0.f ? -1.f : 1.f);	//min clipping
 #endif
 	float4 RM = float4(0.f, materialData.RoughnessFactor, materialData.MetallicFactor, 0);
 	if(materialData.ORMIndex != -1){
@@ -163,7 +163,7 @@ void deferred_light_ps(
 	float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.y, RM.x, AO);
 	
     float3 ambient = SceneAmbientColor.rgb * albedo.rgb * AO;
-    float3 lighting = ambient + diffuse * (1.f - shadowFactor.a);
+    float3 lighting = ambient + diffuse * (1.f - shadowFactor.r);
 	
     for (int i = 0; i < PointLightCount; i++)
     {
@@ -177,7 +177,7 @@ void deferred_light_ps(
         float Attenuation = saturate(1.0 / (1.0 + k1 * Dist + k2 * (Dist * Dist)));
         lighting += PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDir, PointLights[i].Color.rgb * PointLights[i].Position.w, RM.y, RM.x, AO) * Attenuation;
     }
-	outColor = lighting * shadowFactor.rgb;
+	outColor = lighting;
 }
 
 //StructuredBuffer<uint> LightBitFieldsInput : register(t7);
@@ -209,7 +209,7 @@ void deferred_light_grid_ps(
     float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.y, RM.x, AO);
 	
     float3 ambient = SceneAmbientColor.rgb * albedo.rgb * AO;
-    float3 lighting = ambient + diffuse * (1.f - shadowFactor.a);
+    float3 lighting = ambient + diffuse * (1.f - shadowFactor.r);
 	
 	//get which slice this pixel is in
     uint X = floor(inTexcoord.x * GridSize.x);
@@ -247,6 +247,6 @@ void deferred_light_grid_ps(
             lighting += PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDir, PointLights[LightIndex].Color.rgb * PointLights[LightIndex].Position.w, RM.y, RM.x, AO) * Attenuation;
         }
     }
-    outColor = lighting * shadowFactor.rgb;
+    outColor = lighting;
     //outColor = lighting * float3(X / GridSize.x, Y / GridSize.y, Z / 16.f);
 }

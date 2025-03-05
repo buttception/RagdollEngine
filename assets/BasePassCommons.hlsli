@@ -6,6 +6,14 @@ struct FBoundingBox
     float pad1;
 };
 
+struct FVertex
+{
+    float3 position;
+    float3 normal;
+    float3 tangent;
+    float2 texcoord;
+};
+
 //used in compute shader to populate indirect calls
 struct FMeshData
 {

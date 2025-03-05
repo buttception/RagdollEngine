@@ -114,6 +114,7 @@ public:
 
 	nvrhi::TextureHandle DefaultTex;
 	nvrhi::TextureHandle ErrorTex;
+	nvrhi::TextureHandle BlueNoise2D;
 	std::vector<nvrhi::SamplerHandle> Samplers;
 	nvrhi::SamplerHandle ShadowSampler;
 

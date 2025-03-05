@@ -170,7 +170,7 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		{"1600x900"},
 		{"1920x1080"}
 	};
-	static int32_t selectedItem{2};
+	static int32_t selectedItem{3};
 	if(ImGui::Combo("Resolution", &selectedItem, resolutions, 4))
 	{
 		switch (selectedItem)
@@ -269,6 +269,11 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 	if (ImGui::TreeNode("Lighting"))
 	{
 		ImGui::Checkbox("Raytrace Directional Light Shadows", &SceneInfo.bRaytraceDirectionalLight);
+		if (SceneInfo.bRaytraceDirectionalLight)
+		{
+			ImGui::Checkbox("Raytrace Shadows Denoiser", &SceneInfo.bRaytraceShadowDenoiser);
+			ImGui::SliderFloat("Sun Size", &SceneInfo.SunSize, 0.f, 1.f);
+		}
 		ImGui::SliderFloat("Sky Dimmer e-6", &SceneInfo.SkyDimmer, 0.f, 1.f);
 		ImGui::ColorEdit3("Light Diffuse", &SceneInfo.LightDiffuseColor.x);
 		ImGui::SliderFloat("Light Intensity", &SceneInfo.LightIntensity, 0.1f, 10.f);

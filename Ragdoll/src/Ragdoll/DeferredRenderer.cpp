@@ -75,6 +75,10 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 		RenderTargets->PrevAccumulation = RenderTargets->Accumulation0;
 		RenderTargets->CurrLuminanceHistory = RenderTargets->LuminanceHistory1;
 		RenderTargets->PrevLuminanceHistory = RenderTargets->LuminanceHistory0;
+		RenderTargets->CurrMoment = RenderTargets->Moment1;
+		RenderTargets->PrevMoment = RenderTargets->Moment0;
+		RenderTargets->CurrScratch = RenderTargets->Scratch1;
+		RenderTargets->PrevScratch = RenderTargets->Scratch0;
 	}
 	else
 	{
@@ -87,7 +91,11 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 		RenderTargets->CurrAccumulation = RenderTargets->Accumulation0;
 		RenderTargets->PrevAccumulation = RenderTargets->Accumulation1;
 		RenderTargets->CurrLuminanceHistory = RenderTargets->LuminanceHistory0;
-		RenderTargets->PrevLuminanceHistory = RenderTargets->LuminanceHistory1;
+		RenderTargets->PrevLuminanceHistory = RenderTargets->LuminanceHistory1;;
+		RenderTargets->CurrMoment = RenderTargets->Moment0;
+		RenderTargets->PrevMoment = RenderTargets->Moment1;
+		RenderTargets->CurrScratch = RenderTargets->Scratch0;
+		RenderTargets->PrevScratch = RenderTargets->Scratch1;
 	}
 	{
 		//this process is long because it is waiting for the gpu to be done first

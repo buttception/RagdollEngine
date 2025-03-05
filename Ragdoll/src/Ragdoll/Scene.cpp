@@ -566,6 +566,34 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.mipLevels = levels;
 	texDesc.format = nvrhi::Format::RG16_FLOAT;
 	RenderTargets.SpdMips = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	{
+		//denoiser stuff
+		nvrhi::TextureDesc DenoiserTexDesc;
+		DenoiserTexDesc.width = DIVIDE_ROUNDING_UP(SceneInfo.RenderWidth, RenderTargets.k_tileSizeX);
+		DenoiserTexDesc.height = DIVIDE_ROUNDING_UP(SceneInfo.RenderHeight, RenderTargets.k_tileSizeY);
+		DenoiserTexDesc.format = nvrhi::Format::R32_UINT;
+		DenoiserTexDesc.isUAV = true;
+		DenoiserTexDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+		DenoiserTexDesc.keepInitialState = true;
+		DenoiserTexDesc.dimension = nvrhi::TextureDimension::Texture2D;
+		DenoiserTexDesc.debugName = "RayTraceResult";
+		RenderTargets.RayTraceResult = DirectXDevice::GetNativeDevice()->createTexture(DenoiserTexDesc);
+
+		DenoiserTexDesc.width = SceneInfo.RenderWidth;
+		DenoiserTexDesc.height = SceneInfo.RenderHeight;
+		DenoiserTexDesc.format = nvrhi::Format::RG16_FLOAT;
+		DenoiserTexDesc.debugName = "Scratch0";
+		RenderTargets.Scratch0 = DirectXDevice::GetNativeDevice()->createTexture(DenoiserTexDesc);
+		DenoiserTexDesc.debugName = "Scratch1";
+		RenderTargets.Scratch1 = DirectXDevice::GetNativeDevice()->createTexture(DenoiserTexDesc);
+
+		DenoiserTexDesc.format = nvrhi::Format::R11G11B10_FLOAT;
+		DenoiserTexDesc.debugName = "Moment0";
+		RenderTargets.Moment0 = DirectXDevice::GetNativeDevice()->createTexture(DenoiserTexDesc);
+		DenoiserTexDesc.debugName = "Moment1";
+		RenderTargets.Moment1 = DirectXDevice::GetNativeDevice()->createTexture(DenoiserTexDesc);
+	}
 }
 
 void ragdoll::Scene::UpdateTransforms()
