@@ -262,9 +262,10 @@ void ShadowMaskPass::FFX_Denoise(const ragdoll::SceneInformation& SceneInfo, rag
 		TileClassificationConstants.fInvBufferDimensions = Vector2(1.f / SceneInfo.RenderWidth, 1.f / SceneInfo.RenderHeight);
 		TileClassificationConstants.fMotionVectorScale = TileClassificationConstants.fInvBufferDimensions;
 		TileClassificationConstants.normalsUnpackMul_unpackAdd = Vector2(1.f, 0.f);
-		TileClassificationConstants.fProjectionInverse = SceneInfo.MainCameraProjWithJitter.Invert() * Matrix::CreateScale(1.f, 1.f, -1.f);
-		TileClassificationConstants.fReprojectionMatrix = SceneInfo.PrevMainCameraViewProj * SceneInfo.PrevMainCameraViewProjWithJitter.Invert();
-		TileClassificationConstants.fViewProjectionInverse = SceneInfo.MainCameraViewProjWithJitter.Invert() * Matrix::CreateScale(1.f, 1.f, -1.f);
+		TileClassificationConstants.fProjectionInverse = SceneInfo.MainCameraProjWithJitter.Invert();
+		TileClassificationConstants.fReprojectionMatrix = SceneInfo.PrevMainCameraViewProjWithJitter * SceneInfo.PrevMainCameraViewProjWithJitter.Invert();
+		//TileClassificationConstants.fReprojectionMatrix = SceneInfo.PrevMainCameraViewProj.Invert() * SceneInfo.PrevMainCameraViewProj;
+		TileClassificationConstants.fViewProjectionInverse = SceneInfo.MainCameraViewProjWithJitter.Invert();
 		nvrhi::BufferHandle TileClassificationConstantsBuffer = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(TileClassificationConstants), "TileClassificationConstants", 1));
 		CommandListRef->writeBuffer(TileClassificationConstantsBuffer, &TileClassificationConstants, sizeof(TileClassificationConstants));
 

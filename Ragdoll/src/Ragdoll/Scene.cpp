@@ -91,7 +91,13 @@ void ragdoll::Scene::Update(float _dt)
 			break;
 		case 5:
 			DebugInfo.CompCount = 4;
-			DebugInfo.DbgTarget = DeferredRenderer->bIsOddFrame ? RenderTargets.TemporalColor0 : RenderTargets.TemporalColor1;;
+			DebugInfo.DbgTarget = DeferredRenderer->bIsOddFrame ? RenderTargets.TemporalColor0 : RenderTargets.TemporalColor1;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One;
+			break;
+		case 6:
+			DebugInfo.CompCount = 4;
+			DebugInfo.DbgTarget = RenderTargets.ShadowMask;
 			DebugInfo.Add = Vector4::Zero;
 			DebugInfo.Mul = Vector4::One;
 			break;

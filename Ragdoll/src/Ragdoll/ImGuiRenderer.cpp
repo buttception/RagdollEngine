@@ -124,6 +124,7 @@ int32_t ImguiRenderer::DrawFBViewer()
 		"Velocity",
 		"AO",
 		"Temporal Color",
+		"Shadow Mask",
 	};
 	ImGui::Combo("Texture View", &selectedItem, items, IM_ARRAYSIZE(items));
 	ImGui::End();

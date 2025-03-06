@@ -291,7 +291,6 @@ FfxFloat32 LoadPreviousDepth(FfxInt32x2 p)
 FfxFloat32x3 Decode(FfxFloat32x2 f)
 {
     f = f * 2.0 - 1.0;
- 
     // https://twitter.com/Stubbesaurus/status/937994790553227264
     FfxFloat32x3 n = FfxFloat32x3(f.x, f.y, 1.0 - abs(f.x) - abs(f.y));
     FfxFloat32 t = saturate(-n.z);
