@@ -19,6 +19,7 @@ project "Ragdoll"
 	files
 	{
 		"src/**.h",
+		"src/**.hpp",
 		"src/**.cpp",
 		"../assets/**.hlsl",
 		"../assets/**.hlsli",

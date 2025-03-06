@@ -747,6 +747,7 @@ Matrix ComputePlaneTransform(const Vector4& plane, float width, float height)
 
 void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 {
+	LineVertices.clear();
 	instances.clear();
 	for (int i = 0; i < StaticProxies.size(); ++i) {
 		if (Config.bDrawBoxes) {
@@ -806,29 +807,44 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 	
 	if (DebugInfo.bShowFrustum)
 	{
-		//add the 5 planes for the camera
-		Vector4 Planes[6];
-		if(DebugInfo.bFreezeFrustumCulling)
-			GPUScene->ExtractFrustumPlanes(Planes, DebugInfo.FrozenProjection, DebugInfo.FrozenView);
-		else
-			GPUScene->ExtractFrustumPlanes(Planes, SceneInfo.MainCameraProj, SceneInfo.MainCameraView);
-		for (int i = 0; i < 5; ++i)
+		//draw lines for the frustum
+		if (DebugInfo.bFreezeFrustumCulling)
 		{
-			InstanceData debugData;;
-			debugData.ModelToWorld = ComputePlaneTransform(Planes[i], 10.f, 10.f);
-			if(i < 2)
-				debugData.Color = { 0.f, 0.f, 1.f, 1.f };
-			else if(i < 4)
-				debugData.Color = { 1.f, 1.f, 0.f, 1.f };
-			else
-				debugData.Color = { 0.f, 1.f, 0.f, 1.f };
-			instances.emplace_back(debugData);
+			//get the frozen view projection matrix
+			DirectX::BoundingFrustum Frustum;
+			Matrix TempMatrix = DebugInfo.FrozenProjection;
+			TempMatrix._33 = SceneInfo.CameraNear / (SceneInfo.CameraFar - SceneInfo.CameraNear);
+			TempMatrix._43 = -SceneInfo.CameraNear * SceneInfo.CameraFar / (SceneInfo.CameraFar - SceneInfo.CameraNear);
+			DirectX::BoundingFrustum::CreateFromMatrix(Frustum, TempMatrix, true);
+			Frustum.Transform(Frustum, Matrix::CreateScale(1.f, 1.f, -1.f));
+			Frustum.Transform(Frustum, DebugInfo.FrozenView.Invert());
+			Vector3 corners[8];
+			Frustum.GetCorners(corners);
+			auto PushLine = [&](const Vector3& start, const Vector3& end) {
+				LineVertices.push_back({ start, Vector3{0.f, 0.f, 1.f} });   // Start point
+				LineVertices.push_back({ end, Vector3{0.f, 0.f, 1.f} });     // End point
+			};
+
+			PushLine(corners[0], corners[1]);
+			PushLine(corners[1], corners[2]);
+			PushLine(corners[2], corners[3]);
+			PushLine(corners[3], corners[0]);
+
+			PushLine(corners[4], corners[5]);
+			PushLine(corners[5], corners[6]);
+			PushLine(corners[6], corners[7]);
+			PushLine(corners[7], corners[4]);
+
+			PushLine(corners[0], corners[4]);
+			PushLine(corners[1], corners[5]);
+			PushLine(corners[2], corners[6]);
+			PushLine(corners[3], corners[7]);
 		}
 	}
 
 	if (!instances.empty())
 	{
-		MICROPROFILE_SCOPEI("Scene", "Building Debug Instance Buffer", MP_DARKRED);
+		MICROPROFILE_SCOPEI("Debug", "Building Debug Instance Buffer", MP_DARKRED);
 		//add one more cube at where the sun is
 		InstanceData debugData;
 		Vector3 translate = SceneInfo.LightDirection;
@@ -852,6 +868,24 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 		CommandList->beginTrackingBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::CopyDest);
 		CommandList->writeBuffer(StaticInstanceDebugBufferHandle, instances.data(), sizeof(InstanceData) * instances.size());
 		CommandList->setPermanentBufferState(StaticInstanceDebugBufferHandle, nvrhi::ResourceStates::ShaderResource);
+		CommandList->close();
+		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
+	}
+
+	if (!LineVertices.empty())
+	{
+		RD_SCOPE(Debug, Line Buffer);
+		nvrhi::BufferDesc Desc;
+		Desc.byteSize = sizeof(LineVertex) * LineVertices.size();
+		Desc.debugName = "Line Buffer";
+		Desc.initialState = nvrhi::ResourceStates::CopyDest;
+		Desc.structStride = sizeof(LineVertex);
+		LineBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(Desc);
+
+		CommandList->open();
+		CommandList->beginTrackingBufferState(LineBufferHandle, nvrhi::ResourceStates::CopyDest);
+		CommandList->writeBuffer(LineBufferHandle, LineVertices.data(), sizeof(LineVertex)* LineVertices.size());
+		CommandList->setPermanentBufferState(LineBufferHandle, nvrhi::ResourceStates::ShaderResource);
 		CommandList->close();
 		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 	}

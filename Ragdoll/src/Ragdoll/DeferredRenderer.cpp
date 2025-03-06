@@ -266,7 +266,7 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 	}
 
 	Taskflow.emplace([this, &scene]() {
-		DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo, RenderTargets);
+		DebugPass->DrawDebug(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->LineBufferHandle, scene->LineVertices.size(), scene->SceneInfo, RenderTargets);
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::DEBUG]);
 

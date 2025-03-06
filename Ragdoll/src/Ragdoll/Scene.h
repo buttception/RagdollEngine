@@ -26,6 +26,12 @@ namespace ragdoll {
 		//float Range;
 	};
 
+	struct LineVertex 
+	{
+		Vector3 Position;
+		Vector3 Color;
+	};
+
 	struct Proxy {
 		Matrix ModelToWorld;
 		Matrix PrevWorldMatrix;
@@ -285,7 +291,9 @@ namespace ragdoll {
 		std::vector<PointLightProxy> PointLightProxies;
 
 		std::vector<InstanceData> StaticDebugInstanceDatas;	//all the debug cubes
+		std::vector<LineVertex> LineVertices;	//all the debug lines
 		nvrhi::BufferHandle StaticInstanceDebugBufferHandle;	//contains all the aabb boxes to draw
+		nvrhi::BufferHandle LineBufferHandle;	//contains all the lines to draw
 
 		void PopulateStaticProxies();
 		void PopulateLightProxies();
