@@ -174,14 +174,12 @@ void OcclusionCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex
     float3 ScaleX = Transform[0].xyz;
     float3 ScaleY = Transform[1].xyz;
     float3 ScaleZ = Transform[2].xyz;
-    //float3 ScaleX = float3(Transform[0].x, Transform[1].x, Transform[2].x);
-    //float3 ScaleY = float3(Transform[0].y, Transform[1].y, Transform[2].y);
-    //float3 ScaleZ = float3(Transform[0].z, Transform[1].z, Transform[2].z);
     float Scale = max(max(length(ScaleX), length(ScaleY)), length(ScaleZ));
     float Radius = length(Extents) * Scale;
     //calculate the closest possible position of the sphere in viewspace
     float3 PositionInWorld = mul(float4(Center, 1.f), Transform).xyz;
     float3 ViewSpacePosition = mul(float4(PositionInWorld, 1.f), ViewMatrix).xyz;
+    ViewSpacePosition.z = -ViewSpacePosition.z;
     float3 ClosestViewSpacePoint = ViewSpacePosition - float3(0.f, 0.f, Radius);
     
     bool Occluded = true;
@@ -199,6 +197,7 @@ void OcclusionCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex
         //get the position in clip space
         float4 ClipPosition = mul(float4(ClosestViewSpacePoint, 1.f), ProjectionMatrix);
         ClipPosition.xyz /= ClipPosition.w;
+        ClipPosition.z = -ClipPosition.z;
         //clamp texcoord
         aabb = clamp(aabb, float4(0.f, 0.f, 0.f, 0.f), float4(1.f, 1.f, 1.f, 1.f));
         //calculate hi-Z buffer mip
