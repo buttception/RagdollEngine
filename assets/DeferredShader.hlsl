@@ -217,6 +217,7 @@ void deferred_light_grid_ps(
     uint Z = 0;
     for (int i = 0; i < DEPTH_SLICE_COUNT - 1; ++i)
     {
+		//this is technically wrong as the boxes are right to left and top to bottom, but it is ok as i only need the z value
         FBoundingBox Box = BoundingBoxBufferInput[X + Y * GridSize.x + i * GridSize.x * GridSize.y];
         if (viewPos.z < (Box.Center.z + Box.Extents.z) && viewPos.z > (Box.Center.z - Box.Extents.z))
         {

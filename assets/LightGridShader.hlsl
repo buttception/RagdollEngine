@@ -23,22 +23,21 @@ void UpdateBoundingBoxCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupI
 {
     if (DTid.x > Width || DTid.y > Height)
         return;
+    float2 Corners[4] =
+    {
+        saturate(float2(DTid.x, DTid.y) * float2(InvWidth, InvHeight)),
+        saturate(float2(DTid.x + 1, DTid.y) * float2(InvWidth, InvHeight)),
+        saturate(float2(DTid.x, DTid.y + 1) * float2(InvWidth, InvHeight)),
+        saturate(float2(DTid.x + 1, DTid.y + 1) * float2(InvWidth, InvHeight))
+    };
     for (int i = 1; i < DEPTH_SLICE_COUNT; i++)
     {
         uint Index = (i - 1) * Width * Height + DTid.y * Width + DTid.x;
-        float2 Corners[4] =
-        {
-            float2(DTid.x, DTid.y) * float2(InvWidth, InvHeight),
-            float2(DTid.x + 1, DTid.y) * float2(InvWidth, InvHeight),
-            float2(DTid.x, DTid.y + 1) * float2(InvWidth, InvHeight),
-            float2(DTid.x + 1, DTid.y + 1) * float2(InvWidth, InvHeight)
-            
-        };
         float3 Min = FLT_MAX.xxx;
         float3 Max = -FLT_MAX.xxx;
         for (int j = 0; j < 4; ++j)
         {
-            float4 ProjPos = float4(Corners[j] * 2.f - 1.f.xx, DepthBounds[i - 1], 1.0);
+            float4 ProjPos = float4(Corners[j] * -2.f + 1.f.xx, DepthBounds[i - 1], 1.0);
             float4 ViewPos = mul(ProjPos, InvProjection);
             ViewPos /= ViewPos.w;
             Min.x = min(Min.x, ViewPos.x);
@@ -50,7 +49,7 @@ void UpdateBoundingBoxCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupI
         }
         for (int k = 0; k < 4; ++k)
         {
-            float4 ProjPos = float4(Corners[k] * 2.f - 1.f.xx, DepthBounds[i], 1.0);
+            float4 ProjPos = float4(Corners[k] * -2.f + 1.f.xx, DepthBounds[i], 1.0);
             float4 ViewPos = mul(ProjPos, InvProjection);
             ViewPos /= ViewPos.w;
             Min.x = min(Min.x, ViewPos.x);
@@ -80,16 +79,11 @@ struct PointLightProxy
 cbuffer g_Const : register(b0)
 {
     float4x4 View;
-    float4x4 InverseProjectionWithJitter;
     uint LightGridCount;
     uint LightCount;
     uint TextureWidth;
     uint TextureHeight;
     uint FieldsNeeded;
-    uint DepthWidth;
-    uint DepthHeight;
-    uint MipBaseWidth;
-    uint MipBaseHeight;
 };
 
 StructuredBuffer<FBoundingBox> BoundingBoxBufferInput : register(t0);
@@ -102,7 +96,7 @@ bool IsLightInsideTile(FBoundingBox Tile, float3 Position, float Range)
     float3 CenterToLight = Tile.Center - Position;
     float DistanceSq = dot(CenterToLight, CenterToLight);
     float RadiusSq = (length(Tile.Extents) + Range) * (length(Tile.Extents) + Range);
-    return DistanceSq < RadiusSq;
+    return DistanceSq <= RadiusSq;
 }
 
 [numthreads(64, 1, 1)]
@@ -120,14 +114,10 @@ void CullLightsCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, u
         LightBitFieldsBufferOutput[DTid.x * FieldsNeeded + i] = 0;
     }
     float2 InvRes = float2(1.f / TextureWidth, 1.f / TextureHeight);
-    float2 UV = InvRes * float2(X, Y);
-    UV.y = 1.f - UV.y;
     for (int j = 0; j < LightCount; ++j)
     {
         PointLightProxy Light = PointLightBufferInput[j];
         float3 LightViewSpacePosition = mul(float4(Light.Position.xyz, 1.f), View).xyz;
-        //why need to negate??
-        LightViewSpacePosition.xy = -LightViewSpacePosition.xy;
         if (IsLightInsideTile(BoundingBoxBufferInput[DTid.x], LightViewSpacePosition, PointLightBufferInput[j].Color.w))
         {
             const uint BucketIndex = j / 32;

@@ -343,6 +343,12 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 			SceneInfo.bIsCameraDirty = true;
 		if (ImGui::Checkbox("Show Light Grid", &DebugInfo.bShowLightGrid));
 			SceneInfo.bIsCameraDirty = true;
+		if (DebugInfo.bShowLightGrid)
+		{
+			ImGui::SliderInt2("Light grid slice min max", DebugInfo.LightGridSliceStartEnd, 0, 15);
+			DebugInfo.LightGridSliceStartEnd[0] = std::min(DebugInfo.LightGridSliceStartEnd[0], DebugInfo.LightGridSliceStartEnd[1]);
+			DebugInfo.LightGridSliceStartEnd[1] = std::max(DebugInfo.LightGridSliceStartEnd[0], DebugInfo.LightGridSliceStartEnd[1]);
+		}
 		if (ImGui::Checkbox("Show Boxes", &Config.bDrawBoxes))
 			SceneInfo.bIsCameraDirty = true;
 		if (ImGui::SliderInt("Show Cascades", &SceneInfo.EnableCascadeDebug, 0, 4))

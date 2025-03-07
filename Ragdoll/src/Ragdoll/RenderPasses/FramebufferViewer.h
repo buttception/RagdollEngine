@@ -3,7 +3,9 @@
 
 namespace ragdoll {
 	struct SceneInformation;
+	struct DebugInfo;
 	struct SceneRenderTargets;
+	class FGPUScene;
 }
 class FramebufferViewer {
 	struct ConstantBuffer{
@@ -19,6 +21,6 @@ class FramebufferViewer {
 public:
 	void Init(nvrhi::CommandListHandle cmdList);
 
-	void DrawTarget(nvrhi::TextureHandle texture, Vector4 add, Vector4 mul, uint32_t numComp, ragdoll::SceneRenderTargets* targets);
-
+	void DrawTarget(ragdoll::FGPUScene* GPUScene, nvrhi::TextureHandle texture, Vector4 add, Vector4 mul, uint32_t numComp, ragdoll::SceneRenderTargets* targets);
+	void DrawLightGridHitMap(const ragdoll::FGPUScene* GPUScene, const ragdoll::SceneInformation& SceneInfo, const ragdoll::DebugInfo& DebugInfo, ragdoll::SceneRenderTargets* Targets);
 };

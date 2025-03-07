@@ -312,6 +312,8 @@ void ragdoll::FGPUScene::UpdateLightGrid(Scene* Scene, nvrhi::CommandListHandle 
 			Vector4 Point = Vector4(0, 0, DepthBoundsView[i], 1);
 			Vector4 ProjectedPoint = Vector4::Transform(Point, Scene->SceneInfo.MainCameraProj);
 			DepthBoundsCS[i] = ProjectedPoint.z / ProjectedPoint.w;
+			//values here a negative, but will become positive again in the shader
+			//DepthBoundsCS[i] = -DepthBoundsCS[i];
 		}
 		CommandList->beginTrackingBufferState(DepthSliceBoundsClipspaceBufferHandle, nvrhi::ResourceStates::CopyDest);
 		CommandList->writeBuffer(DepthSliceBoundsClipspaceBufferHandle, DepthBoundsCS, DEPTH_SLICE_COUNT * sizeof(float));
@@ -330,7 +332,7 @@ void ragdoll::FGPUScene::UpdateLightGrid(Scene* Scene, nvrhi::CommandListHandle 
 		uint32_t Height;
 		float InvHeight;
 	} CBuffer;
-	CBuffer.InvProjection = Scene->SceneInfo.MainCameraProj.Invert();
+	CBuffer.InvProjection = Scene->SceneInfo.MainCameraProjWithJitter.Invert();
 	CBuffer.Width = TileCountX;
 	CBuffer.Height = TileCountY;
 	CBuffer.InvWidth = 1.f / CBuffer.Width;
@@ -368,28 +370,18 @@ void ragdoll::FGPUScene::CullLightGrid(const SceneInformation& SceneInfo, nvrhi:
 	CommandList->beginMarker("Cull Light Grid");
 	struct FLightGridCullConstantBuffer {
 		Matrix View;
-		Matrix InverseProjectionWithJitter;
 		uint32_t LightGridCount;
 		uint32_t LightCount;
 		uint32_t TextureWidth;
 		uint32_t TextureHeight;
 		uint32_t FieldsNeeded;
-		uint32_t DepthWidth;
-		uint32_t DepthHeight;
-		uint32_t MipBaseWidth;
-		uint32_t MipBaseHeight;
 	} CBuffer;
 	CBuffer.View = SceneInfo.MainCameraView * DirectX::XMMatrixScaling(1.f, 1.f, -1.f);
-	CBuffer.InverseProjectionWithJitter = SceneInfo.MainCameraProjWithJitter.Invert();
 	CBuffer.LightGridCount = LightGridCount;
 	CBuffer.LightCount = PointLightCount;
 	CBuffer.TextureWidth = TileCountX;
 	CBuffer.TextureHeight = TileCountY;
 	CBuffer.FieldsNeeded = FieldsNeeded;
-	CBuffer.DepthWidth = RenderTargets->CurrDepthBuffer->getDesc().width;
-	CBuffer.DepthHeight = RenderTargets->CurrDepthBuffer->getDesc().height;
-	CBuffer.MipBaseWidth = RenderTargets->HZBMips->getDesc().width;
-	CBuffer.MipBaseHeight = RenderTargets->HZBMips->getDesc().height;
 
 	//create the constant buffer
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FLightGridCullConstantBuffer), "LightGridCull ConstantBuffer", 1));

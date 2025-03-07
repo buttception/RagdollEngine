@@ -72,6 +72,7 @@ namespace ragdoll {
 		bool bShowFrustum{ false };
 		bool bEnableLightGrid{ true };
 		bool bShowLightGrid{ false };
+		int32_t LightGridSliceStartEnd[2]{ 0, 15 };
 		uint32_t TotalProxyCount;
 		uint32_t PassedFrustumCullCount{};
 		uint32_t PassedOcclusion1CullCount{};

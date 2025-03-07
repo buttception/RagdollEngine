@@ -272,9 +272,16 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 
 	if (scene->DebugInfo.DbgTarget)
 	{
-		Taskflow.emplace([this, &scene]() {
-			FramebufferViewer->DrawTarget(scene->DebugInfo.DbgTarget, scene->DebugInfo.Add, scene->DebugInfo.Mul, scene->DebugInfo.CompCount, RenderTargets);
+		Taskflow.emplace([this, &scene, GPUScene]() {
+			FramebufferViewer->DrawTarget(GPUScene, scene->DebugInfo.DbgTarget, scene->DebugInfo.Add, scene->DebugInfo.Mul, scene->DebugInfo.CompCount, RenderTargets);
 		});
+		activeList.emplace_back(CommandLists[(int)Pass::FB_VIEWER]);
+	}
+	else if (scene->DebugInfo.bShowLightGrid)
+	{
+		Taskflow.emplace([this, &scene, GPUScene]() {
+			FramebufferViewer->DrawLightGridHitMap(GPUScene, scene->SceneInfo, scene->DebugInfo, RenderTargets);
+			});
 		activeList.emplace_back(CommandLists[(int)Pass::FB_VIEWER]);
 	}
 	else {
