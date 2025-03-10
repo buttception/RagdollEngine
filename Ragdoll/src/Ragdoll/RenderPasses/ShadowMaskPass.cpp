@@ -133,7 +133,7 @@ void ShadowMaskPass::RaytraceShadowMask(const ragdoll::SceneInformation& sceneIn
 		};
 		PipelineDesc.hitGroups = { {
 			"HitGroup",
-			nullptr, // closestHitShader
+			ShaderLibrary->getShader("ClosestHit", nvrhi::ShaderType::ClosestHit), // closestHitShader
 			ShaderLibrary->getShader("AnyHit", nvrhi::ShaderType::AnyHit), // anyHitShader
 			nullptr, // intersectionShader
 			nullptr, // bindingLayout
@@ -161,12 +161,12 @@ void ShadowMaskPass::RaytraceShadowMask(const ragdoll::SceneInformation& sceneIn
 	{
 		//inline raytrace with compute
 		nvrhi::ComputePipelineDesc PipelineDesc;
-		PipelineDesc.bindingLayouts = { BindingLayoutHandle };
+		PipelineDesc.bindingLayouts = { BindingLayoutHandle, AssetManager::GetInstance()->BindlessLayoutHandle };
 		nvrhi::ShaderHandle RaytraceShader = AssetManager::GetInstance()->GetShader("RaytraceShadow.cs.cso");
 		PipelineDesc.CS = RaytraceShader;
 		nvrhi::ComputeState State;
 		State.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
-		State.bindings = { BindingSetHandle };
+		State.bindings = { BindingSetHandle, AssetManager::GetInstance()->DescriptorTable };
 		CommandListRef->setComputeState(State);
 		CommandListRef->dispatch(sceneInfo.RenderWidth / 8 + 1, sceneInfo.RenderHeight / 8 + 1, 1);
 	}

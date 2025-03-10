@@ -278,7 +278,12 @@ void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 				InstanceDesc.transform[j * 4 + k] = Scene->StaticProxies[i].ModelToWorld.m[k][j];
 			}
 		}
-		InstanceDesc.flags = nvrhi::rt::InstanceFlags::TriangleCullDisable;	//may need front is cw
+		//if the material for this instance has alpha, mark instance as non opaque and cull disabled
+		const Material& Mat = AssetManager::GetInstance()->Materials[Scene->StaticProxies[i].MaterialIndex];
+		if(Mat.AlphaMode == Material::AlphaMode::GLTF_OPAQUE)
+			InstanceDesc.flags = nvrhi::rt::InstanceFlags::ForceOpaque | nvrhi::rt::InstanceFlags::TriangleFrontCounterclockwise;
+		else
+			InstanceDesc.flags = nvrhi::rt::InstanceFlags::TriangleCullDisable | nvrhi::rt::InstanceFlags::ForceNonOpaque;
 		InstanceDesc.instanceMask = 1;
 	}
 	nvrhi::rt::AccelStructDesc TLASDesc = nvrhi::rt::AccelStructDesc();
