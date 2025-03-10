@@ -272,6 +272,7 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		ImGui::Checkbox("Raytrace Directional Light Shadows", &SceneInfo.bRaytraceDirectionalLight);
 		if (SceneInfo.bRaytraceDirectionalLight)
 		{
+			ImGui::Checkbox("Inline Raytracing", &SceneInfo.bInlineRaytrace);
 			ImGui::Checkbox("Raytrace Shadows Denoiser", &SceneInfo.bRaytraceShadowDenoiser);
 			ImGui::SliderFloat("Sun Size", &SceneInfo.SunSize, 0.f, 1.f);
 		}

@@ -94,9 +94,7 @@ RWStructuredBuffer<uint> LightBitFieldsBufferOutput : register(u0);
 bool IsLightInsideTile(FBoundingBox Tile, float3 Position, float Range)
 {
     float3 CenterToLight = Tile.Center - Position;
-    float DistanceSq = dot(CenterToLight, CenterToLight);
-    float RadiusSq = (length(Tile.Extents) + Range) * (length(Tile.Extents) + Range);
-    return DistanceSq <= RadiusSq;
+    return length(CenterToLight) <= (length(Tile.Extents) + Range);
 }
 
 [numthreads(64, 1, 1)]
@@ -113,11 +111,12 @@ void CullLightsCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, u
     {
         LightBitFieldsBufferOutput[DTid.x * FieldsNeeded + i] = 0;
     }
-    float2 InvRes = float2(1.f / TextureWidth, 1.f / TextureHeight);
     for (int j = 0; j < LightCount; ++j)
     {
+        //bring the light into viewspace
         PointLightProxy Light = PointLightBufferInput[j];
         float3 LightViewSpacePosition = mul(float4(Light.Position.xyz, 1.f), View).xyz;
+        //test the viewspace light against the viewspace tiles
         if (IsLightInsideTile(BoundingBoxBufferInput[DTid.x], LightViewSpacePosition, PointLightBufferInput[j].Color.w))
         {
             const uint BucketIndex = j / 32;

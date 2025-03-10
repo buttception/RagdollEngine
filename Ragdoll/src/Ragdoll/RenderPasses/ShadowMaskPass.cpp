@@ -122,38 +122,54 @@ void ShadowMaskPass::RaytraceShadowMask(const ragdoll::SceneInformation& sceneIn
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
 	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);
 
-	nvrhi::ShaderLibraryHandle ShaderLibrary = AssetManager::GetInstance()->GetShaderLibrary("RaytraceShadow.lib.cso");
-	nvrhi::rt::PipelineDesc PipelineDesc;
-	PipelineDesc.globalBindingLayouts = { BindingLayoutHandle, AssetManager::GetInstance()->BindlessLayoutHandle };
-	PipelineDesc.shaders = {
-		{ "", ShaderLibrary->getShader("RayGen", nvrhi::ShaderType::RayGeneration), nullptr },
-		{ "", ShaderLibrary->getShader("Miss", nvrhi::ShaderType::Miss), nullptr },
-	};
-	PipelineDesc.hitGroups = { {
-		"HitGroup",
-		nullptr, // closestHitShader
-		ShaderLibrary->getShader("AnyHit", nvrhi::ShaderType::AnyHit), // anyHitShader
-		nullptr, // intersectionShader
-		nullptr, // bindingLayout
-		false  // isProceduralPrimitive
-	} };
-	PipelineDesc.maxPayloadSize = 2 * sizeof(Vector4);
-	nvrhi::rt::PipelineHandle PipelineHandle = AssetManager::GetInstance()->GetRaytracePipeline(PipelineDesc);
+	if (!sceneInfo.bInlineRaytrace)
+	{
+		nvrhi::ShaderLibraryHandle ShaderLibrary = AssetManager::GetInstance()->GetShaderLibrary("RaytraceShadow.lib.cso");
+		nvrhi::rt::PipelineDesc PipelineDesc;
+		PipelineDesc.globalBindingLayouts = { BindingLayoutHandle, AssetManager::GetInstance()->BindlessLayoutHandle };
+		PipelineDesc.shaders = {
+			{ "", ShaderLibrary->getShader("RayGen", nvrhi::ShaderType::RayGeneration), nullptr },
+			{ "", ShaderLibrary->getShader("Miss", nvrhi::ShaderType::Miss), nullptr },
+		};
+		PipelineDesc.hitGroups = { {
+			"HitGroup",
+			nullptr, // closestHitShader
+			ShaderLibrary->getShader("AnyHit", nvrhi::ShaderType::AnyHit), // anyHitShader
+			nullptr, // intersectionShader
+			nullptr, // bindingLayout
+			false  // isProceduralPrimitive
+		} };
+		PipelineDesc.maxPayloadSize = 2 * sizeof(Vector4);
+		nvrhi::rt::PipelineHandle PipelineHandle = AssetManager::GetInstance()->GetRaytracePipeline(PipelineDesc);
 
-	ShaderTableHandle = PipelineHandle->createShaderTable();
-	ShaderTableHandle->setRayGenerationShader("RayGen");
-	ShaderTableHandle->addHitGroup("HitGroup");
-	ShaderTableHandle->addMissShader("Miss");
+		ShaderTableHandle = PipelineHandle->createShaderTable();
+		ShaderTableHandle->setRayGenerationShader("RayGen");
+		ShaderTableHandle->addHitGroup("HitGroup");
+		ShaderTableHandle->addMissShader("Miss");
 
-	nvrhi::rt::State State;
-	State.shaderTable = ShaderTableHandle;
-	State.bindings = { BindingSetHandle, AssetManager::GetInstance()->DescriptorTable };
-	CommandListRef->setRayTracingState(State);
+		nvrhi::rt::State State;
+		State.shaderTable = ShaderTableHandle;
+		State.bindings = { BindingSetHandle, AssetManager::GetInstance()->DescriptorTable };
+		CommandListRef->setRayTracingState(State);
 
-	nvrhi::rt::DispatchRaysArguments args;
-	args.width = sceneInfo.RenderWidth;
-	args.height = sceneInfo.RenderHeight;
-	CommandListRef->dispatchRays(args);
+		nvrhi::rt::DispatchRaysArguments args;
+		args.width = sceneInfo.RenderWidth;
+		args.height = sceneInfo.RenderHeight;
+		CommandListRef->dispatchRays(args);
+	}
+	else
+	{
+		//inline raytrace with compute
+		nvrhi::ComputePipelineDesc PipelineDesc;
+		PipelineDesc.bindingLayouts = { BindingLayoutHandle };
+		nvrhi::ShaderHandle RaytraceShader = AssetManager::GetInstance()->GetShader("RaytraceShadow.cs.cso");
+		PipelineDesc.CS = RaytraceShader;
+		nvrhi::ComputeState State;
+		State.pipeline = AssetManager::GetInstance()->GetComputePipeline(PipelineDesc);
+		State.bindings = { BindingSetHandle };
+		CommandListRef->setComputeState(State);
+		CommandListRef->dispatch(sceneInfo.RenderWidth / 8 + 1, sceneInfo.RenderHeight / 8 + 1, 1);
+	}
 
 	CommandListRef->endMarker();
 

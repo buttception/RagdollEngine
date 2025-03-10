@@ -69,6 +69,10 @@
           "Command": "--scene \"other_gltf/SponzaSingleLight/SponzaSingleLight.gltf\""
         },
         {
+          "Id": "c845025e-882b-4c45-9c18-0fb281bb52bf",
+          "Command": "--scene \"other_gltf/SponzaDoubleLights/SponzaDoubleLights.gltf\""
+        },
+        {
           "Id": "3c5485aa-f98f-4568-ad6d-00ffd1e48294",
           "Command": "--scene \"other_gltf/SponzaMultiLights/SponzaMultiLights.gltf\""
         },

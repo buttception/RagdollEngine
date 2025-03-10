@@ -1,13 +1,6 @@
 #include "Utils.hlsli"
 #include "BasePassCommons.hlsli"
 
-// ---[ Structures ]---
-
-struct HitInfo
-{
-    float ShadowValue;
-};
-
 // ---[ Resources ]---
 cbuffer g_Const : register(b0)
 {
@@ -24,7 +17,7 @@ RaytracingAccelerationStructure SceneBVH : register(t0);
 Texture2D t_GBufferDepth : register(t1);
 StructuredBuffer<FInstanceData> InstanceBuffer : register(t2);
 StructuredBuffer<FMaterialData> MaterialBuffer : register(t3);
-StructuredBuffer<FMeshData> MeshDataBuffer: register(t4);
+StructuredBuffer<FMeshData> MeshDataBuffer : register(t4);
 StructuredBuffer<FVertex> VertexBuffer : register(t5);
 StructuredBuffer<uint> IndexBuffer : register(t6);
 Texture2D<float4> Noise : register(t7);
@@ -34,6 +27,14 @@ sampler Samplers[9] : register(s0);
 
 #define PI 3.14159265359
 #define SAMPLE_COUNT 16
+
+#ifndef INLINE
+// ---[ Structures ]---
+
+struct HitInfo
+{
+    float ShadowValue;
+};
 
 // ---[ Ray Generation Shader ]---
 
@@ -149,3 +150,48 @@ void AnyHit(inout HitInfo payload : SV_RayPayload, in BuiltInTriangleIntersectio
         AcceptHitAndEndSearch();
     }
 }
+#else
+//return true if hit, false if not
+bool TestAlpha(uint InstanceId)
+{
+    return true;
+}
+
+//inline raytracing compute
+[numthreads(8, 8, 1)]
+void RaytraceShadowCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, uint3 GTid : SV_GroupThreadID)
+{
+    //each pixel one ray
+    if (DTid.x >= RenderWidth || DTid.y >= RenderHeight)
+        return;
+    float2 pixelPosition = float2(DTid.xy) + 0.5;
+    float2 inTexcoord = pixelPosition / float2(RenderWidth, RenderHeight);
+    float depth = t_GBufferDepth.Load(int3(pixelPosition, 0)).x;
+    //ignore farplane
+    if (depth == 0.f)
+        return;
+    float3 fragPos = DepthToWorld(depth, inTexcoord, InvViewProjMatrixWithJitter);
+    
+    float3 lightTangent = normalize(cross(LightDirection, float3(0.0f, 1.0f, 0.0f)));
+    float3 lightBitangent = normalize(cross(lightTangent, LightDirection));
+    
+    // Setup the ray
+    RayDesc ray;
+    ray.Origin = fragPos += LightDirection * 0.001f;
+    ray.TMin = 0.01f;
+    ray.TMax = 100.f;
+    ray.Direction = LightDirection;
+    RayQuery<RAY_FLAG_NONE> q;
+    q.TraceRayInline(SceneBVH, 0, 0xFF, ray);
+    
+    while(q.Proceed())
+    {
+        if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+        {
+            //check for alpha
+            u_Output[DTid.xy] = float4(0.f, 0.xx, 1.f);
+            break;
+        }
+    }
+}
+#endif

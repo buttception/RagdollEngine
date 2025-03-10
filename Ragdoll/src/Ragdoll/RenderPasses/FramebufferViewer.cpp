@@ -91,7 +91,7 @@ void FramebufferViewer::DrawLightGridHitMap(const ragdoll::FGPUScene* GPUScene, 
 	c.TileY = GPUScene->TileCountY;
 	c.TileZ = GPUScene->TileCountZ;
 	c.LightCount = GPUScene->PointLightCount;
-	c.LerpFactor = 0.1f;
+	c.LerpFactor = 0.3f;
 	c.SliceStart = DebugInfo.LightGridSliceStartEnd[0];
 	c.SliceEnd = DebugInfo.LightGridSliceStartEnd[1];
 
