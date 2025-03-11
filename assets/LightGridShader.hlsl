@@ -21,9 +21,9 @@ RWStructuredBuffer<FBoundingBox> BoundingBoxBufferOutput : register(u0);
 [numthreads(8, 8, 1)]
 void UpdateBoundingBoxCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, uint3 GTid : SV_GroupThreadID)
 {
-    if (DTid.x > Width || DTid.y > Height)
+    if (DTid.x >= Width || DTid.y >= Height)
         return;
-    float2 Corners[4] =
+    const float2 Corners[4] =
     {
         saturate(float2(DTid.x, DTid.y) * float2(InvWidth, InvHeight)),
         saturate(float2(DTid.x + 1, DTid.y) * float2(InvWidth, InvHeight)),
