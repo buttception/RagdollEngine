@@ -55,7 +55,6 @@ void RayGen()
     ray.TMax = 100.f;
     ray.Direction = LightDirection;
     
-#if 1
     int2 TexelPos = int2(globalIdx.x % 128, globalIdx.y % 128);
     float RadiusRng = Noise[TexelPos].x * SunSize;
     float AngleRng = Noise[TexelPos].y * 2.0f * PI;
@@ -74,21 +73,6 @@ void RayGen()
         ray,
         payload);
     u_Output[globalIdx] = float4(payload.ShadowValue, 0.xx, 1.f);
-#else
-    HitInfo payload;
-    payload.ShadowValue = 0.f;
-    TraceRay(
-        SceneBVH,
-        0,
-        0xFF,
-        0,
-        0,
-        0,
-        ray,
-        payload);
-    u_Output[globalIdx] = float4(1.xxx, payload.ShadowValue);
-#endif
-    
 }
 
 [shader("miss")]

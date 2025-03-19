@@ -99,7 +99,7 @@ void main_light_grid_ps(
         }
     }
     //color the pixel the heat map value
-    float3 HeatColor = GetHeatMapColor((float) LightInTile / (float) LightCount);
+    float3 HeatColor = GetHeatMapColor(saturate((float) LightInTile / (float) LightCount * 2.f));
     outColor = float4(LerpColor(HeatColor, FinalColor.Load(int3(PixelPos, 0)).rgb, LerpFactor), 1.f);
 
 }

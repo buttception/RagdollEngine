@@ -111,6 +111,7 @@ namespace ragdoll
 				params.backBufferHeight = m_PrimaryWindow->GetBufferHeight();
 				params.vsyncEnabled = false;
 				DirectXDevice::GetInstance()->Create(params, m_PrimaryWindow, m_FileManager);
+				DirectXDevice::GetInstance()->m_Device12->SetStablePowerState(TRUE);
 			}
 
 			//setup microprofile for gpu
