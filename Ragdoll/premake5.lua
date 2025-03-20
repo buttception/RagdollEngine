@@ -19,6 +19,7 @@ project "Ragdoll"
 	files
 	{
 		"src/**.h",
+		"src/**.hpp",
 		"src/**.cpp",
 		"../assets/**.hlsl",
 		"../assets/**.hlsli",
@@ -62,6 +63,7 @@ project "Ragdoll"
 		"%{IncludesDir.cxxopts}",
 		"%{IncludesDir.taskflow}",
 		"%{IncludesDir.dlss}",
+		"%{IncludesDir.directxtex}",
     }
 
 	postbuildcommands

@@ -26,24 +26,18 @@ namespace ragdoll {
 		//float Range;
 	};
 
+	struct LineVertex 
+	{
+		Vector3 Position;
+		Vector3 Color;
+	};
+
 	struct Proxy {
 		Matrix ModelToWorld;
 		Matrix PrevWorldMatrix;
+		uint32_t MeshIndex;
+		uint32_t MaterialIndex;
 		DirectX::BoundingBox BoundingBox;
-
-		Vector4 Color = Vector4::One;
-		float Roughness = 0.f;
-		float Metallic = 0.f;
-
-		int32_t BufferIndex;
-		int32_t MaterialIndex;
-		int32_t AlbedoIndex = -1;
-		int32_t AlbedoSamplerIndex = 0;
-		int32_t NormalIndex = -1;
-		int32_t NormalSamplerIndex = 0;
-		int32_t ORMIndex = -1;
-		int32_t ORMSamplerIndex = 0;
-		int32_t bIsLit = 1;
 	};
 
 	struct InstanceData {
@@ -52,32 +46,10 @@ namespace ragdoll {
 
 		Vector4 Color = Vector4::One;
 		uint32_t MeshIndex;
-		float Roughness = 0.f;
-		float Metallic = 0.f;
-
-		int AlbedoIndex = -1;
-		int AlbedoSamplerIndex = 0;
-		int NormalIndex = -1;
-		int NormalSamplerIndex = 0;
-		int ORMIndex = -1;
-		int ORMSamplerIndex = 0;
-		int bIsLit = 1;
 
 		InstanceData& operator=(const Proxy& proxy) {
 			ModelToWorld = proxy.ModelToWorld;
 			PrevWorldMatrix = proxy.PrevWorldMatrix;
-
-			Color = proxy.Color;
-			Roughness = proxy.Roughness;
-			Metallic = proxy.Metallic;
-			
-			AlbedoIndex = proxy.AlbedoIndex;
-			AlbedoSamplerIndex = proxy.AlbedoSamplerIndex;
-			NormalIndex = proxy.NormalIndex;
-			NormalSamplerIndex = proxy.NormalSamplerIndex;
-			ORMIndex = proxy.ORMIndex;
-			ORMSamplerIndex = proxy.ORMSamplerIndex;
-			bIsLit = proxy.bIsLit;
 			return *this;
 		}
 	};
@@ -100,6 +72,7 @@ namespace ragdoll {
 		bool bShowFrustum{ false };
 		bool bEnableLightGrid{ true };
 		bool bShowLightGrid{ false };
+		int32_t LightGridSliceStartEnd[2]{ 0, 15 };
 		uint32_t TotalProxyCount;
 		uint32_t PassedFrustumCullCount{};
 		uint32_t PassedOcclusion1CullCount{};
@@ -157,19 +130,23 @@ namespace ragdoll {
 		float Luminance = 0.f;
 		float FilterRadius = 0.05f;
 		float BloomIntensity = 0.04f;
-		bool UseCACAO = false;
-		bool UseXeGTAO = true;
+		bool UseCACAO = true;
+		bool UseXeGTAO = false;
 		bool bIsCameraDirty{ true };
-		bool bEnableDLSS{ true };
+		bool bEnableDLSS{ false };
 		bool bEnableIntelTAA{ false };
 		bool bEnableFSR{ false };
 		bool bResetAccumulation{ true };
-		bool bEnableJitter{ true };
-		bool bEnableXeGTAONoise{ true };
+		bool bEnableJitter{ false };
+		bool bEnableXeGTAONoise{ false };
 		bool bEnableBloom{ true };
 		bool bEnableOcclusionCull{ true };
-		uint32_t RenderWidth = 1600;
-		uint32_t RenderHeight = 900;
+		bool bRaytraceDirectionalLight{ true };
+		bool bInlineRaytrace{ false };
+		bool bRaytraceShadowDenoiser{ true };
+		float SunSize = 0.1f;
+		uint32_t RenderWidth = 1920;
+		uint32_t RenderHeight = 1080;
 		uint32_t TargetWidth;
 		uint32_t TargetHeight;
 		float JitterX;
@@ -250,6 +227,19 @@ namespace ragdoll {
 		nvrhi::TextureHandle CurrUpscaledBuffer;
 		nvrhi::TextureHandle PrevUpscaledBuffer;
 		nvrhi::TextureHandle PresentationBuffer;
+		//ffx denoiser
+		// Tile size for the shadow denoiser is hardcoded to (8x4)
+		const uint32_t k_tileSizeX = 8;
+		const uint32_t k_tileSizeY = 4;
+		nvrhi::TextureHandle RayTraceResult;	//8x4 tile result
+		nvrhi::TextureHandle Moment0;
+		nvrhi::TextureHandle Moment1;
+		nvrhi::TextureHandle CurrMoment;
+		nvrhi::TextureHandle PrevMoment;
+		nvrhi::TextureHandle Scratch0;
+		nvrhi::TextureHandle Scratch1;
+		nvrhi::TextureHandle CurrScratch;
+		nvrhi::TextureHandle PrevScratch;
 	};
 
 	class Scene {
@@ -303,7 +293,9 @@ namespace ragdoll {
 		std::vector<PointLightProxy> PointLightProxies;
 
 		std::vector<InstanceData> StaticDebugInstanceDatas;	//all the debug cubes
+		std::vector<LineVertex> LineVertices;	//all the debug lines
 		nvrhi::BufferHandle StaticInstanceDebugBufferHandle;	//contains all the aabb boxes to draw
+		nvrhi::BufferHandle LineBufferHandle;	//contains all the lines to draw
 
 		void PopulateStaticProxies();
 		void PopulateLightProxies();

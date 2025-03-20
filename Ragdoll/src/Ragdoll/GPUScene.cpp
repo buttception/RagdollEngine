@@ -9,6 +9,7 @@
 
 #define INSTANCE_DATA_BUFFER_SRV_SLOT 1
 #define MESH_BUFFER_SRV_SLOT 2
+#define MATERIAL_BUFFER_SRV_SLOT 3
 
 #define INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT 0
 #define INSTANCE_ID_BUFFER_UAV_SLOT 1
@@ -22,6 +23,8 @@
 #define INFINITE_Z_ENABLED 1
 #define PREVIOUS_FRAME_ENABLED 1 << 1
 #define IS_PHASE_1 1 << 2
+#define ALPHA_TEST_ENABLED 1 << 3
+#define CULL_ALL 1 << 4
 
 #define MAX_HZB_MIP_COUNT 16
 
@@ -68,6 +71,11 @@ struct FInstanceData
 	uint32_t MaterialIndex;
 };
 
+#define ALPHA_MODE_OPAQUE 1
+#define ALPHA_MODE_MASK 1 << 1
+#define ALPHA_MODE_BLEND 1 << 2
+#define DOUBLE_SIDED 1 << 3
+
 struct FMaterialData
 {
 	Vector4 AlbedoFactor = Vector4::One;
@@ -80,7 +88,9 @@ struct FMaterialData
 	int NormalSamplerIndex = 0;
 	int ORMIndex = -1;
 	int ORMSamplerIndex = 0;
-	int bIsLit = 1;
+
+	float AlphaCutoff = 0.5f;
+	uint32_t Flags;
 };
 
 void ragdoll::FGPUScene::Update(Scene* Scene)
@@ -122,11 +132,12 @@ void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 		FMeshData& data = MeshDatas[i];
 		data.IndexCount = info.IndicesCount;
 		data.VertexCount = info.VerticesCount;
-		data.IndexOffset = info.IBOffset;
-		data.VertexOffset = info.VBOffset;
+		data.IndexOffset = info.IndicesOffset;
+		data.VertexOffset = info.VerticesOffset;
 		data.Center = info.BestFitBox.Center;
 		data.Extents = info.BestFitBox.Extents;
 	}
+	//upload all the materials
 	std::vector<FMaterialData> MaterialDatas;
 	MaterialDatas.resize(AssetManager::GetInstance()->Materials.size());
 	for (int i = 0; i < AssetManager::GetInstance()->Materials.size(); ++i)
@@ -154,7 +165,24 @@ void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 			data.ORMIndex = ORMTexture.ImageIndex;
 			data.ORMSamplerIndex = ORMTexture.SamplerIndex;
 		}
-		data.bIsLit = Material.bIsLit;
+		data.AlphaCutoff = Material.AlphaCutoff;
+		data.Flags = 0;
+		if (Material.AlphaMode == Material::AlphaMode::GLTF_OPAQUE)
+		{
+			data.Flags |= ALPHA_MODE_OPAQUE;
+		}
+		else if (Material.AlphaMode == Material::AlphaMode::GLTF_MASK)
+		{
+			data.Flags |= ALPHA_MODE_MASK;
+		}
+		else if (Material.AlphaMode == Material::AlphaMode::GLTF_BLEND)
+		{
+			data.Flags |= ALPHA_MODE_BLEND;
+		}
+		if (Material.bIsDoubleSided)
+		{
+			data.Flags |= DOUBLE_SIDED;
+		}
 	}
 	//do not need to sort instances now as it contains mesh indices instead now
 	std::vector<FInstanceData> Instances;
@@ -164,7 +192,7 @@ void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 		Instances[i].ModelToWorld = Scene->StaticProxies[i].ModelToWorld;
 		Instances[i].PrevModelToWorld = Scene->StaticProxies[i].PrevWorldMatrix;
 		Instances[i].MaterialIndex = Scene->StaticProxies[i].MaterialIndex;
-		Instances[i].MeshIndex = Scene->StaticProxies[i].BufferIndex;
+		Instances[i].MeshIndex = Scene->StaticProxies[i].MeshIndex;
 	}
 	//indirect draw args do not need any values
 	//get all the bounding boxes and upload onto gpu
@@ -206,8 +234,69 @@ void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 	CommandList->endMarker();
 	PointLightCount = Scene->PointLightProxies.size();
 
+	//create the raytracing resources
+	CommandList->beginMarker("Creating BLASs");
+	BottomLevelASs.clear();
+	for (const VertexBufferInfo& BufferInfo : AssetManager::GetInstance()->VertexBufferInfos)
+	{
+		nvrhi::rt::GeometryDesc GeomDesc = nvrhi::rt::GeometryDesc();
+		nvrhi::rt::AccelStructDesc BLASDesc = nvrhi::rt::AccelStructDesc();
+		nvrhi::rt::GeometryTriangles& Triangles = GeomDesc.geometryData.triangles;
+		Triangles.vertexBuffer = AssetManager::GetInstance()->VBO;
+		Triangles.indexBuffer = AssetManager::GetInstance()->IBO;
+		Triangles.indexFormat = nvrhi::Format::R32_UINT;
+		Triangles.vertexFormat = nvrhi::Format::RGB32_FLOAT;
+		Triangles.vertexStride = sizeof(Vertex);
+		Triangles.vertexCount = BufferInfo.VerticesCount;
+		Triangles.indexCount = BufferInfo.IndicesCount;
+		//offsets are in bytes
+		Triangles.vertexOffset = BufferInfo.VerticesOffset * Triangles.vertexStride;
+		Triangles.indexOffset = BufferInfo.IndicesOffset * sizeof(uint32_t);
+		GeomDesc.geometryType = nvrhi::rt::GeometryType::Triangles;
+		//1 blas per mesh
+		BLASDesc.isTopLevel = false;
+		BLASDesc.debugName = "BLAS";
+		BLASDesc.addBottomLevelGeometry(GeomDesc);
+		nvrhi::rt::AccelStructHandle as = DirectXDevice::GetNativeDevice()->createAccelStruct(BLASDesc);
+		nvrhi::utils::BuildBottomLevelAccelStruct(CommandList, as, BLASDesc);
+		BottomLevelASs.push_back(as);
+	}
+	CommandList->endMarker();
+
+	//create the new TLAS with all the new instances
+	CommandList->beginMarker("Create TLAS");
+	std::vector<nvrhi::rt::InstanceDesc> InstanceDescs(Scene->StaticProxies.size());
+	for (uint32_t i = 0; i < Scene->StaticProxies.size(); ++i)
+	{
+		nvrhi::rt::InstanceDesc& InstanceDesc = InstanceDescs[i];
+		InstanceDesc.bottomLevelAS = BottomLevelASs[Scene->StaticProxies[i].MeshIndex];
+		InstanceDesc.instanceID = i;
+		for (int j = 0; j < 3; ++j)
+		{
+			for (int k = 0; k < 4; ++k)
+			{
+				InstanceDesc.transform[j * 4 + k] = Scene->StaticProxies[i].ModelToWorld.m[k][j];
+			}
+		}
+		//if the material for this instance has alpha, mark instance as non opaque and cull disabled
+		const Material& Mat = AssetManager::GetInstance()->Materials[Scene->StaticProxies[i].MaterialIndex];
+		if(Mat.AlphaMode == Material::AlphaMode::GLTF_OPAQUE)
+			InstanceDesc.flags = nvrhi::rt::InstanceFlags::ForceOpaque | nvrhi::rt::InstanceFlags::TriangleFrontCounterclockwise;
+		else
+			InstanceDesc.flags = nvrhi::rt::InstanceFlags::TriangleCullDisable | nvrhi::rt::InstanceFlags::ForceNonOpaque;
+		InstanceDesc.instanceMask = 1;
+	}
+	nvrhi::rt::AccelStructDesc TLASDesc = nvrhi::rt::AccelStructDesc();
+	TLASDesc.debugName = "TLAS";
+	TLASDesc.isTopLevel = true;
+	TLASDesc.topLevelMaxInstances = Scene->StaticProxies.size();
+	TopLevelAS = DirectXDevice::GetNativeDevice()->createAccelStruct(TLASDesc);
+	CommandList->buildTopLevelAccelStruct(TopLevelAS, InstanceDescs.data(), InstanceDescs.size());
+	CommandList->endMarker();
+
 	CommandList->close();
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
+	DirectXDevice::GetNativeDevice()->waitForIdle();
 }
 
 void ragdoll::FGPUScene::UpdateLightGrid(Scene* Scene, nvrhi::CommandListHandle CommandList)
@@ -228,6 +317,8 @@ void ragdoll::FGPUScene::UpdateLightGrid(Scene* Scene, nvrhi::CommandListHandle 
 			Vector4 Point = Vector4(0, 0, DepthBoundsView[i], 1);
 			Vector4 ProjectedPoint = Vector4::Transform(Point, Scene->SceneInfo.MainCameraProj);
 			DepthBoundsCS[i] = ProjectedPoint.z / ProjectedPoint.w;
+			//values here a negative, but will become positive again in the shader
+			//DepthBoundsCS[i] = -DepthBoundsCS[i];
 		}
 		CommandList->beginTrackingBufferState(DepthSliceBoundsClipspaceBufferHandle, nvrhi::ResourceStates::CopyDest);
 		CommandList->writeBuffer(DepthSliceBoundsClipspaceBufferHandle, DepthBoundsCS, DEPTH_SLICE_COUNT * sizeof(float));
@@ -246,7 +337,7 @@ void ragdoll::FGPUScene::UpdateLightGrid(Scene* Scene, nvrhi::CommandListHandle 
 		uint32_t Height;
 		float InvHeight;
 	} CBuffer;
-	CBuffer.InvProjection = Scene->SceneInfo.MainCameraProj.Invert();
+	CBuffer.InvProjection = Scene->SceneInfo.MainCameraProjWithJitter.Invert();
 	CBuffer.Width = TileCountX;
 	CBuffer.Height = TileCountY;
 	CBuffer.InvWidth = 1.f / CBuffer.Width;
@@ -284,28 +375,18 @@ void ragdoll::FGPUScene::CullLightGrid(const SceneInformation& SceneInfo, nvrhi:
 	CommandList->beginMarker("Cull Light Grid");
 	struct FLightGridCullConstantBuffer {
 		Matrix View;
-		Matrix InverseProjectionWithJitter;
 		uint32_t LightGridCount;
 		uint32_t LightCount;
 		uint32_t TextureWidth;
 		uint32_t TextureHeight;
 		uint32_t FieldsNeeded;
-		uint32_t DepthWidth;
-		uint32_t DepthHeight;
-		uint32_t MipBaseWidth;
-		uint32_t MipBaseHeight;
 	} CBuffer;
-	CBuffer.View = SceneInfo.MainCameraView;
-	CBuffer.InverseProjectionWithJitter = SceneInfo.MainCameraProjWithJitter.Invert();
+	CBuffer.View = SceneInfo.MainCameraView * DirectX::XMMatrixScaling(1.f, 1.f, -1.f);
 	CBuffer.LightGridCount = LightGridCount;
 	CBuffer.LightCount = PointLightCount;
 	CBuffer.TextureWidth = TileCountX;
 	CBuffer.TextureHeight = TileCountY;
 	CBuffer.FieldsNeeded = FieldsNeeded;
-	CBuffer.DepthWidth = RenderTargets->CurrDepthBuffer->getDesc().width;
-	CBuffer.DepthHeight = RenderTargets->CurrDepthBuffer->getDesc().height;
-	CBuffer.MipBaseWidth = RenderTargets->HZBMips->getDesc().width;
-	CBuffer.MipBaseHeight = RenderTargets->HZBMips->getDesc().height;
 
 	//create the constant buffer
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FLightGridCullConstantBuffer), "LightGridCull ConstantBuffer", 1));
@@ -394,7 +475,7 @@ void ragdoll::FGPUScene::ExtractFrustumPlanes(Vector4 OutPlanes[6], const Matrix
 	}
 }
 
-nvrhi::BufferHandle ragdoll::FGPUScene::FrustumCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled)
+nvrhi::BufferHandle ragdoll::FGPUScene::FrustumCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled, uint32_t AlphaTest)
 {
 	RD_SCOPE(Culling, Instance Culling);
 	CommandList->beginMarker("Frustum Cull Scene");
@@ -402,6 +483,9 @@ nvrhi::BufferHandle ragdoll::FGPUScene::FrustumCull(nvrhi::CommandListHandle Com
 	ExtractFrustumPlanes(ConstantBuffer.FrustumPlanes, Projection, View);
 	ConstantBuffer.ProxyCount = ProxyCount;
 	ConstantBuffer.Flags |= InfiniteZEnabled ? INFINITE_Z_ENABLED : 0;
+	//decides to include or exclude the alpha test flag
+	ConstantBuffer.Flags |= AlphaTest == 0 ? CULL_ALL : 0;
+	ConstantBuffer.Flags |= AlphaTest == 2 ? ALPHA_TEST_ENABLED : 0;
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FConstantBuffer), "InstanceCull ConstantBuffer", 1));
 	CommandList->writeBuffer(ConstantBufferHandle, &ConstantBuffer, sizeof(FConstantBuffer));
 
@@ -414,6 +498,7 @@ nvrhi::BufferHandle ragdoll::FGPUScene::FrustumCull(nvrhi::CommandListHandle Com
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_DATA_BUFFER_SRV_SLOT, InstanceBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(MESH_BUFFER_SRV_SLOT, MeshBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(MATERIAL_BUFFER_SRV_SLOT, MaterialBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_UAV(INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT, IndirectDrawArgsBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_ID_BUFFER_UAV_SLOT, InstanceIdBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_UAV(INSTANCE_VISIBLE_COUNT_UAV_SLOT, PassedFrustumTestCountBuffer),
@@ -474,7 +559,7 @@ void ragdoll::FGPUScene::OcclusionCullPhase1(
 	nvrhi::BindingSetDesc BindingSetDesc;
 	BindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-		nvrhi::BindingSetItem::Texture_SRV(0, Targets->HZBMips, nvrhi::Format::RG32_FLOAT, nvrhi::AllSubresources),
+		nvrhi::BindingSetItem::Texture_SRV(0, Targets->HZBMips, nvrhi::Format::D32, nvrhi::AllSubresources),
 		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp_Reduction]),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_DATA_BUFFER_SRV_SLOT, InstanceBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(MESH_BUFFER_SRV_SLOT, MeshBuffer),
@@ -534,7 +619,7 @@ nvrhi::BufferHandle ragdoll::FGPUScene::OcclusionCullPhase2(
 	nvrhi::BindingSetDesc BindingSetDesc;
 	BindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-		nvrhi::BindingSetItem::Texture_SRV(0, Targets->HZBMips, nvrhi::Format::RG32_FLOAT, nvrhi::AllSubresources),
+		nvrhi::BindingSetItem::Texture_SRV(0, Targets->HZBMips, nvrhi::Format::D32, nvrhi::AllSubresources),
 		nvrhi::BindingSetItem::Sampler(0, AssetManager::GetInstance()->Samplers[(int)SamplerTypes::Point_Clamp_Reduction]),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(INSTANCE_DATA_BUFFER_SRV_SLOT, InstanceBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(MESH_BUFFER_SRV_SLOT, MeshBuffer),
@@ -594,11 +679,11 @@ void ragdoll::FGPUScene::BuildHZB(nvrhi::CommandListHandle CommandList, SceneRen
 	{
 		if (i < Targets->HZBMips->getDesc().mipLevels)
 		{
-			BindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_UAV(i, Targets->HZBMips, nvrhi::Format::RG32_FLOAT, { i, 1, 0, 1 }));
+			BindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_UAV(i, Targets->HZBMips, nvrhi::Format::D32, { i, 1, 0, 1 }));
 		}
 		else
 		{
-			BindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_UAV(i, Targets->HZBMips, nvrhi::Format::RG32_FLOAT, { 0, 1, 0, 1 }));
+			BindingSetDesc.addItem(nvrhi::BindingSetItem::Texture_UAV(i, Targets->HZBMips, nvrhi::Format::D32, { 0, 1, 0, 1 }));
 		}
 	}
 	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
@@ -657,7 +742,7 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	OccludedInstanceIdBuffer = DirectXDevice::GetNativeDevice()->createBuffer(InstanceIdBufferDesc);	  //worst case size
 	
 	//create the indirect draw args buffer
-	nvrhi::BufferDesc IndirectDrawArgsBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(nvrhi::DrawIndexedIndirectArguments) * AssetManager::GetInstance()->VertexBufferInfos.size(), "IndirectDrawArgsBuffer");
+	nvrhi::BufferDesc IndirectDrawArgsBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(nvrhi::DrawIndexedIndirectArguments) * Proxies.size(), "IndirectDrawArgsBuffer");
 	IndirectDrawArgsBufferDesc.structStride = sizeof(nvrhi::DrawIndexedIndirectArguments);
 	IndirectDrawArgsBufferDesc.canHaveUAVs = true;
 	IndirectDrawArgsBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;

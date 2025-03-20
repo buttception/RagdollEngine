@@ -28,6 +28,7 @@ Ragdoll/ffx/sdk/bin
 *.png
 *.html
 *.glb
+*.dds
 
 #Specific files
 imgui.ini

@@ -21,6 +21,12 @@ void main_vs(
 	outTexcoord = g_texcoord[inVertexId];
 }
 
+cbuffer g_Const : register(b0)
+{
+    float2 TexcoordAdd;
+    float2 TexcoordMul;
+};
+
 Texture2D Source : register(t0);
 sampler Sampler : register(s0); 
 
@@ -30,5 +36,5 @@ void main_ps(
     out float4 outColor : SV_Target0
 )
 {
-    outColor = Source.Sample(Sampler, inTexcoord).rgba;
+    outColor = Source.Sample(Sampler, inTexcoord * TexcoordMul + TexcoordAdd).rgba;
 }

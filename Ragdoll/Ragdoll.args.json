@@ -29,10 +29,6 @@
       "Command": "",
       "Items": [
         {
-          "Id": "6ca20a97-1734-47c1-a46c-3455dedddbf0",
-          "Command": "--scene \"other_gltf\\San Miguel\\SanMiguel.gltf\""
-        },
-        {
           "Id": "9a512f54-05cf-4eb8-9c58-ec1f7b655ca7",
           "Command": "--sample \"MetalRoughSpheresNoTextures\""
         },
@@ -53,12 +49,28 @@
           "Command": "--sample \"BoxTextured\""
         },
         {
+          "Id": "fdcc5be7-81cd-494b-b185-95cc8dbb58a8",
+          "Command": "--sample \"BoomBoxWithAxes\""
+        },
+        {
+          "Id": "c663b24a-8220-4fcf-8c9d-2cab08492c4b",
+          "Command": "--sample \"AlphaBlendModeTest\""
+        },
+        {
+          "Id": "6ca20a97-1734-47c1-a46c-3455dedddbf0",
+          "Command": "--scene \"other_gltf\\San Miguel\\SanMiguel.gltf\""
+        },
+        {
           "Id": "395cbeaa-ee05-47d8-8240-23067e17d7e7",
           "Command": "--scene \"other_gltf/Bistro/bistro.gltf\""
         },
         {
           "Id": "6931d7b9-9ea1-4de0-b321-90c46acd4bf1",
           "Command": "--scene \"other_gltf/SponzaSingleLight/SponzaSingleLight.gltf\""
+        },
+        {
+          "Id": "c845025e-882b-4c45-9c18-0fb281bb52bf",
+          "Command": "--scene \"other_gltf/SponzaDoubleLights/SponzaDoubleLights.gltf\""
         },
         {
           "Id": "3c5485aa-f98f-4568-ad6d-00ffd1e48294",

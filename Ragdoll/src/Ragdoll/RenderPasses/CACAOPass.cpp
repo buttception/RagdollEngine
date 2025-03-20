@@ -84,7 +84,7 @@ void CACAOPass::GenerateAO(const ragdoll::SceneInformation& sceneInfo, ragdoll::
 	CBuffer.AdaptiveSampleCountLimit = 0.75f;
 	CBuffer.NormalsUnpackMul = 1.f;
 	CBuffer.NormalsUnpackAdd = 0.f;
-	CBuffer.NormalsWorldToViewspaceMatrix = sceneInfo.MainCameraView;
+	CBuffer.NormalsWorldToViewspaceMatrix = sceneInfo.MainCameraView * DirectX::XMMatrixScaling(1.f, 1.f, -1.f);
 	CBuffer.ImportanceMapDimensions = { (float)targets->ImportanceMap->getDesc().width, (float)targets->ImportanceMap->getDesc().height };
 	CBuffer.ImportanceMapInverseDimensions = Vector2{ 1.f, 1.f } / CBuffer.ImportanceMapDimensions;
 	CBuffer.InvSharpness = 0.02f;

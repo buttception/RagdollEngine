@@ -70,7 +70,15 @@ void gbuffer_ps(
     if (materialData.AlbedoIndex != -1){
 		albedo *= Textures[materialData.AlbedoIndex].Sample(Samplers[materialData.AlbedoSamplerIndex], inTexcoord);
 	}
-	clip(albedo.a - 0.01f);
+#ifdef NON_OPAQUE
+	if(materialData.Flags & ALPHA_MODE_MASK)
+	{
+		clip(albedo.a - materialData.AlphaCutoff);
+		albedo.a = 1.f;
+	}
+	else
+		clip(albedo.a <= 0.f ? -1.f : 1.f);	//min clipping
+#endif
 	float4 RM = float4(0.f, materialData.RoughnessFactor, materialData.MetallicFactor, 0);
 	if(materialData.ORMIndex != -1){
         RM = Textures[materialData.ORMIndex].Sample(Samplers[materialData.ORMSamplerIndex], inTexcoord);
@@ -140,21 +148,22 @@ void deferred_light_ps(
 )
 {
 	//getting texture values
-	float4 albedo = albedoTexture.Sample(Samplers[6], inTexcoord);
-	float3 N = Decode(normalTexture.Sample(Samplers[6], inTexcoord).xy);
-	float2 RM = RMTexture.Sample(Samplers[6], inTexcoord).xy;
-	float AO = AOTexture.Sample(Samplers[6], inTexcoord).x;
-	float4 shadowFactor = ShadowMask.Sample(Samplers[6], inTexcoord);
+    int2 PixelLocation = inTexcoord * ScreenSize;
+	float4 albedo = albedoTexture.Load(int3(PixelLocation, 0));
+	float3 N = Decode(normalTexture.Load(int3(PixelLocation, 0)).xy);
+	float2 RM = RMTexture.Load(int3(PixelLocation, 0)).xy;
+	float AO = AOTexture.Load(int3(PixelLocation, 0)).x;
+	float4 shadowFactor = ShadowMask.Load(int3(PixelLocation, 0));
 
 	//getting fragpos
-	float3 fragPos = DepthToWorld(DepthBuffer.Sample(Samplers[6], inTexcoord).r, inTexcoord, InvViewProjMatrix);
+    float3 fragPos = DepthToWorld(DepthBuffer.Load(int3(PixelLocation, 0)).r, inTexcoord, InvViewProjMatrix);
 
 	//apply pbr lighting, AO is 1.f for now so it does nth
 	//float3 diffuse = max(dot(N, LightDirection), 0) * albedo.rgb;
 	float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.y, RM.x, AO);
 	
     float3 ambient = SceneAmbientColor.rgb * albedo.rgb * AO;
-    float3 lighting = ambient + diffuse * (1.f - shadowFactor.a);
+    float3 lighting = ambient + diffuse * (1.f - shadowFactor.r);
 	
     for (int i = 0; i < PointLightCount; i++)
     {
@@ -168,7 +177,7 @@ void deferred_light_ps(
         float Attenuation = saturate(1.0 / (1.0 + k1 * Dist + k2 * (Dist * Dist)));
         lighting += PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDir, PointLights[i].Color.rgb * PointLights[i].Position.w, RM.y, RM.x, AO) * Attenuation;
     }
-	outColor = lighting * shadowFactor.rgb;
+	outColor = lighting;
 }
 
 //StructuredBuffer<uint> LightBitFieldsInput : register(t7);
@@ -183,14 +192,15 @@ void deferred_light_grid_ps(
 )
 {
 	//getting texture values
-    float4 albedo = albedoTexture.Sample(Samplers[6], inTexcoord);
-    float3 N = Decode(normalTexture.Sample(Samplers[6], inTexcoord).xy);
-    float2 RM = RMTexture.Sample(Samplers[6], inTexcoord).xy;
-    float AO = AOTexture.Sample(Samplers[6], inTexcoord).x;
-    float4 shadowFactor = ShadowMask.Sample(Samplers[6], inTexcoord);
+    int2 PixelLocation = inTexcoord * ScreenSize;
+	float4 albedo = albedoTexture.Load(int3(PixelLocation, 0));
+	float3 N = Decode(normalTexture.Load(int3(PixelLocation, 0)).xy);
+	float2 RM = RMTexture.Load(int3(PixelLocation, 0)).xy;
+	float AO = AOTexture.Load(int3(PixelLocation, 0)).x;
+	float4 shadowFactor = ShadowMask.Load(int3(PixelLocation, 0));
 
 	//getting the positions
-    float depth = DepthBuffer.Sample(Samplers[6], inTexcoord).r;
+    float depth = DepthBuffer.Load(int3(PixelLocation, 0)).r;
     float3 fragPos = DepthToWorld(depth, inTexcoord, InvViewProjMatrix);
     float3 viewPos = mul(float4(fragPos, 1), View).xyz;
 
@@ -199,7 +209,7 @@ void deferred_light_grid_ps(
     float3 diffuse = PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDirection, LightDiffuseColor.rgb * LightIntensity, RM.y, RM.x, AO);
 	
     float3 ambient = SceneAmbientColor.rgb * albedo.rgb * AO;
-    float3 lighting = ambient + diffuse * (1.f - shadowFactor.a);
+    float3 lighting = ambient + diffuse * (1.f - shadowFactor.r);
 	
 	//get which slice this pixel is in
     uint X = floor(inTexcoord.x * GridSize.x);
@@ -207,6 +217,7 @@ void deferred_light_grid_ps(
     uint Z = 0;
     for (int i = 0; i < DEPTH_SLICE_COUNT - 1; ++i)
     {
+		//this is technically wrong as the boxes are right to left and top to bottom, but it is ok as i only need the z value
         FBoundingBox Box = BoundingBoxBufferInput[X + Y * GridSize.x + i * GridSize.x * GridSize.y];
         if (viewPos.z < (Box.Center.z + Box.Extents.z) && viewPos.z > (Box.Center.z - Box.Extents.z))
         {
@@ -237,5 +248,6 @@ void deferred_light_grid_ps(
             lighting += PBRLighting(albedo.rgb, N, CameraPosition - fragPos, LightDir, PointLights[LightIndex].Color.rgb * PointLights[LightIndex].Position.w, RM.y, RM.x, AO) * Attenuation;
         }
     }
-    outColor = lighting * shadowFactor.rgb;
+    outColor = lighting;
+    //outColor = lighting * float3(X / GridSize.x, Y / GridSize.y, Z / 16.f);
 }

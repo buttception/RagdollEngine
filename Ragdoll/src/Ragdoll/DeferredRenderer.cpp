@@ -75,6 +75,10 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 		RenderTargets->PrevAccumulation = RenderTargets->Accumulation0;
 		RenderTargets->CurrLuminanceHistory = RenderTargets->LuminanceHistory1;
 		RenderTargets->PrevLuminanceHistory = RenderTargets->LuminanceHistory0;
+		RenderTargets->CurrMoment = RenderTargets->Moment1;
+		RenderTargets->PrevMoment = RenderTargets->Moment0;
+		RenderTargets->CurrScratch = RenderTargets->Scratch1;
+		RenderTargets->PrevScratch = RenderTargets->Scratch0;
 	}
 	else
 	{
@@ -87,7 +91,11 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 		RenderTargets->CurrAccumulation = RenderTargets->Accumulation0;
 		RenderTargets->PrevAccumulation = RenderTargets->Accumulation1;
 		RenderTargets->CurrLuminanceHistory = RenderTargets->LuminanceHistory0;
-		RenderTargets->PrevLuminanceHistory = RenderTargets->LuminanceHistory1;
+		RenderTargets->PrevLuminanceHistory = RenderTargets->LuminanceHistory1;;
+		RenderTargets->CurrMoment = RenderTargets->Moment0;
+		RenderTargets->PrevMoment = RenderTargets->Moment1;
+		RenderTargets->CurrScratch = RenderTargets->Scratch0;
+		RenderTargets->PrevScratch = RenderTargets->Scratch1;
 	}
 	{
 		//this process is long because it is waiting for the gpu to be done first
@@ -174,25 +182,31 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 		activeList.emplace_back(CommandLists[(int)Pass::AO]);
 	}
 
-	Taskflow.emplace([this, &scene, GPUScene]() {
-		ShadowPass->DrawAllInstances(0, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
-	});
-	Taskflow.emplace([this, &scene, GPUScene]() {
-		ShadowPass->DrawAllInstances(1, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
+	if (!scene->SceneInfo.bRaytraceDirectionalLight)
+	{
+		Taskflow.emplace([this, &scene, GPUScene]() {
+			ShadowPass->DrawAllInstances(0, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
 		});
-	Taskflow.emplace([this, &scene, GPUScene]() {
-		ShadowPass->DrawAllInstances(2, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
-		});
-	Taskflow.emplace([this, &scene, GPUScene]() {
-		ShadowPass->DrawAllInstances(3, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
-		});
-	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH0]);
-	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH1]);
-	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH2]);
-	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH3]);
+		Taskflow.emplace([this, &scene, GPUScene]() {
+			ShadowPass->DrawAllInstances(1, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
+			});
+		Taskflow.emplace([this, &scene, GPUScene]() {
+			ShadowPass->DrawAllInstances(2, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
+			});
+		Taskflow.emplace([this, &scene, GPUScene]() {
+			ShadowPass->DrawAllInstances(3, GPUScene, scene->StaticProxies.size(), scene->SceneInfo, RenderTargets);
+			});
+		activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH0]);
+		activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH1]);
+		activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH2]);
+		activeList.emplace_back(CommandLists[(int)Pass::SHADOW_DEPTH3]);
+	}
 
-	Taskflow.emplace([this, &scene]() {
-		ShadowMaskPass->DrawShadowMask(scene->SceneInfo, RenderTargets);
+	Taskflow.emplace([this, &scene, GPUScene]() {
+		if(!scene->SceneInfo.bRaytraceDirectionalLight)
+			ShadowMaskPass->DrawShadowMask(scene->SceneInfo, RenderTargets);
+		else
+			ShadowMaskPass->RaytraceShadowMask(scene->SceneInfo, GPUScene, RenderTargets);
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::SHADOW_MASK]);
 
@@ -252,15 +266,22 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 	}
 
 	Taskflow.emplace([this, &scene]() {
-		DebugPass->DrawBoundingBoxes(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->SceneInfo, RenderTargets);
+		DebugPass->DrawDebug(scene->StaticInstanceDebugBufferHandle, scene->StaticDebugInstanceDatas.size(), scene->LineBufferHandle, scene->LineVertices.size(), scene->SceneInfo, RenderTargets);
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::DEBUG]);
 
 	if (scene->DebugInfo.DbgTarget)
 	{
-		Taskflow.emplace([this, &scene]() {
-			FramebufferViewer->DrawTarget(scene->DebugInfo.DbgTarget, scene->DebugInfo.Add, scene->DebugInfo.Mul, scene->DebugInfo.CompCount, RenderTargets);
+		Taskflow.emplace([this, &scene, GPUScene]() {
+			FramebufferViewer->DrawTarget(GPUScene, scene->DebugInfo.DbgTarget, scene->DebugInfo.Add, scene->DebugInfo.Mul, scene->DebugInfo.CompCount, RenderTargets);
 		});
+		activeList.emplace_back(CommandLists[(int)Pass::FB_VIEWER]);
+	}
+	else if (scene->DebugInfo.bShowLightGrid)
+	{
+		Taskflow.emplace([this, &scene, GPUScene]() {
+			FramebufferViewer->DrawLightGridHitMap(GPUScene, scene->SceneInfo, scene->DebugInfo, RenderTargets);
+			});
 		activeList.emplace_back(CommandLists[(int)Pass::FB_VIEWER]);
 	}
 	else {

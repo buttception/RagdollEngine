@@ -28,16 +28,6 @@ struct InstanceData{
 
 	float4 albedoFactor;
     uint meshIndex;
-	float roughness;
-	float metallic;
-
-	int albedoIndex;
-	int albedoSamplerIndex;
-	int normalIndex;
-	int normalSamplerIndex;
-	int roughnessMetallicIndex;
-	int roughnessMetallicSamplerIndex;
-	int isLit;
 };
 
 StructuredBuffer<InstanceData> InstanceDatas : register(t0);
@@ -70,4 +60,32 @@ void main_ps(
 {
 	InstanceData data = InstanceDatas[inInstanceId + InstanceOffset];
     outColor = data.albedoFactor;
+}
+
+struct LineVertex
+{
+    float3 Position;
+    float3 Color;
+};
+
+StructuredBuffer<LineVertex> LineBuffer : register(t0);
+
+void main_line_vs(
+    in uint vertexID : SV_VertexID,
+    out float4 outPos : SV_POSITION,
+    out float3 outColor : COLOR0
+)
+{
+    LineVertex vertex = LineBuffer[vertexID];
+    outPos = mul(float4(vertex.Position, 1.f), viewProjMatrix);
+    outColor = vertex.Color;
+}
+
+void main_line_ps(
+	in float4 inPos : SV_Position,
+    in float3 inColor : COLOR0,
+    out float4 outColor : SV_Target0
+)
+{
+    outColor = float4(inColor, 1.f);
 }

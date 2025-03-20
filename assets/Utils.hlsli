@@ -179,3 +179,16 @@ float3x3 Adjugate(float4x4 m)
      m[0][0]*m[1][1]-m[0][1]*m[1][0] );
     */
 }
+
+//https://www.shadertoy.com/view/tllcR2
+#define hash(p)  frac(sin(dot(p, float2(11.9898, 78.233))) * 43758.5453) // iq suggestion, for Windows
+float BlueNoise(float2 U)
+{
+    float v = 0.;
+    for (int k = 0; k < 9; k++)
+        v += hash(U + float2(k%3-1,k/3-1));
+  //return       1.125*hash(U)- v/8.  + .5; // some overbound, closer contrast
+    return .9 * (1.125 * hash(U) - v / 8.) + .5; // 
+  //return .75*( 1.125*hash(U)- v/8.) + .5; // very slight overbound
+  //return .65*( 1.125*hash(U)- v/8.) + .5; // dimmed, but histo just fit without clamp. flat up to .5 +- .23
+}

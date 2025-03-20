@@ -124,6 +124,7 @@ int32_t ImguiRenderer::DrawFBViewer()
 		"Velocity",
 		"AO",
 		"Temporal Color",
+		"Shadow Mask",
 	};
 	ImGui::Combo("Texture View", &selectedItem, items, IM_ARRAYSIZE(items));
 	ImGui::End();
@@ -170,7 +171,7 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		{"1600x900"},
 		{"1920x1080"}
 	};
-	static int32_t selectedItem{2};
+	static int32_t selectedItem{3};
 	if(ImGui::Combo("Resolution", &selectedItem, resolutions, 4))
 	{
 		switch (selectedItem)
@@ -268,6 +269,13 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 
 	if (ImGui::TreeNode("Lighting"))
 	{
+		ImGui::Checkbox("Raytrace Directional Light Shadows", &SceneInfo.bRaytraceDirectionalLight);
+		if (SceneInfo.bRaytraceDirectionalLight)
+		{
+			ImGui::Checkbox("Inline Raytracing", &SceneInfo.bInlineRaytrace);
+			ImGui::Checkbox("Raytrace Shadows Denoiser", &SceneInfo.bRaytraceShadowDenoiser);
+			ImGui::SliderFloat("Sun Size", &SceneInfo.SunSize, 0.f, 1.f);
+		}
 		ImGui::SliderFloat("Sky Dimmer e-6", &SceneInfo.SkyDimmer, 0.f, 1.f);
 		ImGui::ColorEdit3("Light Diffuse", &SceneInfo.LightDiffuseColor.x);
 		ImGui::SliderFloat("Light Intensity", &SceneInfo.LightIntensity, 0.1f, 10.f);
@@ -336,6 +344,12 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 			SceneInfo.bIsCameraDirty = true;
 		if (ImGui::Checkbox("Show Light Grid", &DebugInfo.bShowLightGrid));
 			SceneInfo.bIsCameraDirty = true;
+		if (DebugInfo.bShowLightGrid)
+		{
+			ImGui::SliderInt2("Light grid slice min max", DebugInfo.LightGridSliceStartEnd, 0, 15);
+			DebugInfo.LightGridSliceStartEnd[0] = std::min(DebugInfo.LightGridSliceStartEnd[0], DebugInfo.LightGridSliceStartEnd[1]);
+			DebugInfo.LightGridSliceStartEnd[1] = std::max(DebugInfo.LightGridSliceStartEnd[0], DebugInfo.LightGridSliceStartEnd[1]);
+		}
 		if (ImGui::Checkbox("Show Boxes", &Config.bDrawBoxes))
 			SceneInfo.bIsCameraDirty = true;
 		if (ImGui::SliderInt("Show Cascades", &SceneInfo.EnableCascadeDebug, 0, 4))
@@ -382,18 +396,18 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_A))
 		{
 			SceneInfo.bIsCameraDirty = true;
-			data.cameraPos += cameraRight * speed * _dt;
+			data.cameraPos -= cameraRight * speed * _dt;
 		}
 		if (ImGui::IsKeyDown(ImGuiKey::ImGuiKey_D))
 		{
 			SceneInfo.bIsCameraDirty = true;
-			data.cameraPos -= cameraRight * speed * _dt;
+			data.cameraPos += cameraRight * speed * _dt;
 		}
 		if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
 		{
 			SceneInfo.bIsCameraDirty = true;
 			auto& io = ImGui::GetIO();
-			data.cameraYaw += io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * _dt;
+			data.cameraYaw -= io.MouseDelta.x * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * _dt;
 			data.cameraPitch += io.MouseDelta.y * DirectX::XMConvertToRadians(data.cameraRotationSpeed) * _dt;
 			data.cameraPitch = data.cameraPitch > DirectX::XM_PIDIV2 - 0.1f ? DirectX::XM_PIDIV2 - 0.1f : data.cameraPitch;
 			data.cameraPitch = data.cameraPitch < -DirectX::XM_PIDIV2 + 0.1f ? -DirectX::XM_PIDIV2 + 0.1f : data.cameraPitch;
@@ -439,11 +453,13 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		SceneInfo.MainCameraProj._33 = 0.f;
 		SceneInfo.MainCameraProj._44 = 0.f;
 		SceneInfo.MainCameraProj._43 = data.cameraNear;
-		SceneInfo.MainCameraProj._34 = 1.f;
+		SceneInfo.MainCameraProj._34 = -1.f;
 
-		CameraProjection = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraWidth / data.cameraHeight, data.cameraNear, data.cameraFar);
+		//SceneInfo.MainCameraProj = DirectX::XMMatrixPerspectiveFovRH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraWidth / data.cameraHeight, data.cameraFar, data.cameraNear);
 
-		SceneInfo.MainCameraView = DirectX::XMMatrixLookAtLH(data.cameraPos, data.cameraPos + data.cameraDir, Vector3(0.f, 1.f, 0.f));
+		CameraProjection = DirectX::XMMatrixPerspectiveFovRH(DirectX::XMConvertToRadians(data.cameraFov), data.cameraWidth / data.cameraHeight, data.cameraNear, data.cameraFar);
+
+		SceneInfo.MainCameraView = DirectX::XMMatrixLookAtRH(data.cameraPos, data.cameraPos + data.cameraDir, Vector3(0.f, 1.f, 0.f));
 		CameraView = SceneInfo.MainCameraView;
 		SceneInfo.MainCameraViewProj = SceneInfo.MainCameraView * SceneInfo.MainCameraProj;
 		CameraViewProjection = SceneInfo.MainCameraViewProj;

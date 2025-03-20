@@ -3,6 +3,7 @@
 
 #define INSTANCE_DATA_BUFFER_SRV_SLOT t1
 #define MESH_BUFFER_SRV_SLOT t2
+#define MATERIAL_BUFFER_SRV_SLOT t3
 
 #define INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT u0
 #define INSTANCE_ID_BUFFER_UAV_SLOT u1
@@ -16,6 +17,8 @@
 #define INFINITE_Z_ENABLED 1
 #define PREVIOUS_FRAME_ENABLED 1 << 1
 #define IS_PHASE_1 1 << 2
+#define ALPHA_TEST_ENABLED 1 << 3
+#define CULL_ALL 1 << 4
 
 cbuffer g_Const : register(b0)
 {
@@ -31,6 +34,7 @@ cbuffer g_Const : register(b0)
 
 StructuredBuffer<FInstanceData> InstanceDataInput : register(INSTANCE_DATA_BUFFER_SRV_SLOT);
 StructuredBuffer<FMeshData> MeshDataInput : register(MESH_BUFFER_SRV_SLOT);
+StructuredBuffer<FMaterialData> MaterialDataInput : register(MATERIAL_BUFFER_SRV_SLOT);
 
 RWStructuredBuffer<FDrawIndexedIndirectArguments> DrawIndexedIndirectArgsOutput : register(INDIRECT_DRAW_ARGS_BUFFER_UAV_SLOT);
 RWStructuredBuffer<uint> InstanceIdBufferOutput : register(INSTANCE_ID_BUFFER_UAV_SLOT);
@@ -51,6 +55,18 @@ void FrustumCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex, 
         return;
     }
     FInstanceData InstanceData = InstanceDataInput[DTid.x];
+    FMaterialData MaterialData = MaterialDataInput[InstanceData.MaterialIndex];
+    if ((Flags & CULL_ALL) == 0 && Flags & ALPHA_TEST_ENABLED) //cull only mode blend or mask
+    {
+        if (MaterialData.Flags & ALPHA_MODE_OPAQUE)
+            return;
+    }
+    if ((Flags & CULL_ALL) == 0 && (Flags & ALPHA_TEST_ENABLED) == 0) //cull only opaques
+    {
+        if ((MaterialData.Flags & ALPHA_MODE_OPAQUE) == 0)
+            return;
+    }
+        
     //each thread will cull 1 proxy
     float3 Center = MeshDataInput[InstanceData.MeshIndex].Center;
     float3 Extents = MeshDataInput[InstanceData.MeshIndex].Extents;
@@ -158,14 +174,12 @@ void OcclusionCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex
     float3 ScaleX = Transform[0].xyz;
     float3 ScaleY = Transform[1].xyz;
     float3 ScaleZ = Transform[2].xyz;
-    //float3 ScaleX = float3(Transform[0].x, Transform[1].x, Transform[2].x);
-    //float3 ScaleY = float3(Transform[0].y, Transform[1].y, Transform[2].y);
-    //float3 ScaleZ = float3(Transform[0].z, Transform[1].z, Transform[2].z);
     float Scale = max(max(length(ScaleX), length(ScaleY)), length(ScaleZ));
     float Radius = length(Extents) * Scale;
     //calculate the closest possible position of the sphere in viewspace
     float3 PositionInWorld = mul(float4(Center, 1.f), Transform).xyz;
     float3 ViewSpacePosition = mul(float4(PositionInWorld, 1.f), ViewMatrix).xyz;
+    ViewSpacePosition.z = -ViewSpacePosition.z;
     float3 ClosestViewSpacePoint = ViewSpacePosition - float3(0.f, 0.f, Radius);
     
     bool Occluded = true;
@@ -183,6 +197,7 @@ void OcclusionCullCS(uint3 DTid : SV_DispatchThreadID, uint GIid : SV_GroupIndex
         //get the position in clip space
         float4 ClipPosition = mul(float4(ClosestViewSpacePoint, 1.f), ProjectionMatrix);
         ClipPosition.xyz /= ClipPosition.w;
+        ClipPosition.z = -ClipPosition.z;
         //clamp texcoord
         aabb = clamp(aabb, float4(0.f, 0.f, 0.f, 0.f), float4(1.f, 1.f, 1.f, 1.f));
         //calculate hi-Z buffer mip

@@ -52,10 +52,11 @@ void GBufferPass::Draw(ragdoll::FGPUScene* GPUScene, uint32_t ProxyCount, const 
 		PrevViewMatrix = sceneInfo.PrevMainCameraView;
 		PrevProjectionMatrix = sceneInfo.PrevMainCameraProjWithJitter;
 	}
-	CountBuffer = GPUScene->FrustumCull(CommandListRef, ProjectionMatrix, ViewMatrix, ProxyCount, true);
-	CommandListRef->copyBuffer(PassedFrustumTestCountBuffer, 0, CountBuffer, 0, sizeof(uint32_t));
 	if (isOcclusionCullingEnabled)
 	{
+		//cull only opaques to draw opaque objects
+		CountBuffer = GPUScene->FrustumCull(CommandListRef, ProjectionMatrix, ViewMatrix, ProxyCount, true, 1);
+		CommandListRef->copyBuffer(PassedFrustumTestCountBuffer, 0, CountBuffer, 0, sizeof(uint32_t));
 		//occlusion cull phase 1
 		GPUScene->OcclusionCullPhase1(CommandListRef, targets, PrevViewMatrix, PrevProjectionMatrix, CountBuffer, NotOccludedCountBuffer, OccludedCountBuffer, ProxyCount);
 		CommandListRef->copyBuffer(Phase1NonOccludedCountBuffer, 0, NotOccludedCountBuffer, 0, sizeof(uint32_t));
@@ -72,11 +73,24 @@ void GBufferPass::Draw(ragdoll::FGPUScene* GPUScene, uint32_t ProxyCount, const 
 		//build hzb for next frame
 		if (!debugInfo.bFreezeFrustumCulling)
 			GPUScene->BuildHZB(CommandListRef, targets);
+		//cull all the alpha objects
+		CountBuffer = GPUScene->FrustumCull(CommandListRef, ProjectionMatrix, ViewMatrix, ProxyCount, true, 2);
+		CommandListRef->copyBuffer(PassedFrustumTestCountBuffer, 0, CountBuffer, 0, sizeof(uint32_t));
+		//phase 1 cull and can draw
+		GPUScene->OcclusionCullPhase1(CommandListRef, targets, PrevViewMatrix, PrevProjectionMatrix, CountBuffer, NotOccludedCountBuffer, OccludedCountBuffer, ProxyCount);
+		CommandListRef->copyBuffer(Phase1NonOccludedCountBuffer, 0, NotOccludedCountBuffer, 0, sizeof(uint32_t));
+		//draw phase 1 onto gbuffer that was not occluded
+		DrawAllInstances(GPUScene, NotOccludedCountBuffer, ProxyCount, sceneInfo, debugInfo, targets, false);
+		//no hzb rebuild as next frame should not cull against transparent/transulucent objects
 	}
 	else
 	{
-		//draw all instances
+		//draw all opaque
+		CountBuffer = GPUScene->FrustumCull(CommandListRef, ProjectionMatrix, ViewMatrix, ProxyCount, true, 1);
 		DrawAllInstances(GPUScene, CountBuffer, ProxyCount, sceneInfo, debugInfo, targets);
+		//cull all alpha objects
+		CountBuffer = GPUScene->FrustumCull(CommandListRef, ProjectionMatrix, ViewMatrix, ProxyCount, true, 2);
+		DrawAllInstances(GPUScene, CountBuffer, ProxyCount, sceneInfo, debugInfo, targets, false);
 	}
 	CommandListRef->endMarker();
 }
@@ -87,7 +101,8 @@ void GBufferPass::DrawAllInstances(
 	uint32_t ProxyCount,
 	const ragdoll::SceneInformation& sceneInfo,
 	const ragdoll::DebugInfo& debugInfo,
-	ragdoll::SceneRenderTargets* targets)
+	ragdoll::SceneRenderTargets* targets,
+	bool opaquePass)
 {
 	RD_SCOPE(Render, Draw All Instances)
 	CommandListRef->beginMarker("Instance Draws");
@@ -115,7 +130,21 @@ void GBufferPass::DrawAllInstances(
 	PipelineDesc.addBindingLayout(BindingLayoutHandle);
 	PipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
 	nvrhi::ShaderHandle VertexShader = AssetManager::GetInstance()->GetShader("GBufferShader.vs.cso");
-	nvrhi::ShaderHandle PixelShader = AssetManager::GetInstance()->GetShader("GBufferShader.ps.cso");
+	nvrhi::ShaderHandle PixelShader;
+	if (opaquePass)
+	{
+		PixelShader = AssetManager::GetInstance()->GetShader("GBufferShaderOpaque.ps.cso");
+		PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::Back;
+	}
+	else
+	{
+		PixelShader = AssetManager::GetInstance()->GetShader("GBufferShaderAlpha.ps.cso");
+		PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+		nvrhi::BlendState::RenderTarget& BlendStateTarget = PipelineDesc.renderState.blendState.targets[0];
+		BlendStateTarget.blendEnable = true;
+		BlendStateTarget.srcBlend = nvrhi::BlendFactor::SrcAlpha;
+		BlendStateTarget.destBlend = nvrhi::BlendFactor::InvSrcAlpha;
+	}
 	PipelineDesc.setVertexShader(VertexShader);
 	PipelineDesc.setFragmentShader(PixelShader);
 
@@ -123,7 +152,7 @@ void GBufferPass::DrawAllInstances(
 	PipelineDesc.renderState.depthStencilState.stencilEnable = false;
 	PipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
 	PipelineDesc.renderState.depthStencilState.depthFunc = nvrhi::ComparisonFunc::Greater;
-	PipelineDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
+	PipelineDesc.renderState.rasterState.frontCounterClockwise = true;
 	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
 	PipelineDesc.inputLayout = AssetManager::GetInstance()->InstancedInputLayoutHandle;
 
@@ -155,7 +184,7 @@ void GBufferPass::DrawAllInstances(
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
 
 	CommandListRef->setGraphicsState(state);
-	CommandListRef->drawIndexedIndirect(0, CountBuffer, AssetManager::GetInstance()->VertexBufferInfos.size());
+	CommandListRef->drawIndexedIndirect(0, CountBuffer, ProxyCount);
 
 	CommandListRef->endMarker();
 }

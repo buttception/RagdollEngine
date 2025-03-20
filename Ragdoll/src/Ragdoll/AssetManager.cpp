@@ -5,6 +5,7 @@
 
 #include "AssetManager.h"
 #include "DirectXDevice.h"
+#include "stb_image.h"
 
 AssetManager* AssetManager::GetInstance()
 {
@@ -76,6 +77,30 @@ size_t Hash(const nvrhi::ComputePipelineDesc& desc) {
 	return HashBytes(&obj);
 }
 
+size_t Hash(const nvrhi::rt::PipelineDesc& desc) {
+	struct RaytracePipelineAbstraction {
+		//shader
+		size_t ShaderHashes[16];
+		//binding hash
+		size_t BindingsHash[nvrhi::c_MaxBindingLayouts]{ {}, };
+		//values
+		uint32_t MaxPayloadSize;
+		uint32_t MaxAttributeSize; // typical case: float2 uv;
+		uint32_t MaxRecursionDepth;
+	}obj;
+	RD_ASSERT(desc.shaders.size() > 16, "Exceed max number of shaders in a rt pipeline, consider increase size");
+	for (int i = 0; i < desc.shaders.size(); ++i) {
+		obj.ShaderHashes[i] = HashString(desc.shaders[i].exportName);
+	}
+	for (int i = 0; i < nvrhi::c_MaxBindingLayouts; ++i) {
+		obj.BindingsHash[i] = HashBytes(&desc.globalBindingLayouts);
+	}
+	obj.MaxPayloadSize = HashBytes(&desc.maxPayloadSize);
+	obj.MaxAttributeSize = HashBytes(&desc.maxAttributeSize);
+	obj.MaxRecursionDepth = HashBytes(&desc.maxRecursionDepth);
+	return HashBytes(&obj);
+}
+
 nvrhi::GraphicsPipelineHandle AssetManager::GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb)
 {
 	std::lock_guard<std::mutex> LockGuard(Mutex);
@@ -95,6 +120,18 @@ nvrhi::ComputePipelineHandle AssetManager::GetComputePipeline(const nvrhi::Compu
 		std::lock_guard<std::mutex> LockGuard(Mutex);
 		RD_CORE_INFO("CPSO created");
 		return CPSOs[hash] = DirectXDevice::GetNativeDevice()->createComputePipeline(desc);
+	}
+}
+
+nvrhi::rt::PipelineHandle AssetManager::GetRaytracePipeline(const nvrhi::rt::PipelineDesc& desc)
+{
+	size_t hash = Hash(desc);
+	if (RTSOs.contains(hash))
+		return RTSOs.at(hash);
+	{
+		std::lock_guard<std::mutex> LockGuard(Mutex);
+		RD_CORE_INFO("RTSO created");
+		return RTSOs[hash] = DirectXDevice::GetNativeDevice()->createRayTracingPipeline(desc);
 	}
 }
 
@@ -131,8 +168,10 @@ void AssetManager::RecompileShaders()
 	std::filesystem::path Path = "\"" + (FileManagerRef->GetRoot().parent_path() / "Tools\\compileShader.bat\" < NUL").string();
 	system(("call " + Path.string()).c_str());
 	Shaders.clear();
+	ShaderLibraries.clear();
 	GPSOs.clear();
 	CPSOs.clear();
+	RTSOs.clear();
 }
 
 void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
@@ -163,6 +202,7 @@ void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
 	vTexcoordAttrib.offset = offsetof(Vertex, texcoord);
 	vTexcoordAttrib.elementStride = sizeof(Vertex);
 	vTexcoordAttrib.format = nvrhi::Format::RG32_FLOAT;
+	//second buffer for the vertex shader for instance id
 	nvrhi::VertexAttributeDesc InstanceIdAttrib;
 	InstanceIdAttrib.bufferIndex = 1;
 	InstanceIdAttrib.name = "INSTANCEID";
@@ -211,6 +251,65 @@ void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
 	};
 	CommandList->writeTexture(AssetManager::GetInstance()->ErrorTex, 0, 0, &errorColor, 8);
 
+	std::string NoisePath = "stbn_unitvec2_2Dx1D_128x128x64_";
+	for (int i = 0; i < 64; ++i)
+	{
+		RD_SCOPE(Load, Load File);
+		std::filesystem::path modelPath = FileManagerRef->GetRoot() / "bluenoise" / NoisePath;
+		modelPath += std::to_string(i) + ".png";
+		//load raw bytes, do not use stbi load
+		std::ifstream file(modelPath, std::ios::binary | std::ios::ate);
+		RD_ASSERT(!file, "Unable to open file {}:{}", strerror(errno), modelPath.string());
+		uint32_t size = static_cast<int32_t>(file.tellg());
+		file.seekg(0, std::ios::beg);
+		std::vector<uint8_t> data(size);
+		RD_ASSERT(!file.read((char*)data.data(), size), "Failed to read file {}", modelPath.string());
+		//use stbi_info_from_memory to check header on info for how to load
+		int w = -1, h = -1, comp = -1, req_comp = 0;
+		RD_ASSERT(!stbi_info_from_memory(data.data(), size, &w, &h, &comp), "stb unable to read image {}", modelPath.string());
+		if (comp == 3)
+			req_comp = 4;
+		//dont support hdr images
+		//use stbi_load_from_memory to load the image data, set up all the desc with that info
+		uint8_t* raw = stbi_load_from_memory(data.data(), size, &w, &h, &comp, req_comp);
+		RD_ASSERT(!raw, "Issue loading {}", modelPath.string());
+
+		if (!BlueNoise2D)
+		{
+			nvrhi::TextureDesc texDesc;
+			texDesc.width = w;
+			texDesc.height = h;
+			texDesc.arraySize = 64;
+			texDesc.dimension = nvrhi::TextureDimension::Texture2DArray;
+			switch (comp)
+			{
+			case 1:
+				texDesc.format = nvrhi::Format::R8_UNORM;
+				break;
+			case 2:
+				texDesc.format = nvrhi::Format::RG8_UNORM;
+				break;
+			case 3:
+				texDesc.format = nvrhi::Format::RGBA8_UNORM;
+				break;
+			case 4:
+				texDesc.format = nvrhi::Format::RGBA8_UNORM;
+				break;
+			default:
+				RD_ASSERT(true, "Unsupported texture channel count");
+			}
+			texDesc.debugName = "stbn_unitvec2_2Dx1D_128x128x64";
+			texDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+			texDesc.isRenderTarget = false;
+			texDesc.keepInitialState = true;
+			BlueNoise2D = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+		}
+		//upload the texture data
+		CommandList->writeTexture(BlueNoise2D, i, 0, raw, w * (comp == 3 ? 4 : comp));
+
+		stbi_image_free(raw);
+	}
+
 #pragma region Samplers Creation
 	//create the samplers
 	nvrhi::SamplerDesc samplerDesc;
@@ -223,23 +322,13 @@ void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Clamp;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Clamp;
 	Samplers[(int)SamplerTypes::Point_Clamp] = Device->createSampler(samplerDesc);
-	samplerDesc.minFilter = 0;
-	samplerDesc.magFilter = 0;
-	samplerDesc.mipFilter = 0;
-	samplerDesc.addressU = nvrhi::SamplerAddressMode::Wrap;
-	samplerDesc.addressV = nvrhi::SamplerAddressMode::Wrap;
-	samplerDesc.addressW = nvrhi::SamplerAddressMode::Wrap;
-	Samplers[(int)SamplerTypes::Point_Wrap] = Device->createSampler(samplerDesc);
-	samplerDesc.minFilter = 0;
-	samplerDesc.magFilter = 0;
-	samplerDesc.mipFilter = 0;
+	samplerDesc.reductionType = nvrhi::SamplerReductionType::Minimum;
+	Samplers[(int)SamplerTypes::Point_Clamp_Reduction] = Device->createSampler(samplerDesc);
+	samplerDesc.reductionType = nvrhi::SamplerReductionType::Standard;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
 	Samplers[(int)SamplerTypes::Point_Repeat] = Device->createSampler(samplerDesc);
-	samplerDesc.minFilter = 0;
-	samplerDesc.magFilter = 0;
-	samplerDesc.mipFilter = 0;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Mirror;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Mirror;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Mirror;
@@ -252,16 +341,6 @@ void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Clamp;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Clamp;
 	Samplers[(int)SamplerTypes::Linear_Clamp] = Device->createSampler(samplerDesc);
-	samplerDesc.minFilter = 1;
-	samplerDesc.magFilter = 1;
-	samplerDesc.mipFilter = 0;
-	samplerDesc.addressU = nvrhi::SamplerAddressMode::Wrap;
-	samplerDesc.addressV = nvrhi::SamplerAddressMode::Wrap;
-	samplerDesc.addressW = nvrhi::SamplerAddressMode::Wrap;
-	Samplers[(int)SamplerTypes::Linear_Wrap] = Device->createSampler(samplerDesc);
-	samplerDesc.minFilter = 1;
-	samplerDesc.magFilter = 1;
-	samplerDesc.mipFilter = 0;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
@@ -274,28 +353,10 @@ void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Clamp;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Clamp;
 	Samplers[(int)SamplerTypes::Trilinear_Clamp] = Device->createSampler(samplerDesc);
-	samplerDesc.minFilter = 1;
-	samplerDesc.magFilter = 1;
-	samplerDesc.mipFilter = 1;
-	samplerDesc.addressU = nvrhi::SamplerAddressMode::Wrap;
-	samplerDesc.addressV = nvrhi::SamplerAddressMode::Wrap;
-	samplerDesc.addressW = nvrhi::SamplerAddressMode::Wrap;
-	Samplers[(int)SamplerTypes::Trilinear_Wrap] = Device->createSampler(samplerDesc);
-	samplerDesc.minFilter = 1;
-	samplerDesc.magFilter = 1;
-	samplerDesc.mipFilter = 1;
 	samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
 	Samplers[(int)SamplerTypes::Trilinear_Repeat] = Device->createSampler(samplerDesc);
-	samplerDesc.minFilter = 0;
-	samplerDesc.magFilter = 0;
-	samplerDesc.mipFilter = 0;
-	samplerDesc.addressU = nvrhi::SamplerAddressMode::Clamp;
-	samplerDesc.addressV = nvrhi::SamplerAddressMode::Clamp;
-	samplerDesc.addressW = nvrhi::SamplerAddressMode::Clamp;
-	samplerDesc.reductionType = nvrhi::SamplerReductionType::Minimum;
-	Samplers[(int)SamplerTypes::Point_Clamp_Reduction] = Device->createSampler(samplerDesc);
 
 	samplerDesc.minFilter = 1;
 	samplerDesc.magFilter = 1;
@@ -306,12 +367,18 @@ void AssetManager::Init(std::shared_ptr<ragdoll::FileManager> fm)
 	samplerDesc.addressW = nvrhi::SamplerAddressMode::Border;
 	samplerDesc.reductionType = nvrhi::SamplerReductionType::Comparison;
 	ShadowSampler = Device->createSampler(samplerDesc);
+
+	samplerDesc.maxAnisotropy = 16;
+	samplerDesc.addressU = nvrhi::SamplerAddressMode::Repeat;
+	samplerDesc.addressV = nvrhi::SamplerAddressMode::Repeat;
+	samplerDesc.addressW = nvrhi::SamplerAddressMode::Repeat;
+	Samplers[(int)SamplerTypes::Anisotropic_Repeat] = Device->createSampler(samplerDesc);
 #pragma endregion
 
 	//create the bindless descriptor table
 	nvrhi::BindlessLayoutDesc bindlessDesc;
 
-	bindlessDesc.visibility = nvrhi::ShaderType::Pixel;
+	bindlessDesc.visibility = nvrhi::ShaderType::All;
 	bindlessDesc.maxCapacity = 1024;
 	bindlessDesc.firstSlot = 0;
 	bindlessDesc.registerSpaces = {
@@ -337,8 +404,8 @@ size_t AssetManager::AddVertices(const std::vector<Vertex>& newVertices, const s
 	memcpy(Indices.data() + iCurrOffset, newIndices.data(), newIndices.size() * sizeof(uint32_t));
 	//create the vertexbuffer info
 	VertexBufferInfo info;
-	info.VBOffset = vCurrOffset;
-	info.IBOffset = iCurrOffset;
+	info.VerticesOffset = vCurrOffset;
+	info.IndicesOffset = iCurrOffset;
 	info.VerticesCount = (uint32_t)newVertices.size();
 	info.IndicesCount = (uint32_t)newIndices.size();
 	VertexBufferInfos.emplace_back(info);
@@ -357,26 +424,31 @@ void AssetManager::UpdateVBOIBO()
 		nvrhi::BufferDesc vertexBufDesc;
 		vertexBufDesc.byteSize = Vertices.size() * sizeof(Vertex);	//the offset is already the size of the vb
 		vertexBufDesc.isVertexBuffer = true;
+		vertexBufDesc.structStride = sizeof(Vertex);
 		vertexBufDesc.debugName = "Global vertex buffer";
 		vertexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;	//set as copy dest to copy over data
+		vertexBufDesc.canHaveRawViews = true;
+		vertexBufDesc.isAccelStructBuildInput = true;
 		//smth smth syncrhonization need to be this state to be written
 
 		VBO = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(vertexBufDesc);
 		//copy data over
 		CommandList->beginTrackingBufferState(VBO, nvrhi::ResourceStates::CopyDest);	//i tink this is to update nvrhi resource manager state tracker
 		CommandList->writeBuffer(VBO, Vertices.data(), vertexBufDesc.byteSize);
-		CommandList->setPermanentBufferState(VBO, nvrhi::ResourceStates::VertexBuffer);	//now its a vb
+		CommandList->setPermanentBufferState(VBO, nvrhi::ResourceStates::VertexBuffer | nvrhi::ResourceStates::AccelStructBuildInput | nvrhi::ResourceStates::ShaderResource);	//now its a vb
 
 		nvrhi::BufferDesc indexBufDesc;
 		indexBufDesc.byteSize = Indices.size() * sizeof(uint32_t);
 		indexBufDesc.isIndexBuffer = true;
 		indexBufDesc.debugName = "Global index buffer";
 		indexBufDesc.initialState = nvrhi::ResourceStates::CopyDest;
+		indexBufDesc.canHaveRawViews = true;
+		indexBufDesc.isAccelStructBuildInput = true;
 
 		IBO = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(indexBufDesc);
 		CommandList->beginTrackingBufferState(IBO, nvrhi::ResourceStates::CopyDest);
 		CommandList->writeBuffer(IBO, Indices.data(), indexBufDesc.byteSize);
-		CommandList->setPermanentBufferState(IBO, nvrhi::ResourceStates::IndexBuffer);
+		CommandList->setPermanentBufferState(IBO, nvrhi::ResourceStates::IndexBuffer | nvrhi::ResourceStates::AccelStructBuildInput | nvrhi::ResourceStates::ShaderResource);
 
 		CommandList->endMarker();
 	}
@@ -410,5 +482,18 @@ nvrhi::ShaderHandle AssetManager::GetShader(const std::string& shaderFilename)
 		desc,
 		data, size);
 	Shaders[shaderFilename] = shader;
-	return Shaders.at(shaderFilename);
+	return shader;
+}
+
+nvrhi::ShaderLibraryHandle AssetManager::GetShaderLibrary(const std::string& shaderFilename)
+{
+	std::lock_guard<std::mutex> LockGuard(Mutex);
+	if (ShaderLibraries.contains(shaderFilename)) {
+		return ShaderLibraries.at(shaderFilename);
+	}
+	uint32_t Size{};
+	const uint8_t* Data = FileManagerRef->ImmediateLoad("cso/" + shaderFilename, Size);
+	nvrhi::ShaderLibraryHandle ShaderLib = DirectXDevice::GetInstance()->m_NvrhiDevice->createShaderLibrary(Data, Size);
+	ShaderLibraries[shaderFilename] = ShaderLib;
+	return ShaderLib;
 }

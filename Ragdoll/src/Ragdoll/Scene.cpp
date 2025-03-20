@@ -91,7 +91,13 @@ void ragdoll::Scene::Update(float _dt)
 			break;
 		case 5:
 			DebugInfo.CompCount = 4;
-			DebugInfo.DbgTarget = DeferredRenderer->bIsOddFrame ? RenderTargets.TemporalColor0 : RenderTargets.TemporalColor1;;
+			DebugInfo.DbgTarget = DeferredRenderer->bIsOddFrame ? RenderTargets.TemporalColor0 : RenderTargets.TemporalColor1;
+			DebugInfo.Add = Vector4::Zero;
+			DebugInfo.Mul = Vector4::One;
+			break;
+		case 6:
+			DebugInfo.CompCount = 4;
+			DebugInfo.DbgTarget = RenderTargets.ShadowMask;
 			DebugInfo.Add = Vector4::Zero;
 			DebugInfo.Mul = Vector4::One;
 			break;
@@ -206,7 +212,6 @@ void ragdoll::Scene::CreateCustomMeshes()
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 
 	Material mat;
-	mat.bIsLit = true;
 	mat.Color = Vector4::One;
 	mat.AlbedoTextureIndex = 0;
 	AssetManager::GetInstance()->Materials.emplace_back(mat);
@@ -294,14 +299,14 @@ void ragdoll::Scene::CreateRenderTargets()
 		depthBufferDesc.height <<= 1;
 	depthBufferDesc.width >>= 1;
 	depthBufferDesc.height >>= 1;
-	depthBufferDesc.format = nvrhi::Format::RG32_FLOAT;
+	depthBufferDesc.format = nvrhi::Format::D32;
 	depthBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 	depthBufferDesc.isUAV = true;
 	depthBufferDesc.keepInitialState = true;
 	depthBufferDesc.debugName = "HZB";
 	depthBufferDesc.dimension = nvrhi::TextureDimension::Texture2DArray;
 	depthBufferDesc.arraySize = 1;
-	depthBufferDesc.mipLevels = log2(std::max(depthBufferDesc.width, depthBufferDesc.height)) - 1;
+	depthBufferDesc.mipLevels = log2(std::max(depthBufferDesc.width, depthBufferDesc.height));
 	RenderTargets.HZBMips = DirectXDevice::GetNativeDevice()->createTexture(depthBufferDesc);
 
 	nvrhi::TextureDesc texDesc;
@@ -343,7 +348,7 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "TemporalColor1";
 	RenderTargets.TemporalColor1 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
-	texDesc.format = nvrhi::Format::RGBA16_FLOAT;
+	texDesc.format = nvrhi::Format::RG16_FLOAT;
 	texDesc.debugName = "VelocityBuffer";
 	RenderTargets.VelocityBuffer = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
@@ -381,6 +386,10 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "Luminance History1";
 	RenderTargets.LuminanceHistory1 = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
+	texDesc.format = nvrhi::Format::RGBA8_UNORM;
+	texDesc.debugName = "ShadowMask";
+	RenderTargets.ShadowMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
 	texDesc.width = SceneInfo.TargetWidth;
 	texDesc.height = SceneInfo.TargetHeight;
 
@@ -413,13 +422,9 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.debugName = "SceneColor";
 	RenderTargets.SceneColor = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
-	texDesc.format = nvrhi::Format::RGBA16_UNORM;
+	texDesc.format = nvrhi::Format::RG16_UNORM;
 	texDesc.debugName = "GBufferNormal";
 	RenderTargets.GBufferNormal = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
-
-	texDesc.format = nvrhi::Format::RGBA8_UNORM;
-	texDesc.debugName = "ShadowMask";
-	RenderTargets.ShadowMask = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
 
 	texDesc.width = 64;
 	texDesc.height = 2;
@@ -567,6 +572,34 @@ void ragdoll::Scene::CreateRenderTargets()
 	texDesc.mipLevels = levels;
 	texDesc.format = nvrhi::Format::RG16_FLOAT;
 	RenderTargets.SpdMips = DirectXDevice::GetNativeDevice()->createTexture(texDesc);
+
+	{
+		//denoiser stuff
+		nvrhi::TextureDesc DenoiserTexDesc;
+		DenoiserTexDesc.width = DIVIDE_ROUNDING_UP(SceneInfo.RenderWidth, RenderTargets.k_tileSizeX);
+		DenoiserTexDesc.height = DIVIDE_ROUNDING_UP(SceneInfo.RenderHeight, RenderTargets.k_tileSizeY);
+		DenoiserTexDesc.format = nvrhi::Format::R32_UINT;
+		DenoiserTexDesc.isUAV = true;
+		DenoiserTexDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+		DenoiserTexDesc.keepInitialState = true;
+		DenoiserTexDesc.dimension = nvrhi::TextureDimension::Texture2D;
+		DenoiserTexDesc.debugName = "RayTraceResult";
+		RenderTargets.RayTraceResult = DirectXDevice::GetNativeDevice()->createTexture(DenoiserTexDesc);
+
+		DenoiserTexDesc.width = SceneInfo.RenderWidth;
+		DenoiserTexDesc.height = SceneInfo.RenderHeight;
+		DenoiserTexDesc.format = nvrhi::Format::RG16_FLOAT;
+		DenoiserTexDesc.debugName = "Scratch0";
+		RenderTargets.Scratch0 = DirectXDevice::GetNativeDevice()->createTexture(DenoiserTexDesc);
+		DenoiserTexDesc.debugName = "Scratch1";
+		RenderTargets.Scratch1 = DirectXDevice::GetNativeDevice()->createTexture(DenoiserTexDesc);
+
+		DenoiserTexDesc.format = nvrhi::Format::R11G11B10_FLOAT;
+		DenoiserTexDesc.debugName = "Moment0";
+		RenderTargets.Moment0 = DirectXDevice::GetNativeDevice()->createTexture(DenoiserTexDesc);
+		DenoiserTexDesc.debugName = "Moment1";
+		RenderTargets.Moment1 = DirectXDevice::GetNativeDevice()->createTexture(DenoiserTexDesc);
+	}
 }
 
 void ragdoll::Scene::UpdateTransforms()
@@ -618,34 +651,11 @@ void ragdoll::Scene::PopulateStaticProxies()
 		{
 			StaticProxies.emplace_back();
 			Proxy& Proxy = StaticProxies.back();
-			const Material& mat = AssetManager::GetInstance()->Materials[submesh.MaterialIndex];
-			if (mat.AlbedoTextureIndex != -1)
-			{
-				const Texture& tex = AssetManager::GetInstance()->Textures[mat.AlbedoTextureIndex];
-				Proxy.AlbedoIndex = tex.ImageIndex;
-				Proxy.AlbedoSamplerIndex = tex.SamplerIndex;
-			}
-			if (mat.NormalTextureIndex != -1)
-			{
-				const Texture& tex = AssetManager::GetInstance()->Textures[mat.NormalTextureIndex];
-				Proxy.NormalIndex = tex.ImageIndex;
-				Proxy.NormalSamplerIndex = tex.SamplerIndex;
-			}
-			if (mat.RoughnessMetallicTextureIndex != -1)
-			{
-				const Texture& tex = AssetManager::GetInstance()->Textures[mat.RoughnessMetallicTextureIndex];
-				Proxy.ORMIndex = tex.ImageIndex;
-				Proxy.ORMSamplerIndex = tex.SamplerIndex;
-			}
-			Proxy.Color = mat.Color;
-			Proxy.Metallic = mat.Metallic;
-			Proxy.Roughness = mat.Roughness;
-			Proxy.bIsLit = mat.bIsLit;
 			Proxy.ModelToWorld = tComp->m_ModelToWorld;
 			Proxy.PrevWorldMatrix = tComp->m_PrevModelToWorld;
-			Proxy.BufferIndex = (int32_t)submesh.VertexBufferIndex;
-			Proxy.MaterialIndex = (int32_t)submesh.MaterialIndex;
-			AssetManager::GetInstance()->VertexBufferInfos[Proxy.BufferIndex].BestFitBox.Transform(Proxy.BoundingBox, tComp->m_ModelToWorld);
+			Proxy.MaterialIndex = submesh.MaterialIndex;
+			Proxy.MeshIndex = submesh.VertexBufferIndex;
+			AssetManager::GetInstance()->VertexBufferInfos[Proxy.MeshIndex].BestFitBox.Transform(Proxy.BoundingBox, tComp->m_ModelToWorld);
 		}
 	}
 }
@@ -737,6 +747,7 @@ Matrix ComputePlaneTransform(const Vector4& plane, float width, float height)
 
 void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 {
+	LineVertices.clear();
 	instances.clear();
 	for (int i = 0; i < StaticProxies.size(); ++i) {
 		if (Config.bDrawBoxes) {
@@ -747,7 +758,6 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 			Matrix matrix = Matrix::CreateScale(scale);
 			matrix *= Matrix::CreateTranslation(translate);
 			debugData.ModelToWorld = matrix;
-			debugData.bIsLit = false;
 			debugData.Color = { 0.f, 1.f, 0.f, 1.f };
 			instances.emplace_back(debugData);
 		}
@@ -761,7 +771,6 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 		Matrix matrix = Matrix::CreateScale(scale);
 		matrix *= Matrix::CreateTranslation(translate);
 		debugData.ModelToWorld = matrix;
-		debugData.bIsLit = false;
 		debugData.Color = { PointLightProxies[i].Color.x, PointLightProxies[i].Color.y, PointLightProxies[i].Color.z, 1.f};
 		instances.emplace_back(debugData);
 	}
@@ -792,37 +801,50 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 		matrix *= rotationMatrix;
 		matrix *= Matrix::CreateTranslation(SceneInfo.CascadeInfos[SceneInfo.EnableCascadeDebug - 1].center);
 		debugData.ModelToWorld = matrix;
-		debugData.bIsLit = false;
 		debugData.Color = colors[SceneInfo.EnableCascadeDebug - 1];
 		instances.emplace_back(debugData);
 	}
 	
 	if (DebugInfo.bShowFrustum)
 	{
-		//add the 5 planes for the camera
-		Vector4 Planes[6];
-		if(DebugInfo.bFreezeFrustumCulling)
-			GPUScene->ExtractFrustumPlanes(Planes, DebugInfo.FrozenProjection, DebugInfo.FrozenView);
-		else
-			GPUScene->ExtractFrustumPlanes(Planes, SceneInfo.MainCameraProj, SceneInfo.MainCameraView);
-		for (int i = 0; i < 5; ++i)
+		//draw lines for the frustum
+		if (DebugInfo.bFreezeFrustumCulling)
 		{
-			InstanceData debugData;;
-			debugData.ModelToWorld = ComputePlaneTransform(Planes[i], 10.f, 10.f);
-			debugData.bIsLit = false;
-			if(i < 2)
-				debugData.Color = { 0.f, 0.f, 1.f, 1.f };
-			else if(i < 4)
-				debugData.Color = { 1.f, 1.f, 0.f, 1.f };
-			else
-				debugData.Color = { 0.f, 1.f, 0.f, 1.f };
-			instances.emplace_back(debugData);
+			//get the frozen view projection matrix
+			DirectX::BoundingFrustum Frustum;
+			Matrix TempMatrix = DebugInfo.FrozenProjection;
+			TempMatrix._33 = SceneInfo.CameraNear / (SceneInfo.CameraFar - SceneInfo.CameraNear);
+			TempMatrix._43 = -SceneInfo.CameraNear * SceneInfo.CameraFar / (SceneInfo.CameraFar - SceneInfo.CameraNear);
+			DirectX::BoundingFrustum::CreateFromMatrix(Frustum, TempMatrix, true);
+			Frustum.Transform(Frustum, Matrix::CreateScale(1.f, 1.f, -1.f));
+			Frustum.Transform(Frustum, DebugInfo.FrozenView.Invert());
+			Vector3 corners[8];
+			Frustum.GetCorners(corners);
+			auto PushLine = [&](const Vector3& start, const Vector3& end) {
+				LineVertices.push_back({ start, Vector3{0.f, 0.f, 1.f} });   // Start point
+				LineVertices.push_back({ end, Vector3{0.f, 0.f, 1.f} });     // End point
+			};
+
+			PushLine(corners[0], corners[1]);
+			PushLine(corners[1], corners[2]);
+			PushLine(corners[2], corners[3]);
+			PushLine(corners[3], corners[0]);
+
+			PushLine(corners[4], corners[5]);
+			PushLine(corners[5], corners[6]);
+			PushLine(corners[6], corners[7]);
+			PushLine(corners[7], corners[4]);
+
+			PushLine(corners[0], corners[4]);
+			PushLine(corners[1], corners[5]);
+			PushLine(corners[2], corners[6]);
+			PushLine(corners[3], corners[7]);
 		}
 	}
 
 	if (!instances.empty())
 	{
-		MICROPROFILE_SCOPEI("Scene", "Building Debug Instance Buffer", MP_DARKRED);
+		MICROPROFILE_SCOPEI("Debug", "Building Debug Instance Buffer", MP_DARKRED);
 		//add one more cube at where the sun is
 		InstanceData debugData;
 		Vector3 translate = SceneInfo.LightDirection;
@@ -830,7 +852,6 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 		Matrix matrix = Matrix::CreateScale(scale);
 		matrix *= Matrix::CreateTranslation(translate);
 		debugData.ModelToWorld = matrix;
-		debugData.bIsLit = false;
 		debugData.Color = { 1.f, 1.f, 1.f, 1.f };
 		instances.emplace_back(debugData);
 
@@ -850,6 +871,24 @@ void ragdoll::Scene::BuildDebugInstances(std::vector<InstanceData>& instances)
 		CommandList->close();
 		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 	}
+
+	if (!LineVertices.empty())
+	{
+		RD_SCOPE(Debug, Line Buffer);
+		nvrhi::BufferDesc Desc;
+		Desc.byteSize = sizeof(LineVertex) * LineVertices.size();
+		Desc.debugName = "Line Buffer";
+		Desc.initialState = nvrhi::ResourceStates::CopyDest;
+		Desc.structStride = sizeof(LineVertex);
+		LineBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(Desc);
+
+		CommandList->open();
+		CommandList->beginTrackingBufferState(LineBufferHandle, nvrhi::ResourceStates::CopyDest);
+		CommandList->writeBuffer(LineBufferHandle, LineVertices.data(), sizeof(LineVertex)* LineVertices.size());
+		CommandList->setPermanentBufferState(LineBufferHandle, nvrhi::ResourceStates::ShaderResource);
+		CommandList->close();
+		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
+	}
 }
 
 void ragdoll::Scene::UpdateShadowCascadesExtents()
@@ -859,8 +898,8 @@ void ragdoll::Scene::UpdateShadowCascadesExtents()
 	{
 		//create the subfrusta in view space
 		DirectX::BoundingFrustum frustum;
-		Matrix proj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(SceneInfo.CameraFov / 2.f), SceneInfo.CameraAspect, SubfrustaFarPlanes[i-1], SubfrustaFarPlanes[i]);
-		DirectX::BoundingFrustum::CreateFromMatrix(frustum, proj);
+		Matrix proj = DirectX::XMMatrixPerspectiveFovRH(DirectX::XMConvertToRadians(SceneInfo.CameraFov / 2.f), SceneInfo.CameraAspect, SubfrustaFarPlanes[i-1], SubfrustaFarPlanes[i]);
+		DirectX::BoundingFrustum::CreateFromMatrix(frustum, proj, true);
 		//move the frustum to world space
 		frustum.Transform(frustum, SceneInfo.MainCameraView.Invert());
 		//get the corners
@@ -876,13 +915,13 @@ void ragdoll::Scene::UpdateShadowCascadesExtents()
 		center.y = (float)(int32_t)center.y;
 		center.z = (float)(int32_t)center.z;
 		//move all corners into a 1x1x1 cube lightspace with the directional light
-		Matrix lightProj = DirectX::XMMatrixOrthographicLH(1.f, 1.f, -0.5f, 0.5f);	//should be a 1x1x1 cube?
+		Matrix lightProj = DirectX::XMMatrixOrthographicRH(1.f, 1.f, -0.5f, 0.5f);	//should be a 1x1x1 cube?
 		Vector3 lightDir = -SceneInfo.LightDirection;
 		Vector3 up = { 0.f, 1.f, 0.f };
 		if (fabsf(lightDir.Dot(up)) > 0.99f) {
 			up = { 1.f, 0.f, 0.f };
 		}
-		SceneInfo.CascadeInfos[i - 1].view = DirectX::XMMatrixLookAtLH(center, center + lightDir, up);
+		SceneInfo.CascadeInfos[i - 1].view = DirectX::XMMatrixLookAtRH(center, center + lightDir, up);
 		Matrix lightViewProj = SceneInfo.CascadeInfos[i - 1].view * lightProj;
 		//get the furthest extents of the corners for the left right top and bottom values
 		Vector3 min = { FLT_MAX, FLT_MAX, FLT_MAX };
@@ -910,6 +949,7 @@ void ragdoll::Scene::UpdateShadowCascadesExtents()
 		max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
 		for (int j = 0; j < 8; ++j)
 		{
+			sceneCorners[j].z = -sceneCorners[j].z;
 			max = DirectX::XMVectorMax(max, sceneCorners[j]);
 			min = DirectX::XMVectorMin(min, sceneCorners[j]);
 		}
@@ -922,7 +962,7 @@ void ragdoll::Scene::UpdateShadowLightMatrices()
 {
 	for (int i = 0; i < 4; ++i) {
 		//reverse z
-		SceneInfo.CascadeInfos[i].proj = DirectX::XMMatrixOrthographicLH(SceneInfo.CascadeInfos[i].width, SceneInfo.CascadeInfos[i].height, SceneInfo.CascadeInfos[i].farZ, SceneInfo.CascadeInfos[i].nearZ);
+		SceneInfo.CascadeInfos[i].proj = DirectX::XMMatrixOrthographicRH(SceneInfo.CascadeInfos[i].width, SceneInfo.CascadeInfos[i].height, SceneInfo.CascadeInfos[i].farZ, SceneInfo.CascadeInfos[i].nearZ);
 		SceneInfo.CascadeInfos[i].viewProj = SceneInfo.CascadeInfos[i].view * SceneInfo.CascadeInfos[i].proj;
 	}
 }

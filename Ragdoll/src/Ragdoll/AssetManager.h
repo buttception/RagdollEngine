@@ -12,8 +12,13 @@ struct Material {
 	Vector4 Color;
 	float Roughness = 1.f;
 	float Metallic = 1.f;
-
-	bool bIsLit = false;
+	float AlphaCutoff = 0.5f;
+	enum class AlphaMode {
+		GLTF_OPAQUE,
+		GLTF_MASK,
+		GLTF_BLEND
+	} AlphaMode = AlphaMode::GLTF_OPAQUE;
+	bool bIsDoubleSided = false;
 };
 
 struct Vertex {
@@ -25,8 +30,8 @@ struct Vertex {
 
 struct VertexBufferInfo
 {
-	uint32_t VBOffset;
-	uint32_t IBOffset;
+	uint32_t VerticesOffset;
+	uint32_t IndicesOffset;
 	uint32_t IndicesCount;
 	uint32_t VerticesCount;
 
@@ -49,6 +54,7 @@ struct Image
 {
 	//raw byte data, loaded via stbi
 	uint8_t* RawData{ nullptr };
+	bool bIsDDS{ false };
 	nvrhi::TextureHandle TextureHandle;
 };
 
@@ -61,15 +67,13 @@ struct Texture
 enum class SamplerTypes
 {
 	Point_Clamp,
-	Point_Wrap,
 	Point_Repeat,
 	Point_Mirror,
 	Linear_Clamp,
-	Linear_Wrap,
 	Linear_Repeat,
 	Trilinear_Clamp,
-	Trilinear_Wrap,
 	Trilinear_Repeat,
+	Anisotropic_Repeat,
 	Point_Clamp_Reduction,
 	COUNT
 };
@@ -110,14 +114,17 @@ public:
 
 	nvrhi::TextureHandle DefaultTex;
 	nvrhi::TextureHandle ErrorTex;
+	nvrhi::TextureHandle BlueNoise2D;
 	std::vector<nvrhi::SamplerHandle> Samplers;
 	nvrhi::SamplerHandle ShadowSampler;
 
 	std::unordered_map<size_t, nvrhi::GraphicsPipelineHandle> GPSOs;
 	std::unordered_map<size_t, nvrhi::ComputePipelineHandle> CPSOs;
+	std::unordered_map<size_t, nvrhi::rt::PipelineHandle> RTSOs;
 	std::unordered_map<size_t, nvrhi::BindingLayoutHandle> BindingLayouts;
 
 	std::unordered_map<std::string, nvrhi::ShaderHandle> Shaders;
+	std::unordered_map<std::string, nvrhi::ShaderLibraryHandle> ShaderLibraries;
 
 	//no more vbo vectors, but instead is a vector of vb ib offsets
 	//hold onto 1 vbo and ibo here
@@ -136,6 +143,7 @@ public:
 	size_t AddImage(Image img);
 	nvrhi::GraphicsPipelineHandle GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb);
 	nvrhi::ComputePipelineHandle GetComputePipeline(const nvrhi::ComputePipelineDesc& desc);
+	nvrhi::rt::PipelineHandle GetRaytracePipeline(const nvrhi::rt::PipelineDesc& desc);
 	nvrhi::BindingLayoutHandle GetBindingLayout(const nvrhi::BindingSetDesc& desc);
 	void RecompileShaders();
 
@@ -146,6 +154,7 @@ public:
 	void UpdateVBOIBO();
 
 	nvrhi::ShaderHandle GetShader(const std::string& shaderFilename);
+	nvrhi::ShaderLibraryHandle GetShaderLibrary(const std::string& shaderFilename);
 private:
 	nvrhi::CommandListHandle CommandList;	//asset manager commandlist
 	std::shared_ptr<ragdoll::FileManager> FileManagerRef;
