@@ -12,6 +12,7 @@
 #include "Ragdoll/Components/RenderableComp.h"
 #include "Ragdoll/Components/PointLightComp.h"
 #include "Scene.h"
+#include "meshoptimizer.h"
 
 // Define these only in *one* .cc file.
 #define TINYGLTF_IMPLEMENTATION

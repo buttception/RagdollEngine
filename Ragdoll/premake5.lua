@@ -33,7 +33,8 @@ project "Ragdoll"
 
 	libdirs
 	{
-		"%{LibDirs.dlss}"
+		"%{LibDirs.dlss}",
+		"%{LibDirs.meshoptimizer}"
 	}
 
 	links
@@ -41,7 +42,8 @@ project "Ragdoll"
 		"GLFW",
 		"imgui",
 		"d3d12",
-		"dxgi"
+		"dxgi",
+		"meshoptimizer"
 	}
 	
 	vpaths 
@@ -64,11 +66,13 @@ project "Ragdoll"
 		"%{IncludesDir.taskflow}",
 		"%{IncludesDir.dlss}",
 		"%{IncludesDir.directxtex}",
+		"%{IncludesDir.meshoptimizer}",
     }
 
 	postbuildcommands
 	{
 		"xcopy /Y /E /I \"%{LibDirs.dlss}\\Windows_x86_64\\dev\\nvngx_dlss.dll\" \"%{cfg.targetdir}\"",
+		"xcopy /Y /E /I \"%{LibDirs.meshoptimizer}\\meshoptimizer.lib\" \"%{cfg.targetdir}\"",
 		"xcopy /Y /E /I \"%{wks.location}\\assets\\cso\" \"%{cfg.targetdir}\\..\\assets\\cso\"",
 		"\"%{wks.location}Tools\\compileShader.bat\"",
 	}
