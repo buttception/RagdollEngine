@@ -101,6 +101,30 @@ size_t Hash(const nvrhi::rt::PipelineDesc& desc) {
 	return HashBytes(&obj);
 }
 
+size_t Hash(const nvrhi::MeshletPipelineDesc& desc) {
+	struct MeshletPipelineAbstraction {
+		size_t ASHash{};
+		size_t MSHash{};
+		size_t PSHash{};
+
+		size_t RenderStateHash{};
+		size_t PrimTypeHash{};
+		size_t BindingsHash[nvrhi::c_MaxBindingLayouts]{ {}, };
+	}obj;
+	if (desc.AS)
+		obj.ASHash = HashString(desc.AS->getDesc().debugName);
+	if (desc.MS)
+		obj.MSHash = HashString(desc.MS->getDesc().debugName);
+	if (desc.PS)
+		obj.PSHash = HashString(desc.PS->getDesc().debugName);
+	obj.RenderStateHash = HashBytes(&desc.renderState);
+	obj.PrimTypeHash = HashBytes(&desc.primType);
+	for (int i = 0; i < nvrhi::c_MaxBindingLayouts; ++i) {
+		obj.BindingsHash[i] = HashBytes(&desc.bindingLayouts);
+	}
+	return HashBytes(&obj);
+}
+
 nvrhi::GraphicsPipelineHandle AssetManager::GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb)
 {
 	std::lock_guard<std::mutex> LockGuard(Mutex);
@@ -132,6 +156,18 @@ nvrhi::rt::PipelineHandle AssetManager::GetRaytracePipeline(const nvrhi::rt::Pip
 		std::lock_guard<std::mutex> LockGuard(Mutex);
 		RD_CORE_INFO("RTSO created");
 		return RTSOs[hash] = DirectXDevice::GetNativeDevice()->createRayTracingPipeline(desc);
+	}
+}
+
+nvrhi::MeshletPipelineHandle AssetManager::GetMeshletPipeline(const nvrhi::MeshletPipelineDesc& desc, const nvrhi::FramebufferHandle& fb)
+{
+	size_t hash = Hash(desc);
+	if (MPSOs.contains(hash))
+		return MPSOs.at(hash);
+	{
+		std::lock_guard<std::mutex> LockGuard(Mutex);
+		RD_CORE_INFO("MPSO created");
+		return MPSOs[hash] = DirectXDevice::GetNativeDevice()->createMeshletPipeline(desc, fb);
 	}
 }
 
@@ -452,6 +488,41 @@ void AssetManager::UpdateVBOIBO()
 
 		CommandList->endMarker();
 	}
+	//temp
+	{
+		//create the meshlet buffer for first mesh
+		nvrhi::BufferDesc meshletBufDesc;
+		meshletBufDesc.byteSize = Meshes[0].Submeshes[0].MeshletCount * sizeof(meshopt_Meshlet);
+		meshletBufDesc.debugName = "Meshlet Buffer";
+		meshletBufDesc.canHaveTypedViews = true;
+		meshletBufDesc.structStride = sizeof(meshopt_Meshlet);
+		Meshes[0].Submeshes[0].MeshletBuffer = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(meshletBufDesc);
+		CommandList->beginTrackingBufferState(Meshes[0].Submeshes[0].MeshletBuffer, nvrhi::ResourceStates::CopyDest);
+		CommandList->writeBuffer(Meshes[0].Submeshes[0].MeshletBuffer, Meshes[0].Submeshes[0].Meshlets.data(), meshletBufDesc.byteSize);
+		CommandList->setPermanentBufferState(Meshes[0].Submeshes[0].MeshletBuffer, nvrhi::ResourceStates::ShaderResource);
+
+		//create the meshlet vertex buffer for first mesh
+		nvrhi::BufferDesc meshletVertexBufDesc;
+		meshletVertexBufDesc.byteSize = Meshes[0].Submeshes[0].MeshletVertices.size() * sizeof(uint32_t);
+		meshletVertexBufDesc.debugName = "Meshlet Vertex Buffer";
+		meshletVertexBufDesc.canHaveTypedViews = true;
+		meshletVertexBufDesc.structStride = sizeof(uint32_t);
+		Meshes[0].Submeshes[0].MeshletVertexBuffer = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(meshletVertexBufDesc);
+		CommandList->beginTrackingBufferState(Meshes[0].Submeshes[0].MeshletVertexBuffer, nvrhi::ResourceStates::CopyDest);
+		CommandList->writeBuffer(Meshes[0].Submeshes[0].MeshletVertexBuffer, Meshes[0].Submeshes[0].MeshletVertices.data(), meshletVertexBufDesc.byteSize);
+		CommandList->setPermanentBufferState(Meshes[0].Submeshes[0].MeshletVertexBuffer, nvrhi::ResourceStates::ShaderResource);
+
+		//create the meshlet triangle buffer for first mesh
+		nvrhi::BufferDesc meshletTriangleBufDesc;
+		meshletTriangleBufDesc.byteSize = Meshes[0].Submeshes[0].MeshletTrianglesPacked.size() * sizeof(uint32_t);
+		meshletTriangleBufDesc.debugName = "Meshlet Triangle Buffer";
+		meshletTriangleBufDesc.canHaveTypedViews = true;
+		meshletTriangleBufDesc.structStride = sizeof(uint32_t);
+		Meshes[0].Submeshes[0].MeshletPrimitiveBuffer = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(meshletTriangleBufDesc);
+		CommandList->beginTrackingBufferState(Meshes[0].Submeshes[0].MeshletPrimitiveBuffer, nvrhi::ResourceStates::CopyDest);
+		CommandList->writeBuffer(Meshes[0].Submeshes[0].MeshletPrimitiveBuffer, Meshes[0].Submeshes[0].MeshletTrianglesPacked.data(), meshletTriangleBufDesc.byteSize);
+		CommandList->setPermanentBufferState(Meshes[0].Submeshes[0].MeshletPrimitiveBuffer, nvrhi::ResourceStates::ShaderResource);
+	}
 	CommandList->close();
 	DirectXDevice::GetInstance()->m_NvrhiDevice->executeCommandList(CommandList);
 }
@@ -472,6 +543,9 @@ nvrhi::ShaderHandle AssetManager::GetShader(const std::string& shaderFilename)
 	}
 	else if (shaderFilename.find(".cs.") != std::string::npos) {
 		type = nvrhi::ShaderType::Compute;
+	}
+	else if (shaderFilename.find(".ms.") != std::string::npos) {
+		type = nvrhi::ShaderType::Mesh;
 	}
 	uint32_t size{};
 	const uint8_t* data = FileManagerRef->ImmediateLoad("cso/" + shaderFilename, size);

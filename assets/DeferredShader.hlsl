@@ -4,6 +4,45 @@
 
 #define TILE_SIZE 64
 #define DEPTH_SLICE_COUNT 17
+#define MAX_VERTICES 64
+#define MAX_TRIANGLES 124
+
+//thanks chatgpt
+static const float3 ColorPalette[32] =
+{
+    float3(1.0, 0.0, 0.0), // Red
+    float3(0.0, 1.0, 0.0), // Green
+    float3(0.0, 0.0, 1.0), // Blue
+    float3(1.0, 1.0, 0.0), // Yellow
+    float3(1.0, 0.0, 1.0), // Magenta
+    float3(0.0, 1.0, 1.0), // Cyan
+    float3(0.5, 0.0, 0.0), // Dark Red
+    float3(0.0, 0.5, 0.0), // Dark Green
+    float3(0.0, 0.0, 0.5), // Dark Blue
+    float3(0.5, 0.5, 0.0), // Olive
+    float3(0.5, 0.0, 0.5), // Purple
+    float3(0.0, 0.5, 0.5), // Teal
+    float3(1.0, 0.5, 0.0), // Orange
+    float3(1.0, 0.0, 0.5), // Pink
+    float3(0.5, 1.0, 0.0), // Chartreuse
+    float3(0.5, 0.0, 1.0), // Violet
+    float3(0.0, 1.0, 0.5), // Spring Green
+    float3(0.0, 0.5, 1.0), // Azure
+    float3(1.0, 0.75, 0.0), // Goldenrod
+    float3(1.0, 0.25, 0.25), // Light Red
+    float3(0.25, 1.0, 0.25), // Light Green
+    float3(0.25, 0.25, 1.0), // Light Blue
+    float3(0.75, 0.75, 0.75), // Light Gray
+    float3(0.5, 0.5, 0.5), // Gray
+    float3(0.25, 0.25, 0.25), // Dark Gray
+    float3(1.0, 0.5, 0.5), // Soft Red
+    float3(0.5, 1.0, 0.5), // Soft Green
+    float3(0.5, 0.5, 1.0), // Soft Blue
+    float3(1.0, 0.75, 0.75), // Pale Red
+    float3(0.75, 1.0, 0.75), // Pale Green
+    float3(0.75, 0.75, 1.0), // Pale Blue
+    float3(0.2, 0.8, 0.6)   // Extra unique color
+};
 
 cbuffer g_Const : register(b0) {
 	float4x4 viewProjMatrix;
@@ -45,6 +84,75 @@ void gbuffer_vs(
     outInstanceId = inInstanceId;
 }
 
+struct VertexOutput
+{
+    float4 outPos : SV_Position;
+    float4 outPrevFragPos : TEXCOORD1;
+    float4 outFragPos : TEXCOORD2;
+    float3 outNormal : TEXCOORD3;
+    float3 outTangent : TEXCOORD4;
+    float3 outBinormal : TEXCOORD5;
+    float2 outTexcoord : TEXCOORD6;
+    nointerpolation uint outInstanceId : TEXCOORD7;
+};
+
+StructuredBuffer<FVertex> Vertices : register(t2);
+StructuredBuffer<FMeshlet> Meshlets : register(t3);
+StructuredBuffer<uint> VertexIndices : register(t4);
+StructuredBuffer<uint> TriangleIndices : register(t5);
+
+//helpers
+uint3 GetPrimitive(FMeshlet m, uint index)
+{
+    return uint3(
+        TriangleIndices[m.TriangleOffset / 3 + index] & 0xFF,
+        (TriangleIndices[m.TriangleOffset / 3 + index] >> 8) & 0xFF,
+        (TriangleIndices[m.TriangleOffset / 3 + index] >> 16) & 0xFF
+    );
+}
+
+uint GetVertexIndex(FMeshlet m, uint index)
+{
+    return VertexIndices[m.VertexOffset + index];
+}
+
+VertexOutput GetVertexOutput(uint meshletId, uint vertexIndex)
+{
+    FVertex v = Vertices[vertexIndex];
+	//hardcoded to be first
+    FInstanceData data = InstanceDatas[0];
+    VertexOutput vout;
+    vout.outFragPos = mul(float4(v.position, 1), data.ModelToWorld);
+    vout.outPrevFragPos = mul(float4(v.position, 1), data.PrevModelToWorld);
+    vout.outPos = mul(vout.outFragPos, viewProjMatrixWithAA);
+
+    float binormalSign = v.normal.x > 0.0f ? -1.0f : 1.0f;
+    float3x3 AdjugateMatrix = Adjugate(data.ModelToWorld);
+    vout.outNormal = normalize(mul(v.normal, AdjugateMatrix));
+    vout.outTangent = normalize(mul(v.tangent, AdjugateMatrix));
+    vout.outBinormal = normalize(cross(vout.outTangent, vout.outNormal)) * binormalSign;
+    vout.outTexcoord = float2(v.texcoord.x, v.texcoord.y);
+    vout.outInstanceId = meshletId;
+    return vout;
+}
+
+[OutputTopology("triangle")]
+[numthreads(MAX_TRIANGLES, 1, 1)]
+void gbuffer_ms(uint gtid : SV_GroupThreadID, uint gid : SV_GroupID, out indices uint3 triangles[MAX_TRIANGLES], out vertices VertexOutput vertices[MAX_VERTICES])
+{
+    FMeshlet m = Meshlets[gid];
+    SetMeshOutputCounts(m.VertexCount, m.TriangleCount);
+    if (gtid < m.TriangleCount)
+    {
+        triangles[gtid] = GetPrimitive(m, gtid);
+
+    }
+    if (gtid < m.VertexCount)
+    {
+        vertices[gtid] = GetVertexOutput(gid, GetVertexIndex(m, gtid));
+    }
+}
+
 StructuredBuffer<FMaterialData> MaterialDatas : register(t1);
 sampler Samplers[9] : register(s0);
 
@@ -63,7 +171,7 @@ void gbuffer_ps(
 	out float2 outVelocity: SV_Target3
 )
 {
-    FInstanceData data = InstanceDatas[inInstanceId];
+    FInstanceData data = InstanceDatas[0];
     FMaterialData materialData = MaterialDatas[data.MaterialIndex];
 	// Sample textures
     float4 albedo = materialData.AlbedoFactor;
@@ -96,7 +204,7 @@ void gbuffer_ps(
 	}
 
 	//draw to the targets
-	outColor = albedo;
+    outColor = float4(ColorPalette[inInstanceId % 32], 1.f);
 	outNormals.xy = Encode(N);
 	outRoughnessMetallic = float2(roughness, metallic);
 	float4 clipPos = mul(inFragPos, viewProjMatrix);

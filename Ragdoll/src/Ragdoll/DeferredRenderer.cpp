@@ -157,13 +157,18 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 
 	uint32_t ProxyCount = scene->StaticProxies.size();
 	Taskflow.emplace([this, &scene, GPUScene, ProxyCount]() {
-		GBufferPass->Draw(
+		/*GBufferPass->Draw(
 			GPUScene,
 			ProxyCount,
 			scene->SceneInfo,
 			scene->DebugInfo,
 			RenderTargets,
-			scene->SceneInfo.bEnableOcclusionCull);
+			scene->SceneInfo.bEnableOcclusionCull);*/
+		GBufferPass->DrawMeshlets(
+			GPUScene,
+			scene->SceneInfo,
+			scene->DebugInfo,
+			RenderTargets);
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::GBUFFER]);
 
@@ -288,14 +293,14 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 		if (!scene->SceneInfo.bEnableDLSS && !scene->SceneInfo.bEnableFSR)
 		{
 			Taskflow.emplace([this]() {
-				FinalPass->DrawQuad(RenderTargets, false);
+				FinalPass->MeshletPass(RenderTargets, false);
 				});
 			activeList.emplace_back(CommandLists[(int)Pass::FINAL]);
 		}
 		else if (scene->SceneInfo.bEnableFSR)
 		{
 			Taskflow.emplace([this]() {
-				FinalPass->DrawQuad(RenderTargets, true);
+				FinalPass->MeshletPass(RenderTargets, true);
 				});
 			activeList.emplace_back(CommandLists[(int)Pass::FINAL]);
 		}

@@ -3,6 +3,7 @@
 #include <nvrhi/nvrhi.h>
 #include <tiny_gltf.h>
 #include "Ragdoll/Math/RagdollMath.h"
+#include "meshoptimizer.h"
 
 struct Material {
 	int32_t AlbedoTextureIndex = -1;
@@ -43,6 +44,14 @@ struct Submesh
 {
 	size_t VertexBufferIndex;
 	size_t MaterialIndex;
+	//temps
+	std::vector<meshopt_Meshlet> Meshlets;
+	std::vector<uint32_t> MeshletVertices;
+	std::vector<uint32_t> MeshletTrianglesPacked;
+	uint32_t MeshletCount;
+	nvrhi::BufferHandle MeshletBuffer;
+	nvrhi::BufferHandle MeshletVertexBuffer;
+	nvrhi::BufferHandle MeshletPrimitiveBuffer;
 };
 
 struct Mesh
@@ -95,6 +104,9 @@ size_t HashBytes(T* ptr) {
 	return hash(std::make_pair(ptr, sizeof(T)));
 }
 
+constexpr size_t max_vertices = 64;
+constexpr size_t max_triangles = 124;	//not 126 because they want it divisible by 4
+
 class ForwardRenderer;
 class DirectXDevice;
 namespace ragdoll {
@@ -121,6 +133,7 @@ public:
 	std::unordered_map<size_t, nvrhi::GraphicsPipelineHandle> GPSOs;
 	std::unordered_map<size_t, nvrhi::ComputePipelineHandle> CPSOs;
 	std::unordered_map<size_t, nvrhi::rt::PipelineHandle> RTSOs;
+	std::unordered_map<size_t, nvrhi::MeshletPipelineHandle> MPSOs;
 	std::unordered_map<size_t, nvrhi::BindingLayoutHandle> BindingLayouts;
 
 	std::unordered_map<std::string, nvrhi::ShaderHandle> Shaders;
@@ -144,6 +157,7 @@ public:
 	nvrhi::GraphicsPipelineHandle GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb);
 	nvrhi::ComputePipelineHandle GetComputePipeline(const nvrhi::ComputePipelineDesc& desc);
 	nvrhi::rt::PipelineHandle GetRaytracePipeline(const nvrhi::rt::PipelineDesc& desc);
+	nvrhi::MeshletPipelineHandle GetMeshletPipeline(const nvrhi::MeshletPipelineDesc& desc, const nvrhi::FramebufferHandle& fb);
 	nvrhi::BindingLayoutHandle GetBindingLayout(const nvrhi::BindingSetDesc& desc);
 	void RecompileShaders();
 

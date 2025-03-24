@@ -188,3 +188,79 @@ void GBufferPass::DrawAllInstances(
 
 	CommandListRef->endMarker();
 }
+
+void GBufferPass::DrawMeshlets(
+	ragdoll::FGPUScene* GPUScene, 
+	const ragdoll::SceneInformation& sceneInfo,
+	const ragdoll::DebugInfo& debugInfo,
+	ragdoll::SceneRenderTargets* targets)
+{
+	//hardcoded to draw only the first mesh
+	RD_SCOPE(Render, MeshletGBuffer);
+	RD_GPU_SCOPE("MeshletGBufferPass", CommandListRef);
+
+	CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
+	CBuffer.ViewProjWithAA = sceneInfo.MainCameraViewProjWithJitter;
+	CBuffer.PrevViewProj = sceneInfo.PrevMainCameraViewProj;
+	CBuffer.RenderResolution = Vector2((float)sceneInfo.RenderWidth, (float)sceneInfo.RenderHeight);
+	nvrhi::BufferDesc ConstantBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "GBufferPass CBuffer", 1);
+	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(ConstantBufferDesc);
+	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
+
+	//create the binding set
+	nvrhi::BindingSetDesc BindingSetDesc;
+	BindingSetDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, GPUScene->InstanceBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(1, GPUScene->MaterialBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(2, AssetManager::GetInstance()->VBO),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(3, AssetManager::GetInstance()->Meshes[0].Submeshes[0].MeshletBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(4, AssetManager::GetInstance()->Meshes[0].Submeshes[0].MeshletVertexBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(5, AssetManager::GetInstance()->Meshes[0].Submeshes[0].MeshletPrimitiveBuffer),
+
+	};
+	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
+	{
+		BindingSetDesc.addItem(nvrhi::BindingSetItem::Sampler(i, AssetManager::GetInstance()->Samplers[i]));
+	}
+	//get the binding layout
+	nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
+	nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);//create and set the state
+
+	nvrhi::FramebufferDesc desc = nvrhi::FramebufferDesc()
+		.addColorAttachment(targets->GBufferAlbedo)
+		.addColorAttachment(targets->GBufferNormal)
+		.addColorAttachment(targets->GBufferRM)
+		.addColorAttachment(targets->VelocityBuffer)
+		.setDepthAttachment(targets->CurrDepthBuffer);
+	nvrhi::FramebufferHandle pipelineFb = DirectXDevice::GetNativeDevice()->createFramebuffer(desc);
+
+	nvrhi::MeshletPipelineDesc PipelineDesc;
+	PipelineDesc.addBindingLayout(BindingLayoutHandle);
+	PipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
+	nvrhi::ShaderHandle MeshShader = AssetManager::GetInstance()->GetShader("GBufferShader.ms.cso");
+	nvrhi::ShaderHandle PixelShader = AssetManager::GetInstance()->GetShader("GBufferShaderOpaque.ps.cso");
+	PipelineDesc.setMeshShader(MeshShader);
+	PipelineDesc.setFragmentShader(PixelShader);
+
+	PipelineDesc.renderState.depthStencilState.depthTestEnable = true;
+	PipelineDesc.renderState.depthStencilState.stencilEnable = false;
+	PipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
+	PipelineDesc.renderState.depthStencilState.depthFunc = nvrhi::ComparisonFunc::Greater;
+	PipelineDesc.renderState.rasterState.frontCounterClockwise = true;
+	PipelineDesc.primType = nvrhi::PrimitiveType::TriangleList;
+
+	nvrhi::MeshletState state;
+	state.pipeline = AssetManager::GetInstance()->GetMeshletPipeline(PipelineDesc, pipelineFb);
+	state.framebuffer = pipelineFb;
+	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
+	state.addBindingSet(BindingSetHandle);
+	state.addBindingSet(AssetManager::GetInstance()->DescriptorTable);
+
+	CommandListRef->beginMarker("Meshlet GBuffer Pass");
+	CommandListRef->setMeshletState(state);
+
+	CommandListRef->dispatchMesh(AssetManager::GetInstance()->Meshes[0].Submeshes[0].MeshletCount);
+
+	CommandListRef->endMarker();
+}

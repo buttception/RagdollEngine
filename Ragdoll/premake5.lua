@@ -69,12 +69,16 @@ project "Ragdoll"
 		"%{IncludesDir.meshoptimizer}",
     }
 
+	prebuildcommands
+	{
+		"\"%{wks.location}Tools\\compileShader.bat\"",
+	}
+
 	postbuildcommands
 	{
 		"xcopy /Y /E /I \"%{LibDirs.dlss}\\Windows_x86_64\\dev\\nvngx_dlss.dll\" \"%{cfg.targetdir}\"",
 		"xcopy /Y /E /I \"%{LibDirs.meshoptimizer}\\meshoptimizer.lib\" \"%{cfg.targetdir}\"",
 		"xcopy /Y /E /I \"%{wks.location}\\assets\\cso\" \"%{cfg.targetdir}\\..\\assets\\cso\"",
-		"\"%{wks.location}Tools\\compileShader.bat\"",
 	}
 	
 	filter "files:**.hlsl"

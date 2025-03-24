@@ -12,4 +12,5 @@ public:
 	void Init(nvrhi::CommandListHandle cmdList);
 
 	void DrawQuad(ragdoll::SceneRenderTargets* targets, bool upscaled);
+	void MeshletPass(ragdoll::SceneRenderTargets* targets, bool upscaled);
 };

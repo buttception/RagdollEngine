@@ -30,6 +30,13 @@ public:
 		ragdoll::SceneRenderTargets* targets,
 		bool isOcclusionCullingEnabled);
 
+	void DrawMeshlets(
+		ragdoll::FGPUScene* GPUScene,
+		const ragdoll::SceneInformation& sceneInfo,
+		const ragdoll::DebugInfo& debugInfo,
+		ragdoll::SceneRenderTargets* targets
+	);
+
 	nvrhi::BufferHandle PassedFrustumTestCountBuffer;
 	nvrhi::BufferHandle Phase1NonOccludedCountBuffer;
 	nvrhi::BufferHandle Phase2NonOccludedCountBuffer;

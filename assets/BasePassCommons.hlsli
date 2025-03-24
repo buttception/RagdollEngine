@@ -63,3 +63,11 @@ struct FDrawIndexedIndirectArguments
     int baseVertexLocation;
     uint startInstanceLocation;
 };
+
+struct FMeshlet
+{
+    uint VertexOffset;
+    uint TriangleOffset;
+    uint VertexCount;
+    uint TriangleCount;
+};

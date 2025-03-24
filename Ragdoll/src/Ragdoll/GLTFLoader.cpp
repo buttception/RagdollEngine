@@ -828,6 +828,37 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 					AssetManager::GetInstance()->VertexBufferInfos[submesh.VertexBufferIndex].BestFitBox = box;
 					mesh.Submeshes.emplace_back(submesh);
 				}
+
+				//create meshlets
+				{
+					//temp
+					const float cone_weight = 0.f;	//not using cone weight, it is used for culling
+
+					size_t max_meshlets = meshopt_buildMeshletsBound(IndexStagingBuffer.size(), max_vertices, max_triangles);
+					Submesh& submesh = mesh.Submeshes.back();
+					submesh.Meshlets.resize(max_meshlets);
+					submesh.MeshletVertices.resize(max_meshlets* max_vertices);
+					std::vector<uint8_t> MeshletTrianglesUnpacked(max_meshlets* max_triangles * 3);
+
+					submesh.MeshletCount = meshopt_buildMeshlets(submesh.Meshlets.data(), submesh.MeshletVertices.data(), MeshletTrianglesUnpacked.data(), IndexStagingBuffer.data(), IndexStagingBuffer.size(), (float*)VertexStagingBuffer.data(), VertexStagingBuffer.size(), sizeof(Vertex), max_vertices, max_triangles, cone_weight);
+
+					const meshopt_Meshlet& last = submesh.Meshlets[submesh.MeshletCount - 1];
+
+					submesh.MeshletVertices.resize(last.vertex_offset + last.vertex_count);
+					MeshletTrianglesUnpacked.resize(last.triangle_offset + ((last.triangle_count * 3 + 3) & ~3));
+					submesh.Meshlets.resize(submesh.MeshletCount);
+
+					submesh.MeshletTrianglesPacked.resize(MeshletTrianglesUnpacked.size() / 3);
+					//pack the triangles 3 bytes into a 4 byte uint
+					for (int i = 0; i < MeshletTrianglesUnpacked.size(); i += 3)
+					{
+						uint32_t packed = 0;
+						packed |= MeshletTrianglesUnpacked[i + 0] << 0;
+						packed |= MeshletTrianglesUnpacked[i + 1] << 8;
+						packed |= MeshletTrianglesUnpacked[i + 2] << 16;
+						submesh.MeshletTrianglesPacked[i / 3] = packed;
+					}
+				}
 			}
 #if 0
 			RD_CORE_INFO("Mesh: {}", itMesh.name);
