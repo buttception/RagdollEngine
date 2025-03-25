@@ -104,10 +104,11 @@ StructuredBuffer<uint> TriangleIndices : register(t5);
 //helpers
 uint3 GetPrimitive(FMeshlet m, uint index)
 {
+    uint packed = TriangleIndices[m.TriangleOffset + index];
     return uint3(
-        TriangleIndices[m.TriangleOffset / 3 + index] & 0xFF,
-        (TriangleIndices[m.TriangleOffset / 3 + index] >> 8) & 0xFF,
-        (TriangleIndices[m.TriangleOffset / 3 + index] >> 16) & 0xFF
+        packed & 0xFF,
+        (packed >> 8) & 0xFF,
+        (packed >> 16) & 0xFF
     );
 }
 
@@ -145,7 +146,6 @@ void gbuffer_ms(uint gtid : SV_GroupThreadID, uint gid : SV_GroupID, out indices
     if (gtid < m.TriangleCount)
     {
         triangles[gtid] = GetPrimitive(m, gtid);
-
     }
     if (gtid < m.VertexCount)
     {

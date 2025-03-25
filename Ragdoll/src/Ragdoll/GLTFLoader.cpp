@@ -846,17 +846,22 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 
 					submesh.MeshletVertices.resize(last.vertex_offset + last.vertex_count);
 					MeshletTrianglesUnpacked.resize(last.triangle_offset + ((last.triangle_count * 3 + 3) & ~3));
+					submesh.MeshletTrianglesPacked.clear();
+					submesh.MeshletTrianglesPacked.reserve((last.triangle_offset + last.triangle_count * 3) / 3);
 					submesh.Meshlets.resize(submesh.MeshletCount);
 
-					submesh.MeshletTrianglesPacked.resize(MeshletTrianglesUnpacked.size() / 3);
-					//pack the triangles 3 bytes into a 4 byte uint
-					for (int i = 0; i < MeshletTrianglesUnpacked.size(); i += 3)
+					for (int i = 0; i < submesh.MeshletCount; ++i)
 					{
-						uint32_t packed = 0;
-						packed |= MeshletTrianglesUnpacked[i + 0] << 0;
-						packed |= MeshletTrianglesUnpacked[i + 1] << 8;
-						packed |= MeshletTrianglesUnpacked[i + 2] << 16;
-						submesh.MeshletTrianglesPacked[i / 3] = packed;
+						uint32_t triangle_offset = submesh.MeshletTrianglesPacked.size();
+						for (int j = submesh.Meshlets[i].triangle_offset; j < submesh.Meshlets[i].triangle_offset + submesh.Meshlets[i].triangle_count * 3; j += 3)
+						{
+							uint32_t packed = 0;
+							packed |= uint32_t(MeshletTrianglesUnpacked[j + 0]) << 0;
+							packed |= uint32_t(MeshletTrianglesUnpacked[j + 1]) << 8;
+							packed |= uint32_t(MeshletTrianglesUnpacked[j + 2]) << 16;
+							submesh.MeshletTrianglesPacked.emplace_back(packed);
+						}
+						submesh.Meshlets[i].triangle_offset = triangle_offset;
 					}
 				}
 			}
