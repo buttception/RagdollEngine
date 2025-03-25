@@ -448,7 +448,7 @@ size_t AssetManager::AddVertices(const std::vector<Vertex>& newVertices, const s
 	return VertexBufferInfos.size() - 1;
 }
 
-void AssetManager::UpdateVBOIBO()
+void AssetManager::UpdateMeshBuffers()
 {
 	CommandList->open();
 	MICROPROFILE_GPU_SET_CONTEXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer, MicroProfileGetGlobalGpuThreadLog());
@@ -492,39 +492,108 @@ void AssetManager::UpdateVBOIBO()
 	{
 		//create the meshlet buffer for first mesh
 		nvrhi::BufferDesc meshletBufDesc;
-		meshletBufDesc.byteSize = Meshes[0].Submeshes[0].MeshletCount * sizeof(meshopt_Meshlet);
+		meshletBufDesc.byteSize = Meshlets.size() * sizeof(meshopt_Meshlet);
 		meshletBufDesc.debugName = "Meshlet Buffer";
 		meshletBufDesc.canHaveTypedViews = true;
 		meshletBufDesc.structStride = sizeof(meshopt_Meshlet);
-		Meshes[0].Submeshes[0].MeshletBuffer = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(meshletBufDesc);
-		CommandList->beginTrackingBufferState(Meshes[0].Submeshes[0].MeshletBuffer, nvrhi::ResourceStates::CopyDest);
-		CommandList->writeBuffer(Meshes[0].Submeshes[0].MeshletBuffer, Meshes[0].Submeshes[0].Meshlets.data(), meshletBufDesc.byteSize);
-		CommandList->setPermanentBufferState(Meshes[0].Submeshes[0].MeshletBuffer, nvrhi::ResourceStates::ShaderResource);
+		MeshletBuffer = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(meshletBufDesc);
+		CommandList->beginTrackingBufferState(MeshletBuffer, nvrhi::ResourceStates::CopyDest);
+		CommandList->writeBuffer(MeshletBuffer, Meshlets.data(), meshletBufDesc.byteSize);
+		CommandList->setPermanentBufferState(MeshletBuffer, nvrhi::ResourceStates::ShaderResource);
 
 		//create the meshlet vertex buffer for first mesh
 		nvrhi::BufferDesc meshletVertexBufDesc;
-		meshletVertexBufDesc.byteSize = Meshes[0].Submeshes[0].MeshletVertices.size() * sizeof(uint32_t);
+		meshletVertexBufDesc.byteSize = MeshletVertices.size() * sizeof(uint32_t);
 		meshletVertexBufDesc.debugName = "Meshlet Vertex Buffer";
 		meshletVertexBufDesc.canHaveTypedViews = true;
 		meshletVertexBufDesc.structStride = sizeof(uint32_t);
-		Meshes[0].Submeshes[0].MeshletVertexBuffer = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(meshletVertexBufDesc);
-		CommandList->beginTrackingBufferState(Meshes[0].Submeshes[0].MeshletVertexBuffer, nvrhi::ResourceStates::CopyDest);
-		CommandList->writeBuffer(Meshes[0].Submeshes[0].MeshletVertexBuffer, Meshes[0].Submeshes[0].MeshletVertices.data(), meshletVertexBufDesc.byteSize);
-		CommandList->setPermanentBufferState(Meshes[0].Submeshes[0].MeshletVertexBuffer, nvrhi::ResourceStates::ShaderResource);
+		MeshletVertexBuffer = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(meshletVertexBufDesc);
+		CommandList->beginTrackingBufferState(MeshletVertexBuffer, nvrhi::ResourceStates::CopyDest);
+		CommandList->writeBuffer(MeshletVertexBuffer, MeshletVertices.data(), meshletVertexBufDesc.byteSize);
+		CommandList->setPermanentBufferState(MeshletVertexBuffer, nvrhi::ResourceStates::ShaderResource);
 
 		//create the meshlet triangle buffer for first mesh
 		nvrhi::BufferDesc meshletTriangleBufDesc;
-		meshletTriangleBufDesc.byteSize = Meshes[0].Submeshes[0].MeshletTrianglesPacked.size() * sizeof(uint32_t);
+		meshletTriangleBufDesc.byteSize = MeshletTrianglesPacked.size() * sizeof(uint32_t);
 		meshletTriangleBufDesc.debugName = "Meshlet Triangle Buffer";
 		meshletTriangleBufDesc.canHaveTypedViews = true;
 		meshletTriangleBufDesc.structStride = sizeof(uint32_t);
-		Meshes[0].Submeshes[0].MeshletPrimitiveBuffer = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(meshletTriangleBufDesc);
-		CommandList->beginTrackingBufferState(Meshes[0].Submeshes[0].MeshletPrimitiveBuffer, nvrhi::ResourceStates::CopyDest);
-		CommandList->writeBuffer(Meshes[0].Submeshes[0].MeshletPrimitiveBuffer, Meshes[0].Submeshes[0].MeshletTrianglesPacked.data(), meshletTriangleBufDesc.byteSize);
-		CommandList->setPermanentBufferState(Meshes[0].Submeshes[0].MeshletPrimitiveBuffer, nvrhi::ResourceStates::ShaderResource);
+		MeshletPrimitiveBuffer = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(meshletTriangleBufDesc);
+		CommandList->beginTrackingBufferState(MeshletPrimitiveBuffer, nvrhi::ResourceStates::CopyDest);
+		CommandList->writeBuffer(MeshletPrimitiveBuffer, MeshletTrianglesPacked.data(), meshletTriangleBufDesc.byteSize);
+		CommandList->setPermanentBufferState(MeshletPrimitiveBuffer, nvrhi::ResourceStates::ShaderResource);
 	}
 	CommandList->close();
 	DirectXDevice::GetInstance()->m_NvrhiDevice->executeCommandList(CommandList);
+}
+
+void AssetManager::UpdateMeshletsData()
+{
+	Meshlets.clear();
+	MeshletTrianglesPacked.clear();
+	MeshletVertices.clear();
+
+	//maximum number of meshlets based on global index buffer containing every mesh
+	size_t GlobalMaxMeshletsCount = meshopt_buildMeshletsBound(Indices.size(), max_vertices, max_triangles);
+	Meshlets.resize(GlobalMaxMeshletsCount);
+	MeshletVertices.resize(GlobalMaxMeshletsCount * max_vertices);
+	MeshletTrianglesPacked.resize(GlobalMaxMeshletsCount * max_triangles * 3);
+	//worse case of global, even though the worse case should fit the largest mesh only, TODO: find a way to use the other worst case
+	std::vector<uint8_t > MeshletTrianglesUnpacked(GlobalMaxMeshletsCount * max_triangles * 3);
+	uint32_t MeshletTotalCount{}, MeshletTrianglesPackedTotalCount{}, MeshletVerticesTotalCount{};
+	const float ConeWeight = 0.f;	//not using cone weight, it is used for culling
+	for (size_t i = 0; i < VertexBufferInfos.size(); ++i)
+	{
+		VertexBufferInfo& Info = VertexBufferInfos[i];
+
+		//create the meshlet inplaced at the offsets
+		Vertex* VertexStart = &Vertices[Info.VerticesOffset];
+		uint32_t* IndexStart = &Indices[Info.IndicesOffset];
+		meshopt_Meshlet* MeshletStart = &Meshlets[MeshletTotalCount];
+		uint32_t* MeshletVerticesStart = &MeshletVertices[MeshletVerticesTotalCount];
+		
+		uint32_t MeshletTempCount = meshopt_buildMeshlets(MeshletStart, MeshletVerticesStart, MeshletTrianglesUnpacked.data(), IndexStart, Info.IndicesCount, (float*)VertexStart, Info.VerticesCount, sizeof(Vertex), max_vertices, max_triangles, ConeWeight);
+
+		const meshopt_Meshlet& Last = Meshlets[MeshletTempCount + MeshletTotalCount - 1];
+
+		//pack the primtive indices into the offset of the primitive buffer
+		uint32_t UnpackedTrianglesCount = Last.triangle_offset + ((Last.triangle_count * 3 + 3) & ~3);
+		//offset value in terms of 3 indices representing a triangle within the local packed triangle buffer
+		uint32_t PackedTriangleLocalOffset{};
+		for (size_t j = MeshletTotalCount; j < MeshletTotalCount + MeshletTempCount; ++j)
+		{
+			meshopt_Meshlet& Meshlet = Meshlets[j];
+			//offset value of indiv indices in the local unpacked triangle buffer
+			uint32_t UnpackedTriangleOffset = Meshlet.triangle_offset;
+			Meshlet.triangle_offset = PackedTriangleLocalOffset;
+			//iterate through the unpacked meshlet from the original offset to count * 3
+			for (size_t k = UnpackedTriangleOffset; k < UnpackedTriangleOffset + Meshlet.triangle_count * 3; k += 3)
+			{
+				uint32_t packed = 0;
+				packed |= uint32_t(MeshletTrianglesUnpacked[k + 0]) << 0;
+				packed |= uint32_t(MeshletTrianglesUnpacked[k + 1]) << 8;
+				packed |= uint32_t(MeshletTrianglesUnpacked[k + 2]) << 16;
+				//add the packed triangle to the global buffer
+				MeshletTrianglesPacked[MeshletTrianglesPackedTotalCount + PackedTriangleLocalOffset++] = packed;
+			}
+		}
+
+		//update the vertex buffer info
+		Info.MeshletCount = MeshletTempCount;
+		Info.MeshletGroupOffset = MeshletTotalCount;
+		Info.MeshletGroupPrimitivesOffset = MeshletTrianglesPackedTotalCount;
+		Info.MeshletGroupVerticesOffset = MeshletVerticesTotalCount;
+
+		//update the counters so we can shrink the global buffers afterwards
+		MeshletTotalCount += MeshletTempCount;
+		MeshletTrianglesPackedTotalCount += PackedTriangleLocalOffset;
+		MeshletVerticesTotalCount += Last.vertex_offset + Last.vertex_count;
+	}
+
+	//once done, resize the buffers
+	Meshlets.resize(MeshletTotalCount);
+	MeshletTrianglesPacked.resize(MeshletTrianglesPackedTotalCount);
+	MeshletVertices.resize(MeshletVerticesTotalCount);
 }
 
 nvrhi::ShaderHandle AssetManager::GetShader(const std::string& shaderFilename)

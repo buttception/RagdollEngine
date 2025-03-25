@@ -214,9 +214,9 @@ void GBufferPass::DrawMeshlets(
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, GPUScene->InstanceBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(1, GPUScene->MaterialBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(2, AssetManager::GetInstance()->VBO),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(3, AssetManager::GetInstance()->Meshes[0].Submeshes[0].MeshletBuffer),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(4, AssetManager::GetInstance()->Meshes[0].Submeshes[0].MeshletVertexBuffer),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(5, AssetManager::GetInstance()->Meshes[0].Submeshes[0].MeshletPrimitiveBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(3, AssetManager::GetInstance()->MeshletBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(4, AssetManager::GetInstance()->MeshletVertexBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(5, AssetManager::GetInstance()->MeshletPrimitiveBuffer),
 
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
@@ -260,7 +260,7 @@ void GBufferPass::DrawMeshlets(
 	CommandListRef->beginMarker("Meshlet GBuffer Pass");
 	CommandListRef->setMeshletState(state);
 
-	CommandListRef->dispatchMesh(AssetManager::GetInstance()->Meshes[0].Submeshes[0].MeshletCount);
+	CommandListRef->dispatchMesh(AssetManager::GetInstance()->VertexBufferInfos[1].MeshletCount);
 
 	CommandListRef->endMarker();
 }

@@ -141,7 +141,7 @@ namespace ragdoll {
 		bool bEnableXeGTAONoise{ false };
 		bool bEnableBloom{ true };
 		bool bEnableOcclusionCull{ true };
-		bool bRaytraceDirectionalLight{ false };
+		bool bRaytraceDirectionalLight{ true };
 		bool bInlineRaytrace{ false };
 		bool bRaytraceShadowDenoiser{ true };
 		float SunSize = 0.1f;

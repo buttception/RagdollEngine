@@ -257,7 +257,7 @@ void ragdoll::Scene::CreateCustomMeshes()
 		mesh.Submeshes.push_back({ id, i });
 		AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 	}
-	AssetManager::GetInstance()->UpdateVBOIBO();
+	AssetManager::GetInstance()->UpdateMeshBuffers();
 }
 
 void ragdoll::Scene::CreateRenderTargets()

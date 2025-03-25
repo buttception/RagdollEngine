@@ -828,42 +828,6 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 					AssetManager::GetInstance()->VertexBufferInfos[submesh.VertexBufferIndex].BestFitBox = box;
 					mesh.Submeshes.emplace_back(submesh);
 				}
-
-				//create meshlets
-				{
-					//temp
-					const float cone_weight = 0.f;	//not using cone weight, it is used for culling
-
-					size_t max_meshlets = meshopt_buildMeshletsBound(IndexStagingBuffer.size(), max_vertices, max_triangles);
-					Submesh& submesh = mesh.Submeshes.back();
-					submesh.Meshlets.resize(max_meshlets);
-					submesh.MeshletVertices.resize(max_meshlets* max_vertices);
-					std::vector<uint8_t> MeshletTrianglesUnpacked(max_meshlets* max_triangles * 3);
-
-					submesh.MeshletCount = meshopt_buildMeshlets(submesh.Meshlets.data(), submesh.MeshletVertices.data(), MeshletTrianglesUnpacked.data(), IndexStagingBuffer.data(), IndexStagingBuffer.size(), (float*)VertexStagingBuffer.data(), VertexStagingBuffer.size(), sizeof(Vertex), max_vertices, max_triangles, cone_weight);
-
-					const meshopt_Meshlet& last = submesh.Meshlets[submesh.MeshletCount - 1];
-
-					submesh.MeshletVertices.resize(last.vertex_offset + last.vertex_count);
-					MeshletTrianglesUnpacked.resize(last.triangle_offset + ((last.triangle_count * 3 + 3) & ~3));
-					submesh.MeshletTrianglesPacked.clear();
-					submesh.MeshletTrianglesPacked.reserve((last.triangle_offset + last.triangle_count * 3) / 3);
-					submesh.Meshlets.resize(submesh.MeshletCount);
-
-					for (int i = 0; i < submesh.MeshletCount; ++i)
-					{
-						uint32_t triangle_offset = submesh.MeshletTrianglesPacked.size();
-						for (int j = submesh.Meshlets[i].triangle_offset; j < submesh.Meshlets[i].triangle_offset + submesh.Meshlets[i].triangle_count * 3; j += 3)
-						{
-							uint32_t packed = 0;
-							packed |= uint32_t(MeshletTrianglesUnpacked[j + 0]) << 0;
-							packed |= uint32_t(MeshletTrianglesUnpacked[j + 1]) << 8;
-							packed |= uint32_t(MeshletTrianglesUnpacked[j + 2]) << 16;
-							submesh.MeshletTrianglesPacked.emplace_back(packed);
-						}
-						submesh.Meshlets[i].triangle_offset = triangle_offset;
-					}
-				}
 			}
 #if 0
 			RD_CORE_INFO("Mesh: {}", itMesh.name);
@@ -879,9 +843,13 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 		}
 	}
+	{
+		//create the meshlets based on the global vertex and index buffers
+		AssetManager::GetInstance()->UpdateMeshletsData();
+	}
 	//create the buffers
 	{
-		AssetManager::GetInstance()->UpdateVBOIBO();
+		AssetManager::GetInstance()->UpdateMeshBuffers();
 	}
 	uint32_t textureIndicesOffset = static_cast<uint32_t>(AssetManager::GetInstance()->Textures.size());
 	uint32_t imageIndicesOffset = static_cast<uint32_t>(AssetManager::GetInstance()->Images.size());

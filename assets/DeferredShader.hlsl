@@ -104,7 +104,7 @@ StructuredBuffer<uint> TriangleIndices : register(t5);
 //helpers
 uint3 GetPrimitive(FMeshlet m, uint index)
 {
-    uint packed = TriangleIndices[m.TriangleOffset + index];
+    uint packed = TriangleIndices[m.TriangleOffset + index + 43779];
     return uint3(
         packed & 0xFF,
         (packed >> 8) & 0xFF,
@@ -114,12 +114,12 @@ uint3 GetPrimitive(FMeshlet m, uint index)
 
 uint GetVertexIndex(FMeshlet m, uint index)
 {
-    return VertexIndices[m.VertexOffset + index];
+    return VertexIndices[m.VertexOffset + index + 66593];
 }
 
 VertexOutput GetVertexOutput(uint meshletId, uint vertexIndex)
 {
-    FVertex v = Vertices[vertexIndex];
+    FVertex v = Vertices[vertexIndex + 62570];
 	//hardcoded to be first
     FInstanceData data = InstanceDatas[0];
     VertexOutput vout;
@@ -141,7 +141,7 @@ VertexOutput GetVertexOutput(uint meshletId, uint vertexIndex)
 [numthreads(MAX_TRIANGLES, 1, 1)]
 void gbuffer_ms(uint gtid : SV_GroupThreadID, uint gid : SV_GroupID, out indices uint3 triangles[MAX_TRIANGLES], out vertices VertexOutput vertices[MAX_VERTICES])
 {
-    FMeshlet m = Meshlets[gid];
+    FMeshlet m = Meshlets[gid + 1053];
     SetMeshOutputCounts(m.VertexCount, m.TriangleCount);
     if (gtid < m.TriangleCount)
     {
@@ -204,7 +204,8 @@ void gbuffer_ps(
 	}
 
 	//draw to the targets
-    outColor = float4(ColorPalette[inInstanceId % 32], 1.f);
+    //outColor = float4(ColorPalette[inInstanceId % 32], 1.f);
+    outColor = albedo;
 	outNormals.xy = Encode(N);
 	outRoughnessMetallic = float2(roughness, metallic);
 	float4 clipPos = mul(inFragPos, viewProjMatrix);

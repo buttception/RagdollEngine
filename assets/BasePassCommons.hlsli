@@ -21,6 +21,12 @@ struct FMeshData
     uint VertexCount;
     uint IndexOffset;
     uint VertexOffset;
+    
+    uint MeshletCount;
+    uint MeshletGroupOffset;
+    uint MeshletGroupPrimitivesOffset;
+    uint MeshletVerticesOffset;
+    
     float3 Center;
     float3 Extents;
 };

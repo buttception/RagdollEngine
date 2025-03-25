@@ -45,6 +45,10 @@
           "Command": "--sample \"BarramundiFish\""
         },
         {
+          "Id": "fc6c3701-498e-451c-b8c2-208cb826c717",
+          "Command": "--sample \"DragonAttenuation\""
+        },
+        {
           "Id": "125a2791-f8c0-4f37-ac56-fb69a5a1388d",
           "Command": "--sample \"Sponza\""
         },
