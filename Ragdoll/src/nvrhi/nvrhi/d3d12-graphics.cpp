@@ -589,6 +589,22 @@ namespace nvrhi::d3d12
         commitBarriers();
 		m_ActiveCommandList->commandList->ExecuteIndirect(m_Context.drawIndexedIndirectSignature, drawCount, indirectParams->resource, offsetBytes, buffer->resource, 0);
     }
+
+	void CommandList::dispatchMeshIndirect(uint32_t offsetBytes, IBuffer* countBuffer, uint32_t drawCount)
+	{
+        Buffer* indirectParams = checked_cast<Buffer*>(m_CurrentMeshletState.indirectParams);
+        Buffer* buffer = checked_cast<Buffer*>(countBuffer);
+		assert(indirectParams);
+        assert(buffer);
+		updateGraphicsVolatileBuffers();
+
+        if (m_EnableAutomaticBarriers)
+        {
+            requireBufferState(buffer, ResourceStates::IndirectArgument);
+        }
+        commitBarriers();
+		m_ActiveCommandList->commandList->ExecuteIndirect(m_Context.dispatchMeshIndirectSignature, drawCount, indirectParams->resource, offsetBytes, buffer->resource, 0);
+	}
     //end of devin
     
     DX12_ViewportState convertViewportState(const RasterState& rasterState, const FramebufferInfoEx& framebufferInfo, const ViewportState& vpState)

@@ -305,6 +305,19 @@ void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 	CommandList->buildTopLevelAccelStruct(TopLevelAS, InstanceDescs.data(), InstanceDescs.size());
 	CommandList->endMarker();
 
+	//temp, create indirect meshlet arg to test
+	std::vector<nvrhi::DispatchMeshleIndirectArguments> IndirectArgs;
+	IndirectArgs.resize(Scene->StaticProxies.size());
+	for (int i = 0; i < Scene->StaticProxies.size(); ++i)
+	{
+		uint32_t meshIndex = Scene->StaticProxies[i].MeshIndex;
+		IndirectArgs[i].threadGroupCountX = AssetManager::GetInstance()->VertexBufferInfos[meshIndex].MeshletCount;
+	}
+	CommandList->beginMarker("Writing Indirect Args");
+	CommandList->writeBuffer(IndirectMeshletArgsBuffer, IndirectArgs.data(), sizeof(nvrhi::DispatchMeshleIndirectArguments) * IndirectArgs.size());
+	uint32_t MeshletCount = Scene->StaticProxies.size();
+	CommandList->writeBuffer(MeshletCountBuffer, &MeshletCount, sizeof(uint32_t));
+
 	CommandList->close();
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 	DirectXDevice::GetNativeDevice()->waitForIdle();
@@ -761,6 +774,15 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	IndirectDrawArgsBufferDesc.isDrawIndirectArgs = true;
 	IndirectDrawArgsBuffer = DirectXDevice::GetNativeDevice()->createBuffer(IndirectDrawArgsBufferDesc);
 
+	//create the indirect meshlet arg buffer
+	nvrhi::BufferDesc IndirectMeshletArgsBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(nvrhi::DispatchMeshleIndirectArguments) * Proxies.size(), "IndirectMeshletArgsBuffer");
+	IndirectMeshletArgsBufferDesc.structStride = sizeof(nvrhi::DispatchMeshleIndirectArguments);
+	IndirectMeshletArgsBufferDesc.canHaveUAVs = true;
+	IndirectMeshletArgsBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	IndirectMeshletArgsBufferDesc.keepInitialState = true;
+	IndirectMeshletArgsBufferDesc.isDrawIndirectArgs = true;
+	IndirectMeshletArgsBuffer = DirectXDevice::GetNativeDevice()->createBuffer(IndirectMeshletArgsBufferDesc);
+
 	nvrhi::BufferDesc DebugBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(float) * Proxies.size(), "DebugBuffer");
 	DebugBufferDesc.structStride = sizeof(float);
 	DebugBufferDesc.canHaveUAVs = true;
@@ -784,6 +806,8 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	Phase2NonOccludedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
 	CountBufferDesc.debugName = "Phase2OccludedCountBuffer";
 	Phase2OccludedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+	CountBufferDesc.debugName = "MeshletCountBuffer";
+	MeshletCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
 
 	nvrhi::BufferDesc PointLightBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(PointLightProxy) * MAX_LIGHT_COUNT, "PointLightBuffer");
 	PointLightBufferDesc.structStride = sizeof(PointLightProxy);

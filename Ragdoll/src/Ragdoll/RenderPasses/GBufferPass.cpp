@@ -258,17 +258,11 @@ void GBufferPass::DrawMeshlets(
 	state.viewport.addViewportAndScissorRect(pipelineFb->getFramebufferInfo().getViewport());
 	state.addBindingSet(BindingSetHandle);
 	state.addBindingSet(AssetManager::GetInstance()->DescriptorTable);
+	state.indirectParams = GPUScene->IndirectMeshletArgsBuffer;
 
 	CommandListRef->beginMarker("Meshlet GBuffer Pass");
 	CommandListRef->setMeshletState(state);
-
-	for (int i = 0; i < ProxyCount; ++i)
-	{
-		CBuffer.InstanceId = i;
-		uint32_t MeshId = GPUScene->SceneRef->StaticProxies[i].MeshIndex;
-		CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
-		CommandListRef->dispatchMesh(AssetManager::GetInstance()->VertexBufferInfos[MeshId].MeshletCount);
-	}
+	CommandListRef->dispatchMeshIndirect(0, GPUScene->MeshletCountBuffer, ProxyCount);
 
 	CommandListRef->endMarker();
 }

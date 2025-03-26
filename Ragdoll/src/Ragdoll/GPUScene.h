@@ -38,6 +38,9 @@ namespace ragdoll
 		//raytracing stuff
 		std::vector<nvrhi::rt::AccelStructHandle> BottomLevelASs;
 		nvrhi::rt::AccelStructHandle TopLevelAS;
+		//meshlet stuff
+		nvrhi::BufferHandle IndirectMeshletArgsBuffer{};
+		nvrhi::BufferHandle MeshletCountBuffer{};
 
 		//temp
 		Scene* SceneRef;
