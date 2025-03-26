@@ -616,6 +616,9 @@ nvrhi::ShaderHandle AssetManager::GetShader(const std::string& shaderFilename)
 	else if (shaderFilename.find(".ms.") != std::string::npos) {
 		type = nvrhi::ShaderType::Mesh;
 	}
+	else if (shaderFilename.find(".as.") != std::string::npos) {
+		type = nvrhi::ShaderType::Amplification;
+	}
 	uint32_t size{};
 	const uint8_t* data = FileManagerRef->ImmediateLoad("cso/" + shaderFilename, size);
 	nvrhi::ShaderDesc desc;

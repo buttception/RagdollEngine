@@ -111,6 +111,7 @@ void ragdoll::FGPUScene::Update(Scene* Scene)
 		CommandList->close();
 		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 	}
+	SceneRef = Scene;
 }
 
 void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)

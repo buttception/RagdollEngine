@@ -32,6 +32,7 @@ public:
 
 	void DrawMeshlets(
 		ragdoll::FGPUScene* GPUScene,
+		uint32_t ProxyCount,
 		const ragdoll::SceneInformation& sceneInfo,
 		const ragdoll::DebugInfo& debugInfo,
 		ragdoll::SceneRenderTargets* targets

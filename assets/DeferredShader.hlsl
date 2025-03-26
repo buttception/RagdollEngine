@@ -85,6 +85,12 @@ void gbuffer_vs(
     outInstanceId = inInstanceId;
 }
 
+StructuredBuffer<FVertex> Vertices : register(t2);
+StructuredBuffer<FMeshlet> Meshlets : register(t3);
+StructuredBuffer<uint> VertexIndices : register(t4);
+StructuredBuffer<uint> TriangleIndices : register(t5);
+StructuredBuffer<FMeshData> Meshes : register(t6);
+
 struct VertexOutput
 {
     float4 outPos : SV_Position;
@@ -96,12 +102,6 @@ struct VertexOutput
     float2 outTexcoord : TEXCOORD6;
     nointerpolation uint outInstanceId : TEXCOORD7;
 };
-
-StructuredBuffer<FVertex> Vertices : register(t2);
-StructuredBuffer<FMeshlet> Meshlets : register(t3);
-StructuredBuffer<uint> VertexIndices : register(t4);
-StructuredBuffer<uint> TriangleIndices : register(t5);
-StructuredBuffer<FMeshData> Meshes : register(t6);
 
 //helpers
 uint3 GetPrimitive(FMeshlet m, FMeshData MeshData, uint index)
@@ -141,7 +141,12 @@ VertexOutput GetVertexOutput(uint outInstanceId, FMeshData MeshData, uint vertex
 
 [OutputTopology("triangle")]
 [numthreads(MAX_TRIANGLES, 1, 1)]
-void gbuffer_ms(uint gtid : SV_GroupThreadID, uint gid : SV_GroupID, out indices uint3 triangles[MAX_TRIANGLES], out vertices VertexOutput vertices[MAX_VERTICES])
+void gbuffer_ms(
+    uint gtid : SV_GroupThreadID,
+    uint gid : SV_GroupID,
+    out indices uint3 triangles[MAX_TRIANGLES],
+    out vertices VertexOutput vertices[MAX_VERTICES]
+)
 {
     FMeshData MeshData = Meshes[InstanceDatas[InstanceId].MeshIndex];
     FMeshlet m = Meshlets[gid + MeshData.MeshletGroupOffset];

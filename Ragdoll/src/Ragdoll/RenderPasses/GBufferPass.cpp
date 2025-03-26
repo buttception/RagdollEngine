@@ -191,6 +191,7 @@ void GBufferPass::DrawAllInstances(
 
 void GBufferPass::DrawMeshlets(
 	ragdoll::FGPUScene* GPUScene, 
+	uint32_t ProxyCount,
 	const ragdoll::SceneInformation& sceneInfo,
 	const ragdoll::DebugInfo& debugInfo,
 	ragdoll::SceneRenderTargets* targets)
@@ -203,7 +204,6 @@ void GBufferPass::DrawMeshlets(
 	CBuffer.ViewProjWithAA = sceneInfo.MainCameraViewProjWithJitter;
 	CBuffer.PrevViewProj = sceneInfo.PrevMainCameraViewProj;
 	CBuffer.RenderResolution = Vector2((float)sceneInfo.RenderWidth, (float)sceneInfo.RenderHeight);
-	CBuffer.InstanceId = 0;
 	nvrhi::BufferDesc ConstantBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "GBufferPass CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(ConstantBufferDesc);
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
@@ -262,15 +262,13 @@ void GBufferPass::DrawMeshlets(
 	CommandListRef->beginMarker("Meshlet GBuffer Pass");
 	CommandListRef->setMeshletState(state);
 
-	CommandListRef->dispatchMesh(AssetManager::GetInstance()->VertexBufferInfos[1].MeshletCount);
-
-	CBuffer.InstanceId = 1;
-	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
-	CommandListRef->dispatchMesh(AssetManager::GetInstance()->VertexBufferInfos[0].MeshletCount);
-
-	CBuffer.InstanceId = 2;
-	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
-	CommandListRef->dispatchMesh(AssetManager::GetInstance()->VertexBufferInfos[0].MeshletCount);
+	for (int i = 0; i < ProxyCount; ++i)
+	{
+		CBuffer.InstanceId = i;
+		uint32_t MeshId = GPUScene->SceneRef->StaticProxies[i].MeshIndex;
+		CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
+		CommandListRef->dispatchMesh(AssetManager::GetInstance()->VertexBufferInfos[MeshId].MeshletCount);
+	}
 
 	CommandListRef->endMarker();
 }

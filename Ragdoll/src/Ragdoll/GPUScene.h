@@ -39,6 +39,9 @@ namespace ragdoll
 		std::vector<nvrhi::rt::AccelStructHandle> BottomLevelASs;
 		nvrhi::rt::AccelStructHandle TopLevelAS;
 
+		//temp
+		Scene* SceneRef;
+
 		void Update(Scene* Scene);
 		//will sort the proxies before making a instance buffer copy and uploading to gpu
 		void UpdateBuffers(Scene* Scene);

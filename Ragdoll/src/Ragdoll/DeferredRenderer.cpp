@@ -166,6 +166,7 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 			scene->SceneInfo.bEnableOcclusionCull);*/
 		GBufferPass->DrawMeshlets(
 			GPUScene,
+			ProxyCount,
 			scene->SceneInfo,
 			scene->DebugInfo,
 			RenderTargets);
