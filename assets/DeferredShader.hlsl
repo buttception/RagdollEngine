@@ -49,6 +49,7 @@ cbuffer g_Const : register(b0) {
 	float4x4 viewProjMatrixWithAA;
 	float4x4 prevViewProjMatrix;
 	float2 RenderResolution;
+    uint InstanceId;
 };
 
 StructuredBuffer<FInstanceData> InstanceDatas : register(t0);
@@ -100,11 +101,12 @@ StructuredBuffer<FVertex> Vertices : register(t2);
 StructuredBuffer<FMeshlet> Meshlets : register(t3);
 StructuredBuffer<uint> VertexIndices : register(t4);
 StructuredBuffer<uint> TriangleIndices : register(t5);
+StructuredBuffer<FMeshData> Meshes : register(t6);
 
 //helpers
-uint3 GetPrimitive(FMeshlet m, uint index)
+uint3 GetPrimitive(FMeshlet m, FMeshData MeshData, uint index)
 {
-    uint packed = TriangleIndices[m.TriangleOffset + index + 43779];
+    uint packed = TriangleIndices[m.TriangleOffset + index + MeshData.MeshletGroupPrimitivesOffset];
     return uint3(
         packed & 0xFF,
         (packed >> 8) & 0xFF,
@@ -112,16 +114,16 @@ uint3 GetPrimitive(FMeshlet m, uint index)
     );
 }
 
-uint GetVertexIndex(FMeshlet m, uint index)
+uint GetVertexIndex(FMeshlet m, FMeshData MeshData, uint index)
 {
-    return VertexIndices[m.VertexOffset + index + 66593];
+    return VertexIndices[m.VertexOffset + index + MeshData.MeshletVerticesOffset];
 }
 
-VertexOutput GetVertexOutput(uint meshletId, uint vertexIndex)
+VertexOutput GetVertexOutput(uint outInstanceId, FMeshData MeshData, uint vertexIndex)
 {
-    FVertex v = Vertices[vertexIndex + 62570];
+    FVertex v = Vertices[vertexIndex + MeshData.VertexOffset];
 	//hardcoded to be first
-    FInstanceData data = InstanceDatas[0];
+    FInstanceData data = InstanceDatas[outInstanceId];
     VertexOutput vout;
     vout.outFragPos = mul(float4(v.position, 1), data.ModelToWorld);
     vout.outPrevFragPos = mul(float4(v.position, 1), data.PrevModelToWorld);
@@ -133,7 +135,7 @@ VertexOutput GetVertexOutput(uint meshletId, uint vertexIndex)
     vout.outTangent = normalize(mul(v.tangent, AdjugateMatrix));
     vout.outBinormal = normalize(cross(vout.outTangent, vout.outNormal)) * binormalSign;
     vout.outTexcoord = float2(v.texcoord.x, v.texcoord.y);
-    vout.outInstanceId = meshletId;
+    vout.outInstanceId = outInstanceId;
     return vout;
 }
 
@@ -141,15 +143,16 @@ VertexOutput GetVertexOutput(uint meshletId, uint vertexIndex)
 [numthreads(MAX_TRIANGLES, 1, 1)]
 void gbuffer_ms(uint gtid : SV_GroupThreadID, uint gid : SV_GroupID, out indices uint3 triangles[MAX_TRIANGLES], out vertices VertexOutput vertices[MAX_VERTICES])
 {
-    FMeshlet m = Meshlets[gid + 1053];
+    FMeshData MeshData = Meshes[InstanceDatas[InstanceId].MeshIndex];
+    FMeshlet m = Meshlets[gid + MeshData.MeshletGroupOffset];
     SetMeshOutputCounts(m.VertexCount, m.TriangleCount);
     if (gtid < m.TriangleCount)
     {
-        triangles[gtid] = GetPrimitive(m, gtid);
+        triangles[gtid] = GetPrimitive(m, MeshData, gtid);
     }
     if (gtid < m.VertexCount)
     {
-        vertices[gtid] = GetVertexOutput(gid, GetVertexIndex(m, gtid));
+        vertices[gtid] = GetVertexOutput(InstanceId, MeshData, GetVertexIndex(m, MeshData, gtid));
     }
 }
 
@@ -171,7 +174,7 @@ void gbuffer_ps(
 	out float2 outVelocity: SV_Target3
 )
 {
-    FInstanceData data = InstanceDatas[0];
+    FInstanceData data = InstanceDatas[inInstanceId];
     FMaterialData materialData = MaterialDatas[data.MaterialIndex];
 	// Sample textures
     float4 albedo = materialData.AlbedoFactor;

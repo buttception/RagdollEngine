@@ -59,6 +59,12 @@ struct FMeshData
 	uint32_t VertexCount;
 	uint32_t IndexOffset;
 	uint32_t VertexOffset;
+
+	uint32_t MeshletCount;
+	uint32_t MeshletGroupOffset;
+	uint32_t MeshletGroupPrimitivesOffset;
+	uint32_t MeshletGroupVerticesOffset;
+
 	Vector3 Center;
 	Vector3 Extents;
 };
@@ -134,6 +140,10 @@ void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 		data.VertexCount = info.VerticesCount;
 		data.IndexOffset = info.IndicesOffset;
 		data.VertexOffset = info.VerticesOffset;
+		data.MeshletCount = info.MeshletCount;
+		data.MeshletGroupOffset = info.MeshletGroupOffset;
+		data.MeshletGroupPrimitivesOffset = info.MeshletGroupPrimitivesOffset;
+		data.MeshletGroupVerticesOffset = info.MeshletGroupVerticesOffset;
 		data.Center = info.BestFitBox.Center;
 		data.Extents = info.BestFitBox.Extents;
 	}

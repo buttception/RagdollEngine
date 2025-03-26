@@ -203,6 +203,7 @@ void GBufferPass::DrawMeshlets(
 	CBuffer.ViewProjWithAA = sceneInfo.MainCameraViewProjWithJitter;
 	CBuffer.PrevViewProj = sceneInfo.PrevMainCameraViewProj;
 	CBuffer.RenderResolution = Vector2((float)sceneInfo.RenderWidth, (float)sceneInfo.RenderHeight);
+	CBuffer.InstanceId = 0;
 	nvrhi::BufferDesc ConstantBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "GBufferPass CBuffer", 1);
 	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(ConstantBufferDesc);
 	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
@@ -217,6 +218,7 @@ void GBufferPass::DrawMeshlets(
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(3, AssetManager::GetInstance()->MeshletBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(4, AssetManager::GetInstance()->MeshletVertexBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(5, AssetManager::GetInstance()->MeshletPrimitiveBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(6, GPUScene->MeshBuffer),
 
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
@@ -261,6 +263,14 @@ void GBufferPass::DrawMeshlets(
 	CommandListRef->setMeshletState(state);
 
 	CommandListRef->dispatchMesh(AssetManager::GetInstance()->VertexBufferInfos[1].MeshletCount);
+
+	CBuffer.InstanceId = 1;
+	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
+	CommandListRef->dispatchMesh(AssetManager::GetInstance()->VertexBufferInfos[0].MeshletCount);
+
+	CBuffer.InstanceId = 2;
+	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
+	CommandListRef->dispatchMesh(AssetManager::GetInstance()->VertexBufferInfos[0].MeshletCount);
 
 	CommandListRef->endMarker();
 }
