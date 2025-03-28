@@ -593,17 +593,22 @@ namespace nvrhi::d3d12
 	void CommandList::dispatchMeshIndirect(uint32_t offsetBytes, IBuffer* countBuffer, uint32_t drawCount)
 	{
         Buffer* indirectParams = checked_cast<Buffer*>(m_CurrentMeshletState.indirectParams);
-        Buffer* buffer = checked_cast<Buffer*>(countBuffer);
 		assert(indirectParams);
-        assert(buffer);
-		updateGraphicsVolatileBuffers();
-
-        if (m_EnableAutomaticBarriers)
+        Buffer* buffer = nullptr;
+        if (countBuffer)
         {
-            requireBufferState(buffer, ResourceStates::IndirectArgument);
+            Buffer* buffer = checked_cast<Buffer*>(countBuffer);
+            assert(buffer);
+            updateGraphicsVolatileBuffers();
+
+            if (m_EnableAutomaticBarriers)
+            {
+                requireBufferState(buffer, ResourceStates::IndirectArgument);
+            }
+            commitBarriers();
         }
-        commitBarriers();
-		m_ActiveCommandList->commandList->ExecuteIndirect(m_Context.dispatchMeshIndirectSignature, drawCount, indirectParams->resource, offsetBytes, buffer->resource, 0);
+
+		m_ActiveCommandList->commandList->ExecuteIndirect(m_Context.dispatchMeshIndirectSignature, drawCount, indirectParams->resource, offsetBytes, buffer ? buffer->resource : nullptr, 0);
 	}
     //end of devin
     

@@ -40,7 +40,7 @@ namespace ragdoll
 		nvrhi::rt::AccelStructHandle TopLevelAS;
 		//meshlet stuff
 		nvrhi::BufferHandle IndirectMeshletArgsBuffer{};
-		nvrhi::BufferHandle MeshletCountBuffer{};
+		nvrhi::BufferHandle AmplificationGroupInfoBuffer{};
 
 		//temp
 		Scene* SceneRef;
@@ -74,6 +74,15 @@ namespace ragdoll
 			uint32_t ProxyCount
 		);
 		void BuildHZB(nvrhi::CommandListHandle CommandList, SceneRenderTargets* Targets);
+
+		void MeshletInstanceCull(
+			nvrhi::CommandListHandle CommandList,
+			const Matrix& Projection,
+			const Matrix& View,
+			uint32_t ProxyCount,
+			bool InfiniteZEnabled,
+			uint32_t AlphaTest = 0 /*cull all = 0, opaque = 1, alpha = 2*/
+		);
 
 		//helper
 		void ExtractFrustumPlanes(Vector4 OutPlanes[6], const Matrix& Projection, const Matrix& View);

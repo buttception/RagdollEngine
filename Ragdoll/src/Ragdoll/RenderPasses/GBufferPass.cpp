@@ -196,10 +196,12 @@ void GBufferPass::DrawMeshlets(
 	const ragdoll::DebugInfo& debugInfo,
 	ragdoll::SceneRenderTargets* targets)
 {
-	//hardcoded to draw only the first mesh
 	RD_SCOPE(Render, MeshletGBuffer);
 	RD_GPU_SCOPE("MeshletGBufferPass", CommandListRef);
 
+	GPUScene->MeshletInstanceCull(CommandListRef, sceneInfo.MainCameraProjWithJitter, sceneInfo.MainCameraView, ProxyCount, true);
+
+#if 1
 	CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
 	CBuffer.ViewProjWithAA = sceneInfo.MainCameraViewProjWithJitter;
 	CBuffer.PrevViewProj = sceneInfo.PrevMainCameraViewProj;
@@ -219,6 +221,7 @@ void GBufferPass::DrawMeshlets(
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(4, AssetManager::GetInstance()->MeshletVertexBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(5, AssetManager::GetInstance()->MeshletPrimitiveBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(6, GPUScene->MeshBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(7, GPUScene->AmplificationGroupInfoBuffer),
 
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
@@ -240,8 +243,10 @@ void GBufferPass::DrawMeshlets(
 	nvrhi::MeshletPipelineDesc PipelineDesc;
 	PipelineDesc.addBindingLayout(BindingLayoutHandle);
 	PipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
-	nvrhi::ShaderHandle MeshShader = AssetManager::GetInstance()->GetShader("GBufferShader.ms.cso");
+	nvrhi::ShaderHandle AmpShader = AssetManager::GetInstance()->GetShader("Meshlet.as.cso");
+	nvrhi::ShaderHandle MeshShader = AssetManager::GetInstance()->GetShader("Meshlet.ms.cso");
 	nvrhi::ShaderHandle PixelShader = AssetManager::GetInstance()->GetShader("GBufferShaderOpaque.ps.cso");
+	PipelineDesc.setAmplificationShader(AmpShader);
 	PipelineDesc.setMeshShader(MeshShader);
 	PipelineDesc.setFragmentShader(PixelShader);
 
@@ -262,7 +267,8 @@ void GBufferPass::DrawMeshlets(
 
 	CommandListRef->beginMarker("Meshlet GBuffer Pass");
 	CommandListRef->setMeshletState(state);
-	CommandListRef->dispatchMeshIndirect(0, GPUScene->MeshletCountBuffer, ProxyCount);
+	CommandListRef->dispatchMeshIndirect(0, nullptr, 1);
+#endif
 
 	CommandListRef->endMarker();
 }

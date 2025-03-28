@@ -77,3 +77,10 @@ struct FMeshlet
     uint VertexCount;
     uint TriangleCount;
 };
+
+struct DispatchMeshleIndirectArguments
+{
+    uint ThreadGroupCountX;
+    uint ThreadGroupCountY;
+    uint ThreadGroupCountZ;
+};
