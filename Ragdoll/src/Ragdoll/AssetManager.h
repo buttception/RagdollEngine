@@ -146,9 +146,11 @@ public:
 	nvrhi::BufferHandle MeshletBuffer;
 	nvrhi::BufferHandle MeshletVertexBuffer;
 	nvrhi::BufferHandle MeshletPrimitiveBuffer;
+	nvrhi::BufferHandle MeshletBoundingSphereBuffer;
 	std::vector<meshopt_Meshlet> Meshlets;
 	std::vector<uint32_t> MeshletVertices;
 	std::vector<uint32_t> MeshletTrianglesPacked;
+	std::vector<Vector4> MeshletBoundingSpheres;
 	//the information on how to use the global buffer
 	std::vector<nvrhi::VertexAttributeDesc> InstancedVertexAttributes;
 	nvrhi::InputLayoutHandle InstancedInputLayoutHandle;

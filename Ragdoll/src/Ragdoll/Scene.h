@@ -144,6 +144,8 @@ namespace ragdoll {
 		bool bRaytraceDirectionalLight{ true };
 		bool bInlineRaytrace{ false };
 		bool bRaytraceShadowDenoiser{ true };
+		bool bEnableMeshletShading{ true };
+		bool bEnableMeshletFrustumCulling{ true };
 		float SunSize = 0.1f;
 		uint32_t RenderWidth = 1920;
 		uint32_t RenderHeight = 1080;

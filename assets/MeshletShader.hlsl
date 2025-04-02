@@ -6,7 +6,14 @@
 #define MAX_TRIANGLES 124
 #define AS_GROUP_SIZE 64
 
-cbuffer g_Const : register(b0)
+#define INFINITE_Z_ENABLED 1
+#define PREVIOUS_FRAME_ENABLED 1 << 1
+#define IS_PHASE_1 1 << 2
+#define ALPHA_TEST_ENABLED 1 << 3
+#define CULL_ALL 1 << 4
+#define ENABLE_AS_CULL 1 << 5
+
+cbuffer g_Const : register(b1)
 {
     float4x4 viewProjMatrix;
     float4x4 viewProjMatrixWithAA;
@@ -29,7 +36,7 @@ cbuffer g_Const : register(b0)
 struct FAmplificationGroupInfo
 {
     uint InstanceId;
-    uint MeshletGroupOffset;
+    uint AmplificationGroupOffset;
 };
 
 struct PayloadStruct
@@ -58,6 +65,44 @@ StructuredBuffer<FMeshData> Meshes : register(t6);
 
 RWStructuredBuffer<FAmplificationGroupInfo> AmplificationGroupInfoOutput : register(u0);
 
+bool FrustumCull(float3 Center, float3 Extents, float4x4 ModelToWorld)
+{
+    float3 Corners[8] =
+    {
+        Center + float3(-Extents.x, -Extents.y, -Extents.z),
+        Center + float3(-Extents.x, -Extents.y, Extents.z),
+        Center + float3(-Extents.x, Extents.y, -Extents.z),
+        Center + float3(-Extents.x, Extents.y, Extents.z),
+        Center + float3(Extents.x, -Extents.y, -Extents.z),
+        Center + float3(Extents.x, -Extents.y, Extents.z),
+        Center + float3(Extents.x, Extents.y, -Extents.z),
+        Center + float3(Extents.x, Extents.y, Extents.z)
+    };
+    [unroll]
+    for (int i = 0; i < 8; ++i)
+    {
+        Corners[i] = mul(float4(Corners[i], 1.f), ModelToWorld).xyz;
+    }
+    uint PlaneCount = Flags | INFINITE_Z_ENABLED ? 5 : 6;
+    for (int j = 0; j < PlaneCount; ++j)
+    {
+        bool Visible = false;
+        for (int k = 0; k < 8; ++k)
+        {
+            if ((dot(Corners[k], FrustumPlanes[j].xyz) + FrustumPlanes[j].w) >= 0.f)
+            {
+                Visible = true;
+                break;
+            }
+        }
+        if (!Visible)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 [numthreads(64, 1, 1)]
 void MeshletCullCS(in uint3 dtid : SV_DispatchThreadID)
 {
@@ -69,20 +114,47 @@ void MeshletCullCS(in uint3 dtid : SV_DispatchThreadID)
     }
     FInstanceData InstanceData = InstanceDatas[dtid.x];
     FMeshData MeshData = Meshes[InstanceData.MeshIndex];
+    //frustum cull this instance
+    //each thread will cull 1 proxy
+    float3 Center = MeshData.Center;
+    float3 Extents = MeshData.Extents;
+    //view planes are already in world space
+    if (!FrustumCull(Center, Extents, InstanceData.ModelToWorld))
+    {
+        return;
+    }
     //each AS group has 64 threads, each thread processes 1 meshlet
     uint ASCount = (MeshData.MeshletCount + AS_GROUP_SIZE - 1) / AS_GROUP_SIZE;
     uint Index;
     InterlockedAdd(DispatchMeshleIndirectArgumentsBuffer[0].ThreadGroupCountX, ASCount, Index);
-    for (uint i = 0; i < ASCount; i++)
+    for (uint asi = 0; asi < ASCount; asi++)
     {
-        AmplificationGroupInfoOutput[Index + i].InstanceId = dtid.x;
-        AmplificationGroupInfoOutput[Index + i].MeshletGroupOffset = i;
+        AmplificationGroupInfoOutput[Index + asi].InstanceId = dtid.x;
+        AmplificationGroupInfoOutput[Index + asi].AmplificationGroupOffset = asi;
     }
 }
 
 StructuredBuffer<FAmplificationGroupInfo> AmplificationGroupInfoInput : register(t7);
+StructuredBuffer<float4> BoundingSpheres : register(t8);
 groupshared PayloadStruct s_Payload;
-groupshared uint Test;
+groupshared uint MeshletCount;
+
+bool FrustumCull(float3 Center, float Radius)
+{
+    uint PlaneCount = (Flags | INFINITE_Z_ENABLED) ? 5 : 6;
+    
+    for (int j = 0; j < PlaneCount; ++j)
+    {
+        float Distance = dot(Center, FrustumPlanes[j].xyz) + FrustumPlanes[j].w;
+
+        // If the sphere is completely outside one plane, cull it
+        if (Distance < -Radius)
+        {
+            return false;
+        }
+    }
+    return true; // Sphere is at least partially visible
+}
 
 [numthreads(AS_GROUP_SIZE, 1, 1)]
 void MeshletAS(in uint3 gtid: SV_GroupThreadID, in uint3 gid : SV_GroupID)
@@ -90,30 +162,50 @@ void MeshletAS(in uint3 gtid: SV_GroupThreadID, in uint3 gid : SV_GroupID)
     //each AS thread cull one meshlet
     FAmplificationGroupInfo GroupInfo = AmplificationGroupInfoInput[gid.x];
     FInstanceData InstanceData = InstanceDatas[GroupInfo.InstanceId];
+    FMeshData MeshData = Meshes[InstanceData.MeshIndex];
     if (gtid.x == 0)    //first thread set the payload instance id
     {
         s_Payload.InstanceId = GroupInfo.InstanceId;
-        Test = 0;
+        MeshletCount = 0;
     }
+    
     uint VisiblityFlag = INVALID;
-    uint MeshletIndex = GroupInfo.MeshletGroupOffset * AS_GROUP_SIZE + gtid.x;
-    //hardcode all visible first
-    if (MeshletIndex < Meshes[InstanceData.MeshIndex].MeshletCount)
+    //group index * thread count + thread.x to get which meshlet to cull, index is within a mesh group
+    uint LocalMeshletIndex = GroupInfo.AmplificationGroupOffset * AS_GROUP_SIZE + gtid.x;
+    
+    if (LocalMeshletIndex < Meshes[InstanceData.MeshIndex].MeshletCount)
     {
-        VisiblityFlag = VISIBLE;
+        if (Flags & ENABLE_AS_CULL)
+        {
+            //get the meshlet bounding sphere with the new largest scale
+            float3 s0 = length(InstanceData.ModelToWorld[0].xyz);
+            float3 s1 = length(InstanceData.ModelToWorld[1].xyz);
+            float3 s2 = length(InstanceData.ModelToWorld[2].xyz);
+            float s = max(max(s0, s1), s2);
+            //offset by meshlet group offset to access the global bounding sphere data
+            float4 Sphere = BoundingSpheres[LocalMeshletIndex + MeshData.MeshletGroupOffset];
+            float3 SphereWorldPos = mul(float4(Sphere.xyz, 1.f), InstanceData.ModelToWorld).xyz;
+            float SphereRadius = Sphere.w * s;
+            bool Visible = FrustumCull(SphereWorldPos, SphereRadius);
+            if (Visible)
+            {
+                VisiblityFlag = VISIBLE;
+                uint Index;
+                InterlockedAdd(MeshletCount, 1, Index);
+                s_Payload.MeshletIndices[Index] = LocalMeshletIndex;
+            }
+        }
+        else
+        {
+            VisiblityFlag = VISIBLE;
+            uint Index;
+            InterlockedAdd(MeshletCount, 1, Index);
+            s_Payload.MeshletIndices[Index] = LocalMeshletIndex;
+        }
     }
-    else
-    {
-        //set to count so i know it is invalid
-        MeshletIndex = Meshes[InstanceData.MeshIndex].MeshletCount;
-    }
-    uint Index = WavePrefixCountBits(VisiblityFlag == VISIBLE);
-    s_Payload.MeshletIndices[gtid.x] = MeshletIndex;
-    if (VisiblityFlag == VISIBLE)
-        InterlockedAdd(Test, 1);
     //uint VisibleCount = WaveActiveCountBits(VisiblityFlag == VISIBLE);
     //why is this 10 if i use wave active count bits
-    DispatchMesh(Test, 1, 1, s_Payload);
+    DispatchMesh(MeshletCount, 1, 1, s_Payload);
 }
 
 StructuredBuffer<FMaterialData> MaterialDatas : register(t1);
@@ -132,6 +224,7 @@ struct VertexOutput
     float3 outBinormal : TEXCOORD5;
     float2 outTexcoord : TEXCOORD6;
     nointerpolation uint outInstanceId : TEXCOORD7;
+    uint outMeshletIndex : TEXCOORD8;
 };
 //helpers
 uint3 GetPrimitive(FMeshlet m, FMeshData MeshData, uint index)
@@ -149,7 +242,7 @@ uint GetVertexIndex(FMeshlet m, FMeshData MeshData, uint index)
     return VertexIndices[m.VertexOffset + index + MeshData.MeshletVerticesOffset];
 }
 
-VertexOutput GetVertexOutput(uint outInstanceId, FMeshData MeshData, uint vertexIndex)
+VertexOutput GetVertexOutput(uint outInstanceId, FMeshData MeshData, uint vertexIndex, uint meshletIndex)
 {
     FVertex v = Vertices[vertexIndex + MeshData.VertexOffset];
     FInstanceData data = InstanceDatas[outInstanceId];
@@ -165,6 +258,7 @@ VertexOutput GetVertexOutput(uint outInstanceId, FMeshData MeshData, uint vertex
     vout.outBinormal = normalize(cross(vout.outTangent, vout.outNormal)) * binormalSign;
     vout.outTexcoord = float2(v.texcoord.x, v.texcoord.y);
     vout.outInstanceId = outInstanceId;
+    vout.outMeshletIndex = meshletIndex;
     return vout;
 }
 
@@ -180,7 +274,8 @@ void MeshletMS(
 {
     //each ms group deals with a meshlet with 64 vertices
     FMeshData MeshData = Meshes[InstanceDatas[payload.InstanceId].MeshIndex];
-    FMeshlet m = Meshlets[MeshData.MeshletGroupOffset + payload.MeshletIndices[gid.x]];
+    uint MeshletIndex = MeshData.MeshletGroupOffset + payload.MeshletIndices[gid.x];
+    FMeshlet m = Meshlets[MeshletIndex];
     SetMeshOutputCounts(m.VertexCount, m.TriangleCount);
     if (gtid < m.TriangleCount)
     {
@@ -188,9 +283,73 @@ void MeshletMS(
     } 
     if (gtid < m.VertexCount)
     {
-        vertices[gtid] = GetVertexOutput(payload.InstanceId, MeshData, GetVertexIndex(m, MeshData, gtid));
+        vertices[gtid] = GetVertexOutput(payload.InstanceId, MeshData, GetVertexIndex(m, MeshData, gtid), MeshletIndex);
     }
 }
 
 Texture2D Textures[] : register(t0, space1);
 sampler Samplers[9] : register(s0);
+
+void MeshletPS(
+	in float4 inPos : SV_Position,
+	in float4 inPrevFragPos : TEXCOORD1,
+	in float4 inFragPos : TEXCOORD2,
+	in float3 inNormal : TEXCOORD3,
+	in float3 inTangent : TEXCOORD4,
+	in float3 inBinormal : TEXCOORD5,
+	in float2 inTexcoord : TEXCOORD6,
+	in uint inInstanceId : TEXCOORD7,
+	in uint inMeshletIndex : TEXCOORD8,
+	out float4 outColor : SV_Target0,
+	out float2 outNormals : SV_Target1,
+	out float2 outRoughnessMetallic : SV_Target2,
+	out float2 outVelocity : SV_Target3
+)
+{
+    FInstanceData data = InstanceDatas[inInstanceId];
+    FMaterialData materialData = MaterialDatas[data.MaterialIndex];
+	// Sample textures
+    float4 albedo = materialData.AlbedoFactor;
+    if (materialData.AlbedoIndex != -1)
+    {
+        albedo *= Textures[materialData.AlbedoIndex].Sample(Samplers[materialData.AlbedoSamplerIndex], inTexcoord);
+    }
+	if(materialData.Flags & ALPHA_MODE_MASK)
+	{
+		clip(albedo.a - materialData.AlphaCutoff);
+		albedo.a = 1.f;
+	}
+	else
+		clip(albedo.a <= 0.f ? -1.f : 1.f);	//min clipping
+    float4 RM = float4(0.f, materialData.RoughnessFactor, materialData.MetallicFactor, 0);
+    if (materialData.ORMIndex != -1)
+    {
+        RM = Textures[materialData.ORMIndex].Sample(Samplers[materialData.ORMSamplerIndex], inTexcoord);
+    }
+    float ao = 1.f;
+    float roughness = RM.g;
+    float metallic = RM.b;
+
+	// Sample normal map and leave it in model space, the deferred lighting will calculate this instead
+    float3 N = inNormal;
+    if (materialData.NormalIndex != -1)
+    {
+        float3 normalMapValue = normalize(Textures[materialData.NormalIndex].Sample(Samplers[materialData.NormalSamplerIndex], inTexcoord).xyz * 2.0f - 1.0f);
+        float3x3 TBN = float3x3(inTangent, inBinormal, inNormal);
+        N = normalize(mul(normalMapValue, TBN));
+    }
+
+	//draw to the targets
+    outColor = float4(ColorPalette[inMeshletIndex % 32], 1.f);
+    //outColor = albedo;
+    outNormals.xy = Encode(N);
+    outRoughnessMetallic = float2(roughness, metallic);
+    float4 clipPos = mul(inFragPos, viewProjMatrix);
+    float4 ndcPos = clipPos / clipPos.w;
+    ndcPos.xy = ScreenPosToViewportUV(ndcPos.xy);
+    float4 prevClipPos = mul(inPrevFragPos, prevViewProjMatrix);
+    float4 prevNdcPos = prevClipPos / prevClipPos.w;
+    prevNdcPos.xy = ScreenPosToViewportUV(prevNdcPos.xy);
+	//no need div by 2 because i moved it back to viewport so its [0,1]
+    outVelocity = (prevNdcPos.xy - ndcPos.xy) * float2(RenderResolution.x, RenderResolution.y);
+}

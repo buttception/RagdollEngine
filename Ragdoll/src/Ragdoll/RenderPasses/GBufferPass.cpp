@@ -8,6 +8,12 @@
 #include "Ragdoll/Scene.h"
 #include "Ragdoll/GPUScene.h"
 #include "Ragdoll/DirectXDevice.h"
+#define INFINITE_Z_ENABLED 1
+#define PREVIOUS_FRAME_ENABLED 1 << 1
+#define IS_PHASE_1 1 << 2
+#define ALPHA_TEST_ENABLED 1 << 3
+#define CULL_ALL 1 << 4
+#define ENABLE_AS_CULL 1 << 5
 
 void GBufferPass::Init(nvrhi::CommandListHandle cmdList)
 {
@@ -199,21 +205,60 @@ void GBufferPass::DrawMeshlets(
 	RD_SCOPE(Render, MeshletGBuffer);
 	RD_GPU_SCOPE("MeshletGBufferPass", CommandListRef);
 
-	GPUScene->MeshletInstanceCull(CommandListRef, sceneInfo.MainCameraProjWithJitter, sceneInfo.MainCameraView, ProxyCount, true);
+	Matrix ViewMatrix;
+	Matrix ProjectionMatrix;
+	Matrix ViewProjectionMatrix;
+	Matrix PrevViewMatrix;
+	Matrix PrevProjectionMatrix;
+	if (debugInfo.bFreezeFrustumCulling)
+	{
+		PrevViewMatrix = ViewMatrix = debugInfo.FrozenView;
+		PrevProjectionMatrix = ProjectionMatrix = debugInfo.FrozenProjection;
+		ViewProjectionMatrix = ViewMatrix * ProjectionMatrix;
+	}
+	else
+	{
+		ViewMatrix = sceneInfo.MainCameraView;
+		ProjectionMatrix = sceneInfo.MainCameraProjWithJitter;
+		ViewProjectionMatrix = sceneInfo.MainCameraViewProjWithJitter;
+		PrevViewMatrix = sceneInfo.PrevMainCameraView;
+		PrevProjectionMatrix = sceneInfo.PrevMainCameraProjWithJitter;
+	}
+
+	GPUScene->MeshletInstanceCull(CommandListRef, ProjectionMatrix, ViewMatrix, ProxyCount, true);
 
 #if 1
+	struct FConstantBuffer
+	{
+		Matrix ViewMatrix{};
+		Matrix ProjectionMatrix{};
+		Vector4 FrustumPlanes[6]{};
+		uint32_t MipBaseWidth;
+		uint32_t MipBaseHeight;
+		uint32_t MipLevels;
+		uint32_t ProxyCount{};
+		uint32_t Flags{};
+	} ConstantBuffer;
+	GPUScene->ExtractFrustumPlanes(ConstantBuffer.FrustumPlanes, ProjectionMatrix, ViewMatrix);
+	ConstantBuffer.ProxyCount = ProxyCount;
+	ConstantBuffer.Flags |= INFINITE_Z_ENABLED;
+	ConstantBuffer.Flags |= ENABLE_AS_CULL * sceneInfo.bEnableMeshletFrustumCulling;
+	nvrhi::BufferHandle ConstantBufferHandle0 = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FConstantBuffer), "InstanceCull ConstantBuffer", 1));
+	CommandListRef->writeBuffer(ConstantBufferHandle0, &ConstantBuffer, sizeof(FConstantBuffer));
+
 	CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
 	CBuffer.ViewProjWithAA = sceneInfo.MainCameraViewProjWithJitter;
 	CBuffer.PrevViewProj = sceneInfo.PrevMainCameraViewProj;
 	CBuffer.RenderResolution = Vector2((float)sceneInfo.RenderWidth, (float)sceneInfo.RenderHeight);
-	nvrhi::BufferDesc ConstantBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ConstantBuffer), "GBufferPass CBuffer", 1);
-	nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(ConstantBufferDesc);
-	CommandListRef->writeBuffer(ConstantBufferHandle, &CBuffer, sizeof(ConstantBuffer));
+	nvrhi::BufferDesc ConstantBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(struct ConstantBuffer), "GBufferPass CBuffer", 1);
+	nvrhi::BufferHandle ConstantBufferHandle1 = DirectXDevice::GetNativeDevice()->createBuffer(ConstantBufferDesc);
+	CommandListRef->writeBuffer(ConstantBufferHandle1, &CBuffer, sizeof(struct ConstantBuffer));
 
 	//create the binding set
 	nvrhi::BindingSetDesc BindingSetDesc;
 	BindingSetDesc.bindings = {
-		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
+		nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle0),
+		nvrhi::BindingSetItem::ConstantBuffer(1, ConstantBufferHandle1),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(0, GPUScene->InstanceBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(1, GPUScene->MaterialBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(2, AssetManager::GetInstance()->VBO),
@@ -222,6 +267,7 @@ void GBufferPass::DrawMeshlets(
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(5, AssetManager::GetInstance()->MeshletPrimitiveBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(6, GPUScene->MeshBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(7, GPUScene->AmplificationGroupInfoBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(8, AssetManager::GetInstance()->MeshletBoundingSphereBuffer),
 
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
@@ -245,7 +291,7 @@ void GBufferPass::DrawMeshlets(
 	PipelineDesc.addBindingLayout(AssetManager::GetInstance()->BindlessLayoutHandle);
 	nvrhi::ShaderHandle AmpShader = AssetManager::GetInstance()->GetShader("Meshlet.as.cso");
 	nvrhi::ShaderHandle MeshShader = AssetManager::GetInstance()->GetShader("Meshlet.ms.cso");
-	nvrhi::ShaderHandle PixelShader = AssetManager::GetInstance()->GetShader("GBufferShaderOpaque.ps.cso");
+	nvrhi::ShaderHandle PixelShader = AssetManager::GetInstance()->GetShader("Meshlet.ps.cso");
 	PipelineDesc.setAmplificationShader(AmpShader);
 	PipelineDesc.setMeshShader(MeshShader);
 	PipelineDesc.setFragmentShader(PixelShader);

@@ -157,22 +157,25 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 
 	uint32_t ProxyCount = scene->StaticProxies.size();
 	Taskflow.emplace([this, &scene, GPUScene, ProxyCount]() {
-#if 0
-		GBufferPass->Draw(
-			GPUScene,
-			ProxyCount,
-			scene->SceneInfo,
-			scene->DebugInfo,
-			RenderTargets,
-			scene->SceneInfo.bEnableOcclusionCull);
-#else
-		GBufferPass->DrawMeshlets(
-			GPUScene,
-			ProxyCount,
-			scene->SceneInfo,
-			scene->DebugInfo,
-			RenderTargets);
-#endif
+		if (!scene->SceneInfo.bEnableMeshletShading)
+		{
+			GBufferPass->Draw(
+				GPUScene,
+				ProxyCount,
+				scene->SceneInfo,
+				scene->DebugInfo,
+				RenderTargets,
+				scene->SceneInfo.bEnableOcclusionCull);
+		}
+		else
+		{
+			GBufferPass->DrawMeshlets(
+				GPUScene,
+				ProxyCount,
+				scene->SceneInfo,
+				scene->DebugInfo,
+				RenderTargets);
+		}
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::GBUFFER]);
 
