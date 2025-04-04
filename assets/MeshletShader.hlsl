@@ -6,13 +6,6 @@
 #define MAX_TRIANGLES 124
 #define AS_GROUP_SIZE 64
 
-#define INFINITE_Z_ENABLED 1
-#define PREVIOUS_FRAME_ENABLED 1 << 1
-#define IS_PHASE_1 1 << 2
-#define ALPHA_TEST_ENABLED 1 << 3
-#define CULL_ALL 1 << 4
-#define ENABLE_AS_CULL 1 << 5
-
 cbuffer g_Const : register(b1)
 {
     float4x4 viewProjMatrix;
@@ -26,6 +19,7 @@ cbuffer g_Const : register(b0)
     float4x4 ViewMatrix;
     float4x4 ProjectionMatrix;
     float4 FrustumPlanes[6];
+    float3 CameraPosition;
     uint MipBaseWidth;
     uint MipBaseHeight;
     uint MipLevels;
@@ -47,8 +41,6 @@ struct PayloadStruct
 
 #define INVALID 0
 #define VISIBLE 1
-#define CS_CULLED 2
-#define AS_CULLED 3
 
 RWStructuredBuffer<DispatchMeshleIndirectArguments> DispatchMeshleIndirectArgumentsBuffer : register(u1);
 
@@ -119,7 +111,7 @@ void MeshletCullCS(in uint3 dtid : SV_DispatchThreadID)
     float3 Center = MeshData.Center;
     float3 Extents = MeshData.Extents;
     //view planes are already in world space
-    if (!FrustumCull(Center, Extents, InstanceData.ModelToWorld))
+    if ((Flags & ENABLE_INSTANCE_FRUSTUM_CULL) && !FrustumCull(Center, Extents, InstanceData.ModelToWorld))
     {
         return;
     }
@@ -135,7 +127,7 @@ void MeshletCullCS(in uint3 dtid : SV_DispatchThreadID)
 }
 
 StructuredBuffer<FAmplificationGroupInfo> AmplificationGroupInfoInput : register(t7);
-StructuredBuffer<float4> BoundingSpheres : register(t8);
+StructuredBuffer<FMeshletBounds> MeshletBounds : register(t8);
 groupshared PayloadStruct s_Payload;
 groupshared uint MeshletCount;
 
@@ -156,6 +148,19 @@ bool FrustumCull(float3 Center, float Radius)
     return true; // Sphere is at least partially visible
 }
 
+bool ConeCull(uint InstanceId, FMeshletBounds Bounds, float3 CameraPosition)
+{
+    float3 BoundsWorldApex = mul(float4(Bounds.ConeApex, 1.f), InstanceDatas[InstanceId].ModelToWorld).xyz;
+    float3 BoundsWorldAxis = normalize(mul(float4(Bounds.ConeAxis, 0.f), InstanceDatas[InstanceId].ModelToWorld).xyz);
+    
+    float3 v = normalize(BoundsWorldApex - CameraPosition);
+    if (dot(v, BoundsWorldAxis) >= Bounds.ConeCutoff)
+    {
+        return false;
+    }
+    return true;
+}
+
 [numthreads(AS_GROUP_SIZE, 1, 1)]
 void MeshletAS(in uint3 gtid: SV_GroupThreadID, in uint3 gid : SV_GroupID)
 {
@@ -168,14 +173,24 @@ void MeshletAS(in uint3 gtid: SV_GroupThreadID, in uint3 gid : SV_GroupID)
         s_Payload.InstanceId = GroupInfo.InstanceId;
         MeshletCount = 0;
     }
+    GroupMemoryBarrierWithGroupSync();
     
     uint VisiblityFlag = INVALID;
     //group index * thread count + thread.x to get which meshlet to cull, index is within a mesh group
     uint LocalMeshletIndex = GroupInfo.AmplificationGroupOffset * AS_GROUP_SIZE + gtid.x;
+    uint GlobalMeshletIndex = LocalMeshletIndex + MeshData.MeshletGroupOffset;
     
     if (LocalMeshletIndex < Meshes[InstanceData.MeshIndex].MeshletCount)
     {
-        if (Flags & ENABLE_AS_CULL)
+        bool Visible = true;
+        FMeshletBounds MeshletBound = MeshletBounds[GlobalMeshletIndex];
+        //cone culling fastest
+        if (Visible && Flags & ENABLE_AS_CONE_CULL)
+        {
+            Visible = ConeCull(s_Payload.InstanceId, MeshletBound, CameraPosition);
+        }
+        //frustum culling second fastest
+        if (Visible && Flags & ENABLE_AS_FRUSTUM_CULL)
         {
             //get the meshlet bounding sphere with the new largest scale
             float3 s0 = length(InstanceData.ModelToWorld[0].xyz);
@@ -183,19 +198,14 @@ void MeshletAS(in uint3 gtid: SV_GroupThreadID, in uint3 gid : SV_GroupID)
             float3 s2 = length(InstanceData.ModelToWorld[2].xyz);
             float s = max(max(s0, s1), s2);
             //offset by meshlet group offset to access the global bounding sphere data
-            float4 Sphere = BoundingSpheres[LocalMeshletIndex + MeshData.MeshletGroupOffset];
+            float4 Sphere = float4(MeshletBound.Center, MeshletBound.Radius);
             float3 SphereWorldPos = mul(float4(Sphere.xyz, 1.f), InstanceData.ModelToWorld).xyz;
             float SphereRadius = Sphere.w * s;
-            bool Visible = FrustumCull(SphereWorldPos, SphereRadius);
-            if (Visible)
-            {
-                VisiblityFlag = VISIBLE;
-                uint Index;
-                InterlockedAdd(MeshletCount, 1, Index);
-                s_Payload.MeshletIndices[Index] = LocalMeshletIndex;
-            }
+            Visible = FrustumCull(SphereWorldPos, SphereRadius);
         }
-        else
+        //occlusion culling last
+        
+        if (Visible)
         {
             VisiblityFlag = VISIBLE;
             uint Index;
@@ -203,8 +213,7 @@ void MeshletAS(in uint3 gtid: SV_GroupThreadID, in uint3 gid : SV_GroupID)
             s_Payload.MeshletIndices[Index] = LocalMeshletIndex;
         }
     }
-    //uint VisibleCount = WaveActiveCountBits(VisiblityFlag == VISIBLE);
-    //why is this 10 if i use wave active count bits
+    //interlocked add all the debug buffers to readback
     DispatchMesh(MeshletCount, 1, 1, s_Payload);
 }
 
@@ -340,8 +349,9 @@ void MeshletPS(
     }
 
 	//draw to the targets
-    outColor = float4(ColorPalette[inMeshletIndex % 32], 1.f);
-    //outColor = albedo;
+    outColor = albedo;
+    if (Flags & ENABLE_MESHLET_COLOR)
+        outColor *= float4(ColorPalette[inMeshletIndex % 32], 1.f);
     outNormals.xy = Encode(N);
     outRoughnessMetallic = float2(roughness, metallic);
     float4 clipPos = mul(inFragPos, viewProjMatrix);

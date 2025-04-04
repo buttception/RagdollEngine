@@ -141,11 +141,15 @@ namespace ragdoll {
 		bool bEnableXeGTAONoise{ false };
 		bool bEnableBloom{ true };
 		bool bEnableOcclusionCull{ true };
+		bool bEnableInstanceFrustumCull{ true };
 		bool bRaytraceDirectionalLight{ true };
 		bool bInlineRaytrace{ false };
 		bool bRaytraceShadowDenoiser{ true };
 		bool bEnableMeshletShading{ true };
 		bool bEnableMeshletFrustumCulling{ true };
+		bool bEnableMeshletConeCulling{ true };
+		bool bEnableMeshletOcclusionCulling{ true };
+		bool bEnableMeshletColors{ false };
 		float SunSize = 0.1f;
 		uint32_t RenderWidth = 1920;
 		uint32_t RenderHeight = 1080;

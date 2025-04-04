@@ -41,6 +41,9 @@ namespace ragdoll
 		//meshlet stuff
 		nvrhi::BufferHandle IndirectMeshletArgsBuffer{};
 		nvrhi::BufferHandle AmplificationGroupInfoBuffer{};
+		nvrhi::BufferHandle InstanceFrustumCulledCountBuffer{};
+		nvrhi::BufferHandle MeshletFrustumCulledCountBuffer{};
+		nvrhi::BufferHandle MeshletDegenerateConeCountBuffer{};
 
 		//temp
 		Scene* SceneRef;
@@ -81,7 +84,7 @@ namespace ragdoll
 			const Matrix& View,
 			uint32_t ProxyCount,
 			bool InfiniteZEnabled,
-			uint32_t AlphaTest = 0 /*cull all = 0, opaque = 1, alpha = 2*/
+			uint32_t Flags = ~0
 		);
 
 		//helper

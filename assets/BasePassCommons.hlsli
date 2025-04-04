@@ -1,3 +1,16 @@
+#define INFINITE_Z_ENABLED 1
+#define PREVIOUS_FRAME_ENABLED 1 << 1
+#define IS_PHASE_1 1 << 2
+#define ALPHA_TEST_ENABLED 1 << 3
+#define CULL_ALL 1 << 4
+
+#define ENABLE_INSTANCE_FRUSTUM_CULL 1 << 5
+#define ENABLE_INSTANCE_OCCLUSION_CULL 1 << 6
+#define ENABLE_AS_FRUSTUM_CULL 1 << 6
+#define ENABLE_AS_CONE_CULL 1 << 7
+#define ENABLE_AS_OCCLUSION_CULL 1 << 8
+#define ENABLE_MESHLET_COLOR 1 << 9
+
 struct FBoundingBox
 {
     float3 Center;
@@ -76,6 +89,18 @@ struct FMeshlet
     uint TriangleOffset;
     uint VertexCount;
     uint TriangleCount;
+};
+
+struct FMeshletBounds
+{
+	/* bounding sphere, useful for frustum and occlusion culling */
+    float3 Center;
+    float Radius;
+
+	/* normal cone, useful for backface culling */
+    float3 ConeApex;
+    float ConeCutoff; /* = cos(angle/2) */
+    float3 ConeAxis;
 };
 
 struct DispatchMeshleIndirectArguments

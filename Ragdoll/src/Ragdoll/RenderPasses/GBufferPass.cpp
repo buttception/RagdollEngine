@@ -13,7 +13,12 @@
 #define IS_PHASE_1 1 << 2
 #define ALPHA_TEST_ENABLED 1 << 3
 #define CULL_ALL 1 << 4
-#define ENABLE_AS_CULL 1 << 5
+#define ENABLE_INSTANCE_FRUSTUM_CULL 1 << 5
+#define ENABLE_INSTANCE_OCCLUSION_CULL 1 << 6
+#define ENABLE_AS_FRUSTUM_CULL 1 << 6
+#define ENABLE_AS_CONE_CULL 1 << 7
+#define ENABLE_AS_OCCLUSION_CULL 1 << 8
+#define ENABLE_MESHLET_COLOR 1 << 9
 
 void GBufferPass::Init(nvrhi::CommandListHandle cmdList)
 {
@@ -210,11 +215,13 @@ void GBufferPass::DrawMeshlets(
 	Matrix ViewProjectionMatrix;
 	Matrix PrevViewMatrix;
 	Matrix PrevProjectionMatrix;
+	Vector3 CameraPosition;
 	if (debugInfo.bFreezeFrustumCulling)
 	{
 		PrevViewMatrix = ViewMatrix = debugInfo.FrozenView;
 		PrevProjectionMatrix = ProjectionMatrix = debugInfo.FrozenProjection;
 		ViewProjectionMatrix = ViewMatrix * ProjectionMatrix;
+		CameraPosition = debugInfo.FrozenCameraPosition;
 	}
 	else
 	{
@@ -223,16 +230,15 @@ void GBufferPass::DrawMeshlets(
 		ViewProjectionMatrix = sceneInfo.MainCameraViewProjWithJitter;
 		PrevViewMatrix = sceneInfo.PrevMainCameraView;
 		PrevProjectionMatrix = sceneInfo.PrevMainCameraProjWithJitter;
+		CameraPosition = sceneInfo.MainCameraPosition;
 	}
 
-	GPUScene->MeshletInstanceCull(CommandListRef, ProjectionMatrix, ViewMatrix, ProxyCount, true);
-
-#if 1
 	struct FConstantBuffer
 	{
 		Matrix ViewMatrix{};
 		Matrix ProjectionMatrix{};
 		Vector4 FrustumPlanes[6]{};
+		Vector3 CameraPosition;
 		uint32_t MipBaseWidth;
 		uint32_t MipBaseHeight;
 		uint32_t MipLevels;
@@ -242,9 +248,16 @@ void GBufferPass::DrawMeshlets(
 	GPUScene->ExtractFrustumPlanes(ConstantBuffer.FrustumPlanes, ProjectionMatrix, ViewMatrix);
 	ConstantBuffer.ProxyCount = ProxyCount;
 	ConstantBuffer.Flags |= INFINITE_Z_ENABLED;
-	ConstantBuffer.Flags |= ENABLE_AS_CULL * sceneInfo.bEnableMeshletFrustumCulling;
+	ConstantBuffer.Flags |= ENABLE_INSTANCE_FRUSTUM_CULL * sceneInfo.bEnableInstanceFrustumCull;
+	ConstantBuffer.Flags |= ENABLE_AS_FRUSTUM_CULL * sceneInfo.bEnableMeshletFrustumCulling;
+	ConstantBuffer.Flags |= ENABLE_AS_CONE_CULL * sceneInfo.bEnableMeshletConeCulling;
+	ConstantBuffer.Flags |= ENABLE_MESHLET_COLOR * sceneInfo.bEnableMeshletColors;
+	ConstantBuffer.CameraPosition = CameraPosition;
+
 	nvrhi::BufferHandle ConstantBufferHandle0 = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FConstantBuffer), "InstanceCull ConstantBuffer", 1));
 	CommandListRef->writeBuffer(ConstantBufferHandle0, &ConstantBuffer, sizeof(FConstantBuffer));
+
+	GPUScene->MeshletInstanceCull(CommandListRef, ProjectionMatrix, ViewMatrix, ProxyCount, true, ConstantBuffer.Flags);
 
 	CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
 	CBuffer.ViewProjWithAA = sceneInfo.MainCameraViewProjWithJitter;
@@ -314,7 +327,6 @@ void GBufferPass::DrawMeshlets(
 	CommandListRef->beginMarker("Meshlet GBuffer Pass");
 	CommandListRef->setMeshletState(state);
 	CommandListRef->dispatchMeshIndirect(0, nullptr, 1);
-#endif
 
 	CommandListRef->endMarker();
 }

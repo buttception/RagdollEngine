@@ -336,10 +336,14 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 			}
 			SceneInfo.bIsCameraDirty = true;
 		}
-		if (ImGui::Checkbox("Enable Occlusion Culling", &SceneInfo.bEnableOcclusionCull))
-			SceneInfo.bIsCameraDirty = true;
 		ImGui::Checkbox("Enable Mesh shading", &SceneInfo.bEnableMeshletShading);
-		ImGui::Checkbox("Enable Mesh frustum culling", &SceneInfo.bEnableMeshletFrustumCulling);
+		ImGui::Checkbox("Enable Instance Frustum Culling", &SceneInfo.bEnableInstanceFrustumCull);
+		if (ImGui::Checkbox("Enable Instance Occlusion Culling", &SceneInfo.bEnableOcclusionCull))
+			SceneInfo.bIsCameraDirty = true;
+		ImGui::Checkbox("Enable Mesh Frustum culling", &SceneInfo.bEnableMeshletFrustumCulling);
+		ImGui::Checkbox("Enable Mesh Cone culling", &SceneInfo.bEnableMeshletConeCulling);
+		ImGui::Checkbox("Enable Mesh Instance culling", &SceneInfo.bEnableMeshletOcclusionCulling);
+		ImGui::Checkbox("Enable Meshlet colors", &SceneInfo.bEnableMeshletColors);
 		if (ImGui::Checkbox("Enable Light Grid", &DebugInfo.bEnableLightGrid))
 			SceneInfo.bIsCameraDirty = true;
 		if(ImGui::Checkbox("Show Frustum", &DebugInfo.bShowFrustum));

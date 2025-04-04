@@ -25,6 +25,12 @@
 #define IS_PHASE_1 1 << 2
 #define ALPHA_TEST_ENABLED 1 << 3
 #define CULL_ALL 1 << 4
+#define ENABLE_INSTANCE_FRUSTUM_CULL 1 << 5
+#define ENABLE_INSTANCE_OCCLUSION_CULL 1 << 6
+#define ENABLE_AS_FRUSTUM_CULL 1 << 6
+#define ENABLE_AS_CONE_CULL 1 << 7
+#define ENABLE_AS_OCCLUSION_CULL 1 << 8
+#define ENABLE_MESHLET_COLOR 1 << 9
 
 #define MAX_HZB_MIP_COUNT 16
 
@@ -738,7 +744,7 @@ void ragdoll::FGPUScene::BuildHZB(nvrhi::CommandListHandle CommandList, SceneRen
 	CommandList->endMarker();
 }
 
-void ragdoll::FGPUScene::MeshletInstanceCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled, uint32_t AlphaTest)
+void ragdoll::FGPUScene::MeshletInstanceCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled, uint32_t Flags)
 {
 	RD_SCOPE(Culling, Instance Culling);
 	CommandList->beginMarker("Frustum Cull Scene");
@@ -765,15 +771,23 @@ void ragdoll::FGPUScene::MeshletInstanceCull(nvrhi::CommandListHandle CommandLis
 	}
 #if 1
 	{
-		FConstantBuffer ConstantBuffer;
+		struct FMSConstantBuffer
+		{
+			Matrix ViewMatrix{};
+			Matrix ProjectionMatrix{};
+			Vector4 FrustumPlanes[6]{};
+			Vector3 CameraPosition;
+			uint32_t MipBaseWidth;
+			uint32_t MipBaseHeight;
+			uint32_t MipLevels;
+			uint32_t ProxyCount{};
+			uint32_t Flags{};
+		} ConstantBuffer;
 		ExtractFrustumPlanes(ConstantBuffer.FrustumPlanes, Projection, View);
 		ConstantBuffer.ProxyCount = ProxyCount;
-		ConstantBuffer.Flags |= InfiniteZEnabled ? INFINITE_Z_ENABLED : 0;
-		//decides to include or exclude the alpha test flag
-		ConstantBuffer.Flags |= AlphaTest == 0 ? CULL_ALL : 0;
-		ConstantBuffer.Flags |= AlphaTest == 2 ? ALPHA_TEST_ENABLED : 0;
-		nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FConstantBuffer), "InstanceCull ConstantBuffer", 1));
-		CommandList->writeBuffer(ConstantBufferHandle, &ConstantBuffer, sizeof(FConstantBuffer));
+		ConstantBuffer.Flags |= Flags;
+		nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FMSConstantBuffer), "InstanceCull ConstantBuffer", 1));
+		CommandList->writeBuffer(ConstantBufferHandle, &ConstantBuffer, sizeof(FMSConstantBuffer));
 
 		//create the binding set
 		nvrhi::BindingSetDesc BindingSetDesc;

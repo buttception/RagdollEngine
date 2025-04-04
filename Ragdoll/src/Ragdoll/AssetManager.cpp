@@ -488,7 +488,7 @@ void AssetManager::UpdateMeshBuffers()
 
 		CommandList->endMarker();
 	}
-	//temp
+
 	{
 		nvrhi::BufferDesc meshletBufDesc;
 		meshletBufDesc.byteSize = Meshlets.size() * sizeof(meshopt_Meshlet);
@@ -521,13 +521,13 @@ void AssetManager::UpdateMeshBuffers()
 		CommandList->setPermanentBufferState(MeshletPrimitiveBuffer, nvrhi::ResourceStates::ShaderResource);
 
 		nvrhi::BufferDesc meshletBoundingSphereBufDesc;
-		meshletBoundingSphereBufDesc.byteSize = MeshletBoundingSpheres.size() * sizeof(Vector4);
-		meshletBoundingSphereBufDesc.debugName = "Meshlet Bounding Sphere Buffer";
+		meshletBoundingSphereBufDesc.byteSize = MeshletBounds.size() * sizeof(FMeshletBounds);
+		meshletBoundingSphereBufDesc.debugName = "Meshlet Bounds Buffer";
 		meshletBoundingSphereBufDesc.canHaveTypedViews = true;
-		meshletBoundingSphereBufDesc.structStride = sizeof(Vector4);
+		meshletBoundingSphereBufDesc.structStride = sizeof(FMeshletBounds);
 		MeshletBoundingSphereBuffer = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(meshletBoundingSphereBufDesc);
 		CommandList->beginTrackingBufferState(MeshletBoundingSphereBuffer, nvrhi::ResourceStates::CopyDest);
-		CommandList->writeBuffer(MeshletBoundingSphereBuffer, MeshletBoundingSpheres.data(), meshletBoundingSphereBufDesc.byteSize);
+		CommandList->writeBuffer(MeshletBoundingSphereBuffer, MeshletBounds.data(), meshletBoundingSphereBufDesc.byteSize);
 		CommandList->setPermanentBufferState(MeshletBoundingSphereBuffer, nvrhi::ResourceStates::ShaderResource);
 	}
 	CommandList->close();
@@ -597,12 +597,12 @@ void AssetManager::UpdateMeshletsData()
 	Meshlets.clear();
 	MeshletTrianglesPacked.clear();
 	MeshletVertices.clear();
-	MeshletBoundingSpheres.clear();
+	MeshletBounds.clear();
 
 	//maximum number of meshlets based on global index buffer containing every mesh
 	size_t GlobalMaxMeshletsCount = meshopt_buildMeshletsBound(Indices.size(), max_vertices, max_triangles);
 	Meshlets.resize(GlobalMaxMeshletsCount);
-	MeshletBoundingSpheres.resize(GlobalMaxMeshletsCount);
+	MeshletBounds.resize(GlobalMaxMeshletsCount);
 	MeshletVertices.resize(GlobalMaxMeshletsCount * max_vertices);
 	MeshletTrianglesPacked.resize(GlobalMaxMeshletsCount * max_triangles * 3);
 	//worse case of global, even though the worse case should fit the largest mesh only, TODO: find a way to use the other worst case
@@ -625,14 +625,9 @@ void AssetManager::UpdateMeshletsData()
 		for (size_t j = 0; j < MeshletTempCount; ++j)
 		{
 			const meshopt_Meshlet& Meshlet = MeshletStart[j];
-			Vector4 Sphere = GetRitterSphere(
-				Vertices,
-				Info.VerticesOffset, 
-				Meshlet, 
-				MeshletVertices,
-				MeshletVerticesTotalCount
-			);
-			MeshletBoundingSpheres[MeshletTotalCount + j] = Sphere;
+			//use meshopt to generate bounds as well
+			meshopt_Bounds bounds = meshopt_computeMeshletBounds(MeshletVerticesStart + Meshlet.vertex_offset, MeshletTrianglesUnpacked.data() + Meshlet.triangle_offset, Meshlet.triangle_count, (float*)VertexStart, Info.VerticesCount, sizeof(Vertex));
+			MeshletBounds[MeshletTotalCount + j] = bounds;
 		}
 
 		const meshopt_Meshlet& Last = Meshlets[MeshletTempCount + MeshletTotalCount - 1];
@@ -673,7 +668,7 @@ void AssetManager::UpdateMeshletsData()
 
 	//once done, resize the buffers
 	Meshlets.resize(MeshletTotalCount);
-	MeshletBoundingSpheres.resize(MeshletTotalCount);
+	MeshletBounds.resize(MeshletTotalCount);
 	MeshletTrianglesPacked.resize(MeshletTrianglesPackedTotalCount);
 	MeshletVertices.resize(MeshletVerticesTotalCount);
 }
