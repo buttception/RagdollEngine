@@ -768,8 +768,10 @@ void ragdoll::FGPUScene::MeshletInstanceCull(nvrhi::CommandListHandle CommandLis
 		state.bindings = { BindingSetHandle };
 		CommandList->setComputeState(state);
 		CommandList->dispatch(1, 1, 1);
+
+		//reset the debug count buffers
+		CommandList->clearBufferUInt(InstanceFrustumCulledPassedCountBuffer, 0);
 	}
-#if 1
 	{
 		struct FMSConstantBuffer
 		{
@@ -797,6 +799,7 @@ void ragdoll::FGPUScene::MeshletInstanceCull(nvrhi::CommandListHandle CommandLis
 			nvrhi::BindingSetItem::StructuredBuffer_SRV(6, MeshBuffer),
 			nvrhi::BindingSetItem::StructuredBuffer_UAV(0, AmplificationGroupInfoBuffer),
 			nvrhi::BindingSetItem::StructuredBuffer_UAV(1, IndirectMeshletArgsBuffer),
+			nvrhi::BindingSetItem::StructuredBuffer_UAV(7, InstanceFrustumCulledPassedCountBuffer),
 		};
 		nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
 		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);
@@ -813,7 +816,6 @@ void ragdoll::FGPUScene::MeshletInstanceCull(nvrhi::CommandListHandle CommandLis
 		CommandList->setComputeState(state);
 		CommandList->dispatch((ProxyCount + 63) / 64, 1, 1);
 	}
-#endif
 	CommandList->endMarker();
 }
 
@@ -893,6 +895,13 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	Phase2NonOccludedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
 	CountBufferDesc.debugName = "Phase2OccludedCountBuffer";
 	Phase2OccludedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+	//debug counts
+	CountBufferDesc.debugName = "Instance Frustum Culled Count Buffer";
+	InstanceFrustumCulledPassedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+	CountBufferDesc.debugName = "Meshlet Frustum Culled Count Buffer";
+	MeshletFrustumCulledCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+	CountBufferDesc.debugName = "Meshlet Degenerate Cone Count Buffer";
+	MeshletDegenerateConeCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
 
 	nvrhi::BufferDesc PointLightBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(PointLightProxy) * MAX_LIGHT_COUNT, "PointLightBuffer");
 	PointLightBufferDesc.structStride = sizeof(PointLightProxy);

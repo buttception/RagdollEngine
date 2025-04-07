@@ -41,9 +41,11 @@ namespace ragdoll
 		//meshlet stuff
 		nvrhi::BufferHandle IndirectMeshletArgsBuffer{};
 		nvrhi::BufferHandle AmplificationGroupInfoBuffer{};
-		nvrhi::BufferHandle InstanceFrustumCulledCountBuffer{};
+		nvrhi::BufferHandle InstanceFrustumCulledPassedCountBuffer{};
 		nvrhi::BufferHandle MeshletFrustumCulledCountBuffer{};
 		nvrhi::BufferHandle MeshletDegenerateConeCountBuffer{};
+		nvrhi::BufferHandle MeshletOcclusionCulledPhase1CountBuffer{};
+		nvrhi::BufferHandle MeshletOcclusionCulledPhase2CountBuffer{};
 
 		//temp
 		Scene* SceneRef;

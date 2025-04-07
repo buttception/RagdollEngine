@@ -134,8 +134,21 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 				DirectXDevice::GetNativeDevice()->unmapBuffer(GBufferPass->Phase1NonOccludedCountBuffer);
 				DirectXDevice::GetNativeDevice()->unmapBuffer(GBufferPass->Phase2NonOccludedCountBuffer);
 			}
-		}
-		{
+
+			if (GBufferPass->MeshletDegenerateConeCulledCountbuffer && GBufferPass->MeshletFrustumCulledCountBuffer)
+			{
+				scene->DebugInfo.MeshletConeCullCount = scene->DebugInfo.MeshletFrustumCullCount = 0;
+				if (intPtr = (int*)DirectXDevice::GetNativeDevice()->mapBuffer(GBufferPass->MeshletDegenerateConeCulledCountbuffer, nvrhi::CpuAccessMode::Read))
+				{
+					scene->DebugInfo.MeshletConeCullCount = *intPtr;
+				}
+				if (intPtr = (int*)DirectXDevice::GetNativeDevice()->mapBuffer(GBufferPass->MeshletFrustumCulledCountBuffer, nvrhi::CpuAccessMode::Read))
+				{
+					scene->DebugInfo.MeshletFrustumCullCount = *intPtr;
+				}
+				DirectXDevice::GetNativeDevice()->unmapBuffer(GBufferPass->MeshletDegenerateConeCulledCountbuffer);
+				DirectXDevice::GetNativeDevice()->unmapBuffer(GBufferPass->MeshletFrustumCulledCountBuffer);
+			}
 		}
 	}
 

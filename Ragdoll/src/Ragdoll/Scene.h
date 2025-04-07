@@ -77,6 +77,9 @@ namespace ragdoll {
 		uint32_t PassedFrustumCullCount{};
 		uint32_t PassedOcclusion1CullCount{};
 		uint32_t PassedOcclusion2CullCount{};
+		uint32_t MeshletCount{};
+		uint32_t MeshletConeCullCount{};
+		uint32_t MeshletFrustumCullCount{};
 	};
 
 	struct SceneConfig {

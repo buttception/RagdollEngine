@@ -38,9 +38,13 @@ public:
 		ragdoll::SceneRenderTargets* targets
 	);
 
+	//one day should move it to a single buffer with macros for which index is which debug val
 	nvrhi::BufferHandle PassedFrustumTestCountBuffer;
 	nvrhi::BufferHandle Phase1NonOccludedCountBuffer;
 	nvrhi::BufferHandle Phase2NonOccludedCountBuffer;
+	nvrhi::BufferHandle Phase1OccludedCountBuffer;
+	nvrhi::BufferHandle MeshletFrustumCulledCountBuffer;
+	nvrhi::BufferHandle MeshletDegenerateConeCulledCountbuffer;
 
 private:
 	//only draw instances

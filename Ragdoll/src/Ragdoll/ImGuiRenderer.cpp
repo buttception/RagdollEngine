@@ -377,8 +377,17 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 		}
 		ImGui::Text("%d total proxies", DebugInfo.TotalProxyCount);
 		ImGui::Text("%d passed frustum test", DebugInfo.PassedFrustumCullCount);
-		ImGui::Text("%d passed occlusion1 test", DebugInfo.PassedOcclusion1CullCount);
-		ImGui::Text("%d passed occlusion2 test", DebugInfo.PassedOcclusion2CullCount);
+		if (!SceneInfo.bEnableMeshletShading)
+		{
+			ImGui::Text("%d passed occlusion1 test", DebugInfo.PassedOcclusion1CullCount);
+			ImGui::Text("%d passed occlusion2 test", DebugInfo.PassedOcclusion2CullCount);
+		}
+		else
+		{
+			ImGui::Text("%d total meshlets", DebugInfo.MeshletCount);
+			ImGui::Text("%d meshlet cone cull", DebugInfo.MeshletConeCullCount);
+			ImGui::Text("%d meshlet frustum cull", DebugInfo.MeshletFrustumCullCount);
+		}
 		ImGui::TreePop();
 	}
 	ImGui::End();

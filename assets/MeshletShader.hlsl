@@ -41,6 +41,13 @@ struct PayloadStruct
 
 #define INVALID 0
 #define VISIBLE 1
+#define CONE_CULLED 2
+#define FRUSTUM_CULLED 3
+
+//debug buffers
+RWStructuredBuffer<uint> InstanceFrustumCulledPassCountOutput : register(u7);
+RWStructuredBuffer<uint> MeshletFrustumCulledCountOutput : register(u8);
+RWStructuredBuffer<uint> MeshletDegenerateConeCountOutput : register(u9);
 
 RWStructuredBuffer<DispatchMeshleIndirectArguments> DispatchMeshleIndirectArgumentsBuffer : register(u1);
 
@@ -115,6 +122,8 @@ void MeshletCullCS(in uint3 dtid : SV_DispatchThreadID)
     {
         return;
     }
+    //add to the debug counter
+    InterlockedAdd(InstanceFrustumCulledPassCountOutput[0], 1);
     //each AS group has 64 threads, each thread processes 1 meshlet
     uint ASCount = (MeshData.MeshletCount + AS_GROUP_SIZE - 1) / AS_GROUP_SIZE;
     uint Index;
@@ -182,15 +191,15 @@ void MeshletAS(in uint3 gtid: SV_GroupThreadID, in uint3 gid : SV_GroupID)
     
     if (LocalMeshletIndex < Meshes[InstanceData.MeshIndex].MeshletCount)
     {
-        bool Visible = true;
         FMeshletBounds MeshletBound = MeshletBounds[GlobalMeshletIndex];
-        //cone culling fastest
-        if (Visible && Flags & ENABLE_AS_CONE_CULL)
+        //cone culling fastest i tinkA
+        if (Flags & ENABLE_AS_CONE_CULL)
         {
-            Visible = ConeCull(s_Payload.InstanceId, MeshletBound, CameraPosition);
+            if (!ConeCull(s_Payload.InstanceId, MeshletBound, CameraPosition))
+                VisiblityFlag = CONE_CULLED;
         }
         //frustum culling second fastest
-        if (Visible && Flags & ENABLE_AS_FRUSTUM_CULL)
+        if (VisiblityFlag == INVALID && Flags & ENABLE_AS_FRUSTUM_CULL)
         {
             //get the meshlet bounding sphere with the new largest scale
             float3 s0 = length(InstanceData.ModelToWorld[0].xyz);
@@ -201,11 +210,13 @@ void MeshletAS(in uint3 gtid: SV_GroupThreadID, in uint3 gid : SV_GroupID)
             float4 Sphere = float4(MeshletBound.Center, MeshletBound.Radius);
             float3 SphereWorldPos = mul(float4(Sphere.xyz, 1.f), InstanceData.ModelToWorld).xyz;
             float SphereRadius = Sphere.w * s;
-            Visible = FrustumCull(SphereWorldPos, SphereRadius);
+            if (!FrustumCull(SphereWorldPos, SphereRadius))
+                VisiblityFlag = FRUSTUM_CULLED;
         }
         //occlusion culling last
         
-        if (Visible)
+        //if still invalid, it passed all tests, and hence is visible
+        if (VisiblityFlag == INVALID)
         {
             VisiblityFlag = VISIBLE;
             uint Index;
@@ -213,6 +224,10 @@ void MeshletAS(in uint3 gtid: SV_GroupThreadID, in uint3 gid : SV_GroupID)
             s_Payload.MeshletIndices[Index] = LocalMeshletIndex;
         }
     }
+    if (VisiblityFlag == CONE_CULLED)
+        InterlockedAdd(MeshletDegenerateConeCountOutput[0], 1);
+    if (VisiblityFlag == FRUSTUM_CULLED)
+        InterlockedAdd(MeshletFrustumCulledCountOutput[0], 1);
     //interlocked add all the debug buffers to readback
     DispatchMesh(MeshletCount, 1, 1, s_Payload);
 }

@@ -33,6 +33,11 @@ void GBufferPass::Init(nvrhi::CommandListHandle cmdList)
 	Phase1NonOccludedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
 	CountBufferDesc.debugName = "Phase2NonOccludedCountBuffer";
 	Phase2NonOccludedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+
+	CountBufferDesc.debugName = "MeshletFrustumCulledCountBuffer";
+	MeshletFrustumCulledCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+	CountBufferDesc.debugName = "MeshletDegenerateConeCulledCountbuffer";
+	MeshletDegenerateConeCulledCountbuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
 }
 
 void GBufferPass::Draw(ragdoll::FGPUScene* GPUScene, uint32_t ProxyCount, const ragdoll::SceneInformation& sceneInfo, const ragdoll::DebugInfo& debugInfo, ragdoll::SceneRenderTargets* targets, bool isOcclusionCullingEnabled)
@@ -258,6 +263,7 @@ void GBufferPass::DrawMeshlets(
 	CommandListRef->writeBuffer(ConstantBufferHandle0, &ConstantBuffer, sizeof(FConstantBuffer));
 
 	GPUScene->MeshletInstanceCull(CommandListRef, ProjectionMatrix, ViewMatrix, ProxyCount, true, ConstantBuffer.Flags);
+	CommandListRef->copyBuffer(PassedFrustumTestCountBuffer, 0, GPUScene->InstanceFrustumCulledPassedCountBuffer, 0, sizeof(uint32_t));
 
 	CBuffer.ViewProj = sceneInfo.MainCameraViewProj;
 	CBuffer.ViewProjWithAA = sceneInfo.MainCameraViewProjWithJitter;
@@ -281,6 +287,8 @@ void GBufferPass::DrawMeshlets(
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(6, GPUScene->MeshBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(7, GPUScene->AmplificationGroupInfoBuffer),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(8, AssetManager::GetInstance()->MeshletBoundingSphereBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(8, GPUScene->MeshletFrustumCulledCountBuffer),
+		nvrhi::BindingSetItem::StructuredBuffer_UAV(9, GPUScene->MeshletDegenerateConeCountBuffer),
 
 	};
 	for (int i = 0; i < (int)SamplerTypes::COUNT; ++i)
@@ -327,6 +335,12 @@ void GBufferPass::DrawMeshlets(
 	CommandListRef->beginMarker("Meshlet GBuffer Pass");
 	CommandListRef->setMeshletState(state);
 	CommandListRef->dispatchMeshIndirect(0, nullptr, 1);
+
+	CommandListRef->copyBuffer(MeshletFrustumCulledCountBuffer, 0, GPUScene->MeshletFrustumCulledCountBuffer, 0, sizeof(uint32_t));
+	CommandListRef->copyBuffer(MeshletDegenerateConeCulledCountbuffer, 0, GPUScene->MeshletDegenerateConeCountBuffer, 0, sizeof(uint32_t));
+	//reset debug count buffers
+	CommandListRef->clearBufferUInt(GPUScene->MeshletFrustumCulledCountBuffer, 0);
+	CommandListRef->clearBufferUInt(GPUScene->MeshletDegenerateConeCountBuffer, 0);
 
 	CommandListRef->endMarker();
 }

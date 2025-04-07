@@ -641,6 +641,7 @@ void ragdoll::Scene::PopulateStaticProxies()
 {
 	//clear the current proxies
 	StaticProxies.clear();
+	DebugInfo.MeshletCount = 0;
 	//iterate through all the transforms and renderable
 	auto EcsView = EntityManagerRef->GetRegistry().view<RenderableComp, TransformComp>();
 	for (const entt::entity& ent : EcsView) {
@@ -656,6 +657,13 @@ void ragdoll::Scene::PopulateStaticProxies()
 			Proxy.MaterialIndex = submesh.MaterialIndex;
 			Proxy.MeshIndex = submesh.VertexBufferIndex;
 			AssetManager::GetInstance()->VertexBufferInfos[Proxy.MeshIndex].BestFitBox.Transform(Proxy.BoundingBox, tComp->m_ModelToWorld);
+
+			//add meshlet count for debuf
+			Mesh mesh = AssetManager::GetInstance()->Meshes[Proxy.MeshIndex];
+			for (const auto& it : mesh.Submeshes)
+			{
+				DebugInfo.MeshletCount += AssetManager::GetInstance()->VertexBufferInfos[it.VertexBufferIndex].MeshletCount;
+			}
 		}
 	}
 }
