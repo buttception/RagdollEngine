@@ -27,10 +27,11 @@
 #define CULL_ALL 1 << 4
 #define ENABLE_INSTANCE_FRUSTUM_CULL 1 << 5
 #define ENABLE_INSTANCE_OCCLUSION_CULL 1 << 6
-#define ENABLE_AS_FRUSTUM_CULL 1 << 6
-#define ENABLE_AS_CONE_CULL 1 << 7
-#define ENABLE_AS_OCCLUSION_CULL 1 << 8
-#define ENABLE_MESHLET_COLOR 1 << 9
+#define ENABLE_AS_FRUSTUM_CULL 1 << 7
+#define ENABLE_AS_CONE_CULL 1 << 8
+#define ENABLE_AS_OCCLUSION_CULL 1 << 9
+#define ENABLE_MESHLET_COLOR 1 << 10
+#define ENABLE_INSTANCE_COLOR 1 << 11
 
 #define MAX_HZB_MIP_COUNT 16
 
@@ -744,81 +745,6 @@ void ragdoll::FGPUScene::BuildHZB(nvrhi::CommandListHandle CommandList, SceneRen
 	CommandList->endMarker();
 }
 
-void ragdoll::FGPUScene::MeshletInstanceCull(nvrhi::CommandListHandle CommandList, const Matrix& Projection, const Matrix& View, uint32_t ProxyCount, bool InfiniteZEnabled, uint32_t Flags)
-{
-	RD_SCOPE(Culling, Instance Culling);
-	CommandList->beginMarker("Frustum Cull Scene");
-	{
-		//create the binding set
-		nvrhi::BindingSetDesc BindingSetDesc;
-		BindingSetDesc.bindings = {
-			nvrhi::BindingSetItem::StructuredBuffer_UAV(1, IndirectMeshletArgsBuffer),
-		};
-		nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
-		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);
-
-		//pipeline descs
-		nvrhi::ComputePipelineDesc CullingPipelineDesc;
-		CullingPipelineDesc.bindingLayouts = { BindingSetHandle->getLayout() };
-		nvrhi::ShaderHandle CullingShader = AssetManager::GetInstance()->GetShader("ResetMeshlet.cs.cso");
-		CullingPipelineDesc.CS = CullingShader;
-
-		nvrhi::ComputeState state;
-		state.pipeline = AssetManager::GetInstance()->GetComputePipeline(CullingPipelineDesc);
-		state.bindings = { BindingSetHandle };
-		CommandList->setComputeState(state);
-		CommandList->dispatch(1, 1, 1);
-
-		//reset the debug count buffers
-		CommandList->clearBufferUInt(InstanceFrustumCulledPassedCountBuffer, 0);
-	}
-	{
-		struct FMSConstantBuffer
-		{
-			Matrix ViewMatrix{};
-			Matrix ProjectionMatrix{};
-			Vector4 FrustumPlanes[6]{};
-			Vector3 CameraPosition;
-			uint32_t MipBaseWidth;
-			uint32_t MipBaseHeight;
-			uint32_t MipLevels;
-			uint32_t ProxyCount{};
-			uint32_t Flags{};
-		} ConstantBuffer;
-		ExtractFrustumPlanes(ConstantBuffer.FrustumPlanes, Projection, View);
-		ConstantBuffer.ProxyCount = ProxyCount;
-		ConstantBuffer.Flags |= Flags;
-		nvrhi::BufferHandle ConstantBufferHandle = DirectXDevice::GetNativeDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(FMSConstantBuffer), "InstanceCull ConstantBuffer", 1));
-		CommandList->writeBuffer(ConstantBufferHandle, &ConstantBuffer, sizeof(FMSConstantBuffer));
-
-		//create the binding set
-		nvrhi::BindingSetDesc BindingSetDesc;
-		BindingSetDesc.bindings = {
-			nvrhi::BindingSetItem::ConstantBuffer(0, ConstantBufferHandle),
-			nvrhi::BindingSetItem::StructuredBuffer_SRV(0, InstanceBuffer),
-			nvrhi::BindingSetItem::StructuredBuffer_SRV(6, MeshBuffer),
-			nvrhi::BindingSetItem::StructuredBuffer_UAV(0, AmplificationGroupInfoBuffer),
-			nvrhi::BindingSetItem::StructuredBuffer_UAV(1, IndirectMeshletArgsBuffer),
-			nvrhi::BindingSetItem::StructuredBuffer_UAV(7, InstanceFrustumCulledPassedCountBuffer),
-		};
-		nvrhi::BindingLayoutHandle BindingLayoutHandle = AssetManager::GetInstance()->GetBindingLayout(BindingSetDesc);
-		nvrhi::BindingSetHandle BindingSetHandle = DirectXDevice::GetInstance()->CreateBindingSet(BindingSetDesc, BindingLayoutHandle);
-
-		//pipeline descs
-		nvrhi::ComputePipelineDesc CullingPipelineDesc;
-		CullingPipelineDesc.bindingLayouts = { BindingSetHandle->getLayout() };
-		nvrhi::ShaderHandle CullingShader = AssetManager::GetInstance()->GetShader("MeshletCull.cs.cso");
-		CullingPipelineDesc.CS = CullingShader;
-
-		nvrhi::ComputeState state;
-		state.pipeline = AssetManager::GetInstance()->GetComputePipeline(CullingPipelineDesc);
-		state.bindings = { BindingSetHandle };
-		CommandList->setComputeState(state);
-		CommandList->dispatch((ProxyCount + 63) / 64, 1, 1);
-	}
-	CommandList->endMarker();
-}
-
 void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 {
 	//create the buffers
@@ -896,12 +822,14 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	CountBufferDesc.debugName = "Phase2OccludedCountBuffer";
 	Phase2OccludedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
 	//debug counts
-	CountBufferDesc.debugName = "Instance Frustum Culled Count Buffer";
-	InstanceFrustumCulledPassedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
 	CountBufferDesc.debugName = "Meshlet Frustum Culled Count Buffer";
 	MeshletFrustumCulledCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
 	CountBufferDesc.debugName = "Meshlet Degenerate Cone Count Buffer";
 	MeshletDegenerateConeCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+	CountBufferDesc.debugName = "Meshlet Occluded Count Buffer 1";
+	MeshletOcclusionCulledPhase1CountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+	CountBufferDesc.debugName = "Meshlet Occluded Count Buffer 2";
+	MeshletOcclusionCulledPhase2CountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
 
 	nvrhi::BufferDesc PointLightBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(PointLightProxy) * MAX_LIGHT_COUNT, "PointLightBuffer");
 	PointLightBufferDesc.structStride = sizeof(PointLightProxy);

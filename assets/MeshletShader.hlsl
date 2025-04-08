@@ -23,7 +23,6 @@ cbuffer g_Const : register(b0)
     uint MipBaseWidth;
     uint MipBaseHeight;
     uint MipLevels;
-    uint ProxyCount;
     uint Flags;
 }
 
@@ -43,13 +42,30 @@ struct PayloadStruct
 #define VISIBLE 1
 #define CONE_CULLED 2
 #define FRUSTUM_CULLED 3
+#define OCCLUSION_CULLED 4
 
-//debug buffers
-RWStructuredBuffer<uint> InstanceFrustumCulledPassCountOutput : register(u7);
+StructuredBuffer<FInstanceData> InstanceDatas : register(t0);
+StructuredBuffer<FMaterialData> MaterialDatas : register(t1);
+StructuredBuffer<FVertex> Vertices : register(t2);
+StructuredBuffer<FMeshlet> Meshlets : register(t3);
+StructuredBuffer<uint> VertexIndices : register(t4);
+StructuredBuffer<uint> TriangleIndices : register(t5);
+StructuredBuffer<FMeshData> Meshes : register(t6);
+StructuredBuffer<FAmplificationGroupInfo> AmplificationGroupInfoInput : register(t7);
+StructuredBuffer<FMeshletBounds> MeshletBounds : register(t8);
+StructuredBuffer<uint> InstanceCountInput : register(t9);
+StructuredBuffer<uint> InstanceIdBufferInput : register(t10);
+Texture2D<float> HZBMips : register(t11);
+
+Texture2D Textures[] : register(t0, space1);
+sampler Samplers[9] : register(s0);
+
+RWStructuredBuffer<FAmplificationGroupInfo> AmplificationGroupInfoOutput : register(u0);
+RWStructuredBuffer<DispatchMeshleIndirectArguments> DispatchMeshleIndirectArgumentsBuffer : register(u1);
+RWStructuredBuffer<uint> MeshletOcclusionCulledPhase1CountOutput : register(u6);
+RWStructuredBuffer<uint> MeshletOcclusionCulledPhase2CountOutput : register(u7);
 RWStructuredBuffer<uint> MeshletFrustumCulledCountOutput : register(u8);
 RWStructuredBuffer<uint> MeshletDegenerateConeCountOutput : register(u9);
-
-RWStructuredBuffer<DispatchMeshleIndirectArguments> DispatchMeshleIndirectArgumentsBuffer : register(u1);
 
 [numthreads(1,1,1)]
 void ResetMeshletIndirectCS()
@@ -59,84 +75,30 @@ void ResetMeshletIndirectCS()
     DispatchMeshleIndirectArgumentsBuffer[0].ThreadGroupCountZ = 1;
 }
 
-StructuredBuffer<FInstanceData> InstanceDatas : register(t0);
-StructuredBuffer<FMeshData> Meshes : register(t6);
-
-RWStructuredBuffer<FAmplificationGroupInfo> AmplificationGroupInfoOutput : register(u0);
-
-bool FrustumCull(float3 Center, float3 Extents, float4x4 ModelToWorld)
-{
-    float3 Corners[8] =
-    {
-        Center + float3(-Extents.x, -Extents.y, -Extents.z),
-        Center + float3(-Extents.x, -Extents.y, Extents.z),
-        Center + float3(-Extents.x, Extents.y, -Extents.z),
-        Center + float3(-Extents.x, Extents.y, Extents.z),
-        Center + float3(Extents.x, -Extents.y, -Extents.z),
-        Center + float3(Extents.x, -Extents.y, Extents.z),
-        Center + float3(Extents.x, Extents.y, -Extents.z),
-        Center + float3(Extents.x, Extents.y, Extents.z)
-    };
-    [unroll]
-    for (int i = 0; i < 8; ++i)
-    {
-        Corners[i] = mul(float4(Corners[i], 1.f), ModelToWorld).xyz;
-    }
-    uint PlaneCount = Flags | INFINITE_Z_ENABLED ? 5 : 6;
-    for (int j = 0; j < PlaneCount; ++j)
-    {
-        bool Visible = false;
-        for (int k = 0; k < 8; ++k)
-        {
-            if ((dot(Corners[k], FrustumPlanes[j].xyz) + FrustumPlanes[j].w) >= 0.f)
-            {
-                Visible = true;
-                break;
-            }
-        }
-        if (!Visible)
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
 [numthreads(64, 1, 1)]
-void MeshletCullCS(in uint3 dtid : SV_DispatchThreadID)
+void MeshletBuildCommandParameters(in uint3 dtid : SV_DispatchThreadID)
 {
-    //frustum cull instance, phase 1 occlusion cull instance
-    //temp for now, just give all instances to the meshlet shader
-    if (dtid.x >= ProxyCount)
+    //after the instance culling pass, we have a list of visible instances
+    //update the amplification group info buffer and indirect meshlet draw buffer
+    if (dtid.x >= InstanceCountInput[0])
     {
         return;
     }
-    FInstanceData InstanceData = InstanceDatas[dtid.x];
+    uint InstanceId = InstanceIdBufferInput[dtid.x];
+    FInstanceData InstanceData = InstanceDatas[InstanceId];
     FMeshData MeshData = Meshes[InstanceData.MeshIndex];
-    //frustum cull this instance
-    //each thread will cull 1 proxy
-    float3 Center = MeshData.Center;
-    float3 Extents = MeshData.Extents;
-    //view planes are already in world space
-    if ((Flags & ENABLE_INSTANCE_FRUSTUM_CULL) && !FrustumCull(Center, Extents, InstanceData.ModelToWorld))
-    {
-        return;
-    }
-    //add to the debug counter
-    InterlockedAdd(InstanceFrustumCulledPassCountOutput[0], 1);
-    //each AS group has 64 threads, each thread processes 1 meshlet
+    //add the instance meshlets to the indirect draw buffer and amplification group info buffer
+    //1 thread 1 meshlet for the AS
     uint ASCount = (MeshData.MeshletCount + AS_GROUP_SIZE - 1) / AS_GROUP_SIZE;
     uint Index;
     InterlockedAdd(DispatchMeshleIndirectArgumentsBuffer[0].ThreadGroupCountX, ASCount, Index);
     for (uint asi = 0; asi < ASCount; asi++)
     {
-        AmplificationGroupInfoOutput[Index + asi].InstanceId = dtid.x;
+        AmplificationGroupInfoOutput[Index + asi].InstanceId = InstanceId;
         AmplificationGroupInfoOutput[Index + asi].AmplificationGroupOffset = asi;
     }
 }
 
-StructuredBuffer<FAmplificationGroupInfo> AmplificationGroupInfoInput : register(t7);
-StructuredBuffer<FMeshletBounds> MeshletBounds : register(t8);
 groupshared PayloadStruct s_Payload;
 groupshared uint MeshletCount;
 
@@ -170,6 +132,47 @@ bool ConeCull(uint InstanceId, FMeshletBounds Bounds, float3 CameraPosition)
     return true;
 }
 
+bool OcclusionCull(float3 SphereWorldPos, float SphereRadius)
+{
+    float3 ViewSpacePosition = mul(float4(SphereWorldPos, 1.f), ViewMatrix).xyz;
+    ViewSpacePosition.z = -ViewSpacePosition.z;
+    float3 ClosestViewSpacePoint = ViewSpacePosition - float3(0.f, 0.f, SphereRadius);
+    //determine mip map level by getting projected bounds first
+    float4 aabb = float4(0.f, 0.f, 0.f, 0.f);
+    bool Valid = projectSphereView(ViewSpacePosition, SphereRadius, ProjectionMatrix[3].z, ProjectionMatrix[0].x, ProjectionMatrix[1].y, aabb);
+    float mip = -1.f;
+    if (!Valid)
+    {
+        //if invalid, point is behind the near plane, just accept as not occluded
+        return true;
+    }
+    else
+    {
+        //get the position in clip space
+        float4 ClipPosition = mul(float4(ClosestViewSpacePoint, 1.f), ProjectionMatrix);
+        ClipPosition.xyz /= ClipPosition.w;
+        ClipPosition.z = -ClipPosition.z;
+        //clamp texcoord
+        aabb = clamp(aabb, float4(0.f, 0.f, 0.f, 0.f), float4(1.f, 1.f, 1.f, 1.f));
+        //calculate hi-Z buffer mip
+        int2 size = (aabb.xy - aabb.zw) * float2(MipBaseWidth, MipBaseHeight);
+        mip = ceil(log2(max(size.x, size.y)));
+ 
+        //load depths from high z buffer
+        float4 depth =
+        {
+            HZBMips.SampleLevel(Samplers[0], aabb.xy, mip),
+            HZBMips.SampleLevel(Samplers[0], aabb.zy, mip),
+            HZBMips.SampleLevel(Samplers[0], aabb.xw, mip),
+            HZBMips.SampleLevel(Samplers[0], aabb.zw, mip)
+        };
+        //find the min depth, smaller means further away
+        float minDepth = min(min(min(depth.x, depth.y), depth.z), depth.w);
+        //reverse z, smaller means closer to far plane, meaning likely behind
+        return ClipPosition.z >= minDepth;
+    }
+}
+
 [numthreads(AS_GROUP_SIZE, 1, 1)]
 void MeshletAS(in uint3 gtid: SV_GroupThreadID, in uint3 gid : SV_GroupID)
 {
@@ -198,23 +201,26 @@ void MeshletAS(in uint3 gtid: SV_GroupThreadID, in uint3 gid : SV_GroupID)
             if (!ConeCull(s_Payload.InstanceId, MeshletBound, CameraPosition))
                 VisiblityFlag = CONE_CULLED;
         }
+        //get the meshlet bounding sphere with the new largest scale
+        float3 s0 = length(InstanceData.ModelToWorld[0].xyz);
+        float3 s1 = length(InstanceData.ModelToWorld[1].xyz);
+        float3 s2 = length(InstanceData.ModelToWorld[2].xyz);
+        float s = max(max(s0, s1), s2);
+        //offset by meshlet group offset to access the global bounding sphere data
+        float3 SphereWorldPos = mul(float4(MeshletBound.Center, 1.f), InstanceData.ModelToWorld).xyz;
+        float SphereRadius = MeshletBound.Radius * s;
         //frustum culling second fastest
         if (VisiblityFlag == INVALID && Flags & ENABLE_AS_FRUSTUM_CULL)
         {
-            //get the meshlet bounding sphere with the new largest scale
-            float3 s0 = length(InstanceData.ModelToWorld[0].xyz);
-            float3 s1 = length(InstanceData.ModelToWorld[1].xyz);
-            float3 s2 = length(InstanceData.ModelToWorld[2].xyz);
-            float s = max(max(s0, s1), s2);
-            //offset by meshlet group offset to access the global bounding sphere data
-            float4 Sphere = float4(MeshletBound.Center, MeshletBound.Radius);
-            float3 SphereWorldPos = mul(float4(Sphere.xyz, 1.f), InstanceData.ModelToWorld).xyz;
-            float SphereRadius = Sphere.w * s;
             if (!FrustumCull(SphereWorldPos, SphereRadius))
                 VisiblityFlag = FRUSTUM_CULLED;
         }
         //occlusion culling last
-        
+        if (VisiblityFlag == INVALID && Flags & ENABLE_AS_OCCLUSION_CULL)
+        {
+            if (!OcclusionCull(SphereWorldPos, SphereRadius))
+                VisiblityFlag = OCCLUSION_CULLED;
+        }
         //if still invalid, it passed all tests, and hence is visible
         if (VisiblityFlag == INVALID)
         {
@@ -228,15 +234,14 @@ void MeshletAS(in uint3 gtid: SV_GroupThreadID, in uint3 gid : SV_GroupID)
         InterlockedAdd(MeshletDegenerateConeCountOutput[0], 1);
     if (VisiblityFlag == FRUSTUM_CULLED)
         InterlockedAdd(MeshletFrustumCulledCountOutput[0], 1);
+    if (VisiblityFlag == OCCLUSION_CULLED)
+        if (Flags & IS_PHASE_1)
+            InterlockedAdd(MeshletOcclusionCulledPhase1CountOutput[0], 1);
+        else
+            InterlockedAdd(MeshletOcclusionCulledPhase2CountOutput[0], 1);
     //interlocked add all the debug buffers to readback
     DispatchMesh(MeshletCount, 1, 1, s_Payload);
 }
-
-StructuredBuffer<FMaterialData> MaterialDatas : register(t1);
-StructuredBuffer<FVertex> Vertices : register(t2);
-StructuredBuffer<FMeshlet> Meshlets : register(t3);
-StructuredBuffer<uint> VertexIndices : register(t4);
-StructuredBuffer<uint> TriangleIndices : register(t5);
 
 struct VertexOutput
 {
@@ -311,9 +316,6 @@ void MeshletMS(
     }
 }
 
-Texture2D Textures[] : register(t0, space1);
-sampler Samplers[9] : register(s0);
-
 void MeshletPS(
 	in float4 inPos : SV_Position,
 	in float4 inPrevFragPos : TEXCOORD1,
@@ -367,6 +369,8 @@ void MeshletPS(
     outColor = albedo;
     if (Flags & ENABLE_MESHLET_COLOR)
         outColor *= float4(ColorPalette[inMeshletIndex % 32], 1.f);
+    else if (Flags & ENABLE_INSTANCE_COLOR)
+        outColor *= float4(ColorPalette[inInstanceId % 32], 1.f);
     outNormals.xy = Encode(N);
     outRoughnessMetallic = float2(roughness, metallic);
     float4 clipPos = mul(inFragPos, viewProjMatrix);

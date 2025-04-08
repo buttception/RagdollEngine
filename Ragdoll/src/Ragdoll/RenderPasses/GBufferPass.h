@@ -45,6 +45,8 @@ public:
 	nvrhi::BufferHandle Phase1OccludedCountBuffer;
 	nvrhi::BufferHandle MeshletFrustumCulledCountBuffer;
 	nvrhi::BufferHandle MeshletDegenerateConeCulledCountbuffer;
+	nvrhi::BufferHandle MeshletOcclusionCulledPhase1CountBuffer;
+	nvrhi::BufferHandle MeshletOcclusionCulledPhase2CountBuffer;
 
 private:
 	//only draw instances
@@ -56,4 +58,28 @@ private:
 		const ragdoll::DebugInfo& debugInfo,
 		ragdoll::SceneRenderTargets* targets,
 		bool opaquePass = true);
+
+	//helper to build the command parameters for the meshlet pass
+	void BuildMeshletParameters(
+		ragdoll::FGPUScene* GPUScene,
+		const ragdoll::SceneInformation& sceneInfo,
+		const ragdoll::DebugInfo& debugInfo,
+		uint32_t ProxyCount,
+		nvrhi::BufferHandle InstanceIdBuffer,
+		nvrhi::BufferHandle InstanceCountBuffer
+	);
+
+	//helper for dispatching the meshlets
+	void DispatchMeshlets(
+		ragdoll::FGPUScene* GPUScene,
+		const ragdoll::SceneInformation& sceneInfo,
+		const ragdoll::DebugInfo& debugInfo,
+		ragdoll::SceneRenderTargets* targets,
+		Matrix ViewMatrix,
+		Matrix ProjectionMatrix,
+		Matrix TestedViewMatrix,
+		Matrix TestedProjectionMatrix,
+		Vector3 CameraPosition,
+		bool IsPhase1 = false
+	);
 };

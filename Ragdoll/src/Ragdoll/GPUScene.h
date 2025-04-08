@@ -41,7 +41,6 @@ namespace ragdoll
 		//meshlet stuff
 		nvrhi::BufferHandle IndirectMeshletArgsBuffer{};
 		nvrhi::BufferHandle AmplificationGroupInfoBuffer{};
-		nvrhi::BufferHandle InstanceFrustumCulledPassedCountBuffer{};
 		nvrhi::BufferHandle MeshletFrustumCulledCountBuffer{};
 		nvrhi::BufferHandle MeshletDegenerateConeCountBuffer{};
 		nvrhi::BufferHandle MeshletOcclusionCulledPhase1CountBuffer{};
@@ -65,9 +64,9 @@ namespace ragdoll
 			SceneRenderTargets* Targets,
 			Matrix ViewMatrix,
 			Matrix ProjectionMatrix,
-			nvrhi::BufferHandle FrustumVisibleCountBuffer,
-			nvrhi::BufferHandle& PassedOcclusionCountOutput,
-			nvrhi::BufferHandle& FailedOcclusionCountOutput,
+			nvrhi::BufferHandle FrustumVisibleCountBuffer,		//buffer storing the number of visible instances after frustum test
+			nvrhi::BufferHandle& PassedOcclusionCountOutput,	//buffer storing the number of occluded instances
+			nvrhi::BufferHandle& FailedOcclusionCountOutput,	//buffer storing the number of non occluded instances
 			uint32_t ProxyCount
 		);
 		nvrhi::BufferHandle OcclusionCullPhase2(
@@ -79,15 +78,6 @@ namespace ragdoll
 			uint32_t ProxyCount
 		);
 		void BuildHZB(nvrhi::CommandListHandle CommandList, SceneRenderTargets* Targets);
-
-		void MeshletInstanceCull(
-			nvrhi::CommandListHandle CommandList,
-			const Matrix& Projection,
-			const Matrix& View,
-			uint32_t ProxyCount,
-			bool InfiniteZEnabled,
-			uint32_t Flags = ~0
-		);
 
 		//helper
 		void ExtractFrustumPlanes(Vector4 OutPlanes[6], const Matrix& Projection, const Matrix& View);

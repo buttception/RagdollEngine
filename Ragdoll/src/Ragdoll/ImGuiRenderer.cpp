@@ -336,14 +336,26 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 			}
 			SceneInfo.bIsCameraDirty = true;
 		}
-		ImGui::Checkbox("Enable Mesh shading", &SceneInfo.bEnableMeshletShading);
 		ImGui::Checkbox("Enable Instance Frustum Culling", &SceneInfo.bEnableInstanceFrustumCull);
 		if (ImGui::Checkbox("Enable Instance Occlusion Culling", &SceneInfo.bEnableOcclusionCull))
 			SceneInfo.bIsCameraDirty = true;
-		ImGui::Checkbox("Enable Mesh Frustum culling", &SceneInfo.bEnableMeshletFrustumCulling);
-		ImGui::Checkbox("Enable Mesh Cone culling", &SceneInfo.bEnableMeshletConeCulling);
-		ImGui::Checkbox("Enable Mesh Instance culling", &SceneInfo.bEnableMeshletOcclusionCulling);
-		ImGui::Checkbox("Enable Meshlet colors", &SceneInfo.bEnableMeshletColors);
+		ImGui::Checkbox("Enable Mesh shading", &SceneInfo.bEnableMeshletShading);
+		if (SceneInfo.bEnableMeshletShading)
+		{
+			ImGui::Checkbox("Enable Mesh Frustum culling", &SceneInfo.bEnableMeshletFrustumCulling);
+			ImGui::Checkbox("Enable Mesh Cone culling", &SceneInfo.bEnableMeshletConeCulling);
+			ImGui::Checkbox("Enable Mesh Occlusion culling", &SceneInfo.bEnableMeshletOcclusionCulling);
+			if (ImGui::Checkbox("Enable Meshlet colors", &SceneInfo.bEnableMeshletColors))
+			{
+				if (SceneInfo.bEnableMeshletColors)
+					SceneInfo.bEnableInstanceColors = false;
+			}
+		}
+		if (ImGui::Checkbox("Enable Instance colors", &SceneInfo.bEnableInstanceColors)) 
+		{
+			if (SceneInfo.bEnableInstanceColors)
+				SceneInfo.bEnableMeshletColors = false;
+		}
 		if (ImGui::Checkbox("Enable Light Grid", &DebugInfo.bEnableLightGrid))
 			SceneInfo.bIsCameraDirty = true;
 		if(ImGui::Checkbox("Show Frustum", &DebugInfo.bShowFrustum));
@@ -376,17 +388,17 @@ void ImguiRenderer::DrawSettings(ragdoll::DebugInfo& DebugInfo, ragdoll::SceneIn
 			}
 		}
 		ImGui::Text("%d total proxies", DebugInfo.TotalProxyCount);
-		ImGui::Text("%d passed frustum test", DebugInfo.PassedFrustumCullCount);
-		if (!SceneInfo.bEnableMeshletShading)
+		ImGui::Text("%d proxies passed frustum test", DebugInfo.PassedFrustumCullCount);
+		ImGui::Text("%d proxies passed occlusion 1 test", DebugInfo.PassedOcclusion1CullCount);
+		ImGui::Text("%d proxies passed occlusion 2 test", DebugInfo.PassedOcclusion2CullCount);
+		if (SceneInfo.bEnableMeshletShading)
 		{
-			ImGui::Text("%d passed occlusion1 test", DebugInfo.PassedOcclusion1CullCount);
-			ImGui::Text("%d passed occlusion2 test", DebugInfo.PassedOcclusion2CullCount);
-		}
-		else
-		{
-			ImGui::Text("%d total meshlets", DebugInfo.MeshletCount);
+			//useless data now because i do not know how meshlets passed the instance test now
+			//ImGui::Text("%d total meshlets", DebugInfo.MeshletCount);
 			ImGui::Text("%d meshlet cone cull", DebugInfo.MeshletConeCullCount);
 			ImGui::Text("%d meshlet frustum cull", DebugInfo.MeshletFrustumCullCount);
+			ImGui::Text("%d meshlet phase 1 occlusion cull", DebugInfo.MeshletOcclusion1CullCount);
+			ImGui::Text("%d meshlet phase 2 occlusion cull", DebugInfo.MeshletOcclusion2CullCount);
 		}
 		ImGui::TreePop();
 	}
