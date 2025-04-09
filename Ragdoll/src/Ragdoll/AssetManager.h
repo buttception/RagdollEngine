@@ -3,6 +3,7 @@
 #include <nvrhi/nvrhi.h>
 #include <tiny_gltf.h>
 #include "Ragdoll/Math/RagdollMath.h"
+#include "meshoptimizer.h"
 
 struct Material {
 	int32_t AlbedoTextureIndex = -1;
@@ -34,6 +35,11 @@ struct VertexBufferInfo
 	uint32_t IndicesOffset;
 	uint32_t IndicesCount;
 	uint32_t VerticesCount;
+
+	uint32_t MeshletCount;
+	uint32_t MeshletGroupOffset;
+	uint32_t MeshletGroupPrimitivesOffset;
+	uint32_t MeshletGroupVerticesOffset;
 
 	//Best fit box for culling
 	DirectX::BoundingBox BestFitBox;
@@ -78,6 +84,38 @@ enum class SamplerTypes
 	COUNT
 };
 
+struct FMeshletBounds
+{
+	/* bounding sphere, useful for frustum and occlusion culling */
+	Vector3 Center;
+	float Radius;
+
+	/* normal cone, useful for backface culling */
+	Vector3 ConeApex;
+	float ConeCutoff; /* = cos(angle/2) */
+	Vector3 ConeAxis;
+
+	/* extra compressed data, packed into 32 bits, not used for now
+	union {
+		uint32_t Data;
+		struct {
+			// normal cone axis and cutoff, stored in 8-bit SNORM format; decode using x/127.0
+			byte ConeAxis_s8[3];
+			byte ConeCutoff_s8;
+		};
+	};
+	*/
+
+	FMeshletBounds() = default;
+	FMeshletBounds(const meshopt_Bounds& bounds)
+	{
+		Center = Vector3(bounds.center[0], bounds.center[1], bounds.center[2]);
+		Radius = bounds.radius;
+		ConeApex = Vector3(bounds.cone_apex[0], bounds.cone_apex[1], bounds.cone_apex[2]);
+		ConeAxis = Vector3(bounds.cone_axis[0], bounds.cone_axis[1], bounds.cone_axis[2]);
+		ConeCutoff = bounds.cone_cutoff;
+	}
+};
 
 using Bytes = std::pair<const void*, uint32_t>;
 template<>
@@ -94,6 +132,9 @@ template<typename T>
 size_t HashBytes(T* ptr) {
 	return hash(std::make_pair(ptr, sizeof(T)));
 }
+
+constexpr size_t max_vertices = 64;
+constexpr size_t max_triangles = 124;	//not 126 because they want it divisible by 4
 
 class ForwardRenderer;
 class DirectXDevice;
@@ -121,6 +162,7 @@ public:
 	std::unordered_map<size_t, nvrhi::GraphicsPipelineHandle> GPSOs;
 	std::unordered_map<size_t, nvrhi::ComputePipelineHandle> CPSOs;
 	std::unordered_map<size_t, nvrhi::rt::PipelineHandle> RTSOs;
+	std::unordered_map<size_t, nvrhi::MeshletPipelineHandle> MPSOs;
 	std::unordered_map<size_t, nvrhi::BindingLayoutHandle> BindingLayouts;
 
 	std::unordered_map<std::string, nvrhi::ShaderHandle> Shaders;
@@ -132,6 +174,15 @@ public:
 	nvrhi::BufferHandle IBO;
 	std::vector<Vertex> Vertices;
 	std::vector<uint32_t> Indices;
+	//meshlet data
+	nvrhi::BufferHandle MeshletBuffer;
+	nvrhi::BufferHandle MeshletVertexBuffer;
+	nvrhi::BufferHandle MeshletPrimitiveBuffer;
+	nvrhi::BufferHandle MeshletBoundingSphereBuffer;
+	std::vector<meshopt_Meshlet> Meshlets;
+	std::vector<uint32_t> MeshletVertices;
+	std::vector<uint32_t> MeshletTrianglesPacked;
+	std::vector<FMeshletBounds> MeshletBounds;
 	//the information on how to use the global buffer
 	std::vector<nvrhi::VertexAttributeDesc> InstancedVertexAttributes;
 	nvrhi::InputLayoutHandle InstancedInputLayoutHandle;
@@ -144,6 +195,7 @@ public:
 	nvrhi::GraphicsPipelineHandle GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb);
 	nvrhi::ComputePipelineHandle GetComputePipeline(const nvrhi::ComputePipelineDesc& desc);
 	nvrhi::rt::PipelineHandle GetRaytracePipeline(const nvrhi::rt::PipelineDesc& desc);
+	nvrhi::MeshletPipelineHandle GetMeshletPipeline(const nvrhi::MeshletPipelineDesc& desc, const nvrhi::FramebufferHandle& fb);
 	nvrhi::BindingLayoutHandle GetBindingLayout(const nvrhi::BindingSetDesc& desc);
 	void RecompileShaders();
 
@@ -151,7 +203,9 @@ public:
 	//this function will just add the vertices and indices, and populate the vector of objects
 	size_t AddVertices(const std::vector<Vertex>& newVertices, const std::vector<uint32_t>& newIndices);
 	//this function will create the buffer handles and copy the data over
-	void UpdateVBOIBO();
+	void UpdateMeshBuffers();
+	//will create the global meshlet vectors, buffers will be created when update mesh buffers is called
+	void UpdateMeshletsData();
 
 	nvrhi::ShaderHandle GetShader(const std::string& shaderFilename);
 	nvrhi::ShaderLibraryHandle GetShaderLibrary(const std::string& shaderFilename);

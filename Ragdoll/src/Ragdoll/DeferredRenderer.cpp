@@ -134,8 +134,31 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 				DirectXDevice::GetNativeDevice()->unmapBuffer(GBufferPass->Phase1NonOccludedCountBuffer);
 				DirectXDevice::GetNativeDevice()->unmapBuffer(GBufferPass->Phase2NonOccludedCountBuffer);
 			}
-		}
-		{
+
+			if (GBufferPass->MeshletDegenerateConeCulledCountbuffer && GBufferPass->MeshletFrustumCulledCountBuffer)
+			{
+				scene->DebugInfo.MeshletConeCullCount = scene->DebugInfo.MeshletFrustumCullCount = 0;
+				if (intPtr = (int*)DirectXDevice::GetNativeDevice()->mapBuffer(GBufferPass->MeshletDegenerateConeCulledCountbuffer, nvrhi::CpuAccessMode::Read))
+				{
+					scene->DebugInfo.MeshletConeCullCount = *intPtr;
+				}
+				if (intPtr = (int*)DirectXDevice::GetNativeDevice()->mapBuffer(GBufferPass->MeshletFrustumCulledCountBuffer, nvrhi::CpuAccessMode::Read))
+				{
+					scene->DebugInfo.MeshletFrustumCullCount = *intPtr;
+				}
+				if (intPtr = (int*)DirectXDevice::GetNativeDevice()->mapBuffer(GBufferPass->MeshletOcclusionCulledPhase1CountBuffer, nvrhi::CpuAccessMode::Read))
+				{
+					scene->DebugInfo.MeshletOcclusion1CullCount = *intPtr;
+				}
+				if (intPtr = (int*)DirectXDevice::GetNativeDevice()->mapBuffer(GBufferPass->MeshletOcclusionCulledPhase2CountBuffer, nvrhi::CpuAccessMode::Read))
+				{
+					scene->DebugInfo.MeshletOcclusion2CullCount = *intPtr;
+				}
+				DirectXDevice::GetNativeDevice()->unmapBuffer(GBufferPass->MeshletOcclusionCulledPhase1CountBuffer);
+				DirectXDevice::GetNativeDevice()->unmapBuffer(GBufferPass->MeshletOcclusionCulledPhase2CountBuffer);
+				DirectXDevice::GetNativeDevice()->unmapBuffer(GBufferPass->MeshletDegenerateConeCulledCountbuffer);
+				DirectXDevice::GetNativeDevice()->unmapBuffer(GBufferPass->MeshletFrustumCulledCountBuffer);
+			}
 		}
 	}
 
@@ -157,13 +180,25 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 
 	uint32_t ProxyCount = scene->StaticProxies.size();
 	Taskflow.emplace([this, &scene, GPUScene, ProxyCount]() {
-		GBufferPass->Draw(
-			GPUScene,
-			ProxyCount,
-			scene->SceneInfo,
-			scene->DebugInfo,
-			RenderTargets,
-			scene->SceneInfo.bEnableOcclusionCull);
+		if (!scene->SceneInfo.bEnableMeshletShading)
+		{
+			GBufferPass->Draw(
+				GPUScene,
+				ProxyCount,
+				scene->SceneInfo,
+				scene->DebugInfo,
+				RenderTargets,
+				scene->SceneInfo.bEnableOcclusionCull);
+		}
+		else
+		{
+			GBufferPass->DrawMeshlets(
+				GPUScene,
+				ProxyCount,
+				scene->SceneInfo,
+				scene->DebugInfo,
+				RenderTargets);
+		}
 	});
 	activeList.emplace_back(CommandLists[(int)Pass::GBUFFER]);
 
@@ -288,14 +323,14 @@ void Renderer::Render(ragdoll::Scene* scene, ragdoll::FGPUScene* GPUScene, float
 		if (!scene->SceneInfo.bEnableDLSS && !scene->SceneInfo.bEnableFSR)
 		{
 			Taskflow.emplace([this]() {
-				FinalPass->DrawQuad(RenderTargets, false);
+				FinalPass->MeshletPass(RenderTargets, false);
 				});
 			activeList.emplace_back(CommandLists[(int)Pass::FINAL]);
 		}
 		else if (scene->SceneInfo.bEnableFSR)
 		{
 			Taskflow.emplace([this]() {
-				FinalPass->DrawQuad(RenderTargets, true);
+				FinalPass->MeshletPass(RenderTargets, true);
 				});
 			activeList.emplace_back(CommandLists[(int)Pass::FINAL]);
 		}

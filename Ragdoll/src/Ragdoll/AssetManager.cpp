@@ -101,6 +101,30 @@ size_t Hash(const nvrhi::rt::PipelineDesc& desc) {
 	return HashBytes(&obj);
 }
 
+size_t Hash(const nvrhi::MeshletPipelineDesc& desc) {
+	struct MeshletPipelineAbstraction {
+		size_t ASHash{};
+		size_t MSHash{};
+		size_t PSHash{};
+
+		size_t RenderStateHash{};
+		size_t PrimTypeHash{};
+		size_t BindingsHash[nvrhi::c_MaxBindingLayouts]{ {}, };
+	}obj;
+	if (desc.AS)
+		obj.ASHash = HashString(desc.AS->getDesc().debugName);
+	if (desc.MS)
+		obj.MSHash = HashString(desc.MS->getDesc().debugName);
+	if (desc.PS)
+		obj.PSHash = HashString(desc.PS->getDesc().debugName);
+	obj.RenderStateHash = HashBytes(&desc.renderState);
+	obj.PrimTypeHash = HashBytes(&desc.primType);
+	for (int i = 0; i < nvrhi::c_MaxBindingLayouts; ++i) {
+		obj.BindingsHash[i] = HashBytes(&desc.bindingLayouts);
+	}
+	return HashBytes(&obj);
+}
+
 nvrhi::GraphicsPipelineHandle AssetManager::GetGraphicsPipeline(const nvrhi::GraphicsPipelineDesc& desc, const nvrhi::FramebufferHandle& fb)
 {
 	std::lock_guard<std::mutex> LockGuard(Mutex);
@@ -132,6 +156,18 @@ nvrhi::rt::PipelineHandle AssetManager::GetRaytracePipeline(const nvrhi::rt::Pip
 		std::lock_guard<std::mutex> LockGuard(Mutex);
 		RD_CORE_INFO("RTSO created");
 		return RTSOs[hash] = DirectXDevice::GetNativeDevice()->createRayTracingPipeline(desc);
+	}
+}
+
+nvrhi::MeshletPipelineHandle AssetManager::GetMeshletPipeline(const nvrhi::MeshletPipelineDesc& desc, const nvrhi::FramebufferHandle& fb)
+{
+	size_t hash = Hash(desc);
+	if (MPSOs.contains(hash))
+		return MPSOs.at(hash);
+	{
+		std::lock_guard<std::mutex> LockGuard(Mutex);
+		RD_CORE_INFO("MPSO created");
+		return MPSOs[hash] = DirectXDevice::GetNativeDevice()->createMeshletPipeline(desc, fb);
 	}
 }
 
@@ -412,7 +448,7 @@ size_t AssetManager::AddVertices(const std::vector<Vertex>& newVertices, const s
 	return VertexBufferInfos.size() - 1;
 }
 
-void AssetManager::UpdateVBOIBO()
+void AssetManager::UpdateMeshBuffers()
 {
 	CommandList->open();
 	MICROPROFILE_GPU_SET_CONTEXT(CommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList).pointer, MicroProfileGetGlobalGpuThreadLog());
@@ -452,8 +488,189 @@ void AssetManager::UpdateVBOIBO()
 
 		CommandList->endMarker();
 	}
+
+	{
+		nvrhi::BufferDesc meshletBufDesc;
+		meshletBufDesc.byteSize = Meshlets.size() * sizeof(meshopt_Meshlet);
+		meshletBufDesc.debugName = "Meshlet Buffer";
+		meshletBufDesc.canHaveTypedViews = true;
+		meshletBufDesc.structStride = sizeof(meshopt_Meshlet);
+		MeshletBuffer = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(meshletBufDesc);
+		CommandList->beginTrackingBufferState(MeshletBuffer, nvrhi::ResourceStates::CopyDest);
+		CommandList->writeBuffer(MeshletBuffer, Meshlets.data(), meshletBufDesc.byteSize);
+		CommandList->setPermanentBufferState(MeshletBuffer, nvrhi::ResourceStates::ShaderResource);
+
+		nvrhi::BufferDesc meshletVertexBufDesc;
+		meshletVertexBufDesc.byteSize = MeshletVertices.size() * sizeof(uint32_t);
+		meshletVertexBufDesc.debugName = "Meshlet Vertex Buffer";
+		meshletVertexBufDesc.canHaveTypedViews = true;
+		meshletVertexBufDesc.structStride = sizeof(uint32_t);
+		MeshletVertexBuffer = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(meshletVertexBufDesc);
+		CommandList->beginTrackingBufferState(MeshletVertexBuffer, nvrhi::ResourceStates::CopyDest);
+		CommandList->writeBuffer(MeshletVertexBuffer, MeshletVertices.data(), meshletVertexBufDesc.byteSize);
+		CommandList->setPermanentBufferState(MeshletVertexBuffer, nvrhi::ResourceStates::ShaderResource);
+
+		nvrhi::BufferDesc meshletTriangleBufDesc;
+		meshletTriangleBufDesc.byteSize = MeshletTrianglesPacked.size() * sizeof(uint32_t);
+		meshletTriangleBufDesc.debugName = "Meshlet Triangle Buffer";
+		meshletTriangleBufDesc.canHaveTypedViews = true;
+		meshletTriangleBufDesc.structStride = sizeof(uint32_t);
+		MeshletPrimitiveBuffer = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(meshletTriangleBufDesc);
+		CommandList->beginTrackingBufferState(MeshletPrimitiveBuffer, nvrhi::ResourceStates::CopyDest);
+		CommandList->writeBuffer(MeshletPrimitiveBuffer, MeshletTrianglesPacked.data(), meshletTriangleBufDesc.byteSize);
+		CommandList->setPermanentBufferState(MeshletPrimitiveBuffer, nvrhi::ResourceStates::ShaderResource);
+
+		nvrhi::BufferDesc meshletBoundingSphereBufDesc;
+		meshletBoundingSphereBufDesc.byteSize = MeshletBounds.size() * sizeof(FMeshletBounds);
+		meshletBoundingSphereBufDesc.debugName = "Meshlet Bounds Buffer";
+		meshletBoundingSphereBufDesc.canHaveTypedViews = true;
+		meshletBoundingSphereBufDesc.structStride = sizeof(FMeshletBounds);
+		MeshletBoundingSphereBuffer = DirectXDevice::GetInstance()->m_NvrhiDevice->createBuffer(meshletBoundingSphereBufDesc);
+		CommandList->beginTrackingBufferState(MeshletBoundingSphereBuffer, nvrhi::ResourceStates::CopyDest);
+		CommandList->writeBuffer(MeshletBoundingSphereBuffer, MeshletBounds.data(), meshletBoundingSphereBufDesc.byteSize);
+		CommandList->setPermanentBufferState(MeshletBoundingSphereBuffer, nvrhi::ResourceStates::ShaderResource);
+	}
 	CommandList->close();
 	DirectXDevice::GetInstance()->m_NvrhiDevice->executeCommandList(CommandList);
+}
+
+//get the furthest point within the meshlet
+Vector3 GetFurthestPoint(
+	const Vector3& point,
+	const std::vector<Vertex>& vertices,
+	uint32_t vertexOffset,
+	const meshopt_Meshlet& meshlet,
+	const std::vector<uint32_t>& meshletVertices,
+	uint32_t globalMeshletVertexOffset
+)
+{
+	float FurthestDistSqred = 0;
+	Vector3 FurthestPoint = point;
+	for (size_t i = 0; i < meshlet.vertex_count; i++)
+	{
+		uint32_t vertIndex = meshletVertices[globalMeshletVertexOffset + meshlet.vertex_offset + i] + vertexOffset;
+		Vector3 p = vertices[vertIndex].position;
+		Vector3 v = p - point;
+		float distSqred = v.LengthSquared();
+		if (distSqred > FurthestDistSqred)
+		{
+			FurthestDistSqred = distSqred;
+			FurthestPoint = p;
+		}
+	}
+	return FurthestPoint;
+}
+
+Vector4 GetRitterSphere(
+	const std::vector<Vertex>& vertices,	//global vertices
+	uint32_t vertexOffset,					//offset to where the mesh vertices start
+	const meshopt_Meshlet& meshlet,			//the meshlet to calculate the sphere for
+	const std::vector<uint32_t>& meshletVertices,	//the meshlet vertex indices
+	uint32_t globalMeshletVertexOffset
+)
+{
+	//mesh vertex offset in the global buffer + meshlet vertex offset to get the index for the global vertex
+	uint32_t firstMeshletVertexIndex = meshletVertices[globalMeshletVertexOffset + meshlet.vertex_offset] + vertexOffset;
+	Vector3 first = vertices[firstMeshletVertexIndex].position;
+	Vector3 p0 = GetFurthestPoint(first, vertices, vertexOffset, meshlet, meshletVertices, globalMeshletVertexOffset);
+	Vector3 p1 = GetFurthestPoint(p0, vertices, vertexOffset, meshlet, meshletVertices, globalMeshletVertexOffset);
+	Vector3 center = (p0 + p1) * 0.5f;
+	float radiusSqred = (p1 - center).LengthSquared();
+	//check if the sphere is big enough to contain all the points, otherwise update
+	for (size_t i = 0; i < meshlet.vertex_count; i++)
+	{
+		uint32_t vertIndex = meshletVertices[globalMeshletVertexOffset + meshlet.vertex_offset + i] + vertexOffset;
+		Vector3 p = vertices[vertIndex].position;
+		Vector3 v = p - center;
+		float distSqred = v.LengthSquared();
+		if (distSqred > radiusSqred)
+		{
+			//just expand the sphere to be conservative
+			radiusSqred = distSqred;
+		}
+	}
+	return Vector4(center.x, center.y, center.z, sqrtf(radiusSqred));
+}
+
+void AssetManager::UpdateMeshletsData()
+{
+	Meshlets.clear();
+	MeshletTrianglesPacked.clear();
+	MeshletVertices.clear();
+	MeshletBounds.clear();
+
+	//maximum number of meshlets based on global index buffer containing every mesh
+	size_t GlobalMaxMeshletsCount = meshopt_buildMeshletsBound(Indices.size(), max_vertices, max_triangles);
+	Meshlets.resize(GlobalMaxMeshletsCount);
+	MeshletBounds.resize(GlobalMaxMeshletsCount);
+	MeshletVertices.resize(GlobalMaxMeshletsCount * max_vertices);
+	MeshletTrianglesPacked.resize(GlobalMaxMeshletsCount * max_triangles * 3);
+	//worse case of global, even though the worse case should fit the largest mesh only, TODO: find a way to use the other worst case
+	std::vector<uint8_t > MeshletTrianglesUnpacked(GlobalMaxMeshletsCount * max_triangles * 3);
+	uint32_t MeshletTotalCount{}, MeshletTrianglesPackedTotalCount{}, MeshletVerticesTotalCount{};
+	const float ConeWeight = 0.f;	//not using cone weight, it is used for culling
+	for (size_t i = 0; i < VertexBufferInfos.size(); ++i)
+	{
+		VertexBufferInfo& Info = VertexBufferInfos[i];
+
+		//create the meshlet inplaced at the offsets
+		Vertex* VertexStart = &Vertices[Info.VerticesOffset];
+		uint32_t* IndexStart = &Indices[Info.IndicesOffset];
+		meshopt_Meshlet* MeshletStart = &Meshlets[MeshletTotalCount];
+		uint32_t* MeshletVerticesStart = &MeshletVertices[MeshletVerticesTotalCount];
+		
+		uint32_t MeshletTempCount = meshopt_buildMeshlets(MeshletStart, MeshletVerticesStart, MeshletTrianglesUnpacked.data(), IndexStart, Info.IndicesCount, (float*)VertexStart, Info.VerticesCount, sizeof(Vertex), max_vertices, max_triangles, ConeWeight);
+
+		//generate bounds here before packing the data
+		for (size_t j = 0; j < MeshletTempCount; ++j)
+		{
+			const meshopt_Meshlet& Meshlet = MeshletStart[j];
+			//use meshopt to generate bounds as well
+			meshopt_Bounds bounds = meshopt_computeMeshletBounds(MeshletVerticesStart + Meshlet.vertex_offset, MeshletTrianglesUnpacked.data() + Meshlet.triangle_offset, Meshlet.triangle_count, (float*)VertexStart, Info.VerticesCount, sizeof(Vertex));
+			MeshletBounds[MeshletTotalCount + j] = bounds;
+		}
+
+		const meshopt_Meshlet& Last = Meshlets[MeshletTempCount + MeshletTotalCount - 1];
+
+		//pack the primtive indices into the offset of the primitive buffer
+		uint32_t UnpackedTrianglesCount = Last.triangle_offset + ((Last.triangle_count * 3 + 3) & ~3);
+		//offset value in terms of 3 indices representing a triangle within the local packed triangle buffer
+		uint32_t PackedTriangleLocalOffset{};
+		for (size_t j = MeshletTotalCount; j < MeshletTotalCount + MeshletTempCount; ++j)
+		{
+			meshopt_Meshlet& Meshlet = Meshlets[j];
+			//offset value of indiv indices in the local unpacked triangle buffer
+			uint32_t UnpackedTriangleOffset = Meshlet.triangle_offset;
+			Meshlet.triangle_offset = PackedTriangleLocalOffset;
+			//iterate through the unpacked meshlet from the original offset to count * 3
+			for (size_t k = UnpackedTriangleOffset; k < UnpackedTriangleOffset + Meshlet.triangle_count * 3; k += 3)
+			{
+				uint32_t packed = 0;
+				packed |= uint32_t(MeshletTrianglesUnpacked[k + 0]) << 0;
+				packed |= uint32_t(MeshletTrianglesUnpacked[k + 1]) << 8;
+				packed |= uint32_t(MeshletTrianglesUnpacked[k + 2]) << 16;
+				//add the packed triangle to the global buffer
+				MeshletTrianglesPacked[MeshletTrianglesPackedTotalCount + PackedTriangleLocalOffset++] = packed;
+			}
+		}
+
+		//update the vertex buffer info
+		Info.MeshletCount = MeshletTempCount;
+		Info.MeshletGroupOffset = MeshletTotalCount;
+		Info.MeshletGroupPrimitivesOffset = MeshletTrianglesPackedTotalCount;
+		Info.MeshletGroupVerticesOffset = MeshletVerticesTotalCount;
+
+		//update the counters so we can shrink the global buffers afterwards
+		MeshletTotalCount += MeshletTempCount;
+		MeshletTrianglesPackedTotalCount += PackedTriangleLocalOffset;
+		MeshletVerticesTotalCount += Last.vertex_offset + Last.vertex_count;
+	}
+
+	//once done, resize the buffers
+	Meshlets.resize(MeshletTotalCount);
+	MeshletBounds.resize(MeshletTotalCount);
+	MeshletTrianglesPacked.resize(MeshletTrianglesPackedTotalCount);
+	MeshletVertices.resize(MeshletVerticesTotalCount);
 }
 
 nvrhi::ShaderHandle AssetManager::GetShader(const std::string& shaderFilename)
@@ -472,6 +689,12 @@ nvrhi::ShaderHandle AssetManager::GetShader(const std::string& shaderFilename)
 	}
 	else if (shaderFilename.find(".cs.") != std::string::npos) {
 		type = nvrhi::ShaderType::Compute;
+	}
+	else if (shaderFilename.find(".ms.") != std::string::npos) {
+		type = nvrhi::ShaderType::Mesh;
+	}
+	else if (shaderFilename.find(".as.") != std::string::npos) {
+		type = nvrhi::ShaderType::Amplification;
 	}
 	uint32_t size{};
 	const uint8_t* data = FileManagerRef->ImmediateLoad("cso/" + shaderFilename, size);

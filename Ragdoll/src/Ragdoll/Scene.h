@@ -77,6 +77,11 @@ namespace ragdoll {
 		uint32_t PassedFrustumCullCount{};
 		uint32_t PassedOcclusion1CullCount{};
 		uint32_t PassedOcclusion2CullCount{};
+		uint32_t MeshletCount{};
+		uint32_t MeshletConeCullCount{};
+		uint32_t MeshletFrustumCullCount{};
+		uint32_t MeshletOcclusion1CullCount{};
+		uint32_t MeshletOcclusion2CullCount{};
 	};
 
 	struct SceneConfig {
@@ -141,9 +146,16 @@ namespace ragdoll {
 		bool bEnableXeGTAONoise{ false };
 		bool bEnableBloom{ true };
 		bool bEnableOcclusionCull{ true };
+		bool bEnableInstanceFrustumCull{ true };
 		bool bRaytraceDirectionalLight{ true };
 		bool bInlineRaytrace{ false };
 		bool bRaytraceShadowDenoiser{ true };
+		bool bEnableMeshletShading{ true };
+		bool bEnableMeshletFrustumCulling{ true };
+		bool bEnableMeshletConeCulling{ true };
+		bool bEnableMeshletOcclusionCulling{ true };
+		bool bEnableMeshletColors{ false };
+		bool bEnableInstanceColors{ false };
 		float SunSize = 0.1f;
 		uint32_t RenderWidth = 1920;
 		uint32_t RenderHeight = 1080;

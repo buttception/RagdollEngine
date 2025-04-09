@@ -12,6 +12,7 @@
 #include "Ragdoll/Components/RenderableComp.h"
 #include "Ragdoll/Components/PointLightComp.h"
 #include "Scene.h"
+#include "meshoptimizer.h"
 
 // Define these only in *one* .cc file.
 #define TINYGLTF_IMPLEMENTATION
@@ -842,9 +843,13 @@ void GLTFLoader::LoadAndCreateModel(const std::string& fileName)
 			AssetManager::GetInstance()->Meshes.emplace_back(mesh);
 		}
 	}
+	{
+		//create the meshlets based on the global vertex and index buffers
+		AssetManager::GetInstance()->UpdateMeshletsData();
+	}
 	//create the buffers
 	{
-		AssetManager::GetInstance()->UpdateVBOIBO();
+		AssetManager::GetInstance()->UpdateMeshBuffers();
 	}
 	uint32_t textureIndicesOffset = static_cast<uint32_t>(AssetManager::GetInstance()->Textures.size());
 	uint32_t imageIndicesOffset = static_cast<uint32_t>(AssetManager::GetInstance()->Images.size());

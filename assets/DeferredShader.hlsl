@@ -10,10 +10,15 @@ cbuffer g_Const : register(b0) {
 	float4x4 viewProjMatrixWithAA;
 	float4x4 prevViewProjMatrix;
 	float2 RenderResolution;
+    uint InstanceId;
 };
 
 StructuredBuffer<FInstanceData> InstanceDatas : register(t0);
+StructuredBuffer<FMaterialData> MaterialDatas : register(t1);
+
 Texture2D Textures[] : register(t0, space1);
+
+sampler Samplers[9] : register(s0);
 
 void gbuffer_vs(
 	in float3 inPos : POSITION,
@@ -44,9 +49,6 @@ void gbuffer_vs(
     outTexcoord = float2(inTexcoord.x, inTexcoord.y);
     outInstanceId = inInstanceId;
 }
-
-StructuredBuffer<FMaterialData> MaterialDatas : register(t1);
-sampler Samplers[9] : register(s0);
 
 void gbuffer_ps(
 	in float4 inPos : SV_Position,
@@ -96,7 +98,8 @@ void gbuffer_ps(
 	}
 
 	//draw to the targets
-	outColor = albedo;
+    //outColor = float4(ColorPalette[inInstanceId % 32], 1.f);
+    outColor = albedo;
 	outNormals.xy = Encode(N);
 	outRoughnessMetallic = float2(roughness, metallic);
 	float4 clipPos = mul(inFragPos, viewProjMatrix);

@@ -775,6 +775,28 @@ namespace nvrhi::validation
 			return;
 		m_CommandList->drawIndexedIndirect(offsetBytes, countBuffer, drawCount);
     }
+
+	void CommandListWrapper::dispatchMeshIndirect(uint32_t offsetBytes, IBuffer* countBuffer, uint32_t drawCount)
+	{
+		if (!requireOpenState())
+			return;
+		if (!requireType(CommandQueue::Graphics, "dispatchMeshIndirect"))
+			return;
+		if (!m_MeshletStateSet)
+		{
+			error("Meshlet state is not set before a dispatchMeshIndirect call.\n"
+				"Note that setting graphics or compute state invalidates the meshlet state.");
+			return;
+		}
+		if (!m_CurrentMeshletState.indirectParams)
+		{
+			error("Indirect params buffer is not set before a dispatchMeshIndirect call.");
+			return;
+		}
+		if (!validatePushConstants("meshlet", "setMeshletState"))
+			return;
+		m_CommandList->dispatchMeshIndirect(offsetBytes, countBuffer, drawCount);
+	}
     //end of devin
 
     void CommandListWrapper::setComputeState(const ComputeState& state)

@@ -25,6 +25,13 @@
 #define IS_PHASE_1 1 << 2
 #define ALPHA_TEST_ENABLED 1 << 3
 #define CULL_ALL 1 << 4
+#define ENABLE_INSTANCE_FRUSTUM_CULL 1 << 5
+#define ENABLE_INSTANCE_OCCLUSION_CULL 1 << 6
+#define ENABLE_AS_FRUSTUM_CULL 1 << 7
+#define ENABLE_AS_CONE_CULL 1 << 8
+#define ENABLE_AS_OCCLUSION_CULL 1 << 9
+#define ENABLE_MESHLET_COLOR 1 << 10
+#define ENABLE_INSTANCE_COLOR 1 << 11
 
 #define MAX_HZB_MIP_COUNT 16
 
@@ -59,6 +66,12 @@ struct FMeshData
 	uint32_t VertexCount;
 	uint32_t IndexOffset;
 	uint32_t VertexOffset;
+
+	uint32_t MeshletCount;
+	uint32_t MeshletGroupOffset;
+	uint32_t MeshletGroupPrimitivesOffset;
+	uint32_t MeshletGroupVerticesOffset;
+
 	Vector3 Center;
 	Vector3 Extents;
 };
@@ -93,6 +106,12 @@ struct FMaterialData
 	uint32_t Flags;
 };
 
+struct FAmplificationGroupInfo
+{
+	uint32_t InstanceId;
+	uint32_t MeshletGroupOffset;
+};
+
 void ragdoll::FGPUScene::Update(Scene* Scene)
 {
 	//if the projection matrix change, update the frustum aabb
@@ -105,6 +124,7 @@ void ragdoll::FGPUScene::Update(Scene* Scene)
 		CommandList->close();
 		DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 	}
+	SceneRef = Scene;
 }
 
 void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
@@ -134,6 +154,10 @@ void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 		data.VertexCount = info.VerticesCount;
 		data.IndexOffset = info.IndicesOffset;
 		data.VertexOffset = info.VerticesOffset;
+		data.MeshletCount = info.MeshletCount;
+		data.MeshletGroupOffset = info.MeshletGroupOffset;
+		data.MeshletGroupPrimitivesOffset = info.MeshletGroupPrimitivesOffset;
+		data.MeshletGroupVerticesOffset = info.MeshletGroupVerticesOffset;
 		data.Center = info.BestFitBox.Center;
 		data.Extents = info.BestFitBox.Extents;
 	}
@@ -294,7 +318,14 @@ void ragdoll::FGPUScene::UpdateBuffers(Scene* Scene)
 	CommandList->buildTopLevelAccelStruct(TopLevelAS, InstanceDescs.data(), InstanceDescs.size());
 	CommandList->endMarker();
 
+	//reset the indirect arg
+	nvrhi::DispatchMeshleIndirectArguments IndirectArgs;
+	IndirectArgs.threadGroupCountX = 0;
+	IndirectArgs.threadGroupCountY = IndirectArgs.threadGroupCountZ = 1;
+	CommandList->beginMarker("Writing Indirect Args");
+	CommandList->writeBuffer(IndirectMeshletArgsBuffer, &IndirectArgs, sizeof(nvrhi::DispatchMeshleIndirectArguments));
 	CommandList->close();
+
 	DirectXDevice::GetNativeDevice()->executeCommandList(CommandList);
 	DirectXDevice::GetNativeDevice()->waitForIdle();
 }
@@ -750,6 +781,23 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	IndirectDrawArgsBufferDesc.isDrawIndirectArgs = true;
 	IndirectDrawArgsBuffer = DirectXDevice::GetNativeDevice()->createBuffer(IndirectDrawArgsBufferDesc);
 
+	//create the indirect meshlet arg buffer
+	nvrhi::BufferDesc IndirectMeshletArgsBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(nvrhi::DispatchMeshleIndirectArguments), "IndirectMeshletArgsBuffer");
+	IndirectMeshletArgsBufferDesc.structStride = sizeof(nvrhi::DispatchMeshleIndirectArguments);
+	IndirectMeshletArgsBufferDesc.canHaveUAVs = true;
+	IndirectMeshletArgsBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	IndirectMeshletArgsBufferDesc.keepInitialState = true;
+	IndirectMeshletArgsBufferDesc.isDrawIndirectArgs = true;
+	IndirectMeshletArgsBufferDesc.isConstantBuffer = false;
+	IndirectMeshletArgsBuffer = DirectXDevice::GetNativeDevice()->createBuffer(IndirectMeshletArgsBufferDesc);
+
+	nvrhi::BufferDesc AmplificationGroupInfoBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(FAmplificationGroupInfo) * 65535, "AmplificationGroupInfoBuffer");
+	AmplificationGroupInfoBufferDesc.structStride = sizeof(uint32_t);
+	AmplificationGroupInfoBufferDesc.canHaveUAVs = true;
+	AmplificationGroupInfoBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	AmplificationGroupInfoBufferDesc.keepInitialState = true;
+	AmplificationGroupInfoBuffer = DirectXDevice::GetNativeDevice()->createBuffer(AmplificationGroupInfoBufferDesc);
+
 	nvrhi::BufferDesc DebugBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(float) * Proxies.size(), "DebugBuffer");
 	DebugBufferDesc.structStride = sizeof(float);
 	DebugBufferDesc.canHaveUAVs = true;
@@ -773,6 +821,15 @@ void ragdoll::FGPUScene::CreateBuffers(const std::vector<Proxy>& Proxies)
 	Phase2NonOccludedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
 	CountBufferDesc.debugName = "Phase2OccludedCountBuffer";
 	Phase2OccludedCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+	//debug counts
+	CountBufferDesc.debugName = "Meshlet Frustum Culled Count Buffer";
+	MeshletFrustumCulledCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+	CountBufferDesc.debugName = "Meshlet Degenerate Cone Count Buffer";
+	MeshletDegenerateConeCountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+	CountBufferDesc.debugName = "Meshlet Occluded Count Buffer 1";
+	MeshletOcclusionCulledPhase1CountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
+	CountBufferDesc.debugName = "Meshlet Occluded Count Buffer 2";
+	MeshletOcclusionCulledPhase2CountBuffer = DirectXDevice::GetNativeDevice()->createBuffer(CountBufferDesc);
 
 	nvrhi::BufferDesc PointLightBufferDesc = nvrhi::utils::CreateStaticConstantBufferDesc(sizeof(PointLightProxy) * MAX_LIGHT_COUNT, "PointLightBuffer");
 	PointLightBufferDesc.structStride = sizeof(PointLightProxy);

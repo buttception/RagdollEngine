@@ -192,3 +192,64 @@ float BlueNoise(float2 U)
   //return .75*( 1.125*hash(U)- v/8.) + .5; // very slight overbound
   //return .65*( 1.125*hash(U)- v/8.) + .5; // dimmed, but histo just fit without clamp. flat up to .5 +- .23
 }
+
+//thanks chatgpt
+static const float3 ColorPalette[32] =
+{
+    float3(1.0, 0.0, 0.0), // Red
+    float3(0.0, 1.0, 0.0), // Green
+    float3(0.0, 0.0, 1.0), // Blue
+    float3(1.0, 1.0, 0.0), // Yellow
+    float3(1.0, 0.0, 1.0), // Magenta
+    float3(0.0, 1.0, 1.0), // Cyan
+    float3(0.5, 0.0, 0.0), // Dark Red
+    float3(0.0, 0.5, 0.0), // Dark Green
+    float3(0.0, 0.0, 0.5), // Dark Blue
+    float3(0.5, 0.5, 0.0), // Olive
+    float3(0.5, 0.0, 0.5), // Purple
+    float3(0.0, 0.5, 0.5), // Teal
+    float3(1.0, 0.5, 0.0), // Orange
+    float3(1.0, 0.0, 0.5), // Pink
+    float3(0.5, 1.0, 0.0), // Chartreuse
+    float3(0.5, 0.0, 1.0), // Violet
+    float3(0.0, 1.0, 0.5), // Spring Green
+    float3(0.0, 0.5, 1.0), // Azure
+    float3(1.0, 0.75, 0.0), // Goldenrod
+    float3(1.0, 0.25, 0.25), // Light Red
+    float3(0.25, 1.0, 0.25), // Light Green
+    float3(0.25, 0.25, 1.0), // Light Blue
+    float3(0.75, 0.75, 0.75), // Light Gray
+    float3(0.5, 0.5, 0.5), // Gray
+    float3(0.25, 0.25, 0.25), // Dark Gray
+    float3(1.0, 0.5, 0.5), // Soft Red
+    float3(0.5, 1.0, 0.5), // Soft Green
+    float3(0.5, 0.5, 1.0), // Soft Blue
+    float3(1.0, 0.75, 0.75), // Pale Red
+    float3(0.75, 1.0, 0.75), // Pale Green
+    float3(0.75, 0.75, 1.0), // Pale Blue
+    float3(0.2, 0.8, 0.6) // Extra unique color
+};
+
+// 2D Polyhedral Bounds of a Clipped, Perspective-Projected 3D Sphere. Michael Mara, Morgan McGuire. 2013
+bool projectSphereView(float3 c, float r, float znear, float P00, float P11, out float4 aabb)
+{
+    if (c.z < r + znear)
+        return false;
+
+    float3 cr = c * r;
+    float czr2 = c.z * c.z - r * r;
+
+    float vx = sqrt(c.x * c.x + czr2);
+    float minx = (vx * c.x - cr.z) / (vx * c.z + cr.x);
+    float maxx = (vx * c.x + cr.z) / (vx * c.z - cr.x);
+
+    float vy = sqrt(c.y * c.y + czr2);
+    float miny = (vy * c.y - cr.z) / (vy * c.z + cr.y);
+    float maxy = (vy * c.y + cr.z) / (vy * c.z - cr.y);
+
+    aabb = float4(minx * P00, miny * P11, maxx * P00, maxy * P11);
+    // clip space -> uv space
+    aabb = aabb.xyzw * float4(0.5f, -0.5f, 0.5f, -0.5f) + float4(0.5f, 0.5f, 0.5f, 0.5f);
+
+    return true;
+}

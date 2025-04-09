@@ -2285,6 +2285,18 @@ namespace nvrhi
         constexpr DrawIndexedIndirectArguments& setStartInstanceLocation(uint32_t value) { startInstanceLocation = value; return *this; }
     };
 
+    //devin
+    struct DispatchMeshleIndirectArguments
+    {
+		uint32_t threadGroupCountX = 0;
+		uint32_t threadGroupCountY = 1;
+		uint32_t threadGroupCountZ = 1;
+		constexpr DispatchMeshleIndirectArguments& setThreadGroupCountX(uint32_t value) { threadGroupCountX = value; return *this; }
+		constexpr DispatchMeshleIndirectArguments& setThreadGroupCountY(uint32_t value) { threadGroupCountY = value; return *this; }
+		constexpr DispatchMeshleIndirectArguments& setThreadGroupCountZ(uint32_t value) { threadGroupCountZ = value; return *this; }
+    };
+    //end of devin
+
     struct ComputeState
     {
         IComputePipeline* pipeline = nullptr;
@@ -2558,6 +2570,8 @@ namespace nvrhi
 
         virtual void setMeshletState(const MeshletState& state) = 0;
         virtual void dispatchMesh(uint32_t groupsX, uint32_t groupsY = 1, uint32_t groupsZ = 1) = 0;
+        //devin
+		virtual void dispatchMeshIndirect(uint32_t offsetBytes, IBuffer* countBuffer, uint32_t drawCount = 1) = 0;
 
         virtual void setRayTracingState(const rt::State& state) = 0;
         virtual void dispatchRays(const rt::DispatchRaysArguments& args) = 0;

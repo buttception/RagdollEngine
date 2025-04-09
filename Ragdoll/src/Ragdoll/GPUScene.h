@@ -38,6 +38,16 @@ namespace ragdoll
 		//raytracing stuff
 		std::vector<nvrhi::rt::AccelStructHandle> BottomLevelASs;
 		nvrhi::rt::AccelStructHandle TopLevelAS;
+		//meshlet stuff
+		nvrhi::BufferHandle IndirectMeshletArgsBuffer{};
+		nvrhi::BufferHandle AmplificationGroupInfoBuffer{};
+		nvrhi::BufferHandle MeshletFrustumCulledCountBuffer{};
+		nvrhi::BufferHandle MeshletDegenerateConeCountBuffer{};
+		nvrhi::BufferHandle MeshletOcclusionCulledPhase1CountBuffer{};
+		nvrhi::BufferHandle MeshletOcclusionCulledPhase2CountBuffer{};
+
+		//temp
+		Scene* SceneRef;
 
 		void Update(Scene* Scene);
 		//will sort the proxies before making a instance buffer copy and uploading to gpu
@@ -54,9 +64,9 @@ namespace ragdoll
 			SceneRenderTargets* Targets,
 			Matrix ViewMatrix,
 			Matrix ProjectionMatrix,
-			nvrhi::BufferHandle FrustumVisibleCountBuffer,
-			nvrhi::BufferHandle& PassedOcclusionCountOutput,
-			nvrhi::BufferHandle& FailedOcclusionCountOutput,
+			nvrhi::BufferHandle FrustumVisibleCountBuffer,		//buffer storing the number of visible instances after frustum test
+			nvrhi::BufferHandle& PassedOcclusionCountOutput,	//buffer storing the number of occluded instances
+			nvrhi::BufferHandle& FailedOcclusionCountOutput,	//buffer storing the number of non occluded instances
 			uint32_t ProxyCount
 		);
 		nvrhi::BufferHandle OcclusionCullPhase2(
