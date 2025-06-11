@@ -2,7 +2,6 @@
 .vs/
 build/
 build-int/
-dependencies/
 Editor/intermediates/
 Editor/compilers/
 Launcher/intermediates/
