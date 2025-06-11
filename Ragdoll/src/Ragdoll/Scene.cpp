@@ -658,8 +658,8 @@ void ragdoll::Scene::PopulateStaticProxies()
 			Proxy.MeshIndex = submesh.VertexBufferIndex;
 			AssetManager::GetInstance()->VertexBufferInfos[Proxy.MeshIndex].BestFitBox.Transform(Proxy.BoundingBox, tComp->m_ModelToWorld);
 
-			//add meshlet count for debuf
-			Mesh mesh = AssetManager::GetInstance()->Meshes[Proxy.MeshIndex];
+			//add meshlet count for debugs
+			//Mesh mesh = AssetManager::GetInstance()->Meshes[Proxy.MeshIndex];
 			for (const auto& it : mesh.Submeshes)
 			{
 				DebugInfo.MeshletCount += AssetManager::GetInstance()->VertexBufferInfos[it.VertexBufferIndex].MeshletCount;

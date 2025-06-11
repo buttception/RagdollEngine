@@ -239,27 +239,35 @@ bool DirectX::IsPacked(DXGI_FORMAT fmt) noexcept
 	}
 }
 
-bool DirectX::IsPlanar(DXGI_FORMAT fmt) noexcept
+bool DirectX::IsPlanar(DXGI_FORMAT fmt, bool isd3d12) noexcept
 {
 	switch (static_cast<int>(fmt))
 	{
+	case DXGI_FORMAT_R32G8X24_TYPELESS:
+	case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
+	case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
+	case DXGI_FORMAT_X32_TYPELESS_G8X24_UINT:
+	case DXGI_FORMAT_R24G8_TYPELESS:
+	case DXGI_FORMAT_D24_UNORM_S8_UINT:
+	case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
+	case DXGI_FORMAT_X24_TYPELESS_G8_UINT:
+		return isd3d12; // Direct3D 12 considers these planar, Direct3D 11 does not.
+
 	case DXGI_FORMAT_NV12:      // 4:2:0 8-bit
 	case DXGI_FORMAT_P010:      // 4:2:0 10-bit
 	case DXGI_FORMAT_P016:      // 4:2:0 16-bit
 	case DXGI_FORMAT_420_OPAQUE:// 4:2:0 8-bit
 	case DXGI_FORMAT_NV11:      // 4:1:1 8-bit
 
-		/*
-	case WIN10_DXGI_FORMAT_P208: // 4:2:2 8-bit
-	case WIN10_DXGI_FORMAT_V208: // 4:4:0 8-bit
-	case WIN10_DXGI_FORMAT_V408: // 4:4:4 8-bit
+	//case WIN10_DXGI_FORMAT_P208: // 4:2:2 8-bit
+	//case WIN10_DXGI_FORMAT_V208: // 4:4:0 8-bit
+	//case WIN10_DXGI_FORMAT_V408: // 4:4:4 8-bit
 		// These are JPEG Hardware decode formats (DXGI 1.4)
 
-	case XBOX_DXGI_FORMAT_D16_UNORM_S8_UINT:
-	case XBOX_DXGI_FORMAT_R16_UNORM_X8_TYPELESS:
-	case XBOX_DXGI_FORMAT_X16_TYPELESS_G8_UINT:
+	//case XBOX_DXGI_FORMAT_D16_UNORM_S8_UINT:
+	//case XBOX_DXGI_FORMAT_R16_UNORM_X8_TYPELESS:
+	//case XBOX_DXGI_FORMAT_X16_TYPELESS_G8_UINT:
 		// These are Xbox One platform specific types
-		*/
 		return true;
 
 	default:
