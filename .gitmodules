@@ -1,3 +1,6 @@
 [submodule "Ragdoll/dependencies/microprofile"]
 	path = Ragdoll/dependencies/microprofile
 	url = https://github.com/jonasmr/microprofile.git
+[submodule "Ragdoll/dependencies/dlss"]
+	path = Ragdoll/dependencies/dlss
+	url = https://github.com/NVIDIA/DLSS.git
