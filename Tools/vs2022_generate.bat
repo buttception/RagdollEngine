@@ -1,6 +1,8 @@
 @echo off
 setlocal enableextensions disabledelayedexpansion
 
+git submodule update --init --recursive
+
 set "premake_path=..\premake5.lua"
 set "ver=vs2022"
 

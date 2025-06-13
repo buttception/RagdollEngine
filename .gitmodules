@@ -6,25 +6,26 @@
 	url = https://github.com/NVIDIA/DLSS.git
 [submodule "Ragdoll/dependencies/cxxopts"]
 	path = Ragdoll/dependencies/cxxopts
-	url = ./Ragdoll/dependencies/cxxopts
+	url = https://github.com/jarro2783/cxxopts.git
 [submodule "Ragdoll/dependencies/directxtex"]
 	path = Ragdoll/dependencies/directxtex
-	url = ./Ragdoll/dependencies/directxtex
+	url = https://github.com/microsoft/DirectXTex.git
 [submodule "Ragdoll/dependencies/entt"]
 	path = Ragdoll/dependencies/entt
-	url = ./Ragdoll/dependencies/entt
+	url = https://github.com/buttception/entt.git
 [submodule "Ragdoll/dependencies/glfw"]
 	path = Ragdoll/dependencies/glfw
-	url = ./Ragdoll/dependencies/glfw
+	url = https://github.com/buttception/glfw.git
 [submodule "Ragdoll/dependencies/imgui"]
 	path = Ragdoll/dependencies/imgui
-	url = ./Ragdoll/dependencies/imgui
+	url = https://github.com/buttception/imgui.git
+	branch = docking
 [submodule "Ragdoll/dependencies/spdlog"]
 	path = Ragdoll/dependencies/spdlog
-	url = ./Ragdoll/dependencies/spdlog
+	url = https://github.com/buttception/spdlog.git
 [submodule "Ragdoll/dependencies/taskflow"]
 	path = Ragdoll/dependencies/taskflow
-	url = ./Ragdoll/dependencies/taskflow
+	url = https://github.com/taskflow/taskflow.git
 [submodule "Ragdoll/dependencies/tinygltf"]
 	path = Ragdoll/dependencies/tinygltf
-	url = ./Ragdoll/dependencies/tinygltf
+	url = https://github.com/syoyo/tinygltf.git
