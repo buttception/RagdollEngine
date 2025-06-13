@@ -67,6 +67,7 @@ project "Ragdoll"
 		"%{IncludesDir.dlss}",
 		"%{IncludesDir.directxtex}",
 		"%{IncludesDir.meshoptimizer}",
+		"%{IncludesDir.xegtao}",
     }
 
 	prebuildcommands

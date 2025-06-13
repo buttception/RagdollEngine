@@ -4,3 +4,27 @@
 [submodule "Ragdoll/dependencies/dlss"]
 	path = Ragdoll/dependencies/dlss
 	url = https://github.com/NVIDIA/DLSS.git
+[submodule "Ragdoll/dependencies/cxxopts"]
+	path = Ragdoll/dependencies/cxxopts
+	url = ./Ragdoll/dependencies/cxxopts
+[submodule "Ragdoll/dependencies/directxtex"]
+	path = Ragdoll/dependencies/directxtex
+	url = ./Ragdoll/dependencies/directxtex
+[submodule "Ragdoll/dependencies/entt"]
+	path = Ragdoll/dependencies/entt
+	url = ./Ragdoll/dependencies/entt
+[submodule "Ragdoll/dependencies/glfw"]
+	path = Ragdoll/dependencies/glfw
+	url = ./Ragdoll/dependencies/glfw
+[submodule "Ragdoll/dependencies/imgui"]
+	path = Ragdoll/dependencies/imgui
+	url = ./Ragdoll/dependencies/imgui
+[submodule "Ragdoll/dependencies/spdlog"]
+	path = Ragdoll/dependencies/spdlog
+	url = ./Ragdoll/dependencies/spdlog
+[submodule "Ragdoll/dependencies/taskflow"]
+	path = Ragdoll/dependencies/taskflow
+	url = ./Ragdoll/dependencies/taskflow
+[submodule "Ragdoll/dependencies/tinygltf"]
+	path = Ragdoll/dependencies/tinygltf
+	url = ./Ragdoll/dependencies/tinygltf

@@ -1,6 +1,6 @@
 #pragma once
 #include <nvrhi/nvrhi.h>
-#include "xegtao/XeGTAO.h"
+#include "XeGTAO.h"
 
 namespace ragdoll {
 	struct SceneInformation;
